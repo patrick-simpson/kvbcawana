@@ -519,18 +519,19 @@ export default function App() {
     // consulted, so the second delivery banner'd and counted a second child.
     if (payload.id && hasSeen(payload.id)) return;
     if (payload.id) markSeen(payload.id, payload.at ?? Date.now());
-    // ?club=<id> (lib/urlFlags.js): one club's lobby, framed by the downstairs
-    // classroom. Every real check-in goes up to that page first (it welcomes
-    // its own card's club), then only this club's children are welcomed here.
-    if (FLAGS.club) {
-      if (!CONFIGURE && meta?.countsTowardTally !== false && isEmbedded()) {
-        const message = hostCheckin(payload);
-        if (message) {
-          try { window.parent.postMessage(message, window.location.origin); } catch { /* no parent to tell */ }
-        }
+    // Framed (the downstairs classroom, the Journey kiosk), every real
+    // check-in goes up to the host page first (lib/embed.js hostCheckin: an
+    // allowlist of the sanitized frame, this origin only): each welcomes the
+    // clubs of its own moment (a club-night gap's welcome cards).
+    if (!CONFIGURE && meta?.countsTowardTally !== false && isEmbedded()) {
+      const message = hostCheckin(payload);
+      if (message) {
+        try { window.parent.postMessage(message, window.location.origin); } catch { /* no parent to tell */ }
       }
-      if (clubKey(payload.club) !== FLAGS.club) return;
     }
+    // ?club=<id> (lib/urlFlags.js): one club's lobby; only this club's
+    // children are welcomed here.
+    if (FLAGS.club && clubKey(payload.club) !== FLAGS.club) return;
     const late = isLatePhase(phaseRef.current);
     const presentation = late ? 'late' : 'live';
     enqueue({ ...payload, presentation });

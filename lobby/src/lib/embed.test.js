@@ -263,13 +263,21 @@ describe('the sync doorbell, passed up to the Journey kiosk', () => {
     expect(hostCheckin({ firstName: 'x'.repeat(500) }).firstName).toHaveLength(40);
   });
 
-  it('the App hands check-ins up only with ?club=, framed, never in configure mode or a preview; the classroom spells it the same', () => {
+  it('the App hands check-ins up only framed (classroom, Journey), never in configure mode or a preview, after dedupe and before the ?club= filter; both hosts spell it the same', () => {
     const app = readFileSync(resolve(__dirname, '../App.jsx'), 'utf8');
-    expect(app).toMatch(/if \(FLAGS\.club\) \{\s*if \(!CONFIGURE && meta\?\.countsTowardTally !== false && isEmbedded\(\)\) \{\s*const message = hostCheckin\(payload\);[\s\S]{0,160}window\.parent\.postMessage\(message, window\.location\.origin\)/);
+    const up = /if \(!CONFIGURE && meta\?\.countsTowardTally !== false && isEmbedded\(\)\) \{\s*const message = hostCheckin\(payload\);[\s\S]{0,160}window\.parent\.postMessage\(message, window\.location\.origin\)/;
+    expect(app).toMatch(up);
+    const at = app.search(up);
+    expect(app.lastIndexOf('if (payload.id && hasSeen(payload.id)) return;', at)).toBeGreaterThan(-1);
+    expect(app.indexOf('if (FLAGS.club && clubKey(payload.club) !== FLAGS.club) return;')).toBeGreaterThan(at);
+    const journey = readFileSync(resolve(__dirname, '../../../journey/src/schedule/29-transition-gap.js'), 'utf8');
+    expect(journey).toContain(`const GAP_CHECKIN_MESSAGE = '${EMBED_CHECKIN_MESSAGE}';`);
+    expect(journey).toMatch(/event\.source !== checkinFrame\.contentWindow \|\| event\.origin !== CHECKIN_DISPLAY_ORIGIN/);
     const classroom = readFileSync(resolve(__dirname, '../../../classroom/public/src/app.js'), 'utf8');
     expect(classroom).toContain(`export const CHECKIN_MESSAGE = '${EMBED_CHECKIN_MESSAGE}';`);
     expect(classroom).toMatch(/event\.source !== frame\.contentWindow \|\| event\.origin !== window\.location\.origin/);
     // Names never reach storage there.
     expect(classroom).not.toMatch(/localStorage\.setItem\([^)]*(welcome|name)/i);
+    expect(journey).not.toMatch(/localStorage|sessionStorage|indexedDB/);
   });
 });

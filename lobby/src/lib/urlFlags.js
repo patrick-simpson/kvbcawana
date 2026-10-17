@@ -24,10 +24,11 @@
 //                         club's children, only that club's check-ins are
 //                         welcomed, the corner club count is that club's and
 //                         the chime stays off, for this URL only (saved
-//                         Settings and every default are untouched). Framed,
-//                         every sanitized check-in is also handed UP to the
-//                         host page (lib/embed.js hostCheckin). An id from
-//                         CLUB_FLAG_IDS; anything else = no flag.
+//                         Settings and every default are untouched). (Framed,
+//                         with or without it, every sanitized check-in is
+//                         handed UP to the host page: lib/embed.js
+//                         hostCheckin.) An id from CLUB_FLAG_IDS; anything
+//                         else = no flag.
 //
 // Example OBS browser source URL:
 //   https://awana.kvbchurch.org/lobby/?overlay=1&passphrase=…
