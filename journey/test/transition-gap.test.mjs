@@ -1,7 +1,8 @@
 // Club transitions (src/schedule/29-transition-gap.js, owner 2026-10-17): a
 // pure black layer for TRANSITION_GAP_MIN minutes either side of every
-// scheduled hand-off (the shared rule, shared/transitionGap.js, handed to the
-// page through its test seam: jsdom cannot import() a module), never over a
+// scheduled hand-off on a club night (the shared rule, shared/transitionGap.js,
+// handed to the page through its test seam: jsdom cannot import() a module;
+// no gap on any other day), never over a
 // running lesson, a preview, a reading overlay or Settings; the check-in frame
 // never touched; and, on the black, a welcome card per club of the gap's two
 // neighbours for the first names the embedded lobby hands up.
@@ -55,7 +56,7 @@ const feed = ({ cancelled = false } = {}) => ({
   ],
 });
 
-function boot(nowMs, { calendar = feed(), motion = false, rule = gapRule, url } = {}) {
+function boot(nowMs, { calendar = feed(), motion = false, rule = gapRule, nightRule = clubNight, url } = {}) {
   const routes = {
     'current-lesson.json': { json: CURRENT },
     'lessons.json': { json: LESSONS },
@@ -64,7 +65,7 @@ function boot(nowMs, { calendar = feed(), motion = false, rule = gapRule, url } 
   };
   return bootKiosk(routes, { 'journey.captions': 'off' }, undefined, (window) => {
     pinClock(window, nowMs);
-    window.journeyClubNightModule = clubNight;
+    if (nightRule) window.journeyClubNightModule = nightRule;
     if (rule) window.journeyTransitionGapModule = rule;
     window.matchMedia = (query) => ({
       matches: !motion && /prefers-reduced-motion:\s*reduce/.test(query),
@@ -99,7 +100,7 @@ function hand(k, data, { source, origin = 'https://example.test' } = {}) {
 const card = (k, club) => k.document.getElementById(`gap-welcome-${club}`);
 const names = (k, club) => card(k, club).querySelector('.gap-welcome-names').textContent;
 
-test('a Trek night: black 6:28-6:32 (Journey), 6:58-7:02 (Journey and Trek), 7:28-7:32 (Trek)', async () => {
+test('a club night: black 6:28-6:32 (Journey), 6:58-7:02 (Journey and Trek), 7:28-7:32 (Trek)', async () => {
   const k = boot(at(12, 0));
   try {
     await ticks();
@@ -122,24 +123,40 @@ test('a Trek night: black 6:28-6:32 (Journey), 6:58-7:02 (Journey and Trek), 7:2
   }
 });
 
-test('a night without Trek: 6:28-6:32 and, at the Journey window\'s end, 7:28-7:32 (Journey)', async () => {
-  for (const [label, k] of [
-    ['a cancelled club night', boot(at(12, 0), { calendar: feed({ cancelled: true }) })],
-    ['a Thursday', boot(at(12, 0, 0, 8), { calendar: null })],
+test('not a club night: no black at all; the views change at 6:30 and 7:30 as before the gaps', async () => {
+  for (const [label, k, day] of [
+    ['a cancelled club night', boot(at(12, 0), { calendar: feed({ cancelled: true }) }), 7],
+    ['a Thursday', boot(at(12, 0, 0, 8), { calendar: null }), 8],
   ]) {
     try {
       await ticks();
-      const day = label === 'a Thursday' ? 8 : 7;
+      for (const [h, m] of [[18, 28], [18, 31], [18, 58], [19, 1], [19, 13], [19, 16], [19, 28], [19, 31]]) {
+        assert.equal(gapClubs(k, at(h, m, 0, day)), null, `${label} ${h}:${m}`);
+      }
       const table = [
-        [at(18, 27, 0, day), null], [at(18, 28, 0, day), ['journey']], [at(18, 31, 0, day), ['journey']], [at(18, 32, 0, day), null],
-        [at(18, 58, 0, day), null], [at(19, 1, 0, day), null],
-        [at(19, 13, 0, day), null], [at(19, 16, 59, day), null],
-        [at(19, 27, 0, day), null], [at(19, 28, 0, day), ['journey']], [at(19, 31, 59, day), ['journey']], [at(19, 32, 0, day), null],
+        [at(18, 29, 0, day), 'checkin'], [at(18, 30, 0, day), 'journey'],
+        [at(19, 15, 0, day), 'journey'], [at(19, 29, 59, day), 'journey'], [at(19, 30, 0, day), 'checkin'],
       ];
-      for (const [ms, clubs] of table) assert.deepEqual(gapClubs(k, ms), clubs, `${label} ${new Date(ms).toTimeString()}`);
+      for (const [ms, want] of table) {
+        move(k, ms);
+        assert.equal(view(k), want, `${label} ${new Date(ms).toTimeString()}`);
+        assert.equal(black(k), false, `${label} ${new Date(ms).toTimeString()}: never black`);
+      }
     } finally {
       k.close();
     }
+  }
+});
+
+test('until the club-night rule has loaded there is no gap (not a club night)', async () => {
+  const k = boot(at(18, 29), { nightRule: null });
+  try {
+    await ticks();
+    k.window.refreshGap();
+    assert.equal(black(k), false);
+    for (const [h, m] of [[18, 29], [18, 59], [19, 29]]) assert.equal(gapClubs(k, at(h, m)), null, `${h}:${m}`);
+  } finally {
+    k.close();
   }
 });
 

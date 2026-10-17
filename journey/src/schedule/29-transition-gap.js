@@ -7,15 +7,18 @@
    this script's own ?v=; a test hands it over: window.journeyTransitionGapModule).
    Nothing here spells a gap edge: the night's views go in, the gaps come out.
 
-   Tonight's views (journeyNightViews): the Check-in Display, Journey from
-   JOURNEY_START, then on a Trek night (trekSmallGroupTime) Trek's card from
-   TREK_START to TREK_END, else Journey to JOURNEY_END; then the Check-in
-   Display. With a 2-minute gap: 6:28-6:32 black (Journey welcomed), Trek
-   nights 6:58-7:02 (Journey and Trek) and 7:28-7:32 (Trek), other nights
-   7:28-7:32 (Journey). The views themselves still change at the hand-off
-   (scheduledPhase(), lastPhase and the poll are untouched): the black is a
-   layer over them (#gap-view), never a view, so the check-in frame under it
-   stays loaded and connected, and the corner buttons stay above it.
+   Club nights only (owner 2026-10-17; the lobby's rule, clubNightToday(),
+   which Journey already asks through trekSmallGroupTime(); the rule not
+   loaded = no gap): on any other day the views change with no black, as
+   before the gaps existed. Tonight's views (journeyNightViews) are read off
+   the schedule itself: the Check-in Display, Journey from JOURNEY_START,
+   Trek's card from TREK_START to TREK_END, then the Check-in Display. With a
+   2-minute gap: 6:28-6:32 black (Journey welcomed), 6:58-7:02 (Journey and
+   Trek) and 7:28-7:32 (Trek). The views themselves still change at the
+   hand-off (scheduledPhase(), lastPhase and the poll are untouched): the
+   black is a layer over them (#gap-view), never a view, so the check-in
+   frame under it stays loaded and connected, and the corner buttons stay
+   above it.
 
    Never over something being watched: a lesson running (journeyLessonRunning:
    its video, slides, intro, caption question, loading overlay), a preview,
@@ -45,15 +48,21 @@ const GAP_MODULE_URL = (() => {
   return url.href;
 })();
 
-/** Tonight's views end to end, for the shared rule to cut its gaps from. */
+const GAP_VIEW_CLUBS = { checkin: [], journey: ['journey'], trek: ['trek'] };
+
+/* Tonight's views end to end, for the shared rule to cut its gaps from, or
+   null when tonight is not a club night (no gaps then). Read off the
+   schedule itself (scheduledPhaseAt, minute by minute), so the views and
+   their hand-offs can never disagree with what the kiosk shows. */
 function journeyNightViews(now) {
-  const trek = trekSmallGroupTime(now);
-  const views = [
-    { view: 'checkin', from: 0, until: JOURNEY_START_MINUTES, clubs: [] },
-    { view: 'journey', from: JOURNEY_START_MINUTES, until: trek ? TREK_START_MINUTES : JOURNEY_END_MINUTES, clubs: ['journey'] },
-  ];
-  if (trek) views.push({ view: 'trek', from: TREK_START_MINUTES, until: TREK_END_MINUTES, clubs: ['trek'] });
-  views.push({ view: 'checkin', from: trek ? TREK_END_MINUTES : JOURNEY_END_MINUTES, until: 24 * 60, clubs: [] });
+  if (!trekSmallGroupTime(now)) return null;
+  const views = [];
+  for (let minute = 0; minute < 24 * 60; minute += 1) {
+    const view = scheduledPhaseAt(minute, true);
+    const last = views[views.length - 1];
+    if (last && last.view === view) last.until = minute + 1;
+    else views.push({ view, from: minute, until: minute + 1, clubs: GAP_VIEW_CLUBS[view].slice() });
+  }
   return views;
 }
 
@@ -62,8 +71,10 @@ function scheduledGap(now = new Date()) {
   const rule = gapState.rule;
   if (!rule) return null;
   try {
+    const views = journeyNightViews(now);
+    if (!views) return null;
     const minutes = now.getHours() * 60 + now.getMinutes();
-    const period = rule.periodAt(rule.periodsFor(journeyNightViews(now)), minutes);
+    const period = rule.periodAt(rule.periodsFor(views), minutes);
     return period && period.gap ? period : null;
   } catch {
     return null;
