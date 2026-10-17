@@ -215,6 +215,9 @@ describe('display/screens', () => {
       expect(screenUrls(SITE, 'lobby').page).toBe('https://awana.kvbchurch.org/lobby/index.html');
       expect(screenUrls(SITE, 'projector').page).toBe('https://awana.kvbchurch.org/lobby/countdown.html');
       expect(screenUrls(SITE, 'journey').page).toBe('https://awana.kvbchurch.org/journey/');
+      expect(screenUrls(SITE, 'classroom').page).toBe('https://awana.kvbchurch.org/classroom/');
+      expect(screenUrls(SITE, 'classroom').configure).toBe('https://awana.kvbchurch.org/classroom/?configure=1');
+      expect(Object.keys(SCREENS)).toEqual(['lobby', 'projector', 'journey', 'classroom']);
     });
 
     it('gives each a configure-mode page', () => {
@@ -244,7 +247,7 @@ describe('display/screens', () => {
 describe('display/settings', () => {
   // Moved from lobby/desktop/src/settings.test.js (KVBC Awana v9); vitest -> node:test.
   // The hours are new in v9: per computer, default 5:00 to 8:00 pm.
-  const { DEFAULT_SETTINGS, hoursMinutes, normalizeHours, normalizeSettings, parseClock, parseTime } = require('../src/display/settings');
+  const { DEFAULT_SETTINGS, hoursMinutes, normalizeHours, normalizeSettings, parseClock, parseTime, settingsForScreen } = require('../src/display/settings');
 
   const HOURS = { start: '17:00', end: '20:00' };
 
@@ -255,6 +258,19 @@ describe('display/settings', () => {
       // The sound room app's own state.json (no hours) reads the same way.
       expect(normalizeSettings({ screen: 'projector', shutdown: { enabled: true, at: '20:30' } }))
         .toEqual({ screen: 'projector', hours: HOURS, shutdown: { enabled: true, at: '20:30' } });
+    });
+
+    it('choosing the downstairs classroom brings its 6:30-8:00 pm hours and the 8:00 pm shutdown (owner 2026-10-17)', () => {
+      const lobby = normalizeSettings({});
+      const classroom = settingsForScreen(lobby, 'classroom');
+      expect(classroom).toEqual({ screen: 'classroom', hours: { start: '18:30', end: '20:00' }, shutdown: { enabled: true, at: '20:00' } });
+      // The same screen again keeps what someone changed since.
+      const changed = { ...classroom, hours: { start: '18:00', end: '20:00' }, shutdown: { enabled: false, at: '20:00' } };
+      expect(settingsForScreen(changed, 'classroom')).toEqual(changed);
+      // Any other screen changes the screen alone.
+      expect(settingsForScreen(classroom, 'journey')).toEqual({ ...classroom, screen: 'journey' });
+      expect(settingsForScreen(lobby, 'projector')).toEqual({ ...lobby, screen: 'projector' });
+      expect(settingsForScreen(lobby, 'nope')).toEqual(lobby);
     });
 
     it('keeps good values and replaces bad ones', () => {

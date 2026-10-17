@@ -1449,7 +1449,7 @@ app.whenReady().then(async () => {
         roles,
         config: { printerName: cfg.printerName || '', checkinUrl: cfg.checkinUrl || '', launchOnBoot: cfg.launchOnBoot !== false },
         display: { settings: d.settings, monitorId: here ? here.id : null },
-        screens: Object.values(SCREENS).map(({ id, name }) => ({ id, name })),
+        screens: Object.values(SCREENS).map(({ id, name, defaults }) => ({ id, name, ...(defaults ? { hours: defaults.hours } : {}) })),
         sync: syncSession.status(),
       };
     },

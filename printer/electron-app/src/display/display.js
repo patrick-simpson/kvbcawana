@@ -28,7 +28,7 @@ const { clubNightToday, displayWindow, nextClubNight } = require('./clubNight');
 const { NO_OVERRIDES, decideVisibility, hide, showNow, tidy } = require('./visibility');
 const { findDisplay, rememberDisplay } = require('./displays');
 const { SCREENS, isScreenPage, screenUrls } = require('./screens');
-const { hoursMinutes, normalizeSettings, parseTime } = require('./settings');
+const { hoursMinutes, normalizeSettings, parseTime, settingsForScreen } = require('./settings');
 const { shutdownDeadline, shutdownStep } = require('./shutdown');
 
 const APP_NAME = 'KVBC Awana';
@@ -36,7 +36,7 @@ const SOURCES_EVERY_MS = 60 * 60 * 1000; // re-read the schedule and feed hourly
 const RETRY_LOAD_MS = 30 * 1000;
 const CURSOR_IDLE_MS = 3000;
 // What the volunteer calls the monitor it goes on, in titles and the tray.
-const WHERE = { lobby: 'the lobby TV', projector: 'the projector', journey: 'the Journey screen' };
+const WHERE = { lobby: 'the lobby TV', projector: 'the projector', journey: 'the Journey screen', classroom: 'the downstairs classroom screen' };
 const IPC_HANDLES = ['configure:get', 'configure:set'];
 const IPC_EVENTS = ['card:cancel', 'chooser:choose', 'chooser:cancel', 'configure:choose-monitor', 'configure:reload-screen',
   'configure:reload-settings', 'configure:open-log', 'configure:cancel-shutdown'];
@@ -607,7 +607,7 @@ function createDisplay(opts) {
 
   /** Switches the screen. One that is up is replaced at once, on the same monitor. */
   function setScreen(id) {
-    const next = normalizeSettings({ ...state.settings, screen: id });
+    const next = settingsForScreen(state.settings, id);
     if (next.screen === state.settings.screen) return;
     const wasUp = Boolean(lobby);
     state.settings = next;
@@ -723,7 +723,7 @@ function createDisplay(opts) {
       version: opts.version(),
       dev: DEV,
       settings: state.settings,
-      screens: Object.values(SCREENS).map(({ id, name }) => ({ id, name })),
+      screens: Object.values(SCREENS).map(({ id, name, defaults }) => ({ id, name, ...(defaults ? { hours: defaults.hours } : {}) })),
       monitor: saved ? (saved.label || `${saved.size.width} x ${saved.size.height}`) : null,
       monitors: displays.length,
       where: where(),
@@ -985,7 +985,7 @@ function createDisplay(opts) {
    */
   function configure({ screen: screenId, hours: h, monitorId } = {}) {
     if (!running) loadState();
-    if (typeof screenId === 'string') state.settings = normalizeSettings({ ...state.settings, screen: screenId });
+    if (typeof screenId === 'string') state.settings = settingsForScreen(state.settings, screenId);
     if (h && typeof h === 'object') state.settings = normalizeSettings({ ...state.settings, hours: h });
     if (monitorId != null) {
       const d = screen.getAllDisplays().find((x) => x.id === monitorId);

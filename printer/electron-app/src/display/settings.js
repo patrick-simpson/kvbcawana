@@ -78,7 +78,27 @@ function normalizeSettings(raw) {
   };
 }
 
+/**
+ * The settings after choosing screen `id`: a screen with its own `defaults`
+ * (the downstairs classroom: 6:30 to 8:00 pm, the computer off at 8:00 pm,
+ * owner 2026-10-17) brings its hours and turns the shutdown on at its time,
+ * only when it is newly chosen; the same screen again changes nothing, so
+ * hours someone changed afterwards stay. Any other screen changes the screen
+ * alone.
+ * @param {Settings} settings
+ * @param {unknown} id
+ * @returns {Settings}
+ */
+function settingsForScreen(settings, id) {
+  const current = normalizeSettings(settings);
+  const screen = screenFor(id);
+  if (screen.id === current.screen) return current;
+  const d = screen.defaults;
+  if (!d) return normalizeSettings({ ...current, screen: screen.id });
+  return normalizeSettings({ ...current, screen: screen.id, hours: d.hours, shutdown: { enabled: true, at: d.shutdownAt } });
+}
+
 module.exports = {
   DEFAULT_SHUTDOWN_AT, DEFAULT_HOURS, DEFAULT_SETTINGS,
-  parseClock, parseTime, normalizeHours, hoursMinutes, normalizeSettings,
+  parseClock, parseTime, normalizeHours, hoursMinutes, normalizeSettings, settingsForScreen,
 };

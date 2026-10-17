@@ -160,7 +160,7 @@
           <input type="checkbox" id="r-display">
           <span class="tab">Display <span class="tick" aria-hidden="true"></span></span>
           <b>Puts a screen up</b>
-          <span class="what">The lobby signage, the projector or Journey, full screen on a TV or projector on club nights.</span>
+          <span class="what">The lobby signage, the projector, Journey or the downstairs classroom, full screen on a TV or projector on club nights.</span>
         </label>
       </div>
       <p class="msg bad" id="role-bad" hidden>Choose at least one.</p>
@@ -450,6 +450,11 @@
       $('screen').append(o);
     }
     $('screen').value = state.display.settings.screen;
+    // A screen with its own hours (the downstairs classroom) fills them in when picked.
+    $('screen').addEventListener('change', () => {
+      const scr = state.screens.find((s) => s.id === $('screen').value);
+      if (scr && scr.hours) { $('h-start').value = scr.hours.start; $('h-end').value = scr.hours.end; }
+    });
     $('h-start').value = state.display.settings.hours.start;
     $('h-end').value = state.display.settings.hours.end;
     renderMonitors();

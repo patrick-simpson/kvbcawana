@@ -1,20 +1,29 @@
 // @ts-check
 // Moved from lobby/desktop/src (KVBC Awana v9, ROADMAP.md#kvbc-awana-one-app); behaviour unchanged.
-// The three screens the app can put up, one at a time (owner, 2026-10-07):
-// the lobby signage, the projector (countdown, ceremonies and game time) and
-// the Journey kiosk. All three live on the one site, on one origin, so they
-// share the app's one browser profile (the passphrase typed once signs in
-// all three). Pure: main.js hands it the site's lobby URL.
+// The screens the app can put up, one at a time (owner, 2026-10-07): the
+// lobby signage, the projector (countdown, ceremonies and game time), the
+// Journey kiosk and (owner 2026-10-17) the downstairs classroom (Cubbies,
+// then Sparks, then the Sparks lobby; classroom/). All live on the one site,
+// on one origin, so they share the app's one browser profile (the passphrase
+// typed once signs in all of them). Pure: main.js hands it the site's lobby URL.
+//
+// `defaults` (optional): what choosing that screen sets on this computer
+// (settings.js settingsForScreen): the classroom's own hours (6:30 to 8:00 pm)
+// and its 8:00 pm shutdown, owner 2026-10-17. Changed afterwards, they stay.
 'use strict';
 
-/** @typedef {'lobby' | 'projector' | 'journey'} ScreenId */
-/** @typedef {{ id: ScreenId, name: string, short: string, dir: string, page: string, background: string }} Screen */
+/** @typedef {'lobby' | 'projector' | 'journey' | 'classroom'} ScreenId */
+/** @typedef {{ id: ScreenId, name: string, short: string, dir: string, page: string, background: string, defaults?: { hours: { start: string, end: string }, shutdownAt: string } }} Screen */
 
 /** @type {Record<ScreenId, Screen>} */
 const SCREENS = {
   lobby: { id: 'lobby', name: 'Lobby check-in signage', short: 'the lobby', dir: '../lobby/', page: 'index.html', background: '#B3D0E7' },
   projector: { id: 'projector', name: 'Projector: countdown and game time', short: 'the projector', dir: '../lobby/', page: 'countdown.html', background: '#000000' },
   journey: { id: 'journey', name: 'Journey kiosk', short: 'Journey', dir: '../journey/', page: '', background: '#000000' },
+  classroom: {
+    id: 'classroom', name: 'Downstairs classroom', short: 'the downstairs classroom', dir: '../classroom/', page: '', background: '#000000',
+    defaults: { hours: { start: '18:30', end: '20:00' }, shutdownAt: '20:00' },
+  },
 };
 
 const DEFAULT_SCREEN = 'lobby';
