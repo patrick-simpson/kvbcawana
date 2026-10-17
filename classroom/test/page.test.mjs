@@ -57,8 +57,8 @@ async function open(query, size = { width: 1920, height: 1080 }) {
 describe('the clock', { skip: SKIP }, () => {
   // Wednesday 2026-10-14 (a club night by the default rule; no calendar feed served), Eastern daylight time.
   const cases = [
-    ['2026-10-14T22:29:00Z', 'off'], ['2026-10-14T22:31:00Z', 'cubbies'], ['2026-10-14T22:58:00Z', 'black'],
-    ['2026-10-14T23:04:00Z', 'sparks'], ['2026-10-14T23:31:00Z', 'lobby'], ['2026-10-15T00:01:00Z', 'off'],
+    ['2026-10-14T22:29:00Z', 'off'], ['2026-10-14T22:31:00Z', 'cubbies'], ['2026-10-14T22:59:00Z', 'black'],
+    ['2026-10-14T23:04:00Z', 'sparks'], ['2026-10-14T23:29:00Z', 'black'], ['2026-10-14T23:33:00Z', 'lobby'], ['2026-10-15T00:01:00Z', 'off'],
     ['2026-10-13T22:40:00Z', 'off'], // a Tuesday
   ];
   for (const [now, want] of cases) {
@@ -105,20 +105,41 @@ describe('welcomes', { skip: SKIP }, () => {
     // A message the page posts to itself (not from its frame) is ignored.
     await page.evaluate((m) => window.postMessage(m, location.origin), checkin('x', 'Mallory', 'Cubbies'));
     await page.waitForTimeout(150);
-    assert.equal(await page.isHidden('#welcome'), true);
+    assert.equal(await page.isHidden('#welcome-cubbies'), true);
+    assert.equal(await page.isHidden('#welcome-sparks'), true);
     // Another club's child: nothing.
     const frame = page.frame({ url: /\/lobby\/\?club=sparks/ });
     await frame.evaluate((m) => window.postMessage({ post: m }, location.origin), checkin('s', 'Sam', 'Sparks'));
     await page.waitForTimeout(150);
-    assert.equal(await page.isHidden('#welcome'), true);
+    assert.equal(await page.isHidden('#welcome-cubbies'), true);
+    assert.equal(await page.isHidden('#welcome-sparks'), true);
     // The card's club: a welcome, and arrivals share it.
     await frame.evaluate((m) => window.postMessage({ post: m }, location.origin), checkin('a', 'Ava', 'Cubbies'));
-    await page.waitForSelector('#welcome:not([hidden])');
+    await page.waitForSelector('#welcome-cubbies:not([hidden])');
     await frame.evaluate((m) => window.postMessage({ post: m }, location.origin), checkin('b', 'Ben', 'Cubbies'));
-    await page.waitForFunction(() => document.querySelector('.cr-welcome-names').textContent === 'Ava & Ben!');
+    await page.waitForFunction(() => document.querySelector('#welcome-cubbies .cr-welcome-names').textContent === 'Ava & Ben!');
     // Names never reach storage.
     const stored = await page.evaluate(() => JSON.stringify({ ...localStorage }) + JSON.stringify({ ...sessionStorage }));
     assert.doesNotMatch(stored, /Ava|Ben/);
+    await page.close();
+  });
+
+  it('in the black gap both neighbours are welcomed on the black, one card each', async () => {
+    const page = await open('?now=2026-10-14T22:59:00Z');
+    await page.waitForFunction(() => document.documentElement.dataset.phase === 'black');
+    const frame = page.frame({ url: /\/lobby\/\?club=sparks/ });
+    for (const m of [checkin('a', 'Ava', 'Cubbies'), checkin('m', 'Micah', 'Sparks'), checkin('t', 'Tom', 'T&T')]) {
+      await frame.evaluate((x) => window.postMessage({ post: x }, location.origin), m);
+    }
+    await page.waitForSelector('#welcome-cubbies:not([hidden])');
+    await page.waitForSelector('#welcome-sparks:not([hidden])');
+    assert.equal(await page.textContent('#welcome-cubbies .cr-welcome-names'), 'Ava!');
+    assert.equal(await page.textContent('#welcome-sparks .cr-welcome-names'), 'Micah!');
+    // Nothing of the cards shows: the black is up, the chips hidden.
+    assert.equal(await page.isHidden('#cubbies'), true);
+    assert.equal(await page.isHidden('#sparks'), true);
+    const slots = await page.evaluate(() => [...document.querySelectorAll('.cr-welcome')].map((el) => el.dataset.slot));
+    assert.deepEqual(slots, ['left', 'right']);
     await page.close();
   });
 });

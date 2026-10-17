@@ -10,7 +10,7 @@
 //                                                          Trek small group card asks it, byte for byte)
 //   phone remote    canonical shared/journeyRemote.js -> journey/public/src/shared/ (the phone
 //                                                          remote page cleans the Worker's answers with it)
-//   the classroom   the brand kit -> classroom/public/brand/, clubNight.js -> classroom/public/src/shared/
+//   the classroom   the brand kit -> classroom/public/brand/, clubNight.js and transitionGap.js -> classroom/public/src/shared/
 //                   (the downstairs classroom screen, owner 2026-10-17: its schedule asks the rule)
 //
 //   committed copies  the CommonJS copies of shared/*.js the Windows app ships
@@ -50,7 +50,7 @@ export const JOURNEY_MODULES = ['sync-protocol.js', 'cloud-crypto.js', 'clubNigh
 // What each app holds a copy of. Paths are repo-relative.
 export const COPIES = {
   journey: { kit: 'journey/public/brand', modules: 'journey/public/src/shared' },
-  classroom: { kit: 'classroom/public/brand', modules: 'classroom/public/src/shared', moduleList: ['clubNight.js'] },
+  classroom: { kit: 'classroom/public/brand', modules: 'classroom/public/src/shared', moduleList: ['clubNight.js', 'transitionGap.js'] },
   printer: { kit: 'printer/print-server/public/brand', committed: true },
 };
 

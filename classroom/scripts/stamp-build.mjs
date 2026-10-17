@@ -5,7 +5,8 @@
 //   - version.json {build, builtAt};
 //   - ?v=<id> on every local asset the page names (STAMPED), so a reload never
 //     pairs the new page with a stale script from the disk cache (app.js asks
-//     for logic.js with its own ?v=).
+//     for logic.js and clubNight.js with its own ?v=; logic.js's import of
+//     the shared gap rule is stamped here).
 // Usage: node scripts/stamp-build.mjs <build-id> <published dir>
 import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
@@ -28,5 +29,11 @@ for (const asset of STAMPED) {
   html = html.replace(plain, (_m, q) => `${q}${asset}?v=${build}${q}`);
 }
 writeFileSync(file, html);
+// logic.js imports the shared gap rule statically: give it the same ?v=.
+const logic = path.join(dir, 'src', 'logic.js');
+const code = readFileSync(logic, 'utf8');
+const gapImport = "from './shared/transitionGap.js'";
+if (!code.includes(gapImport)) throw new Error('src/logic.js no longer imports ./shared/transitionGap.js');
+writeFileSync(logic, code.replace(gapImport, `from './shared/transitionGap.js?v=${build}'`));
 writeFileSync(path.join(dir, 'version.json'), `${JSON.stringify({ build, builtAt: new Date().toISOString() })}\n`);
 console.log(`classroom build ${build}`);

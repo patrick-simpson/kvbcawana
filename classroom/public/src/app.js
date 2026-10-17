@@ -32,7 +32,7 @@ const root = document.documentElement;
 const $ = (id) => /** @type {HTMLElement} */ (document.getElementById(id));
 const frame = /** @type {HTMLIFrameElement | null} */ (document.getElementById('lobby'));
 const cards = { cubbies: $('cubbies'), sparks: $('sparks') };
-const welcomeEl = $('welcome');
+const welcomeEls = { cubbies: $('welcome-cubbies'), sparks: $('welcome-sparks') };
 const motionQuery = window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : null;
 const motionOk = () => !(motionQuery && motionQuery.matches);
 root.classList.toggle('cr-motion', motionOk());
@@ -123,22 +123,25 @@ function drawChips(nowMs, forced) {
 document.fonts?.ready?.then(() => { for (const el of Object.values(cards)) delete el.querySelector('.cr-chip').dataset.value; drawChips(now().getTime(), PREVIEW ? previewCount() : null); });
 window.addEventListener('storage', (e) => { if (e.key === L.CLUB_COUNTS_KEY) drawChips(now().getTime()); });
 
-/* ── The phase, and the cards' hand-offs ────────────────────────── */
+/* ── The phase, and the hand-offs through black ────────────────── */
+// Into a black gap the card animates OUT first; out of one, the next card (or
+// the lobby) animates IN. Gaps come from shared/transitionGap.js via logic.js.
 let phase = /** @type {string} */ ('');
+let clubs = /** @type {string[]} */ ([]);
 const SWAP_MS = 2400;
 function setPhase(next, first) {
   if (next === phase) return;
   const was = phase;
   phase = next;
-  // 6:57: the Cubbies card animates OUT into black before black takes over.
-  if (was === 'cubbies' && next === 'black' && motionOk() && !first) {
-    cards.cubbies.classList.remove('is-arriving', 'is-calm');
-    cards.cubbies.classList.add('is-leaving');
-    root.dataset.phase = 'cubbies';
-    setTimeout(() => { cards.cubbies.classList.remove('is-leaving'); show(next); }, SWAP_MS);
+  if (L.cardClub(/** @type {any} */ (was)) && next === 'black' && motionOk() && !first) {
+    const card = cards[/** @type {'cubbies' | 'sparks'} */ (was)];
+    card.classList.remove('is-arriving', 'is-calm');
+    card.classList.add('is-leaving');
+    root.dataset.phase = was;
+    setTimeout(() => { card.classList.remove('is-leaving'); if (phase === 'black') show('black'); }, SWAP_MS);
     return;
   }
-  show(next, was === 'black' && next === 'sparks' && !first ? 'is-entering' : 'is-arriving');
+  show(next, was === 'black' && !first ? 'is-entering' : 'is-arriving');
 }
 function show(next, how = 'is-arriving') {
   root.dataset.phase = next;
@@ -152,7 +155,14 @@ function show(next, how = 'is-arriving') {
       setTimeout(() => { el.classList.remove('is-arriving', 'is-entering'); el.classList.add('is-calm'); }, 3200);
     }
   }
-  if (!L.cardClub(next)) hideWelcome(true);
+  if (frame) {
+    frame.classList.remove('is-entering');
+    if (next === 'lobby' && how === 'is-entering' && motionOk()) {
+      frame.classList.add('is-entering');
+      setTimeout(() => frame.classList.remove('is-entering'), SWAP_MS + 100);
+    }
+  }
+  drawWelcomes();
 }
 
 /* ── Easter eggs ────────────────────────────────────────────────── */
@@ -170,7 +180,7 @@ let bearDoneFor = '';
 try { bearDoneFor = localStorage.getItem(BEAR_KEY) || ''; } catch { /* memory only */ }
 function maybeBear(dateKey, minutes) {
   if (!dateKey || bearDoneFor === dateKey || phase !== 'cubbies' || !motionOk()) return;
-  if (minutes !== L.bearMinute(dateKey) || welcomeUp()) return;
+  if (minutes !== L.bearMinute(dateKey) || welcomingNow().length) return;
   bearDoneFor = dateKey;
   try { localStorage.setItem(BEAR_KEY, dateKey); } catch { /* memory only */ }
   const bear = /** @type {HTMLElement} */ (cards.cubbies.querySelector('.cr-bear'));
@@ -180,38 +190,43 @@ function maybeBear(dateKey, minutes) {
   setTimeout(() => bear.classList.remove('is-peeking'), L.BEAR_MS + 200);
 }
 
-/* ── Welcomes ───────────────────────────────────────────────────── */
-let welcome = L.emptyWelcome();
-let welcomeTimer = 0;
-const welcomeUp = () => L.welcomeUp(welcome, phase, now().getTime());
-function drawWelcome() {
-  const kicker = /** @type {HTMLElement} */ (welcomeEl.querySelector('.cr-welcome-kicker'));
-  const names = /** @type {HTMLElement} */ (welcomeEl.querySelector('.cr-welcome-names'));
-  kicker.textContent = 'Welcome';
-  const words = L.welcomeWords(welcome.names);
-  names.style.setProperty('--names-size', String(words.length > 34 ? 4 : words.length > 20 ? 5 : 6.4));
-  if (names.textContent !== words) {
-    names.textContent = words;
-    if (!welcomeEl.hidden && motionOk()) { names.classList.remove('is-more'); void names.offsetWidth; names.classList.add('is-more'); }
+/* ── Welcomes: one card per club, for the clubs of the moment ──── */
+let welcomes = L.emptyWelcomes();
+const welcomingNow = () => L.welcomesUp(welcomes, clubs, now().getTime());
+function drawWelcomes() {
+  const up = welcomingNow();
+  for (const [club, el] of Object.entries(welcomeEls)) {
+    const on = up.includes(club);
+    if (!on) {
+      if (!el.hidden && !el.classList.contains('is-out')) {
+        if (!motionOk()) el.hidden = true;
+        else {
+          el.classList.remove('is-in');
+          el.classList.add('is-out');
+          setTimeout(() => { if (el.classList.contains('is-out')) { el.hidden = true; el.classList.remove('is-out'); } }, 600);
+        }
+      }
+      continue;
+    }
+    // On its own card the welcome sits in the card's place; on the black,
+    // centred, or side by side when both clubs have one.
+    el.dataset.slot = L.cardClub(/** @type {any} */ (phase)) ? 'card' : up.length > 1 ? (club === 'cubbies' ? 'left' : 'right') : 'center';
+    const names = /** @type {HTMLElement} */ (el.querySelector('.cr-welcome-names'));
+    const words = L.welcomeWords(welcomes.cards[club].names);
+    const size = words.length > 34 ? 4 : words.length > 20 ? 5 : 6.4;
+    names.style.setProperty('--names-size', String(el.dataset.slot === 'left' || el.dataset.slot === 'right' ? Math.min(size, words.length > 14 ? 3.4 : 4.4) : size));
+    if (names.textContent !== words) {
+      const wasUp = !el.hidden && !el.classList.contains('is-out');
+      names.textContent = words;
+      if (wasUp && motionOk()) { names.classList.remove('is-more'); void names.offsetWidth; names.classList.add('is-more'); }
+    }
+    if (el.hidden || el.classList.contains('is-out')) {
+      el.hidden = false;
+      el.classList.remove('is-out');
+      el.classList.add('is-in');
+    }
   }
-  if (welcomeEl.hidden) {
-    welcomeEl.hidden = false;
-    welcomeEl.classList.remove('is-out');
-    welcomeEl.classList.add('is-in');
-  }
-  root.classList.add('cr-welcoming');
-  clearTimeout(welcomeTimer);
-  welcomeTimer = setTimeout(() => hideWelcome(false), Math.min(2 ** 31 - 1, Math.max(0, welcome.until - now().getTime())));
-}
-function hideWelcome(atOnce) {
-  clearTimeout(welcomeTimer);
-  if (welcomeEl.hidden) return;
-  welcome = { ...L.emptyWelcome(), seen: welcome.seen };
-  root.classList.remove('cr-welcoming');
-  if (atOnce || !motionOk()) { welcomeEl.hidden = true; return; }
-  welcomeEl.classList.remove('is-in');
-  welcomeEl.classList.add('is-out');
-  setTimeout(() => { if (!welcome.names.length) welcomeEl.hidden = true; }, 600);
+  root.classList.toggle('cr-welcoming', up.length > 0);
 }
 
 let audio = null;
@@ -240,10 +255,10 @@ window.addEventListener('message', (event) => {
   if (!frame || event.source !== frame.contentWindow || event.origin !== window.location.origin) return;
   const d = event.data;
   if (!d || typeof d !== 'object' || d.type !== CHECKIN_MESSAGE) return;
-  const r = L.welcomeFor(welcome, d, /** @type {any} */ (phase), now().getTime());
+  const r = L.welcomeFor(welcomes, d, clubs, now().getTime());
   if (!r.ding) return;
-  welcome = r.state;
-  drawWelcome();
+  welcomes = r.state;
+  drawWelcomes();
   ding();
 });
 
@@ -253,8 +268,11 @@ function tick() {
   if (PREVIEW) return;
   const at = now();
   const c = church(at);
-  setPhase(L.phaseAt(c.minutes, night.ready && c.clubNight), first);
+  const clubNight = night.ready && c.clubNight;
+  clubs = L.welcomeClubsAt(c.minutes, clubNight);
+  setPhase(L.phaseAt(c.minutes, clubNight), first);
   first = false;
+  drawWelcomes();
   drawChips(at.getTime());
   if (phase === 'cubbies') { drawHoney(c.seconds, at.getMilliseconds()); maybeBear(c.dateKey, c.minutes); }
 }
@@ -270,7 +288,7 @@ async function checkBuild() {
     if (!v || typeof v.build !== 'string' || v.build === BUILD) return;
     const page = await fetch(`${window.location.pathname}?b=${Date.now()}`, { cache: 'no-store' });
     if (!page.ok || !(await page.text()).includes(v.build)) return;
-    if (welcomeUp() || phase === 'cubbies' || phase === 'sparks' || phase === 'lobby') return; // only while black
+    if (welcomingNow().length || phase === 'cubbies' || phase === 'sparks' || phase === 'lobby') return; // only while black, no welcome up
     window.location.reload();
   } catch { /* no news */ }
 }
@@ -280,8 +298,9 @@ function previewCount() { return Number(params.get('count') || (PREVIEW.includes
 /* ── Preview: one fixed moment, for the mock-ups and the layout test ── */
 function preview(what) {
   root.classList.add('cr-preview');
-  const names = { 'welcome-cubbies': ['Ava', 'Ben', 'Cara'], 'welcome-sparks': ['Micah'] }[what];
-  const club = what.includes('sparks') ? 'sparks' : what === 'lobby' || what === 'black' ? what : 'cubbies';
+  const NAMES = { cubbies: ['Ava', 'Ben', 'Cara'], sparks: ['Micah'] };
+  const club = what === 'welcome-gap' ? 'black' : what.includes('sparks') ? 'sparks' : what === 'lobby' || what === 'black' ? what : 'cubbies';
+  phase = club;
   show(club, 'none');
   for (const el of Object.values(cards)) el.classList.remove('is-calm');
   drawChips(0, previewCount());
@@ -296,9 +315,11 @@ function preview(what) {
     bear.style.translate = '0 calc(-20 * var(--u))';
     bear.style.rotate = '-3deg';
   }
-  if (names) {
-    welcome = { club, names, until: Number.MAX_SAFE_INTEGER, seen: [] };
-    drawWelcome();
+  const welcomed = { 'welcome-cubbies': ['cubbies'], 'welcome-sparks': ['sparks'], 'welcome-gap': ['cubbies', 'sparks'] }[what];
+  if (welcomed) {
+    clubs = welcomed;
+    for (const c of welcomed) welcomes.cards[c] = { names: NAMES[c], until: Number.MAX_SAFE_INTEGER };
+    drawWelcomes();
   }
 }
 

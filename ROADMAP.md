@@ -1197,12 +1197,12 @@ Nothing; the three items below are done (kept as the record).
 ## Downstairs classroom
 
 ### The owner's decisions (2026-10-16/17)
-- A fourth KVBC Awana display screen for the downstairs classroom: Cubbies card 6:30, black 6:57-7:03, Sparks Large Group Time 7:03, the Sparks-only lobby 7:30, the PC shuts down at 8:00; the PC wakes itself. Highly styled in each club's catalog look; welcomes with a ding for the card's own club; two easter eggs (Cubbie peeks, honey drip). Details: `classroom/docs/DECISIONS.md`; rules: CLAUDE.md "App: classroom/".
+- A fourth KVBC Awana display screen for the downstairs classroom: Cubbies card 6:30, Sparks Large Group Time 7:00, the Sparks-only lobby 7:30, a 2-minute black gap either side of each change (`shared/transitionGap.js`, one number for every screen), the PC shuts down at 8:00; the PC wakes itself. Highly styled in each club's catalog look; welcomes with a ding for the card's own club (both neighbours during a gap); two easter eggs (Cubbie peeks, honey drip). Details: `classroom/docs/DECISIONS.md`; rules: CLAUDE.md "App: classroom/".
 
 ### Status
 - First version built 2026-10-17 (`classroom/`, lobby `?club=`, KVBC Awana screen `classroom`). The PC needs a KVBC Awana release with the new screen choice.
 
 ### Still to do
-- **The Sparks screen** (owner, "very involved much like the Journey screen, with different styles of content"): its own lesson/content flow for 7:03-7:30, to be designed with the owner. The classroom folder, its build id and its schedule are the home for it.
+- **The Sparks screen** (owner, "very involved much like the Journey screen, with different styles of content"): its own lesson/content flow for the Sparks half hour, to be designed with the owner. The classroom folder, its build id and its schedule are the home for it.
 - Register the classroom page with /settings Screens (a `classroom` kind in `worker/src/screens.js` + `sanitizeScreenStatus`), if the owner wants it listed beside the computer row (the PC's own `computer` row already shows it).
 

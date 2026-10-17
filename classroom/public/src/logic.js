@@ -2,37 +2,48 @@
 // the tests can ask them anything (classroom/test/logic.test.mjs).
 //
 // Club nights only (shared/clubNight.js, asked by app.js), by the church's
-// wall clock (owner 2026-10-16/17):
-//   6:30-6:57  the Cubbies card
-//   6:57-7:03  black (#000), so the clubs can pass at the door with no logo up
-//   7:03-7:30  Sparks "Large Group Time"
-//   7:30-8:00  the lobby screen, Sparks only
-//   otherwise  black (the KVBC Awana app has the screen down then anyway)
+// wall clock (owner 2026-10-16/17). The VIEWS, end to end:
+//   6:30  the Cubbies card        (welcomes Cubbies)
+//   7:00  Sparks "Large Group Time" (welcomes Sparks)
+//   7:30  the lobby screen, Sparks only (it welcomes Sparks itself)
+//   8:00  off
+// and around every hand-off a pure black gap of TRANSITION_GAP_MIN minutes
+// each side (shared/transitionGap.js, the ONE number for every screen), whose
+// welcomes are both neighbours' clubs. With the gap at 2: 6:30-6:58 Cubbies,
+// 6:58-7:02 black, 7:02-7:28 Sparks, 7:28-7:32 black, 7:32-8:00 lobby.
+// Nothing here spells a gap edge: PERIODS is derived.
 
+import { TRANSITION_GAP_MIN, gapAround, periodAt, periodsFor } from './shared/transitionGap.js';
+
+export { TRANSITION_GAP_MIN };
 export const CUBBIES_AT = 18 * 60 + 30;
-export const BLACK_AT = 18 * 60 + 57;
-export const SPARKS_AT = 19 * 60 + 3;
+export const SPARKS_AT = 19 * 60;
 export const LOBBY_AT = 19 * 60 + 30;
 export const CLOSE_AT = 20 * 60;
 
-/** The honey drip (easter egg): starts 6:54, done before the 6:57 fade. */
-export const HONEY_AT_S = (18 * 60 + 54) * 60;
+/** The night's views, as data (a gap's clubs come from its neighbours). */
+export const VIEWS = Object.freeze([
+  { view: 'cubbies', from: CUBBIES_AT, until: SPARKS_AT, clubs: ['cubbies'] },
+  { view: 'sparks', from: SPARKS_AT, until: LOBBY_AT, clubs: ['sparks'] },
+  // The lobby welcomes its own club (lobby ?club=sparks); this page adds nothing there.
+  { view: 'lobby', from: LOBBY_AT, until: CLOSE_AT, clubs: [] },
+]);
+export const PERIODS = Object.freeze(periodsFor(VIEWS.map((v) => ({ ...v, clubs: [...v.clubs] }))));
+
+/** The honey drip (easter egg): done 30 s before the Cubbies card fades into the gap. */
 export const HONEY_MS = 150 * 1000;
-
-/** The bear peek (easter egg): once a night, some time in 6:33-6:50. */
-export const BEAR_FROM = 18 * 60 + 33;
-export const BEAR_UNTIL = 18 * 60 + 50;
-export const BEAR_MS = 6000;
-
-/** A welcome stays this long after the latest arrival. */
-export const WELCOME_MS = 20 * 1000;
-export const WELCOME_NAMES_MAX = 5;
-
-export const CLUB_COUNTS_KEY = 'awanaClubCounts.v1';
-const COUNT_MAX_AGE_MS = 12 * 60 * 60 * 1000;
-const COUNT_SKEW_MS = 60 * 60 * 1000;
+export const HONEY_AT_S = gapAround(SPARKS_AT).from * 60 - HONEY_MS / 1000 - 30;
 
 /** @typedef {'off' | 'cubbies' | 'black' | 'sparks' | 'lobby'} Phase */
+
+/**
+ * The period at `minutes` on a club night, or null (off).
+ * @param {number} minutes  minute of the church's day
+ * @param {boolean} clubNight
+ */
+export function periodNow(minutes, clubNight) {
+  return clubNight ? periodAt(PERIODS, minutes) : null;
+}
 
 /**
  * @param {number} minutes  minute of the church's day
@@ -40,15 +51,17 @@ const COUNT_SKEW_MS = 60 * 60 * 1000;
  * @returns {Phase}
  */
 export function phaseAt(minutes, clubNight) {
-  if (!clubNight || !Number.isFinite(minutes)) return 'off';
-  if (minutes < CUBBIES_AT || minutes >= CLOSE_AT) return 'off';
-  if (minutes < BLACK_AT) return 'cubbies';
-  if (minutes < SPARKS_AT) return 'black';
-  if (minutes < LOBBY_AT) return 'sparks';
-  return 'lobby';
+  const p = periodNow(minutes, clubNight);
+  return p ? /** @type {Phase} */ (p.view) : 'off';
 }
 
-/** The club whose card is up (its welcomes and count), or null. @param {Phase} phase */
+/** The clubs welcomed at `minutes` (a card's club; both neighbours in a gap). */
+export function welcomeClubsAt(minutes, clubNight) {
+  const p = periodNow(minutes, clubNight);
+  return p ? p.clubs : [];
+}
+
+/** The club whose card (and count chip) is up, or null. @param {Phase} phase */
 export function cardClub(phase) {
   return phase === 'cubbies' || phase === 'sparks' ? phase : null;
 }
@@ -62,6 +75,19 @@ export function honeyProgress(seconds) {
   if (!(t >= 0) || t >= HONEY_MS) return null;
   return t / HONEY_MS;
 }
+
+/** The bear peek (easter egg): once a night, some time in 6:33-6:50. */
+export const BEAR_FROM = 18 * 60 + 33;
+export const BEAR_UNTIL = 18 * 60 + 50;
+export const BEAR_MS = 6000;
+
+/** A welcome stays this long after the latest arrival. */
+export const WELCOME_MS = 20 * 1000;
+export const WELCOME_NAMES_MAX = 5;
+
+export const CLUB_COUNTS_KEY = 'awanaClubCounts.v1';
+const COUNT_MAX_AGE_MS = 12 * 60 * 60 * 1000;
+const COUNT_SKEW_MS = 60 * 60 * 1000;
 
 /**
  * The night's bear minute, from the date alone (the same on a reload, a
@@ -122,36 +148,42 @@ export function welcomeWords(names) {
 }
 
 /**
- * The welcome card's state machine. One card for a club, names added as
- * they come; it stays WELCOME_MS after the latest arrival.
- * @typedef {{ club: string, names: string[], until: number, seen: string[] }} Welcome
+ * The welcome cards' state: ONE card per club (a Cubbies and a Sparks name
+ * never share one), names added as they come, each card up WELCOME_MS after
+ * its latest arrival. Which clubs are welcomed is the period's `clubs` (a
+ * card's own club; both neighbours in a black gap).
+ * @typedef {{ cards: Record<string, { names: string[], until: number }>, seen: string[] }} Welcomes
  */
 
-/** @returns {Welcome} */
-export function emptyWelcome() { return { club: '', names: [], until: 0, seen: [] }; }
+/** @returns {Welcomes} */
+export function emptyWelcomes() { return { cards: {}, seen: [] }; }
 
 /**
- * A check-in heard. Returns the next state and whether to ding.
- * @param {Welcome} state
+ * A check-in heard. Returns the next state, whether to ding, and the club.
+ * @param {Welcomes} state
  * @param {{ id?: unknown, firstName?: unknown, club?: unknown }} event  already sanitized by the lobby
- * @param {Phase} phase
+ * @param {string[]} clubs  the clubs welcomed now (welcomeClubsAt)
  * @param {number} nowMs
  */
-export function welcomeFor(state, event, phase, nowMs) {
-  const club = cardClub(phase);
+export function welcomeFor(state, event, clubs, nowMs) {
+  const club = clubIdOf(event?.club);
   const id = typeof event?.id === 'string' ? event.id : '';
   const name = typeof event?.firstName === 'string' ? event.firstName.trim() : '';
-  if (!club || !name || clubIdOf(event?.club) !== club) return { state, ding: false };
-  if (id && state.seen.includes(id)) return { state, ding: false };
-  const live = state.club === club && nowMs < state.until;
+  if (!club || !name || !clubs.includes(club)) return { state, ding: false, club: '' };
+  if (id && state.seen.includes(id)) return { state, ding: false, club: '' };
+  const card = state.cards[club];
+  const live = Boolean(card) && nowMs < card.until;
   const seen = id ? [...state.seen.slice(-199), id] : state.seen;
-  const names = live ? [...state.names, name] : [name];
-  return { state: { club, names, until: nowMs + WELCOME_MS, seen }, ding: true };
+  const names = live ? [...card.names, name] : [name];
+  return { state: { cards: { ...state.cards, [club]: { names, until: nowMs + WELCOME_MS } }, seen }, ding: true, club };
 }
 
-/** Whether the welcome is up at `nowMs` for this phase. @param {Welcome} state @param {Phase} phase @param {number} nowMs */
-export function welcomeUp(state, phase, nowMs) {
-  return state.names.length > 0 && state.club === cardClub(phase) && nowMs < state.until;
+/**
+ * The clubs whose welcome card is up now, in the period's order.
+ * @param {Welcomes} state @param {string[]} clubs @param {number} nowMs
+ */
+export function welcomesUp(state, clubs, nowMs) {
+  return clubs.filter((c) => state.cards[c] && state.cards[c].names.length > 0 && nowMs < state.cards[c].until);
 }
 
 // The kit's stepped chip, ported from shared/chipGeometry.js (which imports

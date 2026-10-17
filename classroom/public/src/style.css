@@ -56,6 +56,7 @@ html, body {
 
 /* The lobby frame stays loaded (its socket stays up); only shown 7:30-8:00. */
 #lobby { background: var(--cr-sky); visibility: hidden; }
+#lobby.is-entering { z-index: 6; }
 html[data-phase="lobby"] #lobby { visibility: visible; }
 
 .cr-black { background: #000000; z-index: 5; display: none; }
@@ -343,8 +344,8 @@ html[data-phase="off"] .cr-black { display: block; }
   align-items: center;
   text-align: center;
 }
-html[data-phase="cubbies"] .cr-welcome { --cr-club: var(--cr-cubbies); --cr-club-deep: var(--cr-cubbies-deep); }
-html[data-phase="sparks"] .cr-welcome { --cr-club: var(--cr-sparks); --cr-club-deep: var(--cr-sparks-deep); }
+.cr-welcome[data-club="cubbies"] { --cr-club: var(--cr-cubbies); --cr-club-deep: var(--cr-cubbies-deep); }
+.cr-welcome[data-club="sparks"] { --cr-club: var(--cr-sparks); --cr-club-deep: var(--cr-sparks-deep); }
 .cr-welcome-kicker {
   font-family: var(--cr-label);
   font-size: calc(2.6 * var(--u));
@@ -363,8 +364,8 @@ html[data-phase="sparks"] .cr-welcome { --cr-club: var(--cr-sparks); --cr-club-d
 }
 /* Cubbies: Cubbie cheers at the card's left end (Awana clipart). */
 .cr-welcome-art { display: none; }
-html[data-phase="cubbies"] .cr-welcome { padding-left: calc(16 * var(--u)); }
-html[data-phase="cubbies"] .cr-welcome-art {
+.cr-welcome[data-club="cubbies"] { padding-left: calc(16 * var(--u)); }
+.cr-welcome[data-club="cubbies"] .cr-welcome-art {
   display: block;
   position: absolute;
   left: calc(1.5 * var(--u));
@@ -374,17 +375,20 @@ html[data-phase="cubbies"] .cr-welcome-art {
 }
 /* Sparks: a handbook sticker over the page's right half, a thick green ring
    for its edge (the handbook's photo rings), names in Sparks red. */
-html[data-phase="sparks"] .cr-welcome {
-  left: auto;
-  right: calc(13 * var(--u));
-  bottom: calc(9 * var(--u));
-  translate: none;
+.cr-welcome[data-club="sparks"] {
   max-width: calc(52 * var(--u));
   border: calc(1.2 * var(--u)) solid #2E9B48;
   box-shadow: calc(0.9 * var(--u)) calc(0.9 * var(--u)) 0 #1C6B33;
 }
-html[data-phase="sparks"] .cr-welcome-kicker { color: #2E9B48; }
-html[data-phase="sparks"] .cr-welcome { right: calc(16 * var(--u)); bottom: calc(4 * var(--u)); }
+.cr-welcome[data-club="sparks"] .cr-welcome-kicker { color: #2E9B48; }
+.cr-welcome[data-club="sparks"][data-slot="card"] { left: auto; translate: none; right: calc(16 * var(--u)); bottom: calc(4 * var(--u)); }
+/* On the black (a transition gap): centred, or one club each side. */
+.cr-welcome[data-slot="center"],
+.cr-welcome[data-slot="left"],
+.cr-welcome[data-slot="right"] { bottom: auto; top: 50%; translate: -50% -50%; max-width: calc(48 * var(--u)); }
+.cr-welcome[data-slot="center"] { max-width: calc(84 * var(--u)); }
+.cr-welcome[data-slot="left"] { left: 27%; }
+.cr-welcome[data-slot="right"] { left: 73%; }
 /* Sparky makes room: he rises and steps left so his face stays above the sticker. */
 html.cr-welcoming .cr-sparks .cr-sparky { translate: calc(-4 * var(--u)) calc(-6 * var(--u)); scale: 0.8; }
 html.cr-welcoming .cr-sparks .cr-sp-ring { translate: calc(-4 * var(--u)) calc(-50% - 6 * var(--u)); scale: 0.8; }
@@ -427,6 +431,7 @@ html[data-phase="configure"] .cr-black { display: none; }
   html.cr-motion .cr-card.is-leaving .cr-hero,
   html.cr-motion .cr-card.is-leaving .cr-title { animation: cr-sink 2400ms ease-in-out forwards; }
   html.cr-motion .cr-card.is-entering { animation: cr-in 2400ms ease-in-out backwards; }
+  html.cr-motion #lobby.is-entering { animation: cr-in 2400ms ease-in-out backwards; }
 
   /* The bear: in from the right, a wave, back out. */
   html.cr-motion .cr-bear.is-peeking { animation: cr-peek 6s ease-in-out forwards; }

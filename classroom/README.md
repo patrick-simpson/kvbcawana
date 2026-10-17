@@ -5,12 +5,15 @@ The TV in the downstairs classroom, on club nights:
 | Time | On the screen |
 |---|---|
 | 6:30 pm | The Cubbies card, with how many Cubbies are checked in |
-| 6:57 pm | Black, while the clubs pass at the door |
-| 7:03 pm | Sparks "Large Group Time", with how many Sparks are checked in |
-| 7:30 pm | The lobby screen, Sparks only (pickup list, welcomes, count) |
+| 6:58 pm | Black, while the clubs pass at the door |
+| 7:02 pm | Sparks "Large Group Time", with how many Sparks are checked in |
+| 7:28 pm | Black again |
+| 7:32 pm | The lobby screen, Sparks only (pickup list, welcomes, count) |
 | 8:00 pm | The computer shuts down |
 
-While a card is up, a Cubbies (or Sparks) child who checks in gets a welcome on the screen and a ding.
+The black gaps are 2 minutes either side of each change; that one number lives in `shared/transitionGap.js` for every screen.
+
+While a card is up, a Cubbies (or Sparks) child who checks in gets a welcome on the screen and a ding. During a black gap the clubs on either side are welcomed (each on its own card, on the black).
 
 Address: https://awana.kvbchurch.org/classroom/ (the KVBC Awana app opens it; you never type it).
 

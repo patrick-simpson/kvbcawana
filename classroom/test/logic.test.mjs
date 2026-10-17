@@ -6,12 +6,14 @@ import * as L from '../public/src/logic.js';
 
 const at = (h, m) => h * 60 + m;
 
-describe('phaseAt: the club night by the church clock (owner 2026-10-17)', () => {
+describe('the night by the church clock, gaps from shared/transitionGap.js (owner 2026-10-17)', () => {
+  it('the gap is the shared one', () => assert.equal(L.TRANSITION_GAP_MIN, 2));
   const cases = [
-    [at(18, 29), 'off'], [at(18, 30), 'cubbies'], [at(18, 56), 'cubbies'],
-    [at(18, 57), 'black'], [at(18, 59), 'black'], [at(19, 2), 'black'],
-    [at(19, 3), 'sparks'], [at(19, 29), 'sparks'],
-    [at(19, 30), 'lobby'], [at(19, 59), 'lobby'],
+    [at(18, 29), 'off'], [at(18, 30), 'cubbies'], [at(18, 57), 'cubbies'],
+    [at(18, 58), 'black'], [at(19, 1), 'black'],
+    [at(19, 2), 'sparks'], [at(19, 27), 'sparks'],
+    [at(19, 28), 'black'], [at(19, 31), 'black'],
+    [at(19, 32), 'lobby'], [at(19, 59), 'lobby'],
     [at(20, 0), 'off'], [at(23, 0), 'off'], [at(12, 0), 'off'],
   ];
   for (const [min, want] of cases) {
@@ -21,7 +23,15 @@ describe('phaseAt: the club night by the church clock (owner 2026-10-17)', () =>
     for (const [min] of cases) assert.equal(L.phaseAt(min, false), 'off');
     assert.equal(L.phaseAt(NaN, true), 'off');
   });
-  it('only the two cards have a club', () => {
+  it('welcomes a card\'s club, both neighbours in a gap, nobody in the lobby or off', () => {
+    assert.deepEqual(L.welcomeClubsAt(at(18, 40), true), ['cubbies']);
+    assert.deepEqual(L.welcomeClubsAt(at(18, 59), true), ['cubbies', 'sparks']);
+    assert.deepEqual(L.welcomeClubsAt(at(19, 10), true), ['sparks']);
+    assert.deepEqual(L.welcomeClubsAt(at(19, 29), true), ['sparks']);
+    assert.deepEqual(L.welcomeClubsAt(at(19, 40), true), []);
+    assert.deepEqual(L.welcomeClubsAt(at(18, 40), false), []);
+  });
+  it('only the two cards have a club (and a count chip)', () => {
     assert.equal(L.cardClub('cubbies'), 'cubbies');
     assert.equal(L.cardClub('sparks'), 'sparks');
     for (const p of ['off', 'black', 'lobby']) assert.equal(L.cardClub(p), null);
@@ -29,14 +39,16 @@ describe('phaseAt: the club night by the church clock (owner 2026-10-17)', () =>
 });
 
 describe('the easter eggs', () => {
-  it('the honey runs from 6:54 and is done before the 6:57 fade', () => {
-    assert.equal(L.honeyProgress(at(18, 53) * 60 + 59), null);
-    assert.equal(L.honeyProgress(at(18, 54) * 60), 0);
-    assert.ok(L.honeyProgress(at(18, 55) * 60) > 0.3);
-    assert.equal(L.honeyProgress(at(18, 57) * 60), null);
-    assert.ok(L.HONEY_AT_S + L.HONEY_MS / 1000 <= at(18, 57) * 60);
+  it('the honey finishes before the Cubbies card fades into the gap', () => {
+    const fade = (L.SPARKS_AT - L.TRANSITION_GAP_MIN) * 60;
+    assert.equal(L.honeyProgress(L.HONEY_AT_S - 1), null);
+    assert.equal(L.honeyProgress(L.HONEY_AT_S), 0);
+    assert.ok(L.HONEY_AT_S >= at(18, 54) * 60 && L.HONEY_AT_S <= at(18, 56) * 60, 'about 6:55');
+    assert.ok(L.HONEY_AT_S + L.HONEY_MS / 1000 < fade);
+    assert.equal(L.honeyProgress(fade), null);
+    assert.equal(L.phaseAt(Math.floor(L.HONEY_AT_S / 60), true), 'cubbies');
   });
-  it('the bear comes once a night, at a minute the date picks, inside the Cubbies half hour', () => {
+  it('the bear comes once a night, at a minute the date picks, inside the Cubbies card', () => {
     const seen = new Set();
     for (let d = 1; d <= 28; d += 1) {
       const key = `2026-11-${String(d).padStart(2, '0')}`;
@@ -71,39 +83,52 @@ describe('clubCountFrom: the embedded lobby\'s stored counts (numbers only)', ()
 describe('welcomes (owner 2026-10-17)', () => {
   const t0 = 1_000_000;
   const ci = (id, firstName, club) => ({ id, firstName, club });
-  it('a child of the card\'s club gets a welcome and a ding; other clubs, the black and the lobby nothing', () => {
-    const r = L.welcomeFor(L.emptyWelcome(), ci('a', 'Ava', 'Cubbies'), 'cubbies', t0);
+  const CUB = at(18, 40); const GAP1 = at(18, 59); const SPK = at(19, 10); const GAP2 = at(19, 29); const LOBBY = at(19, 40);
+  const clubsAt = (m) => L.welcomeClubsAt(m, true);
+  it('a child of the card\'s club gets a welcome and a ding; other clubs, the lobby and off nothing', () => {
+    const r = L.welcomeFor(L.emptyWelcomes(), ci('a', 'Ava', 'Cubbies'), clubsAt(CUB), t0);
     assert.equal(r.ding, true);
-    assert.deepEqual(r.state.names, ['Ava']);
-    assert.ok(L.welcomeUp(r.state, 'cubbies', t0 + 1));
-    for (const [club, phase] of [['Sparks', 'cubbies'], ['T&T', 'cubbies'], ['Cubbies', 'sparks'], ['Cubbies', 'black'], ['Sparks', 'black'], ['Sparks', 'lobby'], ['Cubbies', 'off']]) {
-      assert.equal(L.welcomeFor(L.emptyWelcome(), ci('b', 'Ben', club), phase, t0).ding, false, `${club} on ${phase}`);
+    assert.equal(r.club, 'cubbies');
+    assert.deepEqual(L.welcomesUp(r.state, clubsAt(CUB), t0 + 1), ['cubbies']);
+    for (const [club, m] of [['Sparks', CUB], ['T&T', CUB], ['Cubbies', SPK], ['Sparks', LOBBY], ['Cubbies', at(17, 0)]]) {
+      assert.equal(L.welcomeFor(L.emptyWelcomes(), ci('b', 'Ben', club), clubsAt(m), t0).ding, false, `${club} at ${m}`);
     }
-    assert.equal(L.welcomeFor(L.emptyWelcome(), ci('s', 'Sam', 'Sparks'), 'sparks', t0).ding, true);
+    assert.equal(L.welcomeFor(L.emptyWelcomes(), ci('s', 'Sam', 'Sparks'), clubsAt(SPK), t0).ding, true);
   });
-  it('arrivals close together share one card, which stays 20 s after the LATEST', () => {
-    let s = L.emptyWelcome();
-    s = L.welcomeFor(s, ci('a', 'Ava', 'Cubbies'), 'cubbies', t0).state;
-    s = L.welcomeFor(s, ci('b', 'Ben', 'Cubbies'), 'cubbies', t0 + 15_000).state;
-    const r = L.welcomeFor(s, ci('c', 'Cara', 'Cubbies'), 'cubbies', t0 + 30_000);
-    assert.equal(r.ding, true);
-    assert.deepEqual(r.state.names, ['Ava', 'Ben', 'Cara']);
-    assert.ok(L.welcomeUp(r.state, 'cubbies', t0 + 30_000 + L.WELCOME_MS - 1));
-    assert.ok(!L.welcomeUp(r.state, 'cubbies', t0 + 30_000 + L.WELCOME_MS));
-    // After it is gone, a new arrival starts a new card.
-    const later = L.welcomeFor(r.state, ci('d', 'Dan', 'Cubbies'), 'cubbies', t0 + 30_000 + L.WELCOME_MS + 1);
-    assert.deepEqual(later.state.names, ['Dan']);
+  it('in the 6:58 gap both Cubbies and Sparks are welcomed, one card each, never mixed', () => {
+    let s = L.emptyWelcomes();
+    let r = L.welcomeFor(s, ci('a', 'Ava', 'Cubbies'), clubsAt(GAP1), t0);
+    assert.equal(r.ding, true); s = r.state;
+    r = L.welcomeFor(s, ci('m', 'Micah', 'Sparks'), clubsAt(GAP1), t0 + 1000);
+    assert.equal(r.ding, true); s = r.state;
+    assert.deepEqual(s.cards.cubbies.names, ['Ava']);
+    assert.deepEqual(s.cards.sparks.names, ['Micah']);
+    assert.deepEqual(L.welcomesUp(s, clubsAt(GAP1), t0 + 2000), ['cubbies', 'sparks']);
+    // Once the Sparks card is up, only the Sparks welcome stays on it.
+    assert.deepEqual(L.welcomesUp(s, clubsAt(SPK), t0 + 2000), ['sparks']);
+    assert.equal(L.welcomeFor(s, ci('t', 'Tom', 'T&T'), clubsAt(GAP1), t0).ding, false);
+  });
+  it('in the 7:28 gap Sparks are welcomed, nobody else', () => {
+    assert.equal(L.welcomeFor(L.emptyWelcomes(), ci('m', 'Micah', 'Sparks'), clubsAt(GAP2), t0).ding, true);
+    assert.equal(L.welcomeFor(L.emptyWelcomes(), ci('a', 'Ava', 'Cubbies'), clubsAt(GAP2), t0).ding, false);
+    assert.equal(L.welcomeFor(L.emptyWelcomes(), ci('j', 'Jo', 'Journey'), clubsAt(GAP2), t0).ding, false);
+  });
+  it('arrivals close together share their club\'s card, which stays 20 s after the LATEST', () => {
+    let s = L.emptyWelcomes();
+    s = L.welcomeFor(s, ci('a', 'Ava', 'Cubbies'), clubsAt(CUB), t0).state;
+    s = L.welcomeFor(s, ci('b', 'Ben', 'Cubbies'), clubsAt(CUB), t0 + 15_000).state;
+    const r = L.welcomeFor(s, ci('c', 'Cara', 'Cubbies'), clubsAt(CUB), t0 + 30_000);
+    assert.deepEqual(r.state.cards.cubbies.names, ['Ava', 'Ben', 'Cara']);
+    assert.deepEqual(L.welcomesUp(r.state, clubsAt(CUB), t0 + 30_000 + L.WELCOME_MS - 1), ['cubbies']);
+    assert.deepEqual(L.welcomesUp(r.state, clubsAt(CUB), t0 + 30_000 + L.WELCOME_MS), []);
+    const later = L.welcomeFor(r.state, ci('d', 'Dan', 'Cubbies'), clubsAt(CUB), t0 + 30_000 + L.WELCOME_MS + 1);
+    assert.deepEqual(later.state.cards.cubbies.names, ['Dan']);
   });
   it('the same check-in twice is welcomed once', () => {
-    const a = L.welcomeFor(L.emptyWelcome(), ci('a', 'Ava', 'Cubbies'), 'cubbies', t0);
-    const again = L.welcomeFor(a.state, ci('a', 'Ava', 'Cubbies'), 'cubbies', t0 + 1);
+    const a = L.welcomeFor(L.emptyWelcomes(), ci('a', 'Ava', 'Cubbies'), clubsAt(CUB), t0);
+    const again = L.welcomeFor(a.state, ci('a', 'Ava', 'Cubbies'), clubsAt(GAP1), t0 + 1);
     assert.equal(again.ding, false);
-    assert.deepEqual(again.state.names, ['Ava']);
-  });
-  it('a card belongs to its club: the Sparks card never shows a Cubbies welcome', () => {
-    const s = L.welcomeFor(L.emptyWelcome(), ci('a', 'Ava', 'Cubbies'), 'cubbies', t0).state;
-    assert.ok(!L.welcomeUp(s, 'sparks', t0 + 1));
-    assert.ok(!L.welcomeUp(s, 'black', t0 + 1));
+    assert.deepEqual(again.state.cards.cubbies.names, ['Ava']);
   });
   it('the words', () => {
     assert.equal(L.welcomeWords(['Ava']), 'Ava!');

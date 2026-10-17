@@ -78,11 +78,16 @@
     <div class="cr-chip" data-club="sparks" role="status" hidden></div>
   </section>
 
-  <!-- The welcome: a child of the card's club checked in. First names only,
-       from the embedded lobby's sanitized frames; never stored. -->
-  <div id="welcome" class="cr-welcome" role="status" aria-live="polite" hidden>
+  <!-- The welcomes, one card per club: a child of a club welcomed right now
+       (its card's club; both neighbours in a black gap) checked in. First
+       names only, from the embedded lobby's sanitized frames; never stored. -->
+  <div id="welcome-cubbies" class="cr-welcome" data-club="cubbies" role="status" aria-live="polite" hidden>
     <img class="cr-welcome-art" src="art/cubbie-arms-up.svg" alt="" aria-hidden="true">
-    <span class="cr-welcome-kicker"></span>
+    <span class="cr-welcome-kicker">Welcome</span>
+    <span class="cr-welcome-names"></span>
+  </div>
+  <div id="welcome-sparks" class="cr-welcome" data-club="sparks" role="status" aria-live="polite" hidden>
+    <span class="cr-welcome-kicker">Welcome</span>
     <span class="cr-welcome-names"></span>
   </div>
 
