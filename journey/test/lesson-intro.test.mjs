@@ -25,7 +25,7 @@ const ROUTES = {
   'current-lesson-video.mp4': { text: '' },
 };
 const ANSWERED = { 'journey.captions': 'off' };
-const SHOW_TIME = new Date(2026, 9, 7, 18, 35, 0).getTime(); // inside 6:30-7:15
+const SHOW_TIME = new Date(2026, 9, 7, 18, 35, 0).getTime(); // inside 6:30-7:30
 const NOON = new Date(2026, 9, 7, 12, 0, 0).getTime();
 const TIMING = { cardsAt: [0, 40, 80, 120], minMs: 160, holdMaxMs: 400, pollMs: 20 };
 const CARD_IDS = ['journey-intro-journey', 'journey-intro-advocates', 'journey-intro-lesson', 'journey-intro-lgt'];

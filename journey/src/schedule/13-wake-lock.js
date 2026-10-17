@@ -39,7 +39,7 @@ if (!CONFIGURE_MODE) {
 
 // Once the lesson finishes, there's nothing left to show for the rest of
 // the window — fall back to the Check-in Display right away rather than
-// holding on a blank/frozen frame until 7:15. Deliberately does NOT touch
+// holding on a blank/frozen frame until the window ends. Deliberately does NOT touch
 // lastPhase (see the comment above it) — doing so would make the very next
 // poll tick see a manufactured "flip" back to 'journey' and restart the
 // lesson from frame zero, which is exactly the bug this comment is here to

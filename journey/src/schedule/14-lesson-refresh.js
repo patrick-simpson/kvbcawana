@@ -5,7 +5,7 @@
 // Until the first lesson has been read, a failed read is tried again soon
 // (15 s, 30 s, 1 min, then every 5 min), not an hour later: a kiosk booted at
 // 6:20 with one DNS hiccup used to show the placeholder all night, its next
-// try landing after the 7:15 window had closed. The teaching slides, read
+// try landing after the lesson window had closed. The teaching slides, read
 // once at startup, are read again on the same retries while still missing.
 const LESSON_RETRY_MS = [15000, 30000, 60000];
 const LESSON_RETRY_MAX_MS = 5 * 60 * 1000;

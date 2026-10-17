@@ -120,7 +120,7 @@ function renderLessonList(lessons) {
 
 function onLessonPicked(lesson) {
   // Always ask Leader or Student — an earlier version skipped the question
-  // inside the 6:30-7:15 window (playing the Student Video directly, like
+  // inside the 6:30 lesson window (playing the Student Video directly, like
   // the scheduled show), but the two behaviors read as the picker being
   // flaky rather than as a deliberate rule ("it's not asking me
   // consistently" — reported from the live kiosk 2026-08-22). One

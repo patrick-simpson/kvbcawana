@@ -3,10 +3,10 @@
 // shows. See CLAUDE.md for the conventions around changing these
 // constants, and for how the video content itself gets here.
 const JOURNEY_START_MINUTES = 18 * 60 + 30; // 6:30 PM
-const JOURNEY_END_MINUTES = 19 * 60 + 15; // 7:15 PM
+const JOURNEY_END_MINUTES = 19 * 60 + 30; // 7:30 PM (owner 2026-10-17; was 7:15)
 // Club nights only (the lobby's rule, shared/clubNight.js): Trek's small
 // group time, a full-screen title card from 7:00 to 7:30 PM. It takes the
-// Journey window's last quarter hour on those nights, but never cuts a lesson
+// Journey window's last half hour on those nights, but never cuts a lesson
 // that is still running (see 25-trek.js).
 const TREK_START_MINUTES = 19 * 60; // 7:00 PM
 const TREK_END_MINUTES = 19 * 60 + 30; // 7:30 PM
@@ -264,13 +264,17 @@ if (!CONFIGURE_MODE) {
 
 function scheduledPhase() {
   const now = new Date();
-  const minutes = now.getHours() * 60 + now.getMinutes();
-  // Trek's small group time comes first: on a club night it takes 7:00-7:30,
-  // the Journey window's last quarter hour included (trekSmallGroupTime() in
-  // 25-trek.js; a lesson still running holds it off, see pollSchedule()).
-  if (minutes >= TREK_START_MINUTES && minutes < TREK_END_MINUTES && trekSmallGroupTime(now)) {
-    return 'trek';
-  }
+  return scheduledPhaseAt(now.getHours() * 60 + now.getMinutes(), trekSmallGroupTime(now));
+}
+
+/* The view the schedule wants at `minutes` (minute of the local day), given
+   whether tonight is a club night (Trek's small group time). Pure: the club
+   transitions (29-transition-gap.js) lay a night's views out from it.
+   Trek's small group time comes first: on a club night it takes 7:00-7:30,
+   the Journey window's last half hour included (trekSmallGroupTime() in
+   25-trek.js; a lesson still running holds it off, see pollSchedule()). */
+function scheduledPhaseAt(minutes, trekNight) {
+  if (trekNight && minutes >= TREK_START_MINUTES && minutes < TREK_END_MINUTES) return 'trek';
   return minutes >= JOURNEY_START_MINUTES && minutes < JOURNEY_END_MINUTES
     ? 'journey'
     : 'checkin';
@@ -2096,7 +2100,7 @@ function lessonDoneView() {
 }
 
 // `lastPhase` tracks only the *scheduled* phase (for detecting a genuine
-// 18:30/19:15 boundary crossing) — it is deliberately never written to from
+// 18:30/19:30 boundary crossing) — it is deliberately never written to from
 // the manual toggle or the video's 'ended' handler below, both of which call
 // setView() directly to change what's on screen right now without touching
 // this. That's what lets either of them hold a view that disagrees with
@@ -2474,7 +2478,7 @@ if (!CONFIGURE_MODE) {
 
 // Once the lesson finishes, there's nothing left to show for the rest of
 // the window — fall back to the Check-in Display right away rather than
-// holding on a blank/frozen frame until 7:15. Deliberately does NOT touch
+// holding on a blank/frozen frame until the window ends. Deliberately does NOT touch
 // lastPhase (see the comment above it) — doing so would make the very next
 // poll tick see a manufactured "flip" back to 'journey' and restart the
 // lesson from frame zero, which is exactly the bug this comment is here to
@@ -2566,7 +2570,7 @@ journeyVideo.addEventListener('error', () => {
 // Until the first lesson has been read, a failed read is tried again soon
 // (15 s, 30 s, 1 min, then every 5 min), not an hour later: a kiosk booted at
 // 6:20 with one DNS hiccup used to show the placeholder all night, its next
-// try landing after the 7:15 window had closed. The teaching slides, read
+// try landing after the lesson window had closed. The teaching slides, read
 // once at startup, are read again on the same retries while still missing.
 const LESSON_RETRY_MS = [15000, 30000, 60000];
 const LESSON_RETRY_MAX_MS = 5 * 60 * 1000;
@@ -2749,7 +2753,7 @@ function renderLessonList(lessons) {
 
 function onLessonPicked(lesson) {
   // Always ask Leader or Student — an earlier version skipped the question
-  // inside the 6:30-7:15 window (playing the Student Video directly, like
+  // inside the 6:30 lesson window (playing the Student Video directly, like
   // the scheduled show), but the two behaviors read as the picker being
   // flaky rather than as a deliberate rule ("it's not asking me
   // consistently" — reported from the live kiosk 2026-08-22). One
@@ -3402,7 +3406,7 @@ function endPreview() {
   previewFallbackUrl = null;
   previewWeek = null;
   // Tear the preview's video down before handing the view back. Without
-  // this, ending a preview inside the 6:30-7:15 window left the finished
+  // this, ending a preview inside the 6:30 lesson window left the finished
   // video element visible, which made showJourneyContent() early-return
   // (it sees "playback in progress") instead of re-showing the splash.
   stopJourneyContent();
@@ -3721,7 +3725,7 @@ const configureChannel = (() => {
    any manual step resets that timer. "Finish" on the last slide (or the
    auto-advance running off the end) hands control to whatever the video's
    own ending used to do: back to the Check-in Display for the scheduled
-   show, endPreview() for a preview. The ⇄ button and the 7:15 boundary tear
+   show, endPreview() for a preview. The ⇄ button and the window's end tear
    the slideshow down through stopJourneyContent() like everything else.
 
    Preferences live in localStorage (per device, like the caption choice):
@@ -6964,7 +6968,7 @@ window.journeyRemote = { command: remoteCommand, now: remoteNow };
    TREK_START to TREK_END, else Journey to JOURNEY_END; then the Check-in
    Display. With a 2-minute gap: 6:28-6:32 black (Journey welcomed), Trek
    nights 6:58-7:02 (Journey and Trek) and 7:28-7:32 (Trek), other nights
-   7:13-7:17 (Journey). The views themselves still change at the hand-off
+   7:28-7:32 (Journey). The views themselves still change at the hand-off
    (scheduledPhase(), lastPhase and the poll are untouched): the black is a
    layer over them (#gap-view), never a view, so the check-in frame under it
    stays loaded and connected, and the corner buttons stay above it.

@@ -12,7 +12,7 @@
    TREK_START to TREK_END, else Journey to JOURNEY_END; then the Check-in
    Display. With a 2-minute gap: 6:28-6:32 black (Journey welcomed), Trek
    nights 6:58-7:02 (Journey and Trek) and 7:28-7:32 (Trek), other nights
-   7:13-7:17 (Journey). The views themselves still change at the hand-off
+   7:28-7:32 (Journey). The views themselves still change at the hand-off
    (scheduledPhase(), lastPhase and the poll are untouched): the black is a
    layer over them (#gap-view), never a view, so the check-in frame under it
    stays loaded and connected, and the corner buttons stay above it.

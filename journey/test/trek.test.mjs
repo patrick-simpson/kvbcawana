@@ -136,6 +136,8 @@ test('not on a non-club night: a cancelled night, a noClub date, another weekday
     await ticks();
     assert.equal(cancelled.window.scheduledPhase(), 'journey', 'the Journey window as always');
     pinClock(cancelled.window, at(19, 20));
+    assert.equal(cancelled.window.scheduledPhase(), 'journey', 'the Journey window runs to 7:30 (owner 2026-10-17)');
+    pinClock(cancelled.window, at(19, 30));
     assert.equal(cancelled.window.scheduledPhase(), 'checkin');
     assert.equal(view(cancelled), 'journey');
   } finally {
@@ -151,7 +153,7 @@ test('not on a non-club night: a cancelled night, a noClub date, another weekday
   const thursday = boot(at(19, 20, 8), { calendar: null });
   try {
     await ticks();
-    assert.equal(thursday.window.scheduledPhase(), 'checkin', 'no feed: the meeting day only');
+    assert.equal(thursday.window.scheduledPhase(), 'journey', 'no feed: the meeting day only (no card; the Journey window)');
   } finally {
     thursday.close();
   }
@@ -181,7 +183,7 @@ test('a lesson still running at 7:00 is waited for; its end brings the card; 7:3
     assert.ok(k.video.hasAttribute('src'));
     pinClock(k.window, at(19, 16));
     k.window.pollSchedule();
-    assert.equal(view(k), 'journey', 'nor at 7:15 on a club night: the card is waiting for it');
+    assert.equal(view(k), 'journey', 'nor later in Trek time: the card is waiting for it');
     // The video ends: its slides come next, as always, and are not cut either.
     k.video.dispatchEvent(new k.window.Event('ended'));
     assert.equal(view(k), 'journey');

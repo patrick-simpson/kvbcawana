@@ -173,7 +173,7 @@ html.cursor-hidden * {
   background: #000000;
 }
 
-/* ── "Large Group Time" splash — shown on entering the 6:30-7:15 window
+/* ── "Large Group Time" splash — shown on entering the 6:30-7:30 window
    instead of autoplaying; playback only starts once an operator presses
    the button, Space, or → (see schedule.js's isAwaitingPlay()). Flat
    colors, no blur/gradients/shadows beyond the button's, and the only

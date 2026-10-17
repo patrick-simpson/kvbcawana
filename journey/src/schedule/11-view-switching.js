@@ -34,7 +34,7 @@ function lessonDoneView() {
 }
 
 // `lastPhase` tracks only the *scheduled* phase (for detecting a genuine
-// 18:30/19:15 boundary crossing) — it is deliberately never written to from
+// 18:30/19:30 boundary crossing) — it is deliberately never written to from
 // the manual toggle or the video's 'ended' handler below, both of which call
 // setView() directly to change what's on screen right now without touching
 // this. That's what lets either of them hold a view that disagrees with

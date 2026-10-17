@@ -61,13 +61,17 @@ if (!CONFIGURE_MODE) {
 
 function scheduledPhase() {
   const now = new Date();
-  const minutes = now.getHours() * 60 + now.getMinutes();
-  // Trek's small group time comes first: on a club night it takes 7:00-7:30,
-  // the Journey window's last quarter hour included (trekSmallGroupTime() in
-  // 25-trek.js; a lesson still running holds it off, see pollSchedule()).
-  if (minutes >= TREK_START_MINUTES && minutes < TREK_END_MINUTES && trekSmallGroupTime(now)) {
-    return 'trek';
-  }
+  return scheduledPhaseAt(now.getHours() * 60 + now.getMinutes(), trekSmallGroupTime(now));
+}
+
+/* The view the schedule wants at `minutes` (minute of the local day), given
+   whether tonight is a club night (Trek's small group time). Pure: the club
+   transitions (29-transition-gap.js) lay a night's views out from it.
+   Trek's small group time comes first: on a club night it takes 7:00-7:30,
+   the Journey window's last half hour included (trekSmallGroupTime() in
+   25-trek.js; a lesson still running holds it off, see pollSchedule()). */
+function scheduledPhaseAt(minutes, trekNight) {
+  if (trekNight && minutes >= TREK_START_MINUTES && minutes < TREK_END_MINUTES) return 'trek';
   return minutes >= JOURNEY_START_MINUTES && minutes < JOURNEY_END_MINUTES
     ? 'journey'
     : 'checkin';

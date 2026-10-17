@@ -18,7 +18,7 @@
    any manual step resets that timer. "Finish" on the last slide (or the
    auto-advance running off the end) hands control to whatever the video's
    own ending used to do: back to the Check-in Display for the scheduled
-   show, endPreview() for a preview. The ⇄ button and the 7:15 boundary tear
+   show, endPreview() for a preview. The ⇄ button and the window's end tear
    the slideshow down through stopJourneyContent() like everything else.
 
    Preferences live in localStorage (per device, like the caption choice):

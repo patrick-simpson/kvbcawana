@@ -18,7 +18,7 @@ import { JSDOM } from 'jsdom';
 const REPO = path.dirname(new URL(import.meta.url).pathname).replace(/\/test$/, '');
 const PUBLIC = path.join(REPO, 'public');
 
-// The page's schedule is the kiosk's LOCAL time of day (Journey 18:30-19:15), so a
+// The page's schedule is the kiosk's LOCAL time of day (Journey 18:30-19:30), so a
 // test that reads the real clock behaves differently inside that window than
 // outside it (the suite hung every evening in it). Every boot therefore pins
 // the page's Date to a fixed local time OUTSIDE the window; the clock still

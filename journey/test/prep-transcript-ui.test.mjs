@@ -272,7 +272,7 @@ test('a seek armed by a superseded request never lands on the newer video', asyn
   await tick();
   assert.equal(video.getAttribute('src'), 'https://clubs.awana.org/student-1.mp4');
 
-  // Whatever supersedes it (the view-toggle button, the 7:15 boundary, a
+  // Whatever supersedes it (the view-toggle button, the window's end, a
   // newer pick) bumps journeyRequestToken through stopJourneyContent().
   kiosk.window.stopJourneyContent();
   video.dispatchEvent(new kiosk.window.Event('loadedmetadata'));

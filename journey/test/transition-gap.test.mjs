@@ -122,7 +122,7 @@ test('a Trek night: black 6:28-6:32 (Journey), 6:58-7:02 (Journey and Trek), 7:2
   }
 });
 
-test('a night without Trek: 6:28-6:32 and, at the Journey window\'s end, 7:13-7:17 (Journey)', async () => {
+test('a night without Trek: 6:28-6:32 and, at the Journey window\'s end, 7:28-7:32 (Journey)', async () => {
   for (const [label, k] of [
     ['a cancelled club night', boot(at(12, 0), { calendar: feed({ cancelled: true }) })],
     ['a Thursday', boot(at(12, 0, 0, 8), { calendar: null })],
@@ -133,8 +133,8 @@ test('a night without Trek: 6:28-6:32 and, at the Journey window\'s end, 7:13-7:
       const table = [
         [at(18, 27, 0, day), null], [at(18, 28, 0, day), ['journey']], [at(18, 31, 0, day), ['journey']], [at(18, 32, 0, day), null],
         [at(18, 58, 0, day), null], [at(19, 1, 0, day), null],
-        [at(19, 12, 0, day), null], [at(19, 13, 0, day), ['journey']], [at(19, 16, 59, day), ['journey']], [at(19, 17, 0, day), null],
-        [at(19, 28, 0, day), null], [at(19, 31, 0, day), null],
+        [at(19, 13, 0, day), null], [at(19, 16, 59, day), null],
+        [at(19, 27, 0, day), null], [at(19, 28, 0, day), ['journey']], [at(19, 31, 59, day), ['journey']], [at(19, 32, 0, day), null],
       ];
       for (const [ms, clubs] of table) assert.deepEqual(gapClubs(k, ms), clubs, `${label} ${new Date(ms).toTimeString()}`);
     } finally {

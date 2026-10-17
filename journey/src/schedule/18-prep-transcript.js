@@ -474,7 +474,7 @@ function endPreview() {
   previewFallbackUrl = null;
   previewWeek = null;
   // Tear the preview's video down before handing the view back. Without
-  // this, ending a preview inside the 6:30-7:15 window left the finished
+  // this, ending a preview inside the 6:30 lesson window left the finished
   // video element visible, which made showJourneyContent() early-return
   // (it sees "playback in progress") instead of re-showing the splash.
   stopJourneyContent();
