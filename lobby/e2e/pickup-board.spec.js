@@ -167,7 +167,7 @@ const SIXTY = CLUBS.flatMap((club) => NAMES.map((firstName) => ({ firstName, clu
 
 const PICKUP_TIME = new Date('2026-10-06T19:45:00-04:00');
 
-async function lobbyAtPickup(page, extra = {}) {
+async function lobbyAtPickup(page, extra = {}, query = '?lowPower=1') {
   const send = await liveChannel(page);
   await page.clock.setSystemTime(PICKUP_TIME);
   await page.addInitScript((cfg) => {
@@ -179,7 +179,7 @@ async function lobbyAtPickup(page, extra = {}) {
     particleEffect: 'off', firstArrivalMoment: false, sharedScheduleUrl: '',
     ...extra,
   });
-  await page.goto('/index.html?lowPower=1');
+  await page.goto(`/index.html${query}`);
   await expect(page.locator('.stage .manual-slide-copy .lobby-headline')).toBeVisible();
   return send;
 }
@@ -294,3 +294,23 @@ pastFlagship.describe('the club count, top right', () => {
     await expect(page.locator('.corner-top .corner-chip--weather')).toHaveCount(0);
   });
 });
+
+// The downstairs classroom frames ../lobby/?club=sparks for 7:30-8:00 (owner
+// 2026-10-17): that URL's board lists only Sparks children, its corner count is
+// Sparks whatever this screen saved, and nothing else on the screen changes.
+pastFlagship.describe('?club=sparks, the classroom\'s Sparks lobby', () => {
+  pastFlagship.use({ viewport: { width: 1920, height: 1080 } });
+
+  pastFlagship('only Sparks on the pickup board, the Sparks count in the corner', async ({ page }) => {
+    const send = await lobbyAtPickup(page, { cornerClub: 'trek' }, '?lowPower=1&club=sparks');
+    await send('checkout', { entries: SIXTY, printed: 75, at: PICKUP_TIME.toISOString() });
+    const board = page.locator('.stage .checkout-board--list');
+    await expect(board).toBeVisible();
+    await expect(board.locator('.checkout-plate')).toHaveCount(1);
+    await expect(board.locator('.checkout-plate__count')).toHaveText(['10 waiting']);
+    await expect(board.locator('.checkout-name__chip')).toHaveCount(10);
+    await send('tally', { counts: { Sparks: 23, 'T&T': 18, Trek: 9 }, total: 50, at: PICKUP_TIME.toISOString() });
+    await expect(page.locator('.corner-stack .corner-chip--club')).toHaveAttribute('aria-label', 'Sparks: 23 here now');
+  });
+});
+

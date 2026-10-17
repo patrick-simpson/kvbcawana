@@ -1,10 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { parseUrlFlags } from './urlFlags.js';
+import { CLUB_FLAG_IDS, parseUrlFlags } from './urlFlags.js';
+import { CORNER_CLUB_IDS } from './clubs.js';
 
 describe('parseUrlFlags', () => {
   it('defaults to normal signage mode', () => {
     expect(parseUrlFlags('')).toEqual({
-      overlay: false, chroma: null, configUrl: null, lowPower: false,
+      club: null, overlay: false, chroma: null, configUrl: null, lowPower: false,
     });
     expect(parseUrlFlags('?foo=bar').overlay).toBe(false);
   });
@@ -31,7 +32,7 @@ describe('parseUrlFlags', () => {
 
   it('ignores the retired Pusher ?key= and ?cluster= of an old OBS / ProPresenter link', () => {
     const flags = parseUrlFlags('?overlay=1&key=abc123&cluster=eu');
-    expect(flags).toEqual({ overlay: true, chroma: null, configUrl: null, lowPower: false });
+    expect(flags).toEqual({ club: null, overlay: true, chroma: null, configUrl: null, lowPower: false });
   });
 
   it('enables low-power mode via ?lowPower=1/true/yes, off by default', () => {
@@ -40,5 +41,14 @@ describe('parseUrlFlags', () => {
     expect(parseUrlFlags('?lowPower=true').lowPower).toBe(true);
     expect(parseUrlFlags('?lowPower=yes').lowPower).toBe(true);
     expect(parseUrlFlags('?lowPower=0').lowPower).toBe(false);
+  });
+
+  it('?club= takes one known club id, nothing else (the downstairs classroom)', () => {
+    expect(parseUrlFlags('?club=sparks').club).toBe('sparks');
+    expect(parseUrlFlags('?club=Cubbies').club).toBe('cubbies');
+    for (const bad of ['', 'Sparks Club', 'awana', '<b>', 'sparks;cubbies', 'T&T']) {
+      expect(parseUrlFlags(`?club=${encodeURIComponent(bad)}`).club).toBeNull();
+    }
+    expect([...CLUB_FLAG_IDS]).toEqual(CORNER_CLUB_IDS);
   });
 });

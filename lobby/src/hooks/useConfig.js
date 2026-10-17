@@ -239,6 +239,8 @@ export function resolveStoredConfig(remote, device, shared = null) {
 function applyFlags(stored, f) {
   let out = stored;
   if (f.lowPower) out = { ...out, confettiLevel: 'off', reduceMotion: true };
+  // ?club=<id>: one club's lobby (urlFlags.js). Its count in the corner, no chime.
+  if (f.club) out = { ...out, cornerClub: f.club, audioMuted: true };
   return out;
 }
 

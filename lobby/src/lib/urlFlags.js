@@ -18,8 +18,23 @@
 //                         confettiLevel/reduceMotion's own defaults stay
 //                         full-strength for every direct/standalone visit.
 //
+//   ?club=sparks          ONE club's lobby (the downstairs classroom, owner
+//                         2026-10-17: classroom/ frames ../lobby/?club=sparks
+//                         for 7:30-8:00): the pickup board lists only that
+//                         club's children, only that club's check-ins are
+//                         welcomed, the corner club count is that club's and
+//                         the chime stays off, for this URL only (saved
+//                         Settings and every default are untouched). Framed,
+//                         every sanitized check-in is also handed UP to the
+//                         host page (lib/embed.js hostCheckin). An id from
+//                         CLUB_FLAG_IDS; anything else = no flag.
+//
 // Example OBS browser source URL:
 //   https://awana.kvbchurch.org/lobby/?overlay=1&passphrase=…
+// lib/clubs.js CORNER_CLUB_IDS, written out (this file imports nothing;
+// urlFlags.test.js pins the two lists equal).
+export const CLUB_FLAG_IDS = Object.freeze(['puggles', 'cubbies', 'sparks', 'tnt', 'trek', 'journey']);
+
 export function parseUrlFlags(search = window.location.search) {
   const params = new URLSearchParams(search);
 
@@ -42,7 +57,11 @@ export function parseUrlFlags(search = window.location.search) {
     }
   } catch { /* malformed — ignore */ }
 
+  const clubRaw = (params.get('club') || '').trim().toLowerCase();
+  const club = CLUB_FLAG_IDS.includes(clubRaw) ? clubRaw : null;
+
   return {
+    club,
     overlay: ['1', 'true', 'yes'].includes(overlayParam) || chroma !== null,
     chroma,
     configUrl,

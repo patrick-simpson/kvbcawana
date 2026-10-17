@@ -46,7 +46,7 @@ import { resolveSkin, sceneForSkin, SKIN_TABLE } from './lib/skins.js';
 import { BOARD_HIDDEN, decideBoard, demoCheckout, pickupNow } from './lib/checkoutBoard.js';
 import { SAMPLE_BOARD_NAMES, SAMPLE_NAMES, pick } from './lib/demoNames.js';
 import { useScreenSync } from './hooks/useScreenSync.js';
-import { getAllClubs } from './lib/clubs.js';
+import { clubKey, getAllClubs } from './lib/clubs.js';
 import { saveClubCounts } from './lib/clubCountsStore.js';
 import { OVERLAY, setupUp } from './lib/overlayFit.js';
 import {
@@ -92,7 +92,7 @@ import {
 import { useWatchdogReload } from './hooks/useWatchdogReload.js';
 import { useBuildReload } from './hooks/useBuildReload.js';
 import { useTallerThan } from './hooks/useTallerThan.js';
-import { hostDoorbell, isEmbedded } from './lib/embed.js';
+import { hostCheckin, hostDoorbell, isEmbedded } from './lib/embed.js';
 import { isConfigureMode, isSettingsPage, listenForRelay, relayToScreen } from './lib/configureRelay.js';
 import { BACKGROUND_VIDEO_CHANGED_EVENT } from './components/VideoBackground.jsx';
 import { BOARD_DEMO_MS, BUILD_QUIET_MS, SHARE_DEBOUNCE_MS, COUNTS_WITHOUT_NAMES_MS, TONIGHT_STALE_MS, DROPPED_GRACE_MS, EMBED_FULLSCREEN_MESSAGE, LAYER_FAULT_SHOW_MS, MILESTONE_TOAST_MS, OPS_FAILURES_MAX, SETUP_CARD_QUIET_MS } from './lib/constants.js';
@@ -278,7 +278,12 @@ export default function App() {
   useEffect(() => {
     leaveRulesRef.current = { staleMin: config.checkoutBoardStaleMin, namesAbove: config.checkoutBoardNamesAbove };
   }, [config.checkoutBoardStaleMin, config.checkoutBoardNamesAbove]);
-  const handleCheckout = useCallback((payload) => {
+  const handleCheckout = useCallback((sanitized) => {
+    // ?club=<id>: the pickup board lists only that club's children (the naming
+    // rule then counts that club alone, so it anonymises sooner, never later).
+    const payload = FLAGS.club && Array.isArray(sanitized?.entries)
+      ? { ...sanitized, entries: sanitized.entries.filter((e) => clubKey(e?.club) === FLAGS.club) }
+      : sanitized;
     const stamped = stampReceived(payload);
     setCheckout(stamped);
     const empty = Array.isArray(payload?.entries) && payload.entries.length === 0;
@@ -514,6 +519,18 @@ export default function App() {
     // consulted, so the second delivery banner'd and counted a second child.
     if (payload.id && hasSeen(payload.id)) return;
     if (payload.id) markSeen(payload.id, payload.at ?? Date.now());
+    // ?club=<id> (lib/urlFlags.js): one club's lobby, framed by the downstairs
+    // classroom. Every real check-in goes up to that page first (it welcomes
+    // its own card's club), then only this club's children are welcomed here.
+    if (FLAGS.club) {
+      if (!CONFIGURE && meta?.countsTowardTally !== false && isEmbedded()) {
+        const message = hostCheckin(payload);
+        if (message) {
+          try { window.parent.postMessage(message, window.location.origin); } catch { /* no parent to tell */ }
+        }
+      }
+      if (clubKey(payload.club) !== FLAGS.club) return;
+    }
     const late = isLatePhase(phaseRef.current);
     const presentation = late ? 'late' : 'live';
     enqueue({ ...payload, presentation });
@@ -577,6 +594,8 @@ export default function App() {
     for (const entry of recapInWindow(recap.entries, { maxAgeMin: config.recapMaxAgeMin, now: Date.now() })) {
       if (hasSeen(entry.id)) continue;
       markSeen(entry.id, entry.at);
+      // ?club=<id>: only that club's missed children are replayed (never handed up).
+      if (FLAGS.club && clubKey(entry.club) !== FLAGS.club) continue;
       enqueue({ ...entry, presentation: 'replay' });
       bump(entry.at);
     }

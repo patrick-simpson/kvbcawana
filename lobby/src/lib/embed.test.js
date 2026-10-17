@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { HOST_CONTROL, hostClearancePx, hostDoorbell, isEmbedded } from './embed.js';
-import { EMBED_DOORBELL_MESSAGE } from './constants.js';
+import { HOST_CONTROL, hostCheckin, hostClearancePx, hostDoorbell, isEmbedded } from './embed.js';
+import { EMBED_CHECKIN_MESSAGE, EMBED_DOORBELL_MESSAGE } from './constants.js';
 
 // Embedded in the Journey kiosk's iframe, Journey keeps its two buttons in one
 // column in the bottom-right corner, and the signage keeps what it draws
@@ -251,5 +251,25 @@ describe('the sync doorbell, passed up to the Journey kiosk', () => {
     const journey = readFileSync(resolve(__dirname, '../../../journey/public/src/sync.js'), 'utf8');
     expect(journey).toContain(`var DOORBELL_MESSAGE = '${EMBED_DOORBELL_MESSAGE}';`);
     expect(journey).toMatch(/event\.source !== frame\.contentWindow \|\| event\.origin !== window\.location\.origin/);
+  });
+
+  it('hostCheckin hands the classroom an allowlist of the sanitized frame, nothing more', () => {
+    const frame = { id: 'c1', firstName: 'Ava', club: 'Cubbies', at: 1, birthday: true, milestone: 10, lastName: 'Stone', allergy: 'nuts' };
+    expect(hostCheckin(frame)).toEqual({ type: EMBED_CHECKIN_MESSAGE, id: 'c1', firstName: 'Ava', club: 'Cubbies' });
+    expect(hostCheckin({ ...frame, oneOff: true })).toEqual({ type: EMBED_CHECKIN_MESSAGE, id: 'c1', firstName: 'Ava', club: 'Cubbies', oneOff: true });
+    expect(hostCheckin({ ...frame, oneOff: 'yes' })).not.toHaveProperty('oneOff');
+    expect(hostCheckin({ id: 'c2', club: 'Sparks' })).toBeNull();
+    expect(hostCheckin(null)).toBeNull();
+    expect(hostCheckin({ firstName: 'x'.repeat(500) }).firstName).toHaveLength(40);
+  });
+
+  it('the App hands check-ins up only with ?club=, framed, never in configure mode or a preview; the classroom spells it the same', () => {
+    const app = readFileSync(resolve(__dirname, '../App.jsx'), 'utf8');
+    expect(app).toMatch(/if \(FLAGS\.club\) \{\s*if \(!CONFIGURE && meta\?\.countsTowardTally !== false && isEmbedded\(\)\) \{\s*const message = hostCheckin\(payload\);[\s\S]{0,160}window\.parent\.postMessage\(message, window\.location\.origin\)/);
+    const classroom = readFileSync(resolve(__dirname, '../../../classroom/public/src/app.js'), 'utf8');
+    expect(classroom).toContain(`export const CHECKIN_MESSAGE = '${EMBED_CHECKIN_MESSAGE}';`);
+    expect(classroom).toMatch(/event\.source !== frame\.contentWindow \|\| event\.origin !== window\.location\.origin/);
+    // Names never reach storage there.
+    expect(classroom).not.toMatch(/localStorage\.setItem\([^)]*(welcome|name)/i);
   });
 });

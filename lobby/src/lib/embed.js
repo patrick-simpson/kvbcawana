@@ -24,7 +24,7 @@
 // is laid out exactly as it always was.
 
 import { sanitizeJourneyPress } from '../../../shared/journeyRemote.js';
-import { EMBED_DOORBELL_MESSAGE } from './constants.js';
+import { EMBED_CHECKIN_MESSAGE, EMBED_DOORBELL_MESSAGE } from './constants.js';
 
 /**
  * Whether this page is inside another page's frame: the same test the
@@ -68,6 +68,29 @@ export function hostDoorbell(what, payload) {
     if (press) return { ...message, press };
   }
   return message;
+}
+
+/**
+ * What the downstairs classroom host is told of a check-in
+ * (constants.js EMBED_CHECKIN_MESSAGE): an ALLOWLIST of the already
+ * sanitized frame (eventSanitizers.js sanitizeCheckin): its id, first name,
+ * club and the oneOff flag, nothing else (never a birthday, a milestone, a
+ * photo, an age). null when there is no first name.
+ * @param {unknown} payload
+ * @returns {{ type: string, id: string, firstName: string, club: string, oneOff?: true } | null}
+ */
+export function hostCheckin(payload) {
+  if (!payload || typeof payload !== 'object') return null;
+  const p = /** @type {Record<string, unknown>} */ (payload);
+  const firstName = typeof p.firstName === 'string' ? p.firstName.slice(0, 40) : '';
+  if (!firstName) return null;
+  const message = {
+    type: EMBED_CHECKIN_MESSAGE,
+    id: typeof p.id === 'string' ? p.id.slice(0, 120) : '',
+    firstName,
+    club: typeof p.club === 'string' ? p.club.slice(0, 40) : '',
+  };
+  return p.oneOff === true ? { ...message, oneOff: true } : message;
 }
 
 /**

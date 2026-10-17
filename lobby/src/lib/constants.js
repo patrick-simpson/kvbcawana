@@ -118,6 +118,16 @@ export const EMBED_FULLSCREEN_MESSAGE = 'awana-display:toggle-fullscreen';
 // spell the string the same way (CLAUDE.md "room sync").
 export const EMBED_DOORBELL_MESSAGE = 'awana-display:sync-doorbell';
 
+// A check-in, handed UP to the downstairs classroom page (classroom/, which
+// frames ../lobby/?club=sparks and welcomes its card's club itself): only
+// when the URL carries ?club= (urlFlags.js), only framed, never in configure
+// mode or for a Settings preview, at THIS page's own origin. Payload: the
+// sanitized (decrypted) frame's id, first name, club and oneOff, nothing else
+// (lib/embed.js hostCheckin). classroom/public/src/app.js checks event.source
+// is its own iframe and the origin is its own, and keeps names in memory only.
+// Both sides spell the string the same way (lib/embed.test.js reads both).
+export const EMBED_CHECKIN_MESSAGE = 'awana-display:checkin';
+
 // Self-updating pages (see CLAUDE.md, "Self-updating pages"). A display that
 // has been running for days polls version.json this often, and again on the
 // browser's `online` event no more than once per BUILD_ONLINE_MIN_MS, because

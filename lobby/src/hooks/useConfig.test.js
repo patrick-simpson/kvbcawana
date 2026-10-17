@@ -183,6 +183,17 @@ describe('useConfig store', () => {
     expect(defaults.reduceMotion).toBe(false);
   });
 
+  it('?club=sparks puts that club in the corner and keeps the chime off, in config only', () => {
+    localStorage.setItem('awanaConfig.v1', JSON.stringify({ cornerClub: 'trek', audioMuted: false }));
+    atUrl('?club=sparks');
+    _resetForTest();
+    const { config, storedConfig } = renderHook(() => useConfig()).result.current;
+    expect(config.cornerClub).toBe('sparks');
+    expect(config.audioMuted).toBe(true);
+    expect(storedConfig.cornerClub).toBe('trek');
+    expect(storedConfig.audioMuted).toBe(false);
+  });
+
   it('resolveStoredConfig: a saved PowerPoint URL with no explicit source still means PowerPoint', () => {
     expect(resolveStoredConfig({}, {}).backgroundSource).toBe('manual');
     expect(resolveStoredConfig({}, { powerpointEmbedUrl: 'https://x' }).backgroundSource).toBe('powerpoint');
