@@ -1373,3 +1373,49 @@ Code: `journeyRemote.js`; rules (one copy, shared with the phone page):
 - The kiosk list: read from the `screens` index once per object, then kept in memory, refreshed by `screens.js onIndex` each time the registry writes its index (`saveIndex` is the only writer), so a state read or a kiosk poll reads NOTHING from storage (beyond the session check).
 - The press allowance is per sign-in, keyed by the session token's epoch, issue time and signature tail, read by the ONE token parser the sign-in check uses (`session.js parseSession`).
 - Free plan: no storage writes; CPU = clamps and Map lookups. Requests per hour with a phone open (one kiosk): ~2,400 state polls + ~400-500 kiosk polls (360 timed, plus one per change and per press) + presses; with the phone closed: nothing beyond the kiosks' usual hellos.
+
+### 10.10 Is check-in ready tonight? (BUILT, owner 2026-10-17)
+
+"Warn the owner BEFORE club night if check-in is broken, for free, without
+the owner opening a page." The scheduled workflow
+`.github/workflows/checkin-health.yml` asks this route at about 5:15 pm and
+5:50 pm Eastern every Wednesday and FAILS when tonight is a club night and
+something is wrong; GitHub emails the repository owner about a failed
+scheduled run, which is the alert (no email sender in the Worker, nothing
+paid). Code: `health.js`, test `test/health.test.js`.
+
+| Route | Auth | Answer |
+| --- | --- | --- |
+| `GET /v1/health/checkin` | public | below: booleans, counts, times, fixed codes only |
+
+```
+{ v: 1, at, ok, problems: [code...],
+  night, clubTonight, nextClubNight,             // the shared club-day rule (clubday.js via watcher.clubToday; a rehearsal is not a club night)
+  window: {open, opensInMin, openForMin},        // the watcher's window (4:30 pm to 9 pm on a Wednesday); openForMin null while closed
+  cloudCheckin: 'shadow' | 'off', configured,    // CLOUD_CHECKIN; the TwoTimTwo secrets are set (never their values)
+  cloudPrint: 'on' | 'off',                      // the CLOUD_PRINT switch
+  twotimtwo: {signedIn, loginBackoff, down, lastReadAt, lastOkAt, lastOkTonight, lastOkAgeSec, lastError},
+  checkinPage: {ok: true | false | null, at},    // tonight's check-in page probe (null: not read tonight yet)
+  stations: {registered, seenNow, seenThisWeek} } // counts only: heard from within 10 min / 7 days
+```
+
+- `problems` is empty on a day that is not a club day (then `ok` is true,
+  whatever else is so). On a club day, any of: `cloud-checkin-off`,
+  `not-configured`, `cloud-print-off`, `not-watching` (a club day the watcher
+  does not watch, 5 to 8 pm: an extra night on a weekday other than
+  Wednesday), `signin-refused` (TwoTimTwo refused the sign-in or it is backing
+  off), `twotimtwo-down`, `no-good-read` (the window has been open 10 min and
+  no report read tonight succeeded in the last 5 min), `checkin-page-unreadable`,
+  `checkin-page-not-read` (window open 10 min, no probe yet),
+  `no-station-registered`, `no-station-now` (no print station heard from in
+  10 min). The workflow treats `no-station-now` as a failure only at the 5:50
+  check (the laptop may not be on at 5:15).
+- `lastError` is one of the read clock's own codes (`login-refused`,
+  `login-backoff`, `twotimtwo-down`, `signed-out`, `report-unreadable`,
+  `checkin-page-unreadable`, `no-meeting`, `not-configured`) or `other`, and
+  only tonight's; never TwoTimTwo's words. `signedIn` is memory: false after
+  a restart until the next read signs in (the workflow reads `lastOkAgeSec`).
+- Never a name, a clubber id, a station's name or id, the TwoTimTwo account
+  or anything from a secret. NO TwoTimTwo read and no seal: `cloud:status`,
+  `calendar` and `stations` from storage, the client's memory. Like `GET
+  /v1/cloud/status` it arms the watcher's alarm (the cron's safety net).

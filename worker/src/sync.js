@@ -72,6 +72,7 @@ import { Switches, mountSwitches } from './switches.js';
 import { Church, mountChurch } from './church.js';
 import { Notices, mountNotice } from './notice.js';
 import { mountOverview } from './overview.js';
+import { mountHealth } from './health.js';
 
 export { json };
 
@@ -259,6 +260,7 @@ export class SyncCore {
     this.notices = new Notices({ storage: this.storage, now: this.now });
     mountNotice(this.registry, this);   // /v1/notice (routes.md 10.4)
     mountOverview(this.registry, this);   // /v1/tonight/overview (routes.md 10.6)
+    mountHealth(this.registry, this);   // /v1/health/checkin: is check-in ready tonight, no passphrase (routes.md 10.10)
     mountBarf(this.registry, this);   // /v1/desk/barf, /v1/desk/barf-late: a late BARF friend (routes.md 5.1)
   }
 

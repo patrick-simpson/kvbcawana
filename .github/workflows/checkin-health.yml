@@ -1,0 +1,117 @@
+name: Check-in ready tonight?
+
+# Owner 2026-10-17: warn the owner BEFORE club night if check-in is broken,
+# for free, without the owner opening a page. Every Wednesday at about 5:12 pm
+# and 5:47 pm Eastern this asks the sync Worker GET /v1/health/checkin
+# (worker/src/health.js, worker/src/routes.md 10.10: no passphrase, booleans,
+# counts, times and fixed codes only) and FAILS when tonight is a club night
+# and something is wrong. GitHub emails a failed scheduled run to the person
+# who last changed this file's schedule (the repository owner), and that email
+# is the alert. On a night with no club (a break, a cancelled night) it passes
+# quietly. One short job, no checkout: a few seconds of free minutes a week.
+#
+# The 5:12 check: TwoTimTwo signed in and read (the Worker's watcher starts at
+# 4:30 pm), the check-in page readable, cloud check-in on, a print station
+# registered. The 5:47 check adds: a print station heard from in the last 10
+# minutes (the check-in laptop is on with KVBC Awana running).
+#
+# Cron is UTC and Eastern moves an hour twice a year, so each check is
+# scheduled at both its EDT and its EST time; a run whose time is not this
+# season's skips itself (it reads which schedule started it, so a late start
+# from GitHub's queue cannot make it skip or double).
+
+on:
+  schedule:
+    - cron: '12 21 * * 3'   # 5:12 pm EDT
+    - cron: '47 21 * * 3'   # 5:47 pm EDT
+    - cron: '12 22 * * 3'   # 5:12 pm EST
+    - cron: '47 22 * * 3'   # 5:47 pm EST
+  workflow_dispatch:
+    inputs:
+      station:
+        description: 'Also require a print station heard from in the last 10 minutes'
+        type: boolean
+        default: false
+
+permissions: {}
+
+concurrency:
+  group: checkin-health
+  cancel-in-progress: false
+
+jobs:
+  check:
+    name: Check-in ready
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Ask the sync service
+        env:
+          SITE_ORIGIN: ${{ vars.SITE_ORIGIN || 'https://awana.kvbchurch.org' }}
+          SCHEDULE: ${{ github.event.schedule }}
+          EVENT: ${{ github.event_name }}
+          WANT_STATION: ${{ inputs.station }}
+        run: |
+          set -u
+          offset="$(TZ=America/New_York date +%z)"   # -0400 in summer time, -0500 in winter
+          case "$SCHEDULE" in
+            '12 21 * * 3') season=-0400; late=false ;;
+            '47 21 * * 3') season=-0400; late=true ;;
+            '12 22 * * 3') season=-0500; late=false ;;
+            '47 22 * * 3') season=-0500; late=true ;;
+            *) season="$offset"; late="${WANT_STATION:-false}" ;;   # a manual run
+          esac
+          if [ "$EVENT" = "schedule" ] && [ "$season" != "$offset" ]; then
+            echo "This is the other season's run (Eastern is UTC$offset now): nothing to check."
+            exit 0
+          fi
+
+          url="${SITE_ORIGIN%/}/api/v1/health/checkin"
+          say() { echo "$1"; echo "$1" >> "$GITHUB_STEP_SUMMARY"; }
+          err() { echo "::error::$1"; echo "- $1" >> "$GITHUB_STEP_SUMMARY"; }
+          if ! body="$(curl -sS --fail --retry 3 --retry-delay 20 --retry-all-errors --max-time 30 "$url")"; then
+            err "Could not reach the sync service at $url. Check-in (awana.kvbchurch.org/checkin) may not work tonight. Open awana.kvbchurch.org/settings → Tonight, and check Cloudflare."
+            exit 1
+          fi
+          if ! echo "$body" | jq -e '.v == 1' > /dev/null 2>&1; then
+            err "The sync service answered, but not with a check-in health report (is the Worker deployed with GET /v1/health/checkin?)."
+            exit 1
+          fi
+
+          club="$(echo "$body" | jq -r '.clubTonight')"
+          next="$(echo "$body" | jq -r '.nextClubNight // "not on the calendar"')"
+          if [ "$club" != "true" ]; then
+            say "No club tonight (next club night: $next). Nothing to check."
+            exit 0
+          fi
+
+          echo "$body" | jq '{ok, problems, window, twotimtwo, checkinPage, stations, cloudCheckin, cloudPrint}'
+          failed=0
+          for code in $(echo "$body" | jq -r '.problems[]'); do
+            case "$code" in
+              cloud-checkin-off)       msg="Online check-in is switched off on the sync service (CLOUD_CHECKIN is not \"shadow\"). /checkin cannot check anyone in." ;;
+              not-configured)          msg="The sync service has no TwoTimTwo sign-in set (the TWOTIMTWO_* secrets in Cloudflare)." ;;
+              cloud-print-off)         msg="Cloud printing (CLOUD_PRINT) is switched off: labels will not reach the print station. /settings → Tonight → switches." ;;
+              not-watching)            msg="Tonight is a club night but the sync service is not watching TwoTimTwo (it only watches Wednesdays 4:30 to 9 pm)." ;;
+              signin-refused)          msg="TwoTimTwo refused the sync service's sign-in. Has the check-in user's password changed? Update the TWOTIMTWO_PASSWORD secret in Cloudflare." ;;
+              twotimtwo-down)          msg="TwoTimTwo is not answering the sync service (TwoTimTwo down, or no network). Keep the paper sheet ready." ;;
+              no-good-read)            msg="The sync service has not read TwoTimTwo's check-in report in the last 5 minutes. Check /settings → Tonight → Needs a look." ;;
+              checkin-page-unreadable) msg="The sync service could not read TwoTimTwo's check-in page for tonight (is tonight's meeting set up on TwoTimTwo?)." ;;
+              checkin-page-not-read)   msg="The sync service has not read TwoTimTwo's check-in page yet tonight." ;;
+              no-station-registered)   msg="No print station is registered: no computer will print labels. Set up KVBC Awana on the check-in laptop." ;;
+              no-station-now)
+                if [ "$late" != "true" ]; then
+                  echo "Note: no print station heard from in the last 10 minutes (fine this early; checked again at 5:47)."
+                  continue
+                fi
+                msg="No print station has been heard from in 10 minutes. Is the check-in laptop on, with KVBC Awana running and signed in?" ;;
+              *)                       msg="The sync service reports a problem: $code." ;;
+            esac
+            err "$msg"
+            failed=1
+          done
+          if [ "$failed" = 1 ]; then
+            say "Check-in may not work tonight. Details: awana.kvbchurch.org/settings → Tonight."
+            exit 1
+          fi
+          say "Check-in looks ready for tonight."
