@@ -123,6 +123,14 @@ describe('GET /v1/print/handbook', () => {
     expect(handbookReads(t)).toHaveLength(0);
   });
 
+  it('test=1 prints the form\'s meeting even with no club tonight (owner test print)', async () => {
+    const t = await rig({ env: { HANDBOOK_TOKEN: TOKEN }, handbook: handbookSite(), start: Date.parse('2026-10-12T20:00:00Z') });
+    const r = await get(t, '/v1/print/handbook?club=sparks&test=1', `Bearer ${TOKEN}`);
+    expect(r.status).toBe(200);
+    expect(new TextDecoder().decode(r.bytes)).not.toContain('noClub');
+    expect(handbookReads(t).length).toBeGreaterThan(0);
+  });
+
   it('a club it does not print, or a bad balances value, is 400 with no read', async () => {
     const t = await rig({ env: { HANDBOOK_TOKEN: TOKEN }, handbook: handbookSite() });
     expect((await get(t, '/v1/print/handbook?club=trek', `Bearer ${TOKEN}`)).status).toBe(400);

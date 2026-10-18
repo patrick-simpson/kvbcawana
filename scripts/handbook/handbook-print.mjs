@@ -129,10 +129,11 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 /**
  * One club's answer from the Worker (a busy read clock is waited out a few times).
- * @param {{ site: string, token: string }} o @param {string} club
+ * `test` (a hand-started test run) asks even on a day with no club.
+ * @param {{ site: string, token: string, test?: boolean }} o @param {string} club
  */
-async function askWorker({ site, token }, club) {
-  const url = `${site.replace(/\/+$/, '')}/api/v1/print/handbook?club=${encodeURIComponent(club)}`;
+async function askWorker({ site, token, test }, club) {
+  const url = `${site.replace(/\/+$/, '')}/api/v1/print/handbook?club=${encodeURIComponent(club)}${test ? '&test=1' : ''}`;
   for (let i = 0; ; i++) {
     let res;
     try {
@@ -176,7 +177,7 @@ export async function attempt(env, { send = sendMail } = {}) {
   let browser = null;
   try {
     for (const [club, name] of CLUBS) {
-      const got = await askWorker({ site, token }, club);
+      const got = await askWorker({ site, token, test: env.TEST === 'true' }, club);
       if (got.kind === 'noClub') return 'no-club';
       let bytes = got.bytes;
       if (got.kind === 'html') {

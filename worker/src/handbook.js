@@ -256,7 +256,9 @@ export class HandbookSheets {
     if (b !== null && b !== '0' && b !== '1') return json({ ok: false, reason: 'bad-balances' }, 400);
     const balances = b === null ? spec.balances : b === '1';
     const watcher = this.core.watcher;
-    const day = await watcher.clubToday();
+    // `test=1` (the owner's hand-started test print, 2026-10-18): print the
+    // form's meeting even on a day with no club.
+    const day = ctx.url.searchParams.get('test') === '1' ? { club: true } : await watcher.clubToday();
     if (!day.club) return json({ ok: true, noClub: true, today: day.today, next: day.next });
     const client = watcher.clientFor();
     if (!client) return json({ ok: false, reason: 'not-configured' }, 503);

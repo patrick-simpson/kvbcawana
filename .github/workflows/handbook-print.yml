@@ -34,6 +34,10 @@ on:
         description: 'Dry run: make the PDFs and email them to GMAIL_USER instead of the printer'
         type: boolean
         default: false
+      test:
+        description: 'Test: print even if today is not a club night (uses the next meeting on TwoTimTwo)'
+        type: boolean
+        default: false
 
 permissions: {}
 
@@ -92,4 +96,5 @@ jobs:
           GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
           TO: ${{ inputs.to || 'kvbcdownstairs@print.epsonconnect.com' }}
           DRY_RUN: ${{ inputs.dry_run == true && 'true' || 'false' }}
+          TEST: ${{ inputs.test == true && 'true' || 'false' }}
         run: node handbook-print.mjs
