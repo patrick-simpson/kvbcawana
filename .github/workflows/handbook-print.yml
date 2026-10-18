@@ -1,0 +1,95 @@
+name: Print the handbook sheets
+
+# Owner 2026-10-18: every club night at 4:00 pm Eastern, print TwoTimTwo's
+# handbook check-off report for Cubbies, Sparks and T&T on the downstairs
+# Epson: ONE email from the owner's Gmail with three PDFs to the printer's
+# Epson Connect address. Share balances on Sparks and T&T only. Full names are
+# on the sheets (approved by the owner). The sync Worker reads TwoTimTwo
+# (GET /api/v1/print/handbook, worker/src/routes.md 10.12, on its one read
+# clock); scripts/handbook/handbook-print.mjs makes the PDFs and sends the mail
+# (CLAUDE.md "Handbook sheets").
+#
+# Not a club night (the Worker's shared club-day rule): passes quietly, no
+# TwoTimTwo read. A failure is tried again 15 and 30 minutes later; the third
+# failure fails the job, and GitHub emails the owner.
+#
+# Cron is UTC and Eastern moves an hour twice a year: both times are scheduled
+# and the run whose hour is not 4 pm in New York this season skips itself
+# (as checkin-health.yml does).
+#
+# PRIVACY: the log shows only sizes, content types and status codes; the PDFs
+# stay in the runner's memory and are never uploaded as artifacts.
+
+on:
+  schedule:
+    - cron: '0 20 * * *'   # 4:00 pm EDT
+    - cron: '0 21 * * *'   # 4:00 pm EST
+  workflow_dispatch:
+    inputs:
+      to:
+        description: 'Send to (the downstairs Epson)'
+        type: string
+        default: 'kvbcdownstairs@print.epsonconnect.com'
+      dry_run:
+        description: 'Dry run: make the PDFs and email them to GMAIL_USER instead of the printer'
+        type: boolean
+        default: false
+
+permissions: {}
+
+concurrency:
+  group: handbook-print
+  cancel-in-progress: false
+
+jobs:
+  print:
+    name: Handbook sheets
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    steps:
+      - name: Is it 4 pm in New York?
+        id: when
+        env:
+          SCHEDULE: ${{ github.event.schedule }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          offset="$(TZ=America/New_York date +%z)"   # -0400 in summer time, -0500 in winter
+          case "$SCHEDULE" in
+            '0 20 * * *') season=-0400 ;;
+            '0 21 * * *') season=-0500 ;;
+            *) season="$offset" ;;   # a manual run
+          esac
+          if [ "$EVENT" = "schedule" ] && [ "$season" != "$offset" ]; then
+            echo "This is the other season's run (Eastern is UTC$offset now): nothing to do."
+            echo "go=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "go=true" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/checkout@v4
+        if: steps.when.outputs.go == 'true'
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        if: steps.when.outputs.go == 'true'
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: scripts/handbook/package-lock.json
+      - name: Install
+        if: steps.when.outputs.go == 'true'
+        working-directory: scripts/handbook
+        run: |
+          npm ci
+          # Chromium prints an HTML report to PDF (a PDF answer needs none of it).
+          npx playwright install --with-deps --only-shell chromium
+      - name: Make and send the sheets
+        if: steps.when.outputs.go == 'true'
+        working-directory: scripts/handbook
+        env:
+          SITE_ORIGIN: ${{ vars.SITE_ORIGIN || 'https://awana.kvbchurch.org' }}
+          HANDBOOK_TOKEN: ${{ secrets.HANDBOOK_TOKEN }}
+          GMAIL_USER: ${{ secrets.GMAIL_USER }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          TO: ${{ inputs.to || 'kvbcdownstairs@print.epsonconnect.com' }}
+          DRY_RUN: ${{ inputs.dry_run == true && 'true' || 'false' }}
+        run: node handbook-print.mjs

@@ -296,6 +296,25 @@ jobs:
       - run: node --check public/src/app.js && node --check public/src/logic.js && node --check scripts/stamp-build.mjs
       - run: npm test
 
+  handbook:
+    # The 4 pm handbook sheets job's script (scripts/handbook/, run by
+    # handbook-print.yml): its own small suite, a stand-in Worker and SMTP server.
+    name: Handbook sheets script
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: scripts/handbook
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-app
+        with:
+          lockfile: scripts/handbook/package-lock.json
+          working-directory: scripts/handbook
+      - run: npx playwright install --with-deps --only-shell chromium
+      - run: node --check handbook-print.mjs && node --check smtp.mjs
+      - run: npm test
+
   printer:
     name: Club Label Printer
     needs: changes

@@ -1,0 +1,14 @@
+{
+  "name": "handbook-print",
+  "version": "1.0.0",
+  "private": true,
+  "description": "The 4 pm handbook sheets: asks the sync Worker for TwoTimTwo's handbook check-off reports and emails them to the downstairs Epson printer (.github/workflows/handbook-print.yml).",
+  "type": "module",
+  "scripts": {
+    "start": "node handbook-print.mjs",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "playwright": "1.56.1"
+  }
+}
