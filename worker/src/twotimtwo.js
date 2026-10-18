@@ -740,6 +740,22 @@ async function readCapped(res) {
 }
 
 /**
+ * A response's bytes, untouched (a PDF), capped like a page. `html` is the
+ * text only when TwoTimTwo says the answer is text (so the login form is still
+ * seen); a binary answer is never decoded or looked into.
+ * @param {Response} res
+ */
+async function readRaw(res) {
+  const declared = Number(res.headers.get('content-length'));
+  if (Number.isFinite(declared) && declared > PAGE_MAX) throw new Error('page-too-large');
+  const bytes = new Uint8Array(await res.arrayBuffer());
+  if (bytes.byteLength > PAGE_MAX) throw new Error('page-too-large');
+  const contentType = res.headers.get('content-type') || 'application/octet-stream';
+  const html = /^text\/|html|xml/i.test(contentType) ? new TextDecoder().decode(bytes) : '';
+  return { bytes, contentType, html };
+}
+
+/**
  * One signed-in TwoTimTwo session. The cookie jar is memory only: a restarted
  * Durable Object signs in again on its first read.
  */
@@ -818,8 +834,9 @@ export class TwoTimTwoClient {
    * and no hop may leave the TwoTimTwo host. `slot` makes the first hop take a
    * slot from the clock (queueing up to its waitMs); every redirect hop takes one
    * too (FOLLOW_WAIT_MS), a write's included.
-   * @param {string} path @param {{method?: string, form?: URLSearchParams, slot?: { waitMs: number, kind: string, priority?: boolean | { urgent: boolean } }, urgent?: boolean}} [opts]
-   * @returns {Promise<{status: number, path: string, html: string}>}
+   * `raw`: the answer's bytes and content type too, untouched (readRaw).
+   * @param {string} path @param {{method?: string, form?: URLSearchParams, slot?: { waitMs: number, kind: string, priority?: boolean | { urgent: boolean } }, urgent?: boolean, raw?: boolean}} [opts]
+   * @returns {Promise<{status: number, path: string, html: string, bytes?: Uint8Array, contentType?: string}>}
    */
   async request(path, opts = {}) {
     let url = new URL(path, this.origin);
@@ -846,6 +863,7 @@ export class TwoTimTwoClient {
         body = undefined;
         continue;
       }
+      if (opts.raw) return { status: res.status, path: url.pathname, ...(await readRaw(res)) };
       return { status: res.status, path: url.pathname, html: await readCapped(res) };
     }
     throw new Error('too-many-redirects');
@@ -932,9 +950,10 @@ export class TwoTimTwoClient {
    * watcher's report (it may take the slot it reserved); `urgent`: a desk
    * check-in, undo or check-out with nothing cached, the head of the queue
    * (readbudget.js).
+   * `raw`: also the answer's untouched bytes and content type (a PDF report).
    * @param {string} path
-   * @param {{ waitMs?: number, kind?: string, priority?: boolean, urgent?: boolean }} [opts]
-   * @returns {Promise<{ok: true, html: string, path: string} | {ok: false, error: string, retryAfterMs?: number}>}
+   * @param {{ waitMs?: number, kind?: string, priority?: boolean, urgent?: boolean, raw?: boolean }} [opts]
+   * @returns {Promise<{ok: true, html: string, path: string, bytes?: Uint8Array, contentType?: string} | {ok: false, error: string, retryAfterMs?: number}>}
    */
   async page(path, opts = {}) {
     // The caller's wait is for the first request; once one is made the rest queue
@@ -952,7 +971,7 @@ export class TwoTimTwoClient {
       }
       let res;
       try {
-        res = await this.request(path, { slot: { waitMs, kind: opts.kind || 'page', priority } });
+        res = await this.request(path, { slot: { waitMs, kind: opts.kind || 'page', priority }, raw: !!opts.raw });
       } catch (err) {
         const code = errorCode(err);
         return code === 'read-busy' ? { ok: false, error: code, retryAfterMs: /** @type {any} */ (err).retryAfterMs } : { ok: false, error: code };
@@ -965,6 +984,7 @@ export class TwoTimTwoClient {
       // already open (the household export, 2026-10-11).
       if (res.status === 403 && attempt === 0) continue;
       if (res.status !== 200) return { ok: false, error: res.status >= 500 ? 'twotimtwo-down' : `http-${res.status}` };
+      if (opts.raw) return { ok: true, html: res.html, path: res.path, bytes: res.bytes, contentType: res.contentType };
       return { ok: true, html: res.html, path: res.path };
     }
     return { ok: false, error: 'signed-out' };

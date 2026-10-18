@@ -497,12 +497,16 @@ jobs:
           TWOTIMTWO_USERNAME: ${{ secrets.TWOTIMTWO_USERNAME }}
           TWOTIMTWO_PASSWORD: ${{ secrets.TWOTIMTWO_PASSWORD }}
           TWOTIMTWO_HOST: ${{ secrets.TWOTIMTWO_HOST }}
+          # The 4 pm handbook sheets job's machine token (routes.md 10.12,
+          # handbook-print.yml). Optional: sent only when the secret exists.
+          HANDBOOK_TOKEN: ${{ secrets.HANDBOOK_TOKEN }}
         run: |
           node -e '
             const names = ["INITIAL_PASSPHRASE",
               "TWOTIMTWO_USERNAME", "TWOTIMTWO_PASSWORD", "TWOTIMTWO_HOST"];
+            const optional = ["HANDBOOK_TOKEN"];
             const out = {};
-            for (const n of names) if (process.env[n]) out[n] = process.env[n];
+            for (const n of [...names, ...optional]) if (process.env[n]) out[n] = process.env[n];
             const missing = names.filter((n) => !out[n]);
             if (missing.length) console.log(`Not set here: ${missing.join(", ")}.`);
             require("fs").writeFileSync(process.env.RUNNER_TEMP + "/secrets.json", JSON.stringify(out));

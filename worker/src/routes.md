@@ -1459,3 +1459,49 @@ answer to copy.
   page is the login form; 502 with the client's own code otherwise
   (`twotimtwo-down`, `login-refused`, `login-backoff`, `timeout`, `network`,
   `http-404`, ...). A refusal is never kept.
+
+### 10.12 The handbook sheets (BUILT, owner 2026-10-18)
+
+Every club night at 4:00 pm Eastern the GitHub job `handbook-print.yml`
+(`scripts/handbook/handbook-print.mjs`) asks this route for TwoTimTwo's
+handbook check-off report for Cubbies, Sparks and T&T and emails the three as
+PDFs in ONE message from the owner's Gmail to the downstairs Epson
+(Epson Connect). Code: `handbook.js` (`HandbookSheets`), test
+`test/handbook-sheets.test.js`.
+
+| Route | Auth | Answer |
+| --- | --- | --- |
+| `GET /v1/print/handbook?club=cubbies\|sparks\|tnt[&balances=0\|1]` | token or session | the report's bytes, below |
+
+- Auth: `Authorization: Bearer <HANDBOOK_TOKEN>` (a Worker secret, sent by
+  ci.yml from the GitHub secret of the same name; compared in constant time)
+  OR a signed-in session (so the owner can try it from a browser). Neither:
+  401 `signed-out`. Registered `public` with the registry; the route checks
+  its own two ways in. The secret unset: 503 `not-configured` (to any caller
+  that got past the 401), as is a Worker with no TwoTimTwo sign-in.
+- `club` (`HANDBOOK_CLUBS`): cubbies = club_id 1, sparks = 2, tnt = 3 (the
+  form's select, read live 2026-10-18; Puggles 4, Trek 6, Journey 7 are not
+  printed). Share balances (`print_balances=1`) on Sparks and T&T, off on
+  Cubbies (owner); `balances=0|1` overrides. Anything else: 400 `bad-club` /
+  `bad-balances`, no read.
+- Not a club day (`watcher.clubToday()`, the shared rule; a station
+  rehearsing counts as one): `200 {ok: true, noClub: true, today, next}`, NO
+  TwoTimTwo read.
+- Reads, each an interactive read on the one clock (`INTERACTIVE_WAIT_MS`)
+  through the client's `page()` (its sign-in and lapsed-session handling):
+  the form page `/meeting/handbook` (kind `handbook-form`) for its hidden
+  `cal_id` (`calIdOf`: a scan of the `<input>` tags, no parse; kept in memory
+  10 minutes, `HANDBOOK_CAL_TTL_MS`; the setup route 10.11 refreshes it too),
+  then the report (kind `handbook`, `raw`): `GET /meeting/handbook?cal_id=<id>&club_id=<n>[&print_balances=1]&yt0=1`
+  (`checked_in` left off: at 4 pm nobody is checked in). No `cal_id` on the
+  form: 502 `no-meeting`.
+- Answer: 200 with the report's bytes UNCHANGED and TwoTimTwo's own
+  `Content-Type` (a PDF, or the HTML page; the job prints an HTML answer to a
+  Letter PDF itself), plus `X-Handbook-Club`, `X-Handbook-Cal`,
+  `X-Handbook-Balances`, `Cache-Control: no-store`. The body names children
+  (full names on paper approved by the owner, 2026-10-18): it is never parsed
+  (only a text answer is tested for the login form), stored, cached or logged;
+  it is in memory for the one response. At most `PAGE_MAX` (4 MB).
+- Refusals: 429 `read-busy` with `retryAfterMs`; 502 `signed-out` (the login
+  form); 502 with the client's code otherwise (`twotimtwo-down`,
+  `login-refused`, `login-backoff`, `timeout`, `network`, `http-404`, ...).

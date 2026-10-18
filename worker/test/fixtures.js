@@ -100,9 +100,9 @@ export function fakeTwoTimTwo({ password = 'right-pass', report = () => page(tab
     if (u.pathname === '/clubber/csv' && roster) return csvOf(roster());
     if (u.pathname === '/report/completed_books' && books) return csvOf(books(u.searchParams.get('club_id'), u.searchParams.get('from_date'), u.searchParams.get('to_date')));
     if (u.pathname === '/meeting/report' && meeting) return csvOf(meeting(u.searchParams.get('calendar_id')));
-    // The handbook check-off page (handbook.js): `handbook()` answers its HTML, or a Response.
+    // The handbook check-off page (handbook.js): `handbook(url)` answers its HTML, or a Response.
     if (u.pathname === '/meeting/handbook' && handbook) {
-      const h = handbook();
+      const h = handbook(u);
       return h instanceof Response ? h : new Response(h, { status: 200 });
     }
     if (u.pathname === '/clubber/checkinclubber' && init.method === 'POST') {

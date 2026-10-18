@@ -18,7 +18,8 @@
 // select, 300 controls a form, 20 forms) and kept in memory 10 minutes, so
 // repeated presses cost no read. Nothing is stored.
 
-import { json } from './http.js';
+import { safeEqual } from './crypto.js';
+import { fail, json } from './http.js';
 import { INTERACTIVE_WAIT_MS, READ_INTERVAL_MS } from './readbudget.js';
 import { documentOf, isLoginPage } from './twotimtwo.js';
 
@@ -172,15 +173,132 @@ export class HandbookForm {
       return json({ ok: false, reason: r.error }, 502);
     }
     if (isLoginPage(r.html) || /\/site\/login/i.test(r.path || '')) return json({ ok: false, reason: 'signed-out' }, 502);
+    this.core.handbookSheets?.noteCal(r.html);
     const body = { ok: true, readAt: new Date(this.core.now()).toISOString(), path: r.path || HANDBOOK_PATH, ...parseHandbookForm(r.html) };
     this.cache = { at: this.core.now(), body };
     return json({ ...body, cached: false });
   }
 }
 
+// ── The handbook sheets (routes.md 10.12; owner 2026-10-18) ─────────────────
+//
+// GET /v1/print/handbook?club=cubbies|sparks|tnt[&balances=0|1] answers
+// TwoTimTwo's handbook check-off report for one club, its bytes passed through
+// untouched with TwoTimTwo's content type (a PDF, or the HTML page), for the
+// 4 pm GitHub job (scripts/handbook-print.mjs) that emails the three sheets to
+// the downstairs printer. The report names children (the owner approved full
+// names on paper, 2026-10-18): its body is NEVER parsed, stored, cached or
+// logged; it lives in memory for the one response only.
+//
+// Auth: the machine token (secret HANDBOOK_TOKEN, `Authorization: Bearer`,
+// compared in constant time) or a signed-in session (so /tools can try it).
+// No token secret set: 503 not-configured. Not a club night (watcher
+// clubToday()): 200 {noClub: true} with no read. Reads: the form page once (its
+// hidden cal_id, kept 10 minutes, memory only) then the report, both
+// interactive reads on the one clock through the client's page().
+
+/** club -> TwoTimTwo's club_id on the handbook form (read live 2026-10-18), and the owner's share balance rule. */
+export const HANDBOOK_CLUBS = Object.freeze({
+  cubbies: { id: '1', balances: false },
+  sparks: { id: '2', balances: true },
+  tnt: { id: '3', balances: true },
+});
+/** How long the meeting's cal_id is kept (memory only). */
+export const HANDBOOK_CAL_TTL_MS = 10 * 60 * 1000;
+
+/**
+ * The form's hidden cal_id: a scan of the <input> tags only (no parse; free
+ * plan CPU). '' when there is none.
+ * @param {string} html
+ */
+export function calIdOf(html) {
+  for (const m of String(html || '').matchAll(/<input\b[^>]*>/gi)) {
+    const tag = m[0];
+    if (!/\bname\s*=\s*["']?cal_id["'\s>/]/i.test(tag)) continue;
+    const v = /\bvalue\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i.exec(tag);
+    const id = v ? (v[1] ?? v[2] ?? v[3] ?? '') : '';
+    return /^\d{1,12}$/.test(id) ? id : '';
+  }
+  return '';
+}
+
+export class HandbookSheets {
+  /** @param {any} core the SyncCore */
+  constructor(core) {
+    this.core = core;
+    /** @type {{ at: number, id: string }|null} */
+    this.cal = null;
+  }
+
+  /** The form page was read (here or by the form route): keep its cal_id. @param {string} html */
+  noteCal(html) {
+    const id = calIdOf(html);
+    if (id) this.cal = { at: this.core.now(), id };
+    return id;
+  }
+
+  /** @param {Request} request */
+  async allowed(request) {
+    const token = String(this.core.rawEnv?.HANDBOOK_TOKEN || '');
+    const m = /^Bearer\s+(.+)$/i.exec(request.headers.get('Authorization') || '');
+    if (token && m && safeEqual(m[1].trim(), token)) return true;
+    return this.core.authorized(request);
+  }
+
+  /** @param {import('./registry.js').RouteContext} ctx @returns {Promise<Response>} */
+  async get(ctx) {
+    if (!(await this.allowed(ctx.request))) return fail('Not signed in.', 401, { reason: 'signed-out' });
+    if (!this.core.rawEnv?.HANDBOOK_TOKEN) return json({ ok: false, reason: 'not-configured' }, 503);
+    const club = String(ctx.url.searchParams.get('club') || '').toLowerCase();
+    const spec = Object.hasOwn(HANDBOOK_CLUBS, club) ? HANDBOOK_CLUBS[/** @type {keyof typeof HANDBOOK_CLUBS} */ (club)] : null;
+    if (!spec) return json({ ok: false, reason: 'bad-club', clubs: Object.keys(HANDBOOK_CLUBS) }, 400);
+    const b = ctx.url.searchParams.get('balances');
+    if (b !== null && b !== '0' && b !== '1') return json({ ok: false, reason: 'bad-balances' }, 400);
+    const balances = b === null ? spec.balances : b === '1';
+    const watcher = this.core.watcher;
+    const day = await watcher.clubToday();
+    if (!day.club) return json({ ok: true, noClub: true, today: day.today, next: day.next });
+    const client = watcher.clientFor();
+    if (!client) return json({ ok: false, reason: 'not-configured' }, 503);
+
+    /** @param {any} r */
+    const refused = (r) => (r.error === 'read-busy'
+      ? json({ ok: false, reason: 'read-busy', retryAfterMs: r.retryAfterMs ?? READ_INTERVAL_MS }, 429)
+      : json({ ok: false, reason: r.error }, 502));
+    let calId = this.cal && this.core.now() - this.cal.at < HANDBOOK_CAL_TTL_MS ? this.cal.id : '';
+    if (!calId) {
+      const f = await client.page(HANDBOOK_PATH, { waitMs: INTERACTIVE_WAIT_MS, kind: 'handbook-form' });
+      if (!f.ok) return refused(f);
+      if (isLoginPage(f.html) || /\/site\/login/i.test(f.path || '')) return json({ ok: false, reason: 'signed-out' }, 502);
+      calId = this.noteCal(f.html);
+      if (!calId) return json({ ok: false, reason: 'no-meeting' }, 502);
+    }
+    const q = new URLSearchParams({ cal_id: calId, club_id: spec.id });
+    if (balances) q.set('print_balances', '1');
+    q.set('yt0', '1');
+    const r = await client.page(`${HANDBOOK_PATH}?${q}`, { waitMs: INTERACTIVE_WAIT_MS, kind: 'handbook', raw: true });
+    if (!r.ok) return refused(r);
+    if (isLoginPage(r.html) || /\/site\/login/i.test(r.path || '')) return json({ ok: false, reason: 'signed-out' }, 502);
+    return new Response(r.bytes, {
+      status: 200,
+      headers: {
+        'Content-Type': r.contentType || 'application/octet-stream',
+        'Cache-Control': 'no-store',
+        'X-Handbook-Club': club,
+        'X-Handbook-Cal': calId,
+        'X-Handbook-Balances': balances ? '1' : '0',
+      },
+    });
+  }
+}
+
 /** @param {import('./registry.js').Registry} registry @param {any} core */
 export function mountHandbook(registry, core) {
   const form = new HandbookForm(core);
+  const sheets = new HandbookSheets(core);
   core.handbookForm = form;
+  core.handbookSheets = sheets;
   registry.add('GET', '/v1/print/handbook-form', 'session', async () => form.get());
+  // 'public' to the registry: the route checks its own two ways in (token or session).
+  registry.add('GET', '/v1/print/handbook', 'public', async (ctx) => sheets.get(ctx));
 }
