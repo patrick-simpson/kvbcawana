@@ -139,6 +139,15 @@ run(`node scripts/stamp-build.mjs ${hashTree(path.join(ROOT, 'classroom', 'publi
   cpSync(path.join(ROOT, 'site', 'logo', 'index.html'), path.join(logoOut, 'index.html'));
 }
 
+// /tools/handbook-form: an unlisted setup aid (site/tools/handbook-form/index.html, owner
+// 2026-10-18): shows the form on TwoTimTwo's handbook page through the Worker's
+// GET /v1/print/handbook-form (worker/src/routes.md 10.11). Never linked; noindex below.
+{
+  const toolOut = path.join(OUT, 'tools', 'handbook-form');
+  mkdirSync(toolOut, { recursive: true });
+  cpSync(path.join(ROOT, 'site', 'tools', 'handbook-form', 'index.html'), path.join(toolOut, 'index.html'));
+}
+
 // The showcase twins (owner, 2026-10-16: the home page plays a club night on the REAL
 // screens). Each is the built page itself with site/showcase/stub.js INLINE as the first
 // thing in its <head>, so it can never run without it: storage in memory, a club-night
@@ -247,6 +256,9 @@ writeFileSync(path.join(OUT, '_headers'), [
   '/logo*',
   '  Cache-Control: no-cache',
   '  X-Robots-Tag: noindex, nofollow',
+  '/tools/*',
+  '  Cache-Control: no-cache',
+  '  X-Robots-Tag: noindex, nofollow',
   // The old home page, kept unlisted (owner, 2026-10-16): never in a search engine.
   '/classic*',
   '  Cache-Control: no-cache',
@@ -313,7 +325,7 @@ writeFileSync(path.join(OUT, '_routes.json'), `${JSON.stringify({
 writeFileSync(path.join(ROOT, 'site', 'lib', 'large-files.generated.js'),
   `// Written by site/build.mjs for build ${BUILD_ID}; not committed.\nexport const LARGE_FILES = ${JSON.stringify(largeFiles, null, 2)};\nexport const LARGE_PREFIXES = ${JSON.stringify(VIDEO_PREFIXES, null, 2)};\n`);
 
-for (const must of ['index.html', 'lobby/index.html', 'lobby/countdown.html', 'lobby/settings.html', 'journey/index.html', 'journey/remote/index.html', 'classroom/index.html', 'classroom/version.json', 'classroom/src/logic.js', 'journey/remote/remote.js', 'journey/src/shared/journeyRemote.js', 'lobby/shared/sync.json', 'checkin/index.html', 'checkin/ym/index.html', 'checkin/desk-transport.js', 'checkin/cloud-crypto.js', 'checkin/clubs.js', 'checkin/brand/fonts.css', 'links/index.html', 'logo/index.html', 'classic.html', 'robots.txt', 'lobby/showcase.html', 'lobby/countdown-showcase.html', 'lobby/settings-showcase.html', 'journey/showcase.html', 'journey/remote/showcase.html', 'checkin/showcase.html']) {
+for (const must of ['index.html', 'lobby/index.html', 'lobby/countdown.html', 'lobby/settings.html', 'journey/index.html', 'journey/remote/index.html', 'classroom/index.html', 'classroom/version.json', 'classroom/src/logic.js', 'journey/remote/remote.js', 'journey/src/shared/journeyRemote.js', 'lobby/shared/sync.json', 'checkin/index.html', 'checkin/ym/index.html', 'checkin/desk-transport.js', 'checkin/cloud-crypto.js', 'checkin/clubs.js', 'checkin/brand/fonts.css', 'links/index.html', 'logo/index.html', 'tools/handbook-form/index.html', 'classic.html', 'robots.txt', 'lobby/showcase.html', 'lobby/countdown-showcase.html', 'lobby/settings-showcase.html', 'journey/showcase.html', 'journey/remote/showcase.html', 'checkin/showcase.html']) {
   if (!existsSync(path.join(OUT, must))) throw new Error(`site build is missing ${must}`);
 }
 console.log(`\n✓ site/dist built for ${ORIGIN} (build ${BUILD_ID.slice(0, 7)})`);

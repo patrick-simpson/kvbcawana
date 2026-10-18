@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<meta name="color-scheme" content="light dark">
+<title>Handbook Form</title>
+<link rel="stylesheet" href="/lobby/shared/brand/fonts.css">
+<style>
+/* A setup aid (worker/src/routes.md 10.11): shows TwoTimTwo's handbook page form, no names. Unlisted. */
+:root { --page: #F3F6FA; --paper: #FFFFFF; --ink: #231F20; --muted: #5B6573; --line: #D7DEE8; --hot: #CF4518; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --page: #12161C; --paper: #1C2129; --ink: #EEF1F5; --muted: #A3ADBB; --line: #2E3642; }
+}
+:root[data-theme="dark"] { --page: #12161C; --paper: #1C2129; --ink: #EEF1F5; --muted: #A3ADBB; --line: #2E3642; }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--page); color: var(--ink); font: 400 1rem/1.5 "Figtree", system-ui, -apple-system, "Segoe UI", sans-serif; }
+main { max-width: 960px; margin: 0 auto; padding: 32px 16px 64px; display: grid; gap: 16px; }
+h1 { margin: 0; font: 400 clamp(1.6rem, 5vw, 2.4rem)/1.1 "Paytone One", "Arial Rounded MT Bold", system-ui, sans-serif; }
+p { margin: 0; color: var(--muted); max-width: 65ch; }
+.row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+button { font: 600 1rem "Figtree", system-ui, sans-serif; padding: 10px 18px; border-radius: 10px; border: 2px solid var(--ink); background: var(--paper); color: var(--ink); cursor: pointer; }
+button.primary { background: var(--hot); border-color: var(--hot); color: #FFFFFF; }
+button:disabled { opacity: 0.5; cursor: default; }
+pre { margin: 0; padding: 16px; background: var(--paper); border: 1px solid var(--line); border-radius: 10px; overflow: auto; max-height: 70vh; font: 0.85rem/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; white-space: pre; }
+#status { color: var(--ink); font-weight: 600; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Handbook form</h1>
+  <p>This reads the form on TwoTimTwo's handbook report page once (no children's names, just the boxes and choices) so the report can be printed by itself later. Copy what shows below and paste it back to Claude.</p>
+  <div class="row">
+    <button id="read" class="primary" type="button">Read again</button>
+    <button id="copy" type="button" disabled>Copy</button>
+    <span id="status" role="status"></span>
+  </div>
+  <pre id="out"></pre>
+</main>
+<script>
+(() => {
+  const SESSION_KEY = 'awanaSyncSession.v1';
+  const out = document.getElementById('out');
+  const status = document.getElementById('status');
+  const readBtn = document.getElementById('read');
+  const copyBtn = document.getElementById('copy');
+  let text = '';
+
+  function session() {
+    try { return String(localStorage.getItem(SESSION_KEY) || '').trim(); } catch { return ''; }
+  }
+
+  async function read() {
+    const s = session();
+    if (!s) {
+      status.textContent = 'Sign in at awana.kvbchurch.org/settings first, then reload this page.';
+      readBtn.disabled = true;
+      return;
+    }
+    readBtn.disabled = true;
+    copyBtn.disabled = true;
+    status.textContent = 'Reading TwoTimTwo… this can take up to a minute.';
+    try {
+      const res = await fetch('/api/v1/print/handbook-form', { headers: { Authorization: 'Bearer ' + s }, cache: 'no-store' });
+      let body = null;
+      try { body = await res.json(); } catch { body = null; }
+      text = JSON.stringify({ status: res.status, body }, null, 2);
+      out.textContent = text;
+      copyBtn.disabled = false;
+      status.textContent = res.status === 401
+        ? 'Sign in at awana.kvbchurch.org/settings first, then reload this page.'
+        : res.ok ? 'Done. Press Copy.' : 'TwoTimTwo did not answer as hoped. Copy this anyway.';
+    } catch {
+      status.textContent = 'Could not reach the service. Check the internet and press Read again.';
+    } finally {
+      readBtn.disabled = false;
+    }
+  }
+
+  copyBtn.addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(text);
+      status.textContent = 'Copied.';
+    } catch {
+      const range = document.createRange();
+      range.selectNodeContents(out);
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(range);
+      status.textContent = 'Selected. Press Ctrl+C (or Cmd+C) to copy.';
+    }
+  });
+  readBtn.addEventListener('click', read);
+  read();
+})();
+</script>
+</body>
+</html>
