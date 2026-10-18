@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from 'react';
+import { useLayoutEffect, useRef, useState, useMemo } from 'react';
 import { flushSync } from 'react-dom';
 import { M } from '../lib/motion.jsx';
 import { DUR, EASE, SHAPES } from '../lib/brand.js';
@@ -128,6 +128,16 @@ export default function CheckoutBoard({ decision, checkout, calm, demo = false, 
     ? `${box ? `${box.width}x${box.height}` : '-'}|${(checkout?.entries || []).map((e) => `${e.club}/${e.firstName}`).join(',')}`
     : '';
   const extraN = extra.key === fitKey ? extra.n : 0;
+  const entries = checkout?.entries;
+  // ⚡ Bolt: Cache expensive club grouping and palette lookups to avoid re-calculating on every render
+  const clubs = useMemo(() => {
+    if (!listed) return [];
+    return groupByClub(entries || [], getAllClubs()).map((g) => {
+      const club = getClubPalette(g.club);
+      return { ...g, palette: club, mark: Boolean(club.logo) };
+    });
+  }, [listed, entries]);
+
   // No dependency list on purpose: the check has to run after EVERY render,
   // including the one useFontsReady makes when the faces arrive, and it stops
   // by itself (it only acts while the run overflows).
@@ -141,14 +151,6 @@ export default function CheckoutBoard({ decision, checkout, calm, demo = false, 
     }
   });
   if (!shown) return null;
-
-  const entries = checkout?.entries || [];
-  const clubs = listed
-    ? groupByClub(entries, getAllClubs()).map((g) => {
-      const club = getClubPalette(g.club);
-      return { ...g, palette: club, mark: Boolean(club.logo) };
-    })
-    : [];
   let fit = null;
   let nameSize;
   if (listed && box) {

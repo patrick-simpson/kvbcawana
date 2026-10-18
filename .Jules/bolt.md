@@ -1,0 +1,3 @@
+## 2026-10-18 - [CheckoutBoard useMemo]
+**Learning:** In a React codebase utilizing extensive custom palettes and deep nested component props on each rerender, it is important to cache heavy derived lists using useMemo. Also note that utilizing logical fallback assignments '|| []' directly inside dependency arrays flags eslint warnings, so these defaults should be pushed inside hook bodies where appropriate.
+**Action:** Always extract default data manipulations inside the hook itself rather than manipulating before to prevent breaking `react-hooks/exhaustive-deps` when evaluating array variables like 'entries' that have potential undefined states.
