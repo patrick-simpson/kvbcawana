@@ -1419,3 +1419,43 @@ paid). Code: `health.js`, test `test/health.test.js`.
   or anything from a secret. NO TwoTimTwo read and no seal: `cloud:status`,
   `calendar` and `stations` from storage, the client's memory. Like `GET
   /v1/cloud/status` it arms the watcher's alarm (the cron's safety net).
+
+### 10.11 The handbook form (setup aid; BUILT, owner 2026-10-18)
+
+Step 1 of printing TwoTimTwo's handbook check-off report
+(`/meeting/handbook`) for Cubbies, Sparks and T&T before every club night:
+nobody here knows that page's form, so this route shows it. Code:
+`handbook.js`, test `test/handbook.test.js`. The site's unlisted helper page
+`/tools/handbook-form/` calls it with the browser's sync session and shows the
+answer to copy.
+
+| Route | Auth | Answer |
+| --- | --- | --- |
+| `GET /v1/print/handbook-form` | session | the page's form structure, below |
+
+```
+{ ok: true, cached, readAt, path,               // path: the final page's pathname (no query)
+  title, headings: [text...],                   // <title>; h1-h3 text, at most 10
+  forms: [{ action, hasQuery, method, id,       // action without its query string
+    controls: [{ tag, type?, name, id, value?, checked?, label?,
+                 multiple?, optionCount?, options?: [{value, text, selected}], withheld? }],
+    controlsTruncated? }],
+  looseControls: [control...] }                 // controls outside any <form>
+```
+
+- ONE read of `/meeting/handbook` through the client's `page()` (its sign-in
+  and lapsed-session handling) on the one read clock as an interactive read
+  (`INTERACTIVE_WAIT_MS`, kind `handbook-form`); the answer is kept in memory
+  10 minutes (`HANDBOOK_FORM_TTL_MS`), so repeated presses cost no read;
+  presses at once share the read. Nothing is stored.
+- Only forms, title and headings are looked at: never a table, list or other
+  text. Hidden and password values are `"(hidden)"`. A control whose name or
+  id names a child (clubber, child, kid, student, member, person, ...) is
+  `withheld: true`: no label, value or option texts (the count is kept), and
+  digits in its name and id are masked `N`. Texts at most 80 chars, 200
+  options a select, 300 controls a form, 20 forms.
+- Refusals: 401 without a session; 503 `not-configured` (no TwoTimTwo
+  secrets); 429 `read-busy` with `retryAfterMs`; 502 `signed-out` when the
+  page is the login form; 502 with the client's own code otherwise
+  (`twotimtwo-down`, `login-refused`, `login-backoff`, `timeout`, `network`,
+  `http-404`, ...). A refusal is never kept.

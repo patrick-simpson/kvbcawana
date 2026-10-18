@@ -57,7 +57,7 @@ export function checkoutPage({ calendarId = '368', date = '2026-10-14', rows = [
  * A stand-in TwoTimTwo: /site/login with a CSRF token and a session cookie,
  * a signed-in report, and the login form for anything without the cookie.
  */
-export function fakeTwoTimTwo({ password = 'right-pass', report = () => page(table('Sparks ', [{ id: 1, name: 'Ada Tester' }])), checkin = () => CHECKIN_PAGE, checkout = () => checkoutPage(), households = null, attendance = null, roster = null, books = null, meeting = null } = {}) {
+export function fakeTwoTimTwo({ password = 'right-pass', report = () => page(table('Sparks ', [{ id: 1, name: 'Ada Tester' }])), checkin = () => CHECKIN_PAGE, checkout = () => checkoutPage(), households = null, attendance = null, roster = null, books = null, meeting = null, handbook = null } = {}) {
   const calls = [];
   let session = 0;
   const live = new Set();
@@ -100,6 +100,11 @@ export function fakeTwoTimTwo({ password = 'right-pass', report = () => page(tab
     if (u.pathname === '/clubber/csv' && roster) return csvOf(roster());
     if (u.pathname === '/report/completed_books' && books) return csvOf(books(u.searchParams.get('club_id'), u.searchParams.get('from_date'), u.searchParams.get('to_date')));
     if (u.pathname === '/meeting/report' && meeting) return csvOf(meeting(u.searchParams.get('calendar_id')));
+    // The handbook check-off page (handbook.js): `handbook()` answers its HTML, or a Response.
+    if (u.pathname === '/meeting/handbook' && handbook) {
+      const h = handbook();
+      return h instanceof Response ? h : new Response(h, { status: 200 });
+    }
     if (u.pathname === '/clubber/checkinclubber' && init.method === 'POST') {
       state.checkins.push(body);
       return new Response(state.checkinReply ?? `<b>${state.checkinName ?? 'Kit Tester'}</b> 6:02 pm`, { status: 200 });

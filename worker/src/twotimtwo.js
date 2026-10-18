@@ -91,7 +91,7 @@ export function isLoginPage(html) {
  * into exactly the tree the extension's DOMParser sees in Chrome.
  * @param {string} html
  */
-function documentOf(html) {
+export function documentOf(html) {
   return parseHTML(serialize(parse(String(html || '')))).document;
 }
 
@@ -934,7 +934,7 @@ export class TwoTimTwoClient {
    * (readbudget.js).
    * @param {string} path
    * @param {{ waitMs?: number, kind?: string, priority?: boolean, urgent?: boolean }} [opts]
-   * @returns {Promise<{ok: true, html: string} | {ok: false, error: string, retryAfterMs?: number}>}
+   * @returns {Promise<{ok: true, html: string, path: string} | {ok: false, error: string, retryAfterMs?: number}>}
    */
   async page(path, opts = {}) {
     // The caller's wait is for the first request; once one is made the rest queue
@@ -965,7 +965,7 @@ export class TwoTimTwoClient {
       // already open (the household export, 2026-10-11).
       if (res.status === 403 && attempt === 0) continue;
       if (res.status !== 200) return { ok: false, error: res.status >= 500 ? 'twotimtwo-down' : `http-${res.status}` };
-      return { ok: true, html: res.html };
+      return { ok: true, html: res.html, path: res.path };
     }
     return { ok: false, error: 'signed-out' };
   }

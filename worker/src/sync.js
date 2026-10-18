@@ -73,6 +73,7 @@ import { Church, mountChurch } from './church.js';
 import { Notices, mountNotice } from './notice.js';
 import { mountOverview } from './overview.js';
 import { mountHealth } from './health.js';
+import { mountHandbook } from './handbook.js';
 
 export { json };
 
@@ -262,6 +263,7 @@ export class SyncCore {
     mountOverview(this.registry, this);   // /v1/tonight/overview (routes.md 10.6)
     mountHealth(this.registry, this);   // /v1/health/checkin: is check-in ready tonight, no passphrase (routes.md 10.10)
     mountBarf(this.registry, this);   // /v1/desk/barf, /v1/desk/barf-late: a late BARF friend (routes.md 5.1)
+    mountHandbook(this.registry, this);   // /v1/print/handbook-form: the handbook page's form, a setup aid (routes.md 10.11)
   }
 
   /**
