@@ -2,7 +2,7 @@
 
 The plans for the Awana screens and check-in, one section per track. Each track has the owner's decisions (dated), what exists today, the design, the status, and what is still to do. Read a track's status before you touch the code it names.
 
-Tracks: [Settings page](#settings-page) · [Online check-in](#online-check-in) · [Cloud check-in](#cloud-check-in) · [Online only](#online-only) · [KVBC Awana one app](#kvbc-awana-one-app) · [Switch-day cleanup](#switch-day-cleanup) · [Downstairs classroom](#downstairs-classroom)
+Tracks: [Settings page](#settings-page) · [Online check-in](#online-check-in) · [Cloud check-in](#cloud-check-in) · [Online only](#online-only) · [KVBC Awana one app](#kvbc-awana-one-app) · [Switch-day cleanup](#switch-day-cleanup) · [Downstairs classroom](#downstairs-classroom) · [Handbook sheets](#handbook-sheets)
 
 ## Settings page
 
@@ -1206,3 +1206,14 @@ Nothing; the three items below are done (kept as the record).
 - **The Sparks screen** (owner, "very involved much like the Journey screen, with different styles of content"): its own lesson/content flow for the Sparks half hour, to be designed with the owner. The classroom folder, its build id and its schedule are the home for it.
 - Register the classroom page with /settings Screens (a `classroom` kind in `worker/src/screens.js` + `sanitizeScreenStatus`), if the owner wants it listed beside the computer row (the PC's own `computer` row already shows it).
 
+## Handbook sheets
+
+### The owner's decisions (2026-10-18)
+- Every club night at 4:00 pm Eastern, print TwoTimTwo's handbook check-off report for Cubbies, Sparks and T&T on the downstairs Epson, by ONE email with three PDFs from the owner's Gmail to its Epson Connect address. Share balances on Sparks and T&T only. Retry at 4:15 and 4:30, then fail the GitHub job (GitHub emails the owner). Full names on the sheets approved (Epson cloud).
+
+### Status
+- Built 2026-10-18: Worker `GET /v1/print/handbook` (routes.md 10.12, token `HANDBOOK_TOKEN` or session), job `.github/workflows/handbook-print.yml` + `scripts/handbook/`. Rules: CLAUDE.md "Handbook sheets".
+- Not yet seen live: whether TwoTimTwo answers the report as a PDF or an HTML page (both handled; an HTML page is printed to a Letter PDF with TwoTimTwo's own stylesheets, loaded with no sign-in, so a stylesheet behind the sign-in would be missing). Check the first dry run's sheets by eye.
+
+### Still to do
+- Owner: create the GitHub secret `HANDBOOK_TOKEN` (a long random value), re-run CI with `deploy_worker` ticked, then a dry run from the Actions tab.

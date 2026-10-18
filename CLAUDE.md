@@ -30,6 +30,7 @@ This one repo holds three apps for Kennebec Valley Baptist Church's Awana club:
 - The release workflow (`printer-release.yml`) builds the KVBC Awana installer (`desktop-release.yml` went with the old sound room app). Installer files are kept one day, then deleted by a cleanup job. The update feeds live on our site, not on GitHub's "Latest" releases.
 - `brand-catalog-release.yml` is run by hand. It downloads the large catalog PDF to a release. Never add that PDF to the repo.
 - Nightly bots commit to `main`. `lobby-update-calendar.yml` and `journey-update-lesson.yml` run each night. `clean-artifacts.yml` deletes old workflow files to save storage.
+- `checkin-health.yml` (Wednesdays about 5:12 and 5:47 pm Eastern) and `handbook-print.yml` (4:00 pm Eastern daily, does its work only on club nights; "Handbook sheets" below) are scheduled checks/jobs; a failed run emails the owner.
 
 ## Costs: everything stays free
 
@@ -53,6 +54,11 @@ This one repo holds three apps for Kennebec Valley Baptist Church's Awana club:
 ## Club transitions
 
 - Every hand-off between two clubs' views on a club-night screen gets a pure black gap of `TRANSITION_GAP_MIN` minutes before and after it (owner 2026-10-17: 2), ONE number in `shared/transitionGap.js` (`gapAround`, `inTransitionGap`, `periodsFor` lays a night's views end to end and cuts the gaps; a gap's welcomed clubs are both neighbours' clubs, as data). Change it there and every screen moves together. Pure ES module, no imports: an app gets a byte copy from `scripts/family-assets.mjs` (the classroom and Journey, beside their `clubNight.js`). The gap welcomes' rules live there too (`WELCOME_MS` 20 s, `welcomeFor` one card per club deduped by id, `welcomesUp`, `welcomeWords`, `clubIdOf`): ONE copy for every screen that welcomes in a gap; the names come from the embedded lobby's `hostCheckin` hand-up (lobby section). Tests `shared/transitionGap.test.js` (lobby vitest). Never spell a gap edge (6:58, 7:02...) in app code; derive it.
+
+## Handbook sheets
+
+- Owner 2026-10-18: every club night at 4:00 pm Eastern, TwoTimTwo's handbook check-off report for Cubbies, Sparks and T&T (share balances on Sparks and T&T only) prints on the downstairs Epson: `.github/workflows/handbook-print.yml` runs `scripts/handbook/handbook-print.mjs`, which asks the Worker `GET /api/v1/print/handbook?club=` (`worker/src/handbook.js`, `worker/src/routes.md` 10.12; one form read for `cal_id`, kept 10 min, and one report read per club on the one read clock; not a club day = `noClub`, no read) and emails ONE message with three PDFs (an HTML answer printed to a Letter PDF by Chromium; no text body, the Epson would print it) from the owner's Gmail (secrets `GMAIL_USER`, `GMAIL_APP_PASSWORD`; own small SMTP client `scripts/handbook/smtp.mjs`, no mail package) to kvbcdownstairs@print.epsonconnect.com. Fails: tried again 15 and 30 min later, then the job fails (GitHub emails the owner). Manual run: `to` and `dry_run` (mails GMAIL_USER instead).
+- Auth: Worker secret `HANDBOOK_TOKEN` (pushed by ci.yml's "Set the Worker's secrets" from the GitHub secret of the same name when present) as `Authorization: Bearer`, or a signed-in session. Full names on the sheets are approved by the owner (Epson's cloud); the report body is never parsed, stored, cached or logged by the Worker, and the job logs only status codes, content types and sizes, never uploads the PDFs. Tests: `worker/test/handbook-sheets.test.js`, `scripts/handbook/test/` (ci job `handbook`).
 
 ## Keeping it simple and safe
 
