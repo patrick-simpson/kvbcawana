@@ -149,7 +149,9 @@ export const SCREEN_ACTIONS = {
   lobby: Object.freeze(['preview-checkin', 'reset-tally', 'board-demo']),
   // slide-next/slide-prev and the backups are the opening-ceremony remote's
   // (owner 2026-10-19; /lobby/projector-remote.html).
-  projector: Object.freeze(['select', 'resume', 'slide-next', 'slide-prev', 'backup', 'backup-end']),
+  // slide-go is the gym projector telling every mirror (the lobby during the
+  // ceremony) which slide it is on: {index}, past the deck's end = games.
+  projector: Object.freeze(['select', 'resume', 'slide-next', 'slide-prev', 'backup', 'backup-end', 'slide-go']),
   journey: Object.freeze(['start-downloads', 'pause-downloads', 'resume-downloads', 'stop-downloads', 'delete-downloads']),
   computer: Object.freeze([]),
 };
@@ -232,14 +234,19 @@ export function sanitizeScreenSettings(kind, raw) {
 /**
  * One action for a screen of this kind, or null. Only the projector's wall
  * pick (checked exactly as the projector checks a relayed one) and its
- * ceremony backup (one of PROJECTOR_BACKUPS) carry data.
+ * ceremony backup (one of PROJECTOR_BACKUPS) and its slide-go (a slide
+ * index 0..49) carry data.
  * @param {unknown} kind
  * @param {unknown} action
  * @param {unknown} [data]
- * @returns {{action: string, data?: {type: 'countdown'} | {type: 'window', index: number} | {what: string}} | null}
+ * @returns {{action: string, data?: {type: 'countdown'} | {type: 'window', index: number} | {what: string} | {index: number}} | null}
  */
 export function sanitizeScreenAction(kind, action, data) {
   if (!isScreenKind(kind) || typeof action !== 'string' || !SCREEN_ACTIONS[kind].includes(action)) return null;
+  if (kind === 'projector' && action === 'slide-go') {
+    const index = /** @type {any} */ (data)?.index;
+    return Number.isInteger(index) && index >= 0 && index < 50 ? { action, data: { index } } : null;
+  }
   if (kind === 'projector' && action === 'backup') {
     const what = /** @type {any} */ (data)?.what;
     return PROJECTOR_BACKUPS.includes(what) ? { action, data: { what } } : null;

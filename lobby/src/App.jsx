@@ -93,6 +93,7 @@ import { useWatchdogReload } from './hooks/useWatchdogReload.js';
 import { useBuildReload } from './hooks/useBuildReload.js';
 import { useTallerThan } from './hooks/useTallerThan.js';
 import { hostCheckin, hostDoorbell, isEmbedded } from './lib/embed.js';
+import { useCeremonyMirror } from './hooks/useCeremonyMirror.js';
 import { isConfigureMode, isSettingsPage, listenForRelay, relayToScreen } from './lib/configureRelay.js';
 import { BACKGROUND_VIDEO_CHANGED_EVENT } from './components/VideoBackground.jsx';
 import { BOARD_DEMO_MS, BUILD_QUIET_MS, SHARE_DEBOUNCE_MS, COUNTS_WITHOUT_NAMES_MS, TONIGHT_STALE_MS, DROPPED_GRACE_MS, EMBED_FULLSCREEN_MESSAGE, LAYER_FAULT_SHOW_MS, MILESTONE_TOAST_MS, OPS_FAILURES_MAX, SETUP_CARD_QUIET_MS } from './lib/constants.js';
@@ -139,6 +140,13 @@ const WAITING_ENTER = withSquish(
   holdThenLand(0, DUR.pop, { opacity: 0, scale: 0.6 }, { opacity: 1, scale: 1 }, EASE.pop),
   squishLand(0, 'chip', DUR.pop, 'pop'),
 );
+
+// The ceremony mirror turns the lobby over to the projector by zooming the
+// projector's wall up from just under full size, and hands it back by
+// shrinking it away (transform and opacity only; instant under zero
+// animation). Its last values are at rest: shown full size, or gone.
+const MIRROR_SHOW = { opacity: 1, scale: 1, transition: { duration: 0.7, ease: EASE.settle } };
+const MIRROR_HIDE = { opacity: 0, scale: 0.86, transition: { duration: 0.6, ease: EASE.exit } };
 
 export default function App() {
   // ?config=<url>: centrally-managed overrides fetched once at startup,
@@ -209,7 +217,20 @@ export default function App() {
   // WAITING chip, then play in full), so a rehearsal never hides a child.
   const [promoPreview, setPromoPreview] = useState(/** @type {{ promo: any, at: number } | null} */ (null));
   const previewUp = !FLAGS.overlay && promoPreview != null;
-  const checkInsHeld = checkInsHeldNow({ overlay: FLAGS.overlay, slideSpecial: slideInfo.special, previewUp });
+  // `specialDates` is the shared schedule's break-week table (#342) — the same
+  // file the projector reads. resolvePhase already applies it (a cancelled
+  // night is 'off'); the calendar slides need it too, so nights-remaining and
+  // the heads-up slide agree with the projector.
+  const { phase, specialDates, schedule: sharedSchedule, source: scheduleSource } = useSchedule(config);
+  // The opening ceremony on the lobby (owner 2026-10-19): the projector's own
+  // page, mirrored from 6:00 until T&T game time (lib/ceremonyMirror.js). It
+  // covers the wall like a promo poster does and holds check-ins the same way
+  // (WAITING chip; the names play as one run when the lobby comes back).
+  const { mounted: mirrorMounted, up: mirrorUp, frameRef: mirrorFrameRef, query: mirrorQuery } = useCeremonyMirror({
+    schedule: sharedSchedule, embedded: isEmbedded(), configure: CONFIGURE, settingsPage: SETTINGS_PAGE, overlay: FLAGS.overlay,
+  });
+  const coverUp = previewUp || mirrorUp;
+  const checkInsHeld = checkInsHeldNow({ overlay: FLAGS.overlay, slideSpecial: slideInfo.special, previewUp: coverUp });
   const {
     currentEvent, run: checkInRun, step: checkInStep, enqueue, skipCurrent, pending, gap: checkInGap,
   } = useCheckInQueue(config, { held: checkInsHeld });
@@ -234,11 +255,6 @@ export default function App() {
   const showTallyRef = useRef(config.showTally);
   useEffect(() => { showTallyRef.current = config.showTally; }, [config.showTally]);
   const { hasSeen, markSeen, stats: seenStats } = useSeenEvents();
-  // `specialDates` is the shared schedule's break-week table (#342) — the same
-  // file the projector reads. resolvePhase already applies it (a cancelled
-  // night is 'off'); the calendar slides need it too, so nights-remaining and
-  // the heads-up slide agree with the projector.
-  const { phase, specialDates, source: scheduleSource } = useSchedule(config);
   const phaseRef = useRef(phase);
   useEffect(() => { phaseRef.current = phase; }, [phase]);
   useTheme(config);
@@ -1075,7 +1091,7 @@ export default function App() {
     celebrationUp: celebration != null,
     celebrationsQueued: celebrationDepth(),
     settingsOpen,
-    previewUp,
+    previewUp: coverUp,
     slideEditorOpen,
     debugOpen,
     boardVisible: boardDecision.state !== BOARD_HIDDEN,
@@ -1083,7 +1099,7 @@ export default function App() {
     lastEventAt,
     now: Date.now(),
     quietMs: BUILD_QUIET_MS,
-  }), [currentEvent, pending, celebration, celebrationDepth, settingsOpen, previewUp, slideEditorOpen, debugOpen,
+  }), [currentEvent, pending, celebration, celebrationDepth, settingsOpen, coverUp, slideEditorOpen, debugOpen,
     boardDecision.state, leaveNow, lastEventAt]);
   useBuildReload(buildReloadBusy);
 
@@ -1412,7 +1428,7 @@ export default function App() {
   // A promo poster is full-bleed art with its own header where the band
   // sits: a band notice steps aside for it as it does for a toast (a poster
   // always moves on, since it holds check-ins), and comes back after.
-  const posterHeld = posterIsHeld({ checkInsHeld, slidePoster: slideInfo.poster, previewUp });
+  const posterHeld = posterIsHeld({ checkInsHeld, slidePoster: slideInfo.poster, previewUp: coverUp });
   const stageClass = stageClassName({
     overlay, aprilFools, checkInUp: currentEvent != null, critical: room.critical, flagsUp,
   });
@@ -1502,6 +1518,33 @@ export default function App() {
           </div>
         </ErrorBoundary>
       )}
+
+      {/* The opening ceremony, mirrored (owner 2026-10-19): the projector's own
+          page, loaded hidden a little before 6:00, turned over to the moment
+          its ceremony starts and handed back when T&T game time does. */}
+      <AnimatePresence>
+      {mirrorMounted && (
+        <ErrorBoundary key="ceremony-mirror" label="ceremony-mirror" onError={() => recordLayerFault('ceremony-mirror')}>
+          <M.div
+            className="lobby-mirror"
+            data-testid="ceremony-mirror"
+            data-up={mirrorUp ? '1' : '0'}
+            aria-hidden={!mirrorUp}
+            initial={false}
+            animate={mirrorUp ? MIRROR_SHOW : MIRROR_HIDE}
+            exit={MIRROR_HIDE}
+          >
+            <iframe
+              ref={mirrorFrameRef}
+              className="lobby-mirror__frame"
+              title="The game time projector"
+              src={`./countdown.html?mirror=1${config.reduceMotion ? '&vr=1' : ''}${mirrorQuery}`}
+              tabIndex={-1}
+            />
+          </M.div>
+        </ErrorBoundary>
+      )}
+      </AnimatePresence>
 
       {/* Ambient particles (#26): snow / rain / sparkles just above the
           background, below every widget and banner. Signage only (never on

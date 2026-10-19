@@ -16,6 +16,11 @@
 //   ?configure=1 — the operator menu alone, for the sound room app's
 //                  Settings window (views/ConfigureView.jsx); its wall picks
 //                  are relayed to the live projector (src/lib/configureRelay.js).
+//   ?mirror=1    — the lobby's copy of the projector during the opening
+//                  ceremony (owner 2026-10-19): no menus, silent, never a
+//                  registered screen; follows the gym projector's slide-go
+//                  announcements and backups, and tells its host frame
+//                  whether the ceremony is on (App.jsx useMirror).
 
 function readFlags() {
   try {
@@ -25,9 +30,10 @@ function readFlags() {
       vr: params.get('vr') === '1',
       view: params.get('view'),
       configure: params.get('configure') === '1',
+      mirror: params.get('mirror') === '1',
     };
   } catch {
-    return { freeze: false, vr: false, view: null, configure: false };
+    return { freeze: false, vr: false, view: null, configure: false, mirror: false };
   }
 }
 

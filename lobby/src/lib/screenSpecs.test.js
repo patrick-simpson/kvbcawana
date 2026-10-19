@@ -77,7 +77,7 @@ describe('the other kinds', () => {
     const app = readFileSync(resolve(__dirname, '../presentation/App.jsx'), 'utf8');
     expect(app).toContain("listenForRelay('projector', ['select', 'resume']");
     // The relay's two, then the opening-ceremony remote's four (owner 2026-10-19).
-    expect(SCREEN_ACTIONS.projector).toEqual(['select', 'resume', 'slide-next', 'slide-prev', 'backup', 'backup-end']);
+    expect(SCREEN_ACTIONS.projector).toEqual(['select', 'resume', 'slide-next', 'slide-prev', 'backup', 'backup-end', 'slide-go']);
     expect(sanitizeScreenAction('projector', 'select', { type: 'countdown', x: 1 })).toEqual({ action: 'select', data: { type: 'countdown' } });
     expect(sanitizeScreenAction('projector', 'select', { type: 'window', index: 1.5 })).toBeNull();
     expect(sanitizeScreenAction('lobby', 'select', { type: 'countdown' })).toBeNull();
@@ -93,6 +93,11 @@ describe('the other kinds', () => {
     expect(sanitizeScreenAction('projector', 'slide-next', { by: 9 })).toEqual({ action: 'slide-next' });
     expect(sanitizeScreenAction('projector', 'backup-end')).toEqual({ action: 'backup-end' });
     expect(sanitizeScreenAction('lobby', 'slide-next')).toBeNull();
+    // The gym projector's slide announcement for its mirrors.
+    expect(sanitizeScreenAction('projector', 'slide-go', { index: 3, x: 1 })).toEqual({ action: 'slide-go', data: { index: 3 } });
+    expect(sanitizeScreenAction('projector', 'slide-go', { index: 50 })).toBeNull();
+    expect(sanitizeScreenAction('projector', 'slide-go', { index: -1 })).toBeNull();
+    expect(sanitizeScreenAction('projector', 'slide-go')).toBeNull();
   });
 
   it('an unknown kind keeps nothing', () => {

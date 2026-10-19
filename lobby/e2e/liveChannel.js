@@ -48,6 +48,14 @@ export async function liveChannel(page) {
     await expect.poll(() => sockets.length, { timeout: 10000 }).toBeGreaterThan(0);
     sockets[sockets.length - 1].send(JSON.stringify({ e: event, d: data }));
   };
+  // Every socket the page has opened, as the Worker broadcasts (a page with a
+  // frame of its own on the channel, like the lobby's ceremony mirror).
+  send.all = async (event, data) => {
+    await expect.poll(() => sockets.length, { timeout: 10000 }).toBeGreaterThan(0);
+    for (const ws of sockets) {
+      try { ws.send(JSON.stringify({ e: event, d: data })); } catch { /* a socket the page already closed */ }
+    }
+  };
   byPage.set(page, send);
   return send;
 }

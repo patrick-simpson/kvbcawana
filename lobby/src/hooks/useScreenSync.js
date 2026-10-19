@@ -58,6 +58,27 @@ function setThisScreen(patch) {
   listeners.forEach((fn) => fn());
 }
 
+/**
+ * Every projector's actions as they ring, whatever its id (the lobby's mirror
+ * of the projector follows the gym projector's slide-go and backups; it is
+ * never a registered screen of its own). Cleaned by the projector's
+ * allowlist; the Worker only rings an action for a screen of that kind.
+ * @param {(action: string, data: unknown, id: string) => void} fn
+ * @returns {() => void} unsubscribe
+ */
+export function listenToProjectors(fn) {
+  return onSyncDoorbell((what, payload) => {
+    if (what !== 'screen-action' || !payload || typeof payload.id !== 'string') return;
+    const clean = sanitizeScreenAction('projector', payload.action, payload.data);
+    if (clean) fn(clean.action, clean.data, payload.id);
+  });
+}
+
+/** This page's screen id, once useScreenSync has one (null before, or when it does not register). */
+export function thisScreenId() {
+  return thisScreen.id;
+}
+
 /** What this page is registered as (a name field reads it). @returns {ThisScreen} */
 export function useThisScreen() {
   return useSyncExternalStore(

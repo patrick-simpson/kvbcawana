@@ -13,6 +13,21 @@ export function onRemoteStep(fn) {
   return () => { listeners.delete(fn); };
 }
 
+/** @type {Set<(index: number) => void>} */
+const goers = new Set();
+
+/** Listen for "go to slide N" (a mirror following the gym projector); returns the unsubscribe. @param {(index: number) => void} fn */
+export function onRemoteGo(fn) {
+  goers.add(fn);
+  return () => { goers.delete(fn); };
+}
+
+/** Send the deck on the wall to slide `index` (past its end = hand off to games). @param {number} index @returns {boolean} heard */
+export function remoteGo(index) {
+  for (const fn of goers) fn(index);
+  return goers.size > 0;
+}
+
 /** Send one step to the deck on the wall. @param {1 | -1} dir @returns {boolean} heard */
 export function remoteStep(dir) {
   for (const fn of listeners) fn(dir);

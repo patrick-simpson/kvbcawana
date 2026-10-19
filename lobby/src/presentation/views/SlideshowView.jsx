@@ -8,7 +8,7 @@ import { LEAVE_TOTAL, holdThen } from '../lib/landing.js';
 import { HOUSE } from '../lib/kit.js';
 import { useKeydown } from '../hooks/index.js';
 import { slideGesture, useTouch } from '../lib/touch.js';
-import { onRemoteStep } from '../lib/remoteSteps.js';
+import { onRemoteGo, onRemoteStep } from '../lib/remoteSteps.js';
 import { ColorSweep } from '../components/ColorSweep.jsx';
 import { StepChip } from '../components/StepChip.jsx';
 import { Slide } from './Slide.jsx';
@@ -38,7 +38,7 @@ const CHANGE_HOLD = LEAVE_TOTAL + 0.02;
  * mid-wall carries on across and off it (unmounting it would snap its waves
  * off the wall in one frame).
  */
-export const SlideshowView = ({ deck, now, onExit, onFinish, onBareChange }) => {
+export const SlideshowView = ({ deck, now, onExit, onFinish, onBareChange, onIndexChange }) => {
   // "Upcoming Awana Nights": when the calendar knows about upcoming
   // events (same calendar-feed.json the lobby display reads), the
   // closing deck ENDS on a slide announcing them — goodnight plays
@@ -81,6 +81,7 @@ export const SlideshowView = ({ deck, now, onExit, onFinish, onBareChange }) => 
       // first game window (onFinish, wired in App.jsx) — one more press
       // of the same arrow key on the final blackout starts T&T games.
       // Decks without a hand-off (closing) simply hold their last slide.
+      if (onFinish) onIndexChange?.(slides.length);
       onFinish?.();
       return;
     }
@@ -155,6 +156,21 @@ export const SlideshowView = ({ deck, now, onExit, onFinish, onBareChange }) => 
     stepRef.current = (dir) => (dir === 1 ? goNext() : goPrev());
   });
   useEffect(() => onRemoteStep((dir) => stepRef.current(dir)), []);
+  // A mirror following the gym projector: straight to its slide (past the
+  // end = the hand-off to games, as one more press would be).
+  const goRef = useRef(/** @type {(to: number) => void} */ (() => {}));
+  useEffect(() => {
+    goRef.current = (to) => { if (to !== index) goTo(to, to > index ? 1 : -1); };
+  });
+  useEffect(() => onRemoteGo((to) => goRef.current(to)), []);
+  // Tell App every slide this deck moves to (the gym projector announces it
+  // for its mirrors); the first slide at mount is not a move.
+  const lastIndex = useRef(index);
+  useEffect(() => {
+    if (lastIndex.current === index) return;
+    lastIndex.current = index;
+    onIndexChange?.(index);
+  }, [index, onIndexChange]);
 
   useKeydown((e) => {
     if (['Space', 'ArrowRight', 'PageDown'].includes(e.code)) {

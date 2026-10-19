@@ -4160,3 +4160,25 @@ html.configure-mode .panel-backdrop { background: #F6F4EF; }
   }
   .joy-burst { display: none; }
 }
+
+/* ── The opening ceremony, mirrored (App.jsx, lib/ceremonyMirror.js) ──────────
+   The projector's own page over the whole stage, at the preview's level so
+   the status sticker, the flags and the WAITING chip stay on top. Loaded
+   hidden (opacity 0, never display:none, so it lays out and is ready at
+   6:00); it takes no clicks. Black behind it, like the gym's wall. */
+.lobby-mirror {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  background: #000000;
+  opacity: 0;
+  pointer-events: none;
+}
+.lobby-mirror__frame {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: #000000;
+}

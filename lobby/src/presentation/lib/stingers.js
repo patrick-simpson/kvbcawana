@@ -27,6 +27,12 @@ function readStored() {
   }
 }
 
+/** The lobby's mirror of the projector (?mirror=1) never sounds: silent for this page alone, nothing stored. */
+let silenced = false;
+export function silenceStingers() {
+  silenced = true;
+}
+
 export function stingersEnabled() {
   return enabled;
 }
@@ -86,7 +92,7 @@ export function unlockStingers() {
  * adds a third note for the final milestone.
  */
 export function playStinger(intensity = 0.5) {
-  if (!enabled) return;
+  if (!enabled || silenced) return;
   const ac = audioCtx();
   if (!ac) return;
   try {

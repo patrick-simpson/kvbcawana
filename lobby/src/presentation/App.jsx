@@ -17,7 +17,7 @@ import { ViewErrorBoundary, ErrorScreen } from './components/ViewErrorBoundary.j
 import { ChurchMark } from './components/ChurchMark.jsx';
 import { ResumePill } from './components/ResumePill.jsx';
 import { BackupView } from './components/BackupView.jsx';
-import { remoteStep } from './lib/remoteSteps.js';
+import { remoteGo, remoteStep } from './lib/remoteSteps.js';
 import { SetupChecklist } from './components/SetupChecklist.jsx';
 import { CountdownView } from './views/CountdownView.jsx';
 import { GameTimeView } from './views/GameTimeView.jsx';
@@ -27,13 +27,19 @@ import { QuickNav } from './views/QuickNav.jsx';
 import { TouchMenu } from './views/TouchMenu.jsx';
 import { ConfigureView } from './views/ConfigureView.jsx';
 import { listenForRelay, relayToScreen } from '../lib/configureRelay.js';
-import { useScreenSync } from '../hooks/useScreenSync.js';
+import { listenToProjectors, sendScreenAction, thisScreenId, useScreenSync } from '../hooks/useScreenSync.js';
 import { lowPowerPreference, setLowPowerPreference, subscribeLowPower } from './hooks/useLowPower.js';
-import { setStingersEnabled, stingersEnabled, subscribeStingers, unlockStingers } from './lib/stingers.js';
+import { setStingersEnabled, silenceStingers, stingersEnabled, subscribeStingers, unlockStingers } from './lib/stingers.js';
 import { isTouch, usePortrait, useTouch } from './lib/touch.js';
 
 const OPENING_WINDOW_INDEX = 0;
 const CONFIGURE = FLAGS.configure;
+// The lobby's copy of the projector during the opening ceremony (?mirror=1;
+// owner 2026-10-19): silent, no menus, never a registered screen.
+const MIRROR = FLAGS.mirror && !CONFIGURE;
+if (MIRROR) silenceStingers();
+/** The message a mirror sends its host frame (lobby src/lib/embed.js reads the same string). */
+export const MIRROR_MESSAGE = 'awana-display:projector-mirror';
 
 /** A backup screen the remote asked for (already cleaned by useScreenSync; checked again). */
 const isBackup = (t) => Boolean(t) && ['us-flag', 'awana-flag', 'verse'].includes(t.what);
@@ -144,7 +150,7 @@ export const App = () => {
 
   // The projector must never doze off mid-countdown (same shared hook
   // as the signage page — on the presentation import allowlist).
-  useWakeLock(!CONFIGURE);
+  useWakeLock(!CONFIGURE && !MIRROR);
 
   // Self-updating (see CLAUDE.md, "Self-updating pages"): the projector picks
   // up a new deploy on its own, and only while nobody is watching it count.
@@ -217,8 +223,48 @@ export const App = () => {
     return () => window.removeEventListener('keydown', onKey, { capture: true });
   }, [backup]);
 
+  // The gym projector announces every slide its opening deck moves to (any
+  // cause: keys, the remote, its own timer) as a slide-go for its mirrors;
+  // it ignores its own echo. A mirror never announces.
+  const announceSlide = useCallback((index) => {
+    if (CONFIGURE || MIRROR) return;
+    const id = thisScreenId();
+    if (id) sendScreenAction(id, 'slide-go', { index });
+  }, []);
+
+  // A mirror follows every projector's announcements and backups. A slide-go
+  // while it still counts down (the gym started early) opens the ceremony
+  // first and goes to that slide once the deck is up.
+  const pendingGo = useRef(/** @type {number | null} */ (null));
+  const mirrorState = useRef(state);
+  useEffect(() => { mirrorState.current = state; }, [state]);
+  useEffect(() => {
+    if (!MIRROR) return undefined;
+    return listenToProjectors((action, data) => {
+      const s = mirrorState.current;
+      if (action === 'slide-go') {
+        const index = /** @type {{index: number}} */ (data).index;
+        if (s.mode === AppMode.SLIDESHOW && s.deck === 'opening') remoteGo(index);
+        else if (s.mode === AppMode.COUNTDOWN) { pendingGo.current = index; select({ type: 'window', index: OPENING_WINDOW_INDEX }); }
+      } else if (action === 'backup' && isBackup(data)) setBackup(/** @type {any} */ (data).what);
+      else if (action === 'backup-end') setBackup(null);
+    });
+  }, [select]);
+  useEffect(() => {
+    if (pendingGo.current === null || state.mode !== AppMode.SLIDESHOW) return;
+    const index = pendingGo.current;
+    pendingGo.current = null;
+    remoteGo(index);
+  }, [state]);
+  // ...and tells its host (the lobby) whether the ceremony is on.
+  const ceremony = state.mode === AppMode.SLIDESHOW && state.deck === 'opening';
+  useEffect(() => {
+    if (!MIRROR || window.parent === window) return;
+    try { window.parent.postMessage({ type: MIRROR_MESSAGE, ceremony }, window.location.origin); } catch { /* host gone */ }
+  }, [ceremony]);
+
   useProjectorScreen({
-    enabled: !CONFIGURE,
+    enabled: !CONFIGURE && !MIRROR,
     onAction: (action, target) => {
       if (action === 'resume') resume();
       else if (action === 'select' && isTarget(target)) select(target);
@@ -265,6 +311,7 @@ export const App = () => {
               onSelect={select}
               firstGameIndex={firstGameIndex}
               onBareChange={setBare}
+              onIndexChange={announceSlide}
             />
           </ViewErrorBoundary>
         </motion.div>
@@ -277,7 +324,7 @@ export const App = () => {
 
       <ChurchMark hidden={bare && !backup} full={state.mode === AppMode.SHUTDOWN} />
 
-      {touch ? (
+      {MIRROR ? null : touch ? (
         <TouchMenu
           now={now}
           state={state}
@@ -293,8 +340,8 @@ export const App = () => {
       ) : (
         <QuickNav now={now} state={state} isOverride={isOverride} onSelect={select} onResume={resume} socketStatus={socketStatus} />
       )}
-      {isOverride && <ResumePill now={now} resumeAt={resumeAt} onStay={stay} />}
-      {touch ? <SetupChecklist touch onSetUp={() => setMenu('display')} /> : <SetupChecklist />}
+      {!MIRROR && isOverride && <ResumePill now={now} resumeAt={resumeAt} onStay={stay} />}
+      {MIRROR ? null : touch ? <SetupChecklist touch onSetUp={() => setMenu('display')} /> : <SetupChecklist />}
     </div>
     </MotionConfig>
   );
@@ -318,7 +365,7 @@ const slugFor = (state) =>
     [AppMode.SHUTDOWN]: 'shutdown',
   })[state.mode];
 
-const ActiveView = ({ state, now, tally, meetingTheme, onSelect, firstGameIndex, onBareChange }) => {
+const ActiveView = ({ state, now, tally, meetingTheme, onSelect, firstGameIndex, onBareChange, onIndexChange }) => {
   switch (state.mode) {
     case AppMode.COUNTDOWN:
       return (
@@ -338,6 +385,7 @@ const ActiveView = ({ state, now, tally, meetingTheme, onSelect, firstGameIndex,
           now={now}
           onExit={() => onSelect({ type: 'countdown' })}
           onBareChange={onBareChange}
+          onIndexChange={state.deck === 'opening' ? onIndexChange : undefined}
           onFinish={
             state.deck === 'opening' && firstGameIndex !== -1
               ? () => onSelect({ type: 'window', index: firstGameIndex })
