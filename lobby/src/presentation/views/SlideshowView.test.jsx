@@ -36,7 +36,10 @@ describe('SlideshowView: the operator\'s keys still drive the deck', () => {
     const { container } = render(deck());
     expect(current(container)).toBe(ORDER[0]);
     expect(container.textContent).toMatch(/Wednesday night/);
-    expect(container.textContent).toMatch(/WELCOME TO AWANA/);
+    // The grand welcome (owner 2026-10-19): WELCOME letter by letter, TO, the
+    // church's full logo (a drawing), one label for the whole sequence.
+    expect(container.querySelector('[role="img"][aria-label="Welcome to Awana"]')).not.toBeNull();
+    expect(container.querySelector('.pj-grand__word').textContent).toBe('WELCOME');
     // No change yet, so no sweep on the wall.
     expect(container.querySelector('[data-sweep]')).toBeNull();
   });
@@ -125,8 +128,11 @@ describe('SlideshowView: the operator\'s keys still drive the deck', () => {
   it('the blackout reports a bare wall (App takes the mark away) and back again', () => {
     const onBareChange = vi.fn();
     render(deck({ onBareChange }));
-    expect(onBareChange).toHaveBeenLastCalledWith(false);
+    // The grand welcome draws the church's full logo itself, so the corner's
+    // steps aside for it too (never two church logos at once).
+    expect(onBareChange).toHaveBeenLastCalledWith(true);
     press('Space');
+    expect(onBareChange).toHaveBeenLastCalledWith(false);
     press('Space');
     press('Space');
     expect(onBareChange).toHaveBeenLastCalledWith(true);

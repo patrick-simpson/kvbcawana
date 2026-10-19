@@ -93,7 +93,9 @@ export const SlideshowView = ({ deck, now, onExit, onFinish, onBareChange }) => 
   const goPrev = () => goTo(index - 1, -1);
 
   // The closing blackout is a bare wall: tell App to take the mark away.
-  const bare = slide.layout === 'black';
+  // The grand welcome draws the church's full logo itself, so the corner's
+  // steps aside too: never two church logos at once.
+  const bare = slide.layout === 'black' || slide.layout === 'grand-welcome';
   useEffect(() => {
     onBareChange?.(bare);
   }, [bare, onBareChange]);

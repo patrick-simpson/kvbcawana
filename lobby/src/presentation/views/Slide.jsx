@@ -14,6 +14,7 @@ import { useFontsReady } from '../hooks/useFontsReady.js';
 import { ambientVariants, partVariants } from '../lib/landing.js';
 import { PLEDGE_FIT, PLEDGE_FIT_PORTRAIT, fitPledge } from '../lib/pledgeFit.js';
 import { usePortrait } from '../lib/touch.js';
+import { GrandWelcome } from './GrandWelcome.jsx';
 
 /**
  * One slide, laid out by its explicit `layout` field, in the kit's three
@@ -29,6 +30,9 @@ export const Slide = ({ slide, now, events, hold = 0, onNext }) => {
   // no clock, no ambient layers. Checked before anything below reads
   // slide.title (the doodle seed) so a black slide truly renders nothing else.
   if (slide.layout === 'black') return <div className="w-full h-full" style={{ background: '#000000' }} />;
+  // The grand welcome is a sequence of its own on the black wall (no doodles,
+  // no particles: the bands, the letters and the logo are the show).
+  if (slide.layout === 'grand-welcome') return <GrandWelcome now={now} hold={hold} />;
 
   return (
     <ScreenFrame

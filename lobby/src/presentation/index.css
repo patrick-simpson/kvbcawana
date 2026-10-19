@@ -372,6 +372,83 @@
   white-space: nowrap;
   pointer-events: none;
 }
+/* The grand welcome (views/GrandWelcome.jsx; owner 2026-10-19): the
+   opening's first slide, on the black wall. Sizes in projector units; the
+   letters' offsets are hard (zero blur), the logo plain white. */
+.pj-grand {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: #000000;
+}
+.pj-grand__bands {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.pj-grand__band {
+  position: absolute;
+  top: -10%;
+  bottom: -10%;
+  left: 0;
+  width: 22%;
+}
+.pj-grand .pj-frame {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.pj-grand__kicker {
+  margin-top: calc(5 * var(--u));
+  margin-bottom: calc(1 * var(--u));
+}
+.pj-grand__word {
+  margin: calc(0.4 * var(--u)) 0 0;
+  font-family: var(--font-display);
+  font-size: calc(9.6 * var(--u));
+  line-height: 0.9;
+  color: #FFFFFF;
+  white-space: nowrap;
+}
+.pj-grand__letter {
+  display: inline-block;
+}
+.pj-grand__to {
+  margin: calc(1.2 * var(--u)) 0 0;
+  font-family: var(--font-condensed);
+  font-size: calc(3 * var(--u));
+  line-height: 1;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #FFFFFF;
+}
+.pj-grand__logo {
+  display: block;
+  margin-top: calc(1.8 * var(--u));
+  width: max(calc(50 * var(--u)), 520px);
+  height: auto;
+  overflow: visible;
+}
+.pj-grand__marks {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: calc(3.6 * var(--u));
+  margin-top: calc(3.6 * var(--u));
+  max-width: calc(90 * var(--u));
+}
+/* Each mark fits a box (the marks run from square T&T to long JOURNEY), so
+   the six together stay inside the frame; whole and unstretched. */
+.pj-grand__mark {
+  display: block;
+  flex: 0 1 auto;
+  min-width: 0;
+  width: auto;
+  height: calc(5 * var(--u));
+  max-width: calc(13 * var(--u));
+  object-fit: contain;
+}
+
 /* The opening-ceremony remote's backups (components/BackupView.jsx): one
    screen over whatever is up, under the church's logo and the menus. A flag
    beside its pledge, or the verse alone. Flat: no blur, no gradient. */
@@ -1477,6 +1554,14 @@
 
   /* ── The shutdown screen ── */
   .pj-shutdown { padding-bottom: calc(36 * var(--u)); }
+
+  /* ── The grand welcome: the same stack, lower and wider in a tall frame ── */
+  .pj-grand__kicker { margin-top: calc(40 * var(--u)); }
+  .pj-grand__word { font-size: calc(17 * var(--u)); }
+  .pj-grand__to { font-size: calc(6 * var(--u)); }
+  .pj-grand__logo { width: calc(88 * var(--u)); }
+  .pj-grand__marks { flex-wrap: wrap; max-width: calc(80 * var(--u)); gap: calc(5 * var(--u)); }
+  .pj-grand__mark { height: calc(11 * var(--u)); }
 
   /* ── The ceremony remote's backups: the flag over its pledge ── */
   .pj-backup__row { flex-direction: column; justify-content: center; text-align: center; top: calc(24 * var(--u)); bottom: calc(24 * var(--u)); }

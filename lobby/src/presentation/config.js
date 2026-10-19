@@ -37,9 +37,10 @@ export const DECKS = {
   opening: [
     {
       id: 'welcome',
-      layout: 'celebration',
+      // The grand welcome (views/GrandWelcome.jsx; owner 2026-10-19): 15 s, silent.
+      layout: 'grand-welcome',
       title: 'WELCOME TO AWANA',
-      duration: 10,
+      duration: 15,
     },
     {
       id: 'us-pledge',
