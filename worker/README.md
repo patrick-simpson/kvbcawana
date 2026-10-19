@@ -213,7 +213,7 @@ one silent for a month.
 | `GET /v1/screens/<id>/settings` | `{screen, settings: {savedAt, settings} \| null}` |
 | `PUT /v1/screens/<id>/settings` `{settings}` | `{savedAt, settings, dropped}`; the whole layer, through the kind's allowlist |
 | `PUT /v1/screens/<id>/name` `{name}` | `{screen}` |
-| `POST /v1/screens/<id>/action` `{action, data?}` | `{ok, delivered}`; lobby: `preview-checkin`, `reset-tally`, `board-demo`; projector: `select`, `resume`; journey: `start-downloads`, `pause-downloads`, `resume-downloads`, `stop-downloads`, `delete-downloads`, QUEUED (`{ok, delivered: false, queued: true}`, at most 5, 10 min) and handed over once in the kiosk's next hello answer (`actions`; `src/routes.md` 10.8) |
+| `POST /v1/screens/<id>/action` `{action, data?}` | `{ok, delivered}`; lobby: `preview-checkin`, `reset-tally`, `board-demo`; projector: `select`, `resume`, and the opening-ceremony remote's `slide-next`, `slide-prev`, `backup` `{what: us-flag|awana-flag|verse}`, `backup-end`; journey: `start-downloads`, `pause-downloads`, `resume-downloads`, `stop-downloads`, `delete-downloads`, QUEUED (`{ok, delivered: false, queued: true}`, at most 5, 10 min) and handed over once in the kiosk's next hello answer (`actions`; `src/routes.md` 10.8) |
 | `DELETE /v1/screens/<id>` | `{forgotten}`; a screen still running comes back at its next hello |
 
 A settings change, a rename and an action ring the live channel only (never
