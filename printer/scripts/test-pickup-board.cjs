@@ -92,7 +92,11 @@ async function serverSuite() {
   fs.writeFileSync(path.join(dataDir, 'config.json'), JSON.stringify({
     printerName: 'Fake',  }, null, 2));
   const now = Date.now();
-  const row = (r, minsAgo) => Object.assign({ clubName: 'Sparks', printer: 'Fake', success: true, timestamp: new Date(now - minsAgo * 60000).toISOString() }, r);
+  // "Tonight" is this computer's local day: in the first minutes after midnight
+  // a row N minutes back would be yesterday's. Keep every row after midnight
+  // (still oldest = most minutes ago, all before the report's `at`).
+  const midnight = new Date(now).setHours(0, 0, 0, 0);
+  const row = (r, minsAgo) => Object.assign({ clubName: 'Sparks', printer: 'Fake', success: true, timestamp: new Date(Math.max(now - minsAgo * 60000, midnight + (10 - minsAgo) * 100)).toISOString() }, r);
   fs.writeFileSync(path.join(dataDir, 'print-history.json'), JSON.stringify([
     row({ firstName: 'Zed', lastName: 'Walker', visitor: true }, 1),
     row({ firstName: 'Mia', lastName: 'Reed', clubberId: '77', clubName: 'T&T' }, 2),
