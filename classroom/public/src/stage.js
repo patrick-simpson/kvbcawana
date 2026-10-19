@@ -189,6 +189,16 @@ export async function createStage(deps) {
     words.textContent = b.text;
     page.append(words);
     layer.append(page);
+    if (b.look !== 'board') {
+      const badge = document.createElement('div');
+      badge.className = 'cr-show-badge';
+      badge.setAttribute('aria-hidden', 'true');
+      const mark = document.createElement('img');
+      mark.src = 'brand/logos/sparks-color.svg';
+      mark.alt = '';
+      badge.append(mark);
+      layer.append(badge);
+    }
     fitText(words, page);
   }
 

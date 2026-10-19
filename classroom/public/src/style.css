@@ -488,8 +488,27 @@ html.cr-welcoming .cr-sparks .cr-sp-ring { translate: calc(-4 * var(--u)) calc(-
   padding: calc(3 * var(--u)) calc(5 * var(--u));
   overflow: hidden;
 }
-.cr-show--page .cr-show-page { background: #ffffff; border-radius: calc(4 * var(--u)); box-shadow: calc(1.2 * var(--u)) calc(1.2 * var(--u)) 0 #1C6B33; }
-.cr-show-heading { margin: 0 0 calc(1.4 * var(--u)); font-family: var(--cr-shout); font-size: calc(3.6 * var(--u) * var(--cr-shout-fit)); line-height: 1.05; color: var(--cr-sparks); }
+.cr-show--page .cr-show-page { background: #ffffff; border-radius: calc(5 * var(--u)) calc(5 * var(--u)) calc(5 * var(--u)) calc(1.4 * var(--u)); box-shadow: calc(1.2 * var(--u)) calc(1.2 * var(--u)) 0 #1C6B33; }
+/* The HangGlider handbook's sun arc sweeping off the right edge (behind the page). */
+.cr-show--page::before {
+  content: '';
+  position: absolute; right: calc(-30 * var(--u)); top: calc(-8 * var(--u));
+  width: calc(56 * var(--u)); height: calc(72 * var(--u)); border-radius: 50%;
+  border: calc(3.4 * var(--u)) solid var(--cr-sun);
+  box-shadow: inset 0 0 0 calc(1.6 * var(--u)) #F7941D;
+}
+/* ... and its round badge in a double green ring, the Sparks mark inside, on the page's corner. */
+.cr-show-badge {
+  position: absolute; z-index: 1;
+  right: calc(5 * var(--u)); top: calc(3 * var(--u));
+  width: calc(14 * var(--u)); height: calc(14 * var(--u)); border-radius: 50%;
+  background: #ffffff; border: calc(0.6 * var(--u)) solid #1C6B33;
+  box-shadow: 0 0 0 calc(0.6 * var(--u)) #ffffff, 0 0 0 calc(1.2 * var(--u)) #2E9B48;
+  display: grid; place-items: center;
+}
+.cr-show-badge img { width: 78%; height: auto; }
+.cr-show--page .cr-show-page { padding-right: calc(13 * var(--u)); }
+.cr-show-heading { margin: 0 0 calc(1.4 * var(--u)); font-family: var(--cr-shout); font-size: calc(3.6 * var(--u) * var(--cr-shout-fit)); line-height: 1.05; color: #C8202F; }
 .cr-show-words {
   margin: 0;
   font-family: var(--cr-shout);

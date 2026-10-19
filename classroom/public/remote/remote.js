@@ -178,6 +178,13 @@ function render() {
 }
 
 const KIND = { video: 'Video', image: 'Picture', pdf: 'PDF', text: 'Text' };
+// The handbook's round badges: one drawn mark per kind (24 grid, stroked; fixed markup, never data).
+const ICONS = {
+  video: '<svg viewBox="0 0 24 24"><path d="M9 7l8 5-8 5z" fill="currentColor"/></svg>',
+  image: '<svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="14" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M5 17l5-5 4 4 2-2 3 3"/></svg>',
+  pdf: '<svg viewBox="0 0 24 24"><path d="M7 3h7l4 4v14H7z"/><path d="M14 3v4h4M10 12h5M10 15h5M10 18h3"/></svg>',
+  text: '<svg viewBox="0 0 24 24"><path d="M5 18L9.5 6h1L15 18M6.8 14h6.4"/><path d="M17 11.5c1.5-1 4-.6 4 1.5V18m0-3c-2-.5-4 0-4 1.6 0 1.4 2.2 1.8 4 .2"/></svg>',
+};
 function drawTiles(box, list, shown) {
   const key = JSON.stringify([list.map((b) => [b.id, b.title, b.kind]), shown && shown.id]);
   if (box.dataset.key === key) return;
@@ -190,11 +197,16 @@ function drawTiles(box, list, shown) {
     t.dataset.button = b.id;
     t.setAttribute('aria-pressed', String(Boolean(shown && shown.id === b.id)));
     const name = document.createElement('span');
+    name.className = 'tile-name';
     name.textContent = b.title;
+    const badge = document.createElement('span');
+    badge.className = 'tile-badge';
+    badge.setAttribute('aria-hidden', 'true');
+    badge.innerHTML = ICONS[b.kind] || '';
     const kind = document.createElement('span');
     kind.className = 'tile-kind';
     kind.textContent = KIND[b.kind] || '';
-    t.append(name, kind);
+    t.append(name, badge, kind);
     return t;
   }));
   box.hidden = list.length === 0;
