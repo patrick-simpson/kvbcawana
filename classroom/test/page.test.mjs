@@ -97,6 +97,34 @@ describe('the cards fit', { skip: SKIP }, () => {
   }
 });
 
+describe('the opening ceremony', { skip: SKIP }, () => {
+  // Owner 2026-10-19: "ALL screens should show the games projector display.
+  // Classroom ... included." The embedded lobby shows the projector itself and
+  // says so; this page raises its frame over the black for it.
+  const word = (up) => ({ type: 'awana-display:ceremony-mirror', up });
+  const lobbyShown = (page) => page.evaluate(() => getComputedStyle(document.getElementById('lobby')).visibility === 'visible');
+  it('the lobby frame comes up over the black while its mirror is up, and goes when it ends', async () => {
+    const page = await open('?now=2026-10-14T22:01:00Z'); // Wednesday 6:01 pm Eastern
+    await page.waitForFunction(() => document.documentElement.dataset.phase === 'off');
+    // Not from the frame: ignored.
+    await page.evaluate((m) => window.postMessage(m, location.origin), word(true));
+    await page.waitForTimeout(1200);
+    assert.equal(await lobbyShown(page), false);
+    const frame = page.frame({ url: /\/lobby\/\?club=sparks/ });
+    await frame.evaluate((m) => window.postMessage({ post: m }, location.origin), word(true));
+    await page.waitForTimeout(300);
+    assert.equal(await lobbyShown(page), false, 'waits for the lobby\'s own mirror to arrive first');
+    await page.waitForFunction(() => document.documentElement.classList.contains('cr-mirror'), null, { timeout: 3000 });
+    assert.equal(await lobbyShown(page), true);
+    assert.equal(await page.evaluate(() => getComputedStyle(document.getElementById('lobby')).zIndex), '7');
+    await frame.evaluate((m) => window.postMessage({ post: m }, location.origin), word(false));
+    await page.waitForFunction(() => !document.documentElement.classList.contains('cr-mirror') && !document.documentElement.classList.contains('cr-mirror-leaving'), null, { timeout: 3000 });
+    assert.equal(await lobbyShown(page), false);
+    assert.equal(await page.evaluate(() => document.documentElement.dataset.phase), 'off');
+    await page.close();
+  });
+});
+
 describe('welcomes', { skip: SKIP }, () => {
   const checkin = (id, firstName, club) => ({ type: 'awana-display:checkin', id, firstName, club });
   it('come from the lobby frame only, for the card\'s club only', async () => {

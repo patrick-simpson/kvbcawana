@@ -23,13 +23,16 @@ export const MIRROR_OVERRUN_MS = 20 * 60 * 1000;
 
 /**
  * Whether the hidden mirror should be loaded now: in the ceremony, or within
- * MIRROR_PRELOAD_MS of it, on a club night the shared schedule knows. Never
- * in an embedded lobby (Journey's check-in display, the classroom's frame),
- * the configure or settings page, or an OBS overlay feed.
- * @param {{ schedule: any, now: Date, embedded?: boolean, configure?: boolean, settingsPage?: boolean, overlay?: boolean }} q
+ * MIRROR_PRELOAD_MS of it, on a club night the shared schedule knows. An
+ * embedded lobby runs it too (owner 2026-10-19: "ALL screens should show the
+ * games projector display. Classroom and journey included": Journey's
+ * check-in display shows it, the classroom raises its frame for it). Never
+ * the home page's showcase twin, the configure or settings page, or an OBS
+ * overlay feed.
+ * @param {{ schedule: any, now: Date, showcase?: boolean, configure?: boolean, settingsPage?: boolean, overlay?: boolean }} q
  */
-export function mirrorWanted({ schedule, now, embedded = false, configure = false, settingsPage = false, overlay = false }) {
-  if (embedded || configure || settingsPage || overlay) return false;
+export function mirrorWanted({ schedule, now, showcase = false, configure = false, settingsPage = false, overlay = false }) {
+  if (showcase || configure || settingsPage || overlay) return false;
   return resolvePhase(schedule, now) === 'ceremony'
     || resolvePhase(schedule, new Date(now.getTime() + MIRROR_PRELOAD_MS)) === 'ceremony';
 }

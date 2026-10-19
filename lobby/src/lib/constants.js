@@ -130,6 +130,18 @@ export const EMBED_DOORBELL_MESSAGE = 'awana-display:sync-doorbell';
 // All sides spell the string the same way (lib/embed.test.js reads them).
 export const EMBED_CHECKIN_MESSAGE = 'awana-display:checkin';
 
+// The opening ceremony, handed UP to the page framing this one (owner
+// 2026-10-19: "when the opening is happening ALL screens should show the
+// games projector display. Classroom and journey included"): a framed lobby
+// runs the projector mirror too (lib/ceremonyMirror.js) and tells its host
+// whenever the mirror goes up or comes down: `{type, up}`, nothing else
+// (lib/embed.js hostMirror), at THIS page's own origin, never in configure
+// mode. The classroom (classroom/public/src/app.js) raises its lobby frame
+// over the black while it is up, unless the screen is busy; Journey
+// (journey/src/schedule/30-ceremony-mirror.js) holds its self-update.
+// All sides spell the string the same way (lib/embed.test.js reads them).
+export const EMBED_MIRROR_MESSAGE = 'awana-display:ceremony-mirror';
+
 // Self-updating pages (see CLAUDE.md, "Self-updating pages"). A display that
 // has been running for days polls version.json this often, and again on the
 // browser's `online` event no more than once per BUILD_ONLINE_MIN_MS, because

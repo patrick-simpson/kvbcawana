@@ -58,6 +58,10 @@ html, body {
 #lobby { background: var(--cr-sky); visibility: hidden; pointer-events: none; }
 #lobby.is-entering { z-index: 6; }
 html[data-phase="lobby"] #lobby { visibility: visible; }
+/* The opening ceremony (app.js drawMirror): the lobby frame, showing the game
+   time projector, over the black and the cards; under the remote's swoop. */
+html.cr-mirror #lobby,
+html.cr-mirror-leaving #lobby { visibility: visible; z-index: 7; }
 
 .cr-black { background: #000000; z-index: 5; display: none; }
 html[data-phase="black"] .cr-black,
@@ -583,6 +587,8 @@ html[data-phase="configure"] .cr-black { display: none; }
   html.cr-motion .cr-card.is-leaving .cr-title { animation: cr-sink 2400ms ease-in-out forwards; }
   html.cr-motion .cr-card.is-entering { animation: cr-in 2400ms ease-in-out backwards; }
   html.cr-motion #lobby.is-entering { animation: cr-in 2400ms ease-in-out backwards; }
+  html.cr-motion.cr-mirror #lobby { animation: cr-in 600ms ease-out backwards; }
+  html.cr-motion.cr-mirror-leaving #lobby { animation: cr-out 600ms ease-in forwards; }
 
   /* The bear: in from the right, a wave, back out. */
   html.cr-motion .cr-bear.is-peeking { animation: cr-peek 6s ease-in-out forwards; }

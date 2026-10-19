@@ -92,7 +92,7 @@ import {
 import { useWatchdogReload } from './hooks/useWatchdogReload.js';
 import { useBuildReload } from './hooks/useBuildReload.js';
 import { useTallerThan } from './hooks/useTallerThan.js';
-import { hostCheckin, hostDoorbell, isEmbedded } from './lib/embed.js';
+import { hostCheckin, hostDoorbell, hostMirror, isEmbedded } from './lib/embed.js';
 import { useCeremonyMirror } from './hooks/useCeremonyMirror.js';
 import { isConfigureMode, isSettingsPage, listenForRelay, relayToScreen } from './lib/configureRelay.js';
 import { BACKGROUND_VIDEO_CHANGED_EVENT } from './components/VideoBackground.jsx';
@@ -227,9 +227,20 @@ export default function App() {
   // covers the wall like a promo poster does and holds check-ins the same way
   // (WAITING chip; the names play as one run when the lobby comes back).
   const { mounted: mirrorMounted, up: mirrorUp, frameRef: mirrorFrameRef, query: mirrorQuery } = useCeremonyMirror({
-    schedule: sharedSchedule, embedded: isEmbedded(), configure: CONFIGURE, settingsPage: SETTINGS_PAGE, overlay: FLAGS.overlay,
+    schedule: sharedSchedule, showcase: SHOWCASE, configure: CONFIGURE, settingsPage: SETTINGS_PAGE, overlay: FLAGS.overlay,
   });
   const coverUp = previewUp || mirrorUp;
+  // Framed (the classroom, the Journey kiosk), the host is told when the
+  // mirror goes up and comes down (lib/embed.js hostMirror): the classroom
+  // raises this frame over its black for it, Journey holds its self-update.
+  // Nothing is said until the mirror first goes up (a host starts at "down").
+  const mirrorToldRef = useRef(false);
+  useEffect(() => {
+    if (CONFIGURE || !isEmbedded()) return;
+    if (!mirrorUp && !mirrorToldRef.current) return;
+    mirrorToldRef.current = true;
+    try { window.parent.postMessage(hostMirror(mirrorUp), window.location.origin); } catch { /* no parent to tell */ }
+  }, [mirrorUp]);
   const checkInsHeld = checkInsHeldNow({ overlay: FLAGS.overlay, slideSpecial: slideInfo.special, previewUp: coverUp });
   const {
     currentEvent, run: checkInRun, step: checkInStep, enqueue, skipCurrent, pending, gap: checkInGap,

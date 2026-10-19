@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { embed } from './embedHost.js';
 import { liveChannel } from './liveChannel.js';
 
 // The lobby mirrors the game time projector during the opening ceremony
@@ -52,4 +53,21 @@ test('the lobby turns over to the projector at 6:00; names wait and play when ga
   await expect(frame.locator('[data-mode="game-time"]')).toBeAttached();
   await expect(mirror).toHaveAttribute('data-up', '0');
   await expect(page.locator('.stage')).toContainText(/Penelope/i, { timeout: 15000 });
+});
+
+// Owner 2026-10-19: "ALL screens should show the games projector display.
+// Classroom and journey included." Framed (the Journey kiosk, the classroom),
+// the lobby runs the same mirror and tells its host when it is up.
+test('a framed lobby shows the opening too and tells its host', async ({ page }) => {
+  await page.addInitScript(() => {
+    window.awanaMirrorTuning = { wanted: true, query: `&now=${encodeURIComponent('2026-09-16T17:59:58-04:00')}` };
+    if (location.pathname.endsWith('/journey-host.html')) {
+      window.__said = [];
+      addEventListener('message', (e) => { if (e.data && e.data.type === 'awana-display:ceremony-mirror') window.__said.push(e.data); });
+    }
+  });
+  const frame = await embed(page);
+  const mirror = frame.locator('[data-testid="ceremony-mirror"]');
+  await expect(mirror).toHaveAttribute('data-up', '1', { timeout: 10000 });
+  await expect.poll(() => page.evaluate(() => window.__said)).toEqual([{ type: 'awana-display:ceremony-mirror', up: true }]);
 });

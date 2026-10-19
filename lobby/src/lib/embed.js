@@ -24,7 +24,7 @@
 // is laid out exactly as it always was.
 
 import { sanitizeJourneyPress } from '../../../shared/journeyRemote.js';
-import { EMBED_CHECKIN_MESSAGE, EMBED_DOORBELL_MESSAGE } from './constants.js';
+import { EMBED_CHECKIN_MESSAGE, EMBED_DOORBELL_MESSAGE, EMBED_MIRROR_MESSAGE } from './constants.js';
 
 /**
  * Whether this page is inside another page's frame: the same test the
@@ -98,6 +98,16 @@ export function hostCheckin(payload) {
     club: typeof p.club === 'string' ? p.club.slice(0, 40) : '',
   };
   return p.oneOff === true ? { ...message, oneOff: true } : message;
+}
+
+/**
+ * What a host is told of the opening ceremony (constants.js
+ * EMBED_MIRROR_MESSAGE): whether the projector mirror is on this page now.
+ * @param {unknown} up
+ * @returns {{ type: string, up: boolean }}
+ */
+export function hostMirror(up) {
+  return { type: EMBED_MIRROR_MESSAGE, up: up === true };
 }
 
 /**

@@ -15,16 +15,16 @@ const tuning = () => (typeof window !== 'undefined' && /** @type {any} */ (windo
  * The lobby's mirror of the projector during the opening ceremony (rules:
  * lib/ceremonyMirror.js). `mounted`: the hidden frame is loaded; `up`: the
  * mirror says its ceremony is on, so the lobby shows it and holds check-ins.
- * @param {{ schedule: any, embedded: boolean, configure: boolean, settingsPage: boolean, overlay: boolean }} q
+ * @param {{ schedule: any, showcase: boolean, configure: boolean, settingsPage: boolean, overlay: boolean }} q
  */
-export function useCeremonyMirror({ schedule, embedded, configure, settingsPage, overlay }) {
+export function useCeremonyMirror({ schedule, showcase, configure, settingsPage, overlay }) {
   const frameRef = useRef(/** @type {HTMLIFrameElement | null} */ (null));
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {
     const t = setInterval(() => setNow(new Date()), TICK_MS);
     return () => clearInterval(t);
   }, []);
-  const wanted = tuning().wanted === true || mirrorWanted({ schedule, now, embedded, configure, settingsPage, overlay });
+  const wanted = tuning().wanted === true || mirrorWanted({ schedule, now, showcase, configure, settingsPage, overlay });
 
   const [said, setSaid] = useState(false);
   const [wantedUntil, setWantedUntil] = useState(0);

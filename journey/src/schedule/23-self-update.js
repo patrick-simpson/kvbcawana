@@ -48,6 +48,8 @@ let lastVersionCheckMs = 0;
    press Begin: all of those are the room's, not ours. In practice this means
    the Check-in Display is showing, or the Journey window has ended. */
 function safeToReload() {
+  // The opening ceremony on the Check-in Display (30): the room is watching.
+  if (ceremonyMirrorShowing()) return false;
   // A club transition's black with no welcome on it is nobody's to watch
   // (the black is only ever up when nothing below is being watched; the
   // splash waiting under it is not on screen yet).

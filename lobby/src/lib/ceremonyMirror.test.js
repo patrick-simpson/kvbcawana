@@ -21,11 +21,15 @@ describe('the ceremony mirror', () => {
     expect(wanted(wed('18:05:00'))).toBe(false);
   });
 
-  it('never on another night, a cancelled night, or a page that is not the lobby TV', () => {
+  it('a framed lobby runs it too (the Journey kiosk, the downstairs classroom; owner 2026-10-19)', () => {
+    expect(wanted(wed('18:01:00'), { embedded: true })).toBe(true);
+  });
+
+  it('never on another night, a cancelled night, or a page that is not a screen', () => {
     expect(wanted(new Date('2026-09-17T18:01:00'))).toBe(false); // a Thursday
     const off = { ...DEFAULT_SCHEDULE, specialDates: { '2026-09-16': { noClub: true } } };
     expect(mirrorWanted({ schedule: off, now: wed('18:01:00') })).toBe(false);
-    for (const flag of ['embedded', 'configure', 'settingsPage', 'overlay']) {
+    for (const flag of ['showcase', 'configure', 'settingsPage', 'overlay']) {
       expect(wanted(wed('18:01:00'), { [flag]: true })).toBe(false);
     }
   });

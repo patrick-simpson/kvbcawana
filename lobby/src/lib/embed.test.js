@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { HOST_CONTROL, hostCheckin, hostClearancePx, hostDoorbell, isEmbedded } from './embed.js';
-import { EMBED_CHECKIN_MESSAGE, EMBED_DOORBELL_MESSAGE } from './constants.js';
+import { HOST_CONTROL, hostCheckin, hostClearancePx, hostDoorbell, hostMirror, isEmbedded } from './embed.js';
+import { EMBED_CHECKIN_MESSAGE, EMBED_DOORBELL_MESSAGE, EMBED_MIRROR_MESSAGE } from './constants.js';
 
 // Embedded in the Journey kiosk's iframe, Journey keeps its two buttons in one
 // column in the bottom-right corner, and the signage keeps what it draws
@@ -285,5 +285,18 @@ describe('the sync doorbell, passed up to the Journey kiosk', () => {
     // Names never reach storage there.
     expect(classroom).not.toMatch(/localStorage\.setItem\([^)]*(welcome|name)/i);
     expect(journey).not.toMatch(/localStorage|sessionStorage|indexedDB/);
+  });
+
+  it('hostMirror tells a host only whether the opening ceremony is up; the App sends it only framed, never in configure mode; both hosts spell it the same', () => {
+    expect(hostMirror(true)).toEqual({ type: EMBED_MIRROR_MESSAGE, up: true });
+    expect(hostMirror(false)).toEqual({ type: EMBED_MIRROR_MESSAGE, up: false });
+    expect(hostMirror('yes')).toEqual({ type: EMBED_MIRROR_MESSAGE, up: false });
+    const app = readFileSync(resolve(__dirname, '../App.jsx'), 'utf8');
+    expect(app).toMatch(/if \(CONFIGURE \|\| !isEmbedded\(\)\) return;\s*if \(!mirrorUp && !mirrorToldRef\.current\) return;\s*mirrorToldRef\.current = true;\s*try \{ window\.parent\.postMessage\(hostMirror\(mirrorUp\), window\.location\.origin\)/);
+    const journey = readFileSync(resolve(__dirname, '../../../journey/src/schedule/30-ceremony-mirror.js'), 'utf8');
+    expect(journey).toContain(`const CEREMONY_MIRROR_MESSAGE = '${EMBED_MIRROR_MESSAGE}';`);
+    expect(journey).toMatch(/event\.source !== checkinFrame\.contentWindow \|\| event\.origin !== location\.origin/);
+    const classroom = readFileSync(resolve(__dirname, '../../../classroom/public/src/app.js'), 'utf8');
+    expect(classroom).toContain(`export const MIRROR_MESSAGE = '${EMBED_MIRROR_MESSAGE}';`);
   });
 });

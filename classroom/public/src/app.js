@@ -31,6 +31,9 @@ const CHALK_KEY = 'awanaClassroomChalk.v1';
 // this on the page when SMART Ink's toolbar comes up: a pen left the tray.
 export const PEN_LIFTED_EVENT = 'awana:pen-lifted';
 export const CHECKIN_MESSAGE = 'awana-display:checkin';
+// The embedded lobby says when it puts the game time projector up for the
+// opening ceremony (lobby/src/lib/embed.js hostMirror: {type, up}).
+export const MIRROR_MESSAGE = 'awana-display:ceremony-mirror';
 
 const root = document.documentElement;
 const $ = (id) => /** @type {HTMLElement} */ (document.getElementById(id));
@@ -405,6 +408,48 @@ window.addEventListener('message', (event) => {
   ding();
 });
 
+/* ── The opening ceremony (owner 2026-10-19) ─────────────────────── */
+// "When the opening is happening ALL screens should show the games projector
+// display. Classroom and journey included." The embedded lobby runs the
+// projector mirror itself (lobby/src/lib/ceremonyMirror.js: from 6:00 until
+// T&T game time) and says when it is up; this page raises the lobby frame
+// over the black for it. A busy screen is not interrupted (owner: "Don't
+// interrupt"): the black board, something the Sparks remote put up, or a
+// /settings preview keeps it down, and it comes up if the screen frees
+// before the opening ends. It waits MIRROR_REVEAL_MS after the word so the
+// lobby's own mirror has finished arriving (never a glimpse of the lobby).
+const MIRROR_REVEAL_MS = 800;
+const MIRROR_LEAVE_MS = 600;
+let mirrorSaid = false;
+let mirrorSince = 0;
+let mirrorShown = false;
+let mirrorLeaveTimer = 0;
+window.addEventListener('message', (event) => {
+  if (!frame || event.source !== frame.contentWindow || event.origin !== window.location.origin) return;
+  const d = event.data;
+  if (!d || typeof d !== 'object' || d.type !== MIRROR_MESSAGE) return;
+  const up = d.up === true;
+  if (up && !mirrorSaid) mirrorSince = Date.now();
+  mirrorSaid = up;
+  drawMirror();
+});
+function drawMirror() {
+  const busy = Boolean(board) || Boolean(stageApi && (stageApi.showing() || stageApi.previewLook()));
+  const want = mirrorSaid && !busy && !CONFIGURE && !PREVIEW && Date.now() - mirrorSince >= MIRROR_REVEAL_MS;
+  if (want === mirrorShown) return;
+  mirrorShown = want;
+  clearTimeout(mirrorLeaveTimer);
+  root.classList.toggle('cr-mirror', want);
+  root.classList.remove('cr-mirror-leaving');
+  // The opening ended: it fades back to whatever is scheduled. Something
+  // busy taking over: it simply goes (that is on top already).
+  if (!want && !mirrorSaid && motionOk()) {
+    root.classList.add('cr-mirror-leaving');
+    mirrorLeaveTimer = window.setTimeout(() => root.classList.remove('cr-mirror-leaving'), MIRROR_LEAVE_MS);
+  }
+  console.info(`classroom: opening ceremony ${want ? 'on screen' : 'off screen'}`);
+}
+
 /* ── The clock ──────────────────────────────────────────────────── */
 let first = true;
 function tick() {
@@ -427,6 +472,7 @@ function tick() {
   drawChips(at.getTime());
   if (phase === 'cubbies' && !board) { drawHoney(c.seconds, at.getMilliseconds()); maybeBear(c.dateKey, c.minutes); }
   maybeChalk(c.dateKey);
+  drawMirror();
   stageApi?.report();
 }
 
@@ -441,6 +487,7 @@ async function checkBuild() {
     if (!v || typeof v.build !== 'string' || v.build === BUILD) return;
     const page = await fetch(`${window.location.pathname}?b=${Date.now()}`, { cache: 'no-store' });
     if (!page.ok || !(await page.text()).includes(v.build)) return;
+    if (mirrorShown) return; // nor over the opening ceremony
     if (welcomingNow().length || phase === 'cubbies' || phase === 'sparks' || phase === 'lobby') return; // only while black, no welcome up
     if (stageApi && (stageApi.showing() || stageApi.previewLook())) return; // nor under something the remote put up
     window.location.reload();
