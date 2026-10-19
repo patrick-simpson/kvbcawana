@@ -164,3 +164,45 @@ export function chipGeometry(labelEm, valueEm) {
     height: by1 + 0.14,
   };
 }
+
+/* ── The black board (owner 2026-10-18) ──────────────────────────
+   A leader lifts a SMART Board pen (KVBC Awana sees SMART Ink's toolbar and
+   tells the page), touches the board with a pen, or presses the corner pen
+   button: the screen goes black to write on (SMART Ink's black pen set to
+   write white), with only the club's count chip and the welcomes on it,
+   until the next scheduled screen. Putting the pen back changes nothing; a
+   "Show the card again" button stays up for BOARD_UNDO_MS in case it was an
+   accident. Never in a black gap or with the screen off. */
+export const BOARD_UNDO_MS = 10 * 1000;
+const BOARD_VIEWS = { cubbies: ['cubbies'], sparks: ['sparks'], lobby: ['sparks'] };
+
+/**
+ * The period a board started now would last for, or null when no board can
+ * start (a gap, off, or not a club night).
+ * @param {number} minutes  minute of the church's day
+ * @param {boolean} clubNight
+ */
+export function boardPeriod(minutes, clubNight) {
+  const p = periodNow(minutes, clubNight);
+  return p && BOARD_VIEWS[p.view] ? p : null;
+}
+
+/**
+ * Is a board started in the period beginning at `from` still up at `minutes`?
+ * It goes when its period does (the next scheduled screen takes over).
+ * @param {{ from: number } | null} board
+ */
+export function boardUp(board, minutes, clubNight) {
+  if (!board) return false;
+  const p = boardPeriod(minutes, clubNight);
+  return Boolean(p && p.from === board.from);
+}
+
+/** The clubs a board welcomes (and whose count it keeps): the period's own; the lobby's is Sparks. */
+export function boardClubs(view) {
+  return BOARD_VIEWS[view] ? [...BOARD_VIEWS[view]] : [];
+}
+
+/** The chalk Cubbie (easter egg): once a night, this long after a board goes up. */
+export const CHALK_AFTER_MS = 45 * 1000;
+export const CHALK_MS = 2600;

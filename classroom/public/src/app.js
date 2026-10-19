@@ -26,6 +26,10 @@ const FEED_URL = new URL('calendar-feed.json', LOBBY).href;
 const RULE_URL = new URL(`./shared/clubNight.js${own.search}`, own).href;
 const NIGHT_REFRESH_MS = 6 * 60 * 60 * 1000;
 const BEAR_KEY = 'awanaClassroomBear.v1';
+const CHALK_KEY = 'awanaClassroomChalk.v1';
+// KVBC Awana's display (printer/electron-app/src/display/pen-watch.js) fires
+// this on the page when SMART Ink's toolbar comes up: a pen left the tray.
+export const PEN_LIFTED_EVENT = 'awana:pen-lifted';
 export const CHECKIN_MESSAGE = 'awana-display:checkin';
 
 const root = document.documentElement;
@@ -33,6 +37,10 @@ const $ = (id) => /** @type {HTMLElement} */ (document.getElementById(id));
 const frame = /** @type {HTMLIFrameElement | null} */ (document.getElementById('lobby'));
 const cards = { cubbies: $('cubbies'), sparks: $('sparks') };
 const welcomeEls = { cubbies: $('welcome-cubbies'), sparks: $('welcome-sparks') };
+const boardEl = $('board');
+const boardChip = /** @type {HTMLElement} */ (boardEl.querySelector('.cr-chip'));
+const undoBtn = /** @type {HTMLButtonElement} */ (boardEl.querySelector('.cr-board-undo'));
+const penBtn = /** @type {HTMLButtonElement} */ ($('pen-btn'));
 const motionQuery = window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : null;
 const motionOk = () => !(motionQuery && motionQuery.matches);
 root.classList.toggle('cr-motion', motionOk());
@@ -107,12 +115,13 @@ function chipSvg(club, value) {
 }
 function readCounts() { try { return localStorage.getItem(L.CLUB_COUNTS_KEY); } catch { return null; } }
 function drawChips(nowMs, forced) {
-  for (const club of /** @type {const} */ (['cubbies', 'sparks'])) {
-    const chip = /** @type {HTMLElement} */ (cards[club].querySelector('.cr-chip'));
+  for (const chip of /** @type {NodeListOf<HTMLElement>} */ (document.querySelectorAll('.cr-chip'))) {
+    const club = chip.dataset.club;
+    if (club !== 'cubbies' && club !== 'sparks') { chip.hidden = true; continue; }
     const n = forced != null ? forced : L.clubCountFrom(readCounts(), nowMs, club);
     chip.hidden = n == null;
-    if (n == null || chip.dataset.value === String(n)) continue;
-    chip.dataset.value = String(n);
+    if (n == null || chip.dataset.value === `${club}:${n}`) continue;
+    chip.dataset.value = `${club}:${n}`;
     const { svg, width, height } = chipSvg(club, String(n));
     chip.replaceChildren(svg);
     chip.style.width = `${width.toFixed(3)}em`;
@@ -120,7 +129,7 @@ function drawChips(nowMs, forced) {
     chip.setAttribute('aria-label', `${club === 'cubbies' ? 'Cubbies' : 'Sparks'} checked in: ${n}`);
   }
 }
-document.fonts?.ready?.then(() => { for (const el of Object.values(cards)) delete el.querySelector('.cr-chip').dataset.value; drawChips(now().getTime(), PREVIEW ? previewCount() : null); });
+document.fonts?.ready?.then(() => { for (const el of document.querySelectorAll('.cr-chip')) delete /** @type {HTMLElement} */ (el).dataset.value; drawChips(now().getTime(), PREVIEW ? previewCount() : null); });
 window.addEventListener('storage', (e) => { if (e.key === L.CLUB_COUNTS_KEY) drawChips(now().getTime()); });
 
 /* ── The phase, and the hand-offs through black ────────────────── */
@@ -179,7 +188,7 @@ function drawHoney(seconds, ms) {
 let bearDoneFor = '';
 try { bearDoneFor = localStorage.getItem(BEAR_KEY) || ''; } catch { /* memory only */ }
 function maybeBear(dateKey, minutes) {
-  if (!dateKey || bearDoneFor === dateKey || phase !== 'cubbies' || !motionOk()) return;
+  if (!dateKey || bearDoneFor === dateKey || phase !== 'cubbies' || board || !motionOk()) return;
   if (minutes !== L.bearMinute(dateKey) || welcomingNow().length) return;
   bearDoneFor = dateKey;
   try { localStorage.setItem(BEAR_KEY, dateKey); } catch { /* memory only */ }
@@ -188,6 +197,107 @@ function maybeBear(dateKey, minutes) {
   void bear.offsetWidth;
   bear.classList.add('is-peeking');
   setTimeout(() => bear.classList.remove('is-peeking'), L.BEAR_MS + 200);
+}
+
+/* ── The black board (a leader lifted a pen) ─────────────────────── */
+// Memory only: { from, view, at }. It lasts for the period it started in
+// (logic.js boardUp); the next scheduled screen takes over.
+let board = /** @type {{ from: number, view: string, at: number } | null} */ (null);
+let undoTimer = 0;
+function startBoard(how) {
+  if (board || CONFIGURE || PREVIEW) return;
+  const c = church(now());
+  const p = L.boardPeriod(c.minutes, night.ready && c.clubNight);
+  if (!p) return;
+  board = { from: p.from, view: p.view, at: Date.now() };
+  clubs = L.boardClubs(p.view);
+  console.info(`classroom: black board (${how}) until ${Math.floor(p.until / 60)}:${String(p.until % 60).padStart(2, '0')}`);
+  clearTimeout(undoTimer);
+  undoTimer = window.setTimeout(drawBoard, L.BOARD_UNDO_MS + 50);
+  drawBoard();
+  drawChips(now().getTime());
+  drawWelcomes();
+}
+function endBoard() {
+  board = null;
+  clearTimeout(undoTimer);
+  clearInk();
+  drawBoard();
+}
+function drawBoard() {
+  const up = Boolean(board);
+  boardEl.hidden = !up;
+  root.classList.toggle('cr-board-up', up);
+  boardChip.dataset.club = up ? L.boardClubs(board.view)[0] : '';
+  undoBtn.hidden = !(up && (PREVIEW || Date.now() - board.at < L.BOARD_UNDO_MS));
+  penBtn.hidden = up || CONFIGURE || !['cubbies', 'sparks', 'lobby'].includes(phase);
+  if (up) sizeInk();
+}
+window.addEventListener(PEN_LIFTED_EVENT, () => startBoard('pen lifted'));
+penBtn.addEventListener('click', () => startBoard('pen button'));
+// A pen touching a card is the backup for a computer that cannot see SMART
+// Ink's toolbar (the lobby frame takes no pointer events: style.css).
+document.addEventListener('pointerdown', (e) => {
+  if (e.pointerType === 'pen' && !board && e.target !== penBtn && !penBtn.contains(/** @type {Node} */ (e.target))) startBoard('pen touch');
+});
+undoBtn.addEventListener('click', () => {
+  if (!board) return;
+  const view = board.view;
+  endBoard();
+  clubs = L.welcomeClubsAt(church(now()).minutes, night.ready && church(now()).clubNight);
+  show(view, 'none');
+  drawChips(now().getTime());
+});
+
+// Ink, only where SMART Ink is not running (it draws on a layer of its own,
+// above this window, and keeps the pen from reaching the page): white lines.
+const ink = /** @type {HTMLCanvasElement} */ (boardEl.querySelector('.cr-board-ink'));
+const inkCtx = ink.getContext('2d');
+let stroke = /** @type {{ id: number, x: number, y: number } | null} */ (null);
+function sizeInk() {
+  const ratio = window.devicePixelRatio || 1;
+  const w = Math.round(window.innerWidth * ratio);
+  const h = Math.round(window.innerHeight * ratio);
+  if (ink.width === w && ink.height === h) return;
+  ink.width = w;
+  ink.height = h;
+}
+function clearInk() { inkCtx?.clearRect(0, 0, ink.width, ink.height); }
+function inkAt(e) { const r = ink.getBoundingClientRect(); const k = ink.width / (r.width || 1); return { x: (e.clientX - r.left) * k, y: (e.clientY - r.top) * k }; }
+ink.addEventListener('pointerdown', (e) => {
+  if (!inkCtx) return;
+  ink.setPointerCapture?.(e.pointerId);
+  stroke = { id: e.pointerId, ...inkAt(e) };
+});
+ink.addEventListener('pointermove', (e) => {
+  if (!inkCtx || !stroke || stroke.id !== e.pointerId) return;
+  const p = inkAt(e);
+  inkCtx.strokeStyle = '#ffffff';
+  inkCtx.lineCap = 'round';
+  inkCtx.lineJoin = 'round';
+  inkCtx.lineWidth = Math.max(3, ink.width / 400);
+  inkCtx.beginPath();
+  inkCtx.moveTo(stroke.x, stroke.y);
+  inkCtx.lineTo(p.x, p.y);
+  inkCtx.stroke();
+  stroke = { id: e.pointerId, ...p };
+});
+for (const ev of ['pointerup', 'pointercancel']) ink.addEventListener(ev, () => { stroke = null; });
+window.addEventListener('resize', () => { if (board) sizeInk(); });
+
+/* The chalk Cubbie (easter egg): once a night, CHALK_AFTER_MS into a board. */
+let chalkDoneFor = '';
+try { chalkDoneFor = localStorage.getItem(CHALK_KEY) || ''; } catch { /* memory only */ }
+function maybeChalk(dateKey) {
+  if (!board || !dateKey || chalkDoneFor === dateKey || !motionOk()) return;
+  if (Date.now() - board.at < L.CHALK_AFTER_MS || welcomingNow().length) return;
+  chalkDoneFor = dateKey;
+  try { localStorage.setItem(CHALK_KEY, dateKey); } catch { /* memory only */ }
+  const chalk = /** @type {HTMLElement} */ (boardEl.querySelector('.cr-chalk'));
+  chalk.classList.remove('is-drawing');
+  void chalk.offsetWidth;
+  chalk.classList.add('is-drawing');
+  setTimeout(() => chalk.classList.remove('is-drawing'), L.CHALK_MS + 200);
 }
 
 /* ── Welcomes: one card per club, for the clubs of the moment ──── */
@@ -210,7 +320,7 @@ function drawWelcomes() {
     }
     // On its own card the welcome sits in the card's place; on the black,
     // centred, or side by side when both clubs have one.
-    el.dataset.slot = L.cardClub(/** @type {any} */ (phase)) ? 'card' : up.length > 1 ? (club === 'cubbies' ? 'left' : 'right') : 'center';
+    el.dataset.slot = board ? 'center' : L.cardClub(/** @type {any} */ (phase)) ? 'card' : up.length > 1 ? (club === 'cubbies' ? 'left' : 'right') : 'center';
     const names = /** @type {HTMLElement} */ (el.querySelector('.cr-welcome-names'));
     const words = L.welcomeWords(welcomes.cards[club].names);
     const size = words.length > 34 ? 4 : words.length > 20 ? 5 : 6.4;
@@ -269,12 +379,18 @@ function tick() {
   const at = now();
   const c = church(at);
   const clubNight = night.ready && c.clubNight;
-  clubs = L.welcomeClubsAt(c.minutes, clubNight);
-  setPhase(L.phaseAt(c.minutes, clubNight), first);
+  // A board goes when its period does: the next screen comes straight up
+  // (no card fading out from under the black).
+  const boardEnded = Boolean(board) && !L.boardUp(board, c.minutes, clubNight);
+  if (boardEnded) endBoard();
+  clubs = board ? L.boardClubs(board.view) : L.welcomeClubsAt(c.minutes, clubNight);
+  setPhase(L.phaseAt(c.minutes, clubNight), first || boardEnded);
   first = false;
+  drawBoard();
   drawWelcomes();
   drawChips(at.getTime());
-  if (phase === 'cubbies') { drawHoney(c.seconds, at.getMilliseconds()); maybeBear(c.dateKey, c.minutes); }
+  if (phase === 'cubbies' && !board) { drawHoney(c.seconds, at.getMilliseconds()); maybeBear(c.dateKey, c.minutes); }
+  maybeChalk(c.dateKey);
 }
 
 /* ── A new build: reload when nothing is on screen for someone ──── */
@@ -299,9 +415,15 @@ function previewCount() { return Number(params.get('count') || (PREVIEW.includes
 function preview(what) {
   root.classList.add('cr-preview');
   const NAMES = { cubbies: ['Ava', 'Ben', 'Cara'], sparks: ['Micah'] };
-  const club = what === 'welcome-gap' ? 'black' : what.includes('sparks') ? 'sparks' : what === 'lobby' || what === 'black' ? what : 'cubbies';
+  const club = what === 'welcome-gap' ? 'black' : what.includes('sparks') ? 'sparks' : what.includes('lobby') || what === 'black' ? (what === 'black' ? 'black' : 'lobby') : 'cubbies';
   phase = club;
   show(club, 'none');
+  // ?preview=board-cubbies|board-sparks|board-lobby|board-welcome: the black board.
+  if (what.startsWith('board')) {
+    board = { from: 0, view: club, at: Date.now() };
+    clubs = L.boardClubs(club);
+  }
+  drawBoard();
   for (const el of Object.values(cards)) el.classList.remove('is-calm');
   drawChips(0, previewCount());
   if (what === 'honey') {
@@ -315,7 +437,7 @@ function preview(what) {
     bear.style.translate = '0 calc(-20 * var(--u))';
     bear.style.rotate = '-3deg';
   }
-  const welcomed = { 'welcome-cubbies': ['cubbies'], 'welcome-sparks': ['sparks'], 'welcome-gap': ['cubbies', 'sparks'] }[what];
+  const welcomed = { 'welcome-cubbies': ['cubbies'], 'welcome-sparks': ['sparks'], 'welcome-gap': ['cubbies', 'sparks'], 'board-welcome': ['cubbies'] }[what];
   if (welcomed) {
     clubs = welcomed;
     for (const c of welcomed) welcomes.cards[c] = { names: NAMES[c], until: Number.MAX_SAFE_INTEGER };

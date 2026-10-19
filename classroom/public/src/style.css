@@ -55,7 +55,7 @@ html, body {
 }
 
 /* The lobby frame stays loaded (its socket stays up); only shown 7:30-8:00. */
-#lobby { background: var(--cr-sky); visibility: hidden; }
+#lobby { background: var(--cr-sky); visibility: hidden; pointer-events: none; }
 #lobby.is-entering { z-index: 6; }
 html[data-phase="lobby"] #lobby { visibility: visible; }
 
@@ -394,6 +394,66 @@ html.cr-welcoming .cr-sparks .cr-sparky { translate: calc(-4 * var(--u)) calc(-6
 html.cr-welcoming .cr-sparks .cr-sp-ring { translate: calc(-4 * var(--u)) calc(-50% - 6 * var(--u)); scale: 0.8; }
 
 
+/* ── The black board (a leader lifted a pen) ────────────────────
+   Pure black over the card or the lobby, until the next scheduled screen;
+   only the club's count chip and the welcomes (z 7) sit on it. */
+.cr-board { background: #000000; z-index: 6; touch-action: none; }
+.cr-board-ink { position: absolute; inset: 0; width: 100%; height: 100%; }
+.cr-board-undo,
+.cr-pen-btn {
+  position: fixed;
+  z-index: 8;
+  left: max(3vw, 24px);
+  bottom: max(3vh, 24px);
+  border: 0;
+  margin: 0;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.cr-board-undo {
+  padding: 0.55em 1.1em 0.6em;
+  border-radius: 999px;
+  background: #ffffff;
+  color: var(--cr-ink);
+  font-family: var(--cr-label);
+  font-size: clamp(1.2rem, 2.2 * var(--u), 3rem);
+  letter-spacing: 0.04em;
+  box-shadow: 0.18em 0.18em 0 #5b5d63;
+}
+/* The pen button: small and quiet in the bottom-left corner of the cards. */
+.cr-pen-btn {
+  width: 1em;
+  height: 1em;
+  padding: 0.22em;
+  border-radius: 50%;
+  background: #ffffff;
+  color: var(--cr-ink);
+  box-shadow: 0.12em 0.12em 0 rgba(35, 31, 32, 0.45);
+  font-size: clamp(48px, 3.6 * var(--u), 96px);
+  opacity: 0.8;
+}
+.cr-pen-btn svg { display: block; width: 100%; height: 100%; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.cr-board-undo:active,
+.cr-pen-btn:active { translate: 2px 2px; box-shadow: none; }
+
+/* The chalk Cubbie (easter egg, once a night): Cubbie (Awana's clipart, his
+   own colours) pops up at the bottom right of the board beside a chalk
+   squiggle he has "drawn", then ducks away. Rest = below the frame. */
+.cr-chalk { position: absolute; right: calc(7 * var(--u)); bottom: 0; width: calc(34 * var(--u)); height: calc(16 * var(--u)); overflow: hidden; pointer-events: none; }
+.cr-chalk-cubbie { position: absolute; right: 0; bottom: calc(-26 * var(--u)); width: calc(13 * var(--u)); height: auto; transform-origin: 50% 100%; }
+.cr-chalk-line {
+  position: absolute;
+  left: 0;
+  bottom: calc(3 * var(--u));
+  width: calc(19 * var(--u));
+  height: calc(8 * var(--u));
+  background: #ffffff;
+  -webkit-mask: url(../brand/doodles/squiggle-long.svg) center / contain no-repeat;
+  mask: url(../brand/doodles/squiggle-long.svg) center / contain no-repeat;
+  transform-origin: 0 50%;
+  scale: 0 1;
+}
+
 /* ── Configure mode (KVBC Awana's Settings window) ─────────────── */
 .cr-configure { display: none; }
 html[data-phase="configure"] body { background: #f6f4ef; cursor: auto; }
@@ -426,7 +486,7 @@ html[data-phase="configure"] .cr-black { display: none; }
   html.cr-motion .cr-card.is-calm .cr-d { animation: cr-bob 11s ease-in-out calc(var(--i, 0) * -1.3s) infinite; }
   html.cr-motion .cr-card.is-calm .cr-sparky { animation: cr-float 7s ease-in-out infinite; }
 
-  /* Gentle exit into black (6:57) and entry out of black (7:03). */
+  /* Gentle exit into a black gap and entry out of one. */
   html.cr-motion .cr-card.is-leaving { animation: cr-out 2400ms ease-in-out forwards; }
   html.cr-motion .cr-card.is-leaving .cr-hero,
   html.cr-motion .cr-card.is-leaving .cr-title { animation: cr-sink 2400ms ease-in-out forwards; }
@@ -435,6 +495,10 @@ html[data-phase="configure"] .cr-black { display: none; }
 
   /* The bear: in from the right, a wave, back out. */
   html.cr-motion .cr-bear.is-peeking { animation: cr-peek 6s ease-in-out forwards; }
+
+  /* The chalk Cubbie: up, a quick squiggle, back down. */
+  html.cr-motion .cr-chalk.is-drawing .cr-chalk-cubbie { animation: cr-chalk-peek 2600ms ease-in-out forwards; }
+  html.cr-motion .cr-chalk.is-drawing .cr-chalk-line { animation: cr-chalk-draw 2600ms ease-out forwards; }
 
   /* The welcome comes in soft and leaves soft. */
   html.cr-motion .cr-sparks .cr-sparky,
@@ -472,3 +536,11 @@ html[data-phase="configure"] .cr-black { display: none; }
 @keyframes cr-welcome-in { from { opacity: 0; margin-bottom: calc(-6 * var(--u)); scale: 0.92; } to { opacity: 1; margin-bottom: 0; scale: 1; } }
 @keyframes cr-welcome-out { from { opacity: 1; } to { opacity: 0; scale: 0.96; } }
 @keyframes cr-squish { 0% { scale: 1; } 35% { scale: 1.05 0.94; } 70% { scale: 0.99 1.02; } 100% { scale: 1; } }
+@keyframes cr-chalk-peek {
+  0% { translate: 0 0; rotate: 8deg; }
+  20% { translate: 0 calc(-15 * var(--u)); rotate: 0deg; }
+  45% { rotate: -6deg; }
+  70% { translate: 0 calc(-15 * var(--u)); rotate: 2deg; }
+  100% { translate: 0 0; rotate: 8deg; }
+}
+@keyframes cr-chalk-draw { 0%, 20% { scale: 0 1; opacity: 1; } 50% { scale: 1 1; opacity: 1; } 82% { opacity: 1; } 100% { scale: 1 1; opacity: 0; } }

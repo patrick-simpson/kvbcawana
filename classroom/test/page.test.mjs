@@ -143,3 +143,85 @@ describe('welcomes', { skip: SKIP }, () => {
     await page.close();
   });
 });
+
+describe('the black board (owner 2026-10-18)', { skip: SKIP }, () => {
+  const lifted = (page) => page.evaluate(() => window.dispatchEvent(new Event('awana:pen-lifted')));
+  const visible = (page, sel) => page.evaluate((s) => { const el = document.querySelector(s); return Boolean(el) && !el.closest('[hidden]') && getComputedStyle(el).display !== 'none'; }, sel);
+
+  it('a lifted pen blacks the card out, keeping the club\'s chip; the undo button brings the card back', async () => {
+    const page = await open('?now=2026-10-14T22:40:00Z');
+    await page.waitForFunction(() => document.documentElement.dataset.phase === 'cubbies');
+    await page.evaluate(() => localStorage.setItem('awanaClubCounts.v1', JSON.stringify({ v: 1, at: Date.now(), byClub: { cubbies: 7 } })));
+    assert.equal(await visible(page, '#pen-btn'), true);
+    await lifted(page);
+    await page.waitForSelector('#board:not([hidden])');
+    assert.equal(await page.evaluate(() => getComputedStyle(document.getElementById('board')).backgroundColor), 'rgb(0, 0, 0)');
+    assert.equal(await page.getAttribute('#board .cr-chip', 'data-club'), 'cubbies');
+    assert.equal(await visible(page, '#board .cr-board-undo'), true);
+    assert.equal(await visible(page, '#pen-btn'), false);
+    // The board is on top of the card.
+    const top = await page.evaluate(() => document.elementFromPoint(innerWidth / 2, innerHeight / 2).closest('#board') !== null);
+    assert.equal(top, true);
+    await page.click('#board .cr-board-undo');
+    await page.waitForSelector('#board', { state: 'hidden' });
+    assert.equal(await visible(page, '#cubbies'), true);
+    await page.close();
+  });
+
+  it('welcomes the club on the board, centred', async () => {
+    const page = await open('?now=2026-10-14T23:40:00Z');
+    await page.waitForFunction(() => document.documentElement.dataset.phase === 'lobby');
+    await lifted(page);
+    await page.waitForSelector('#board:not([hidden])');
+    assert.equal(await page.getAttribute('#board .cr-chip', 'data-club'), 'sparks');
+    const frame = page.frame({ url: /\/lobby\/\?club=sparks/ });
+    await frame.evaluate((m) => window.postMessage({ post: m }, location.origin), { type: 'awana-display:checkin', id: 'm', firstName: 'Micah', club: 'Sparks' });
+    await page.waitForSelector('#welcome-sparks:not([hidden])');
+    assert.equal(await page.getAttribute('#welcome-sparks', 'data-slot'), 'center');
+    await page.close();
+  });
+
+  it('the pen button does it too, and the board goes when its period does', async () => {
+    const page = await open('?now=2026-10-14T22:57:57Z');
+    await page.waitForFunction(() => document.documentElement.dataset.phase === 'cubbies');
+    await page.click('#pen-btn');
+    await page.waitForSelector('#board:not([hidden])');
+    await page.waitForFunction(() => document.documentElement.dataset.phase === 'black', null, { timeout: 8000 });
+    assert.equal(await page.isHidden('#board'), true);
+    assert.equal(await page.isHidden('#pen-btn'), true);
+    // No board in a gap.
+    await lifted(page);
+    await page.waitForTimeout(400);
+    assert.equal(await page.isHidden('#board'), true);
+    await page.close();
+  });
+
+  it('a pen touching the card starts it; a finger does not', async () => {
+    const page = await open('?now=2026-10-14T23:10:00Z');
+    await page.waitForFunction(() => document.documentElement.dataset.phase === 'sparks');
+    const down = (type) => page.evaluate((t) => document.getElementById('sparks').dispatchEvent(new PointerEvent('pointerdown', { pointerType: t, bubbles: true, clientX: 300, clientY: 300 })), type);
+    await down('touch');
+    await page.waitForTimeout(300);
+    assert.equal(await page.isHidden('#board'), true);
+    await down('pen');
+    await page.waitForSelector('#board:not([hidden])');
+    assert.equal(await page.getAttribute('#board .cr-chip', 'data-club'), 'sparks');
+    await page.close();
+  });
+
+  for (const size of [{ width: 1280, height: 720 }, { width: 1920, height: 1080 }, { width: 1024, height: 768 }]) {
+    it(`fits at ${size.width}x${size.height}: chip top right, undo bottom left, apart`, async () => {
+      const page = await open('?preview=board-cubbies', size);
+      const b = await page.evaluate(() => {
+        const box = (s) => { const r = document.querySelector(s).getBoundingClientRect(); return { l: r.left, t: r.top, r: r.right, b: r.bottom }; };
+        return { chip: box('#board .cr-chip'), undo: box('#board .cr-board-undo') };
+      });
+      for (const x of Object.values(b)) assert.ok(x.l >= 0 && x.t >= 0 && x.r <= size.width + 0.5 && x.b <= size.height + 0.5, JSON.stringify(x));
+      assert.ok(b.chip.r > size.width * 0.8 && b.chip.t < size.height * 0.2);
+      assert.ok(b.undo.l < size.width * 0.2 && b.undo.b > size.height * 0.8);
+      // The chalk Cubbie rests below the frame (he only peeks once a night).
+      assert.ok(await page.evaluate(() => document.querySelector('.cr-chalk-cubbie').getBoundingClientRect().top >= innerHeight - 0.5));
+      await page.close();
+    });
+  }
+});

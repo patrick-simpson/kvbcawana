@@ -157,3 +157,29 @@ describe('the count chip is the kit\'s stepped chip', () => {
     assert.ok(g.value.x > g.label.x);
   });
 });
+
+describe('the black board (owner 2026-10-18)', () => {
+  it('can start on the cards and in the lobby, never in a gap or off', () => {
+    assert.equal(L.boardPeriod(at(18, 40), true).view, 'cubbies');
+    assert.equal(L.boardPeriod(at(19, 10), true).view, 'sparks');
+    assert.equal(L.boardPeriod(at(19, 40), true).view, 'lobby');
+    for (const m of [at(18, 59), at(19, 29), at(18, 0), at(20, 5)]) assert.equal(L.boardPeriod(m, true), null);
+    assert.equal(L.boardPeriod(at(18, 40), false), null);
+  });
+  it('lasts until the next scheduled screen', () => {
+    const b = L.boardPeriod(at(18, 40), true);
+    assert.equal(L.boardUp(b, at(18, 57), true), true);
+    assert.equal(L.boardUp(b, b.until, true), false);
+    assert.equal(L.boardUp(b, at(19, 10), true), false);
+    assert.equal(L.boardUp(null, at(18, 40), true), false);
+    const lobby = L.boardPeriod(at(19, 40), true);
+    assert.equal(L.boardUp(lobby, at(19, 59), true), true);
+    assert.equal(L.boardUp(lobby, at(20, 0), true), false);
+  });
+  it('keeps the period\'s club (the lobby\'s is Sparks)', () => {
+    assert.deepEqual(L.boardClubs('cubbies'), ['cubbies']);
+    assert.deepEqual(L.boardClubs('sparks'), ['sparks']);
+    assert.deepEqual(L.boardClubs('lobby'), ['sparks']);
+    assert.deepEqual(L.boardClubs('black'), []);
+  });
+});

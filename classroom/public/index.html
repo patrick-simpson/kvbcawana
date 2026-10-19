@@ -93,17 +93,37 @@
 
   <div id="black" class="cr-layer cr-black"></div>
 
+  <!-- The black board (owner 2026-10-18): a leader lifts a SMART Board pen
+       (KVBC Awana sees SMART Ink's toolbar), touches the board with a pen, or
+       presses the pen button: black to write on until the next scheduled
+       screen, with only the club's count chip and the welcomes on it. SMART
+       Ink draws the writing on its own layer; the canvas draws it only where
+       SMART Ink is not running. -->
+  <section id="board" class="cr-layer cr-board" aria-label="Writing board" hidden>
+    <canvas class="cr-board-ink"></canvas>
+    <div class="cr-chip" data-club="" role="status" hidden></div>
+    <button type="button" class="cr-board-undo" hidden>Show the card again</button>
+    <div class="cr-chalk" aria-hidden="true">
+      <i class="cr-chalk-line"></i>
+      <img class="cr-chalk-cubbie" src="art/cubbie-waving.svg" alt="">
+    </div>
+  </section>
+  <button type="button" id="pen-btn" class="cr-pen-btn" aria-label="Black board to write on" hidden>
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20l1.2-4.6L15.6 5a2.1 2.1 0 0 1 3 0l.4.4a2.1 2.1 0 0 1 0 3L8.6 18.8 4 20z"/><path d="M13.8 6.8l3.4 3.4"/></svg>
+  </button>
+
   <section class="cr-configure" aria-label="Downstairs classroom">
     <h1>Downstairs classroom</h1>
     <p>Nothing to set here: this screen runs by the clock on club nights.</p>
     <ul>
       <li><b>6:30</b> the Cubbies card</li>
-      <li><b>6:57</b> black, while the clubs pass at the door</li>
-      <li><b>7:03</b> Sparks Large Group Time</li>
+      <li><b>About 7:00</b> black for a few minutes, while the clubs pass at the door</li>
+      <li><b>Then</b> Sparks Large Group Time</li>
       <li><b>7:30</b> the lobby screen, Sparks only</li>
       <li><b>8:00</b> this computer shuts down (the shutdown setting on the left)</li>
     </ul>
     <p>A Cubbies or Sparks child who checks in while their card is up gets a welcome and a ding.</p>
+    <p>Lifting a SMART Board pen (or touching the board with one, or the small pen button in the bottom left) turns the screen black to write on until the next scheduled screen. Set SMART Ink's black pen to write white (SMART Settings, Pen and Button Settings).</p>
   </section>
 
   <script type="module" src="src/app.js"></script>
