@@ -55,10 +55,17 @@ export function isEmbedded() {
  * null for anything else.
  * @param {unknown} what
  * @param {unknown} payload
- * @returns {{ type: string, what: string, id?: string, press?: { id: string, action: string, data?: Record<string, unknown> } } | null}
+ * @returns {{ type: string, what: string, id?: string, rev?: number, press?: { id: string, action: string, data?: Record<string, unknown> } } | null}
  */
 export function hostDoorbell(what, payload) {
   if (what === 'journey') return { type: EMBED_DOORBELL_MESSAGE, what };
+  // The Sparks remote changed what the downstairs classroom shows (routes.md
+  // 10.13): the word and the stage's whole-number rev, nothing else (the
+  // classroom reads the stage itself).
+  if (what === 'classroom') {
+    const rev = payload && typeof payload === 'object' ? /** @type {any} */ (payload).rev : null;
+    return Number.isInteger(rev) && rev >= 0 ? { type: EMBED_DOORBELL_MESSAGE, what, rev } : { type: EMBED_DOORBELL_MESSAGE, what };
+  }
   if (what !== 'screen' && what !== 'screen-action') return null;
   const id = payload && typeof payload === 'object' ? /** @type {any} */ (payload).id : null;
   if (typeof id !== 'string' || !/^[A-Za-z0-9_-]{16,64}$/.test(id)) return null;

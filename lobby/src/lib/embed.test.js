@@ -218,6 +218,12 @@ describe('the sync doorbell, passed up to the Journey kiosk', () => {
     }
   });
 
+  it('a classroom ring (the Sparks remote) goes up as the word and a whole-number rev only', () => {
+    expect(hostDoorbell('classroom', { what: 'classroom', rev: 7, watch: true, at: 'x' })).toEqual({ type: EMBED_DOORBELL_MESSAGE, what: 'classroom', rev: 7 });
+    expect(hostDoorbell('classroom', { rev: 'x' })).toEqual({ type: EMBED_DOORBELL_MESSAGE, what: 'classroom' });
+    expect(hostDoorbell('classroom', null)).toEqual({ type: EMBED_DOORBELL_MESSAGE, what: 'classroom' });
+  });
+
   it('a phone remote ring also hands up its press, only when well formed and cleaned; the Journey kiosk spells it the same', () => {
     const ring = (press, action = 'remote') => ({ what: 'screen-action', id: ID, action, at: 'x', press });
     expect(hostDoorbell('screen-action', ring({ id: 'r1abc', action: 'slide-next', evil: 1 })))
