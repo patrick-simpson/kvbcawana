@@ -13,6 +13,7 @@ const ALLOWED = [
   '/checkin', '/checkin/ym',
   '/lobby/', '/lobby/countdown', '/journey/', '/journey/remote/',
   '/classroom/', '/classroom/remote/', // owner 2026-10-18: the Sparks remote is on the links page
+  '/lobby/projector-remote.html', // the opening ceremony remote (phone: Next and Back for the projector's slides)
   '/settings', '/logo/',
   '/download/kvbc-awana', '/help', '/capabilities.html', '/release-notes/printer.md',
   '/',
@@ -35,7 +36,7 @@ test('every link is one of the listed pages: no extra links, no passphrase, quer
   }
 });
 
-test('each of the 15 listed pages is linked exactly once', () => {
+test('each of the 16 listed pages is linked exactly once', () => {
   assert.equal(hrefs.length, ALLOWED.length);
   assert.deepEqual([...hrefs].sort(), [...ALLOWED].sort());
 });
