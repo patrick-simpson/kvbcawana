@@ -1,0 +1,78 @@
+/* The opening-ceremony remote: the projector's own look in a phone. Ink
+   field (the wall is black), kit fonts (Paytone One shouts, Londrina Solid
+   labels, Figtree reads), the hot orange for the one button to press, flat
+   colour and hard offsets only (no blur, no gradient). Phone first (360-430
+   px); Back and Next never move. Every colour pair meets WCAG AA. */
+:root {
+  --pr-ink: #231F20;
+  --pr-card: #343031;
+  --pr-line: #FFFFFF;
+  --pr-hot: #CF4518;       /* the kit's hot, darkened for AA under white */
+  --pr-hot-deep: #8A2C0E;
+  --pr-sun: #FCB614;
+  --pr-soft: #D9D6D2;
+  --pr-shout: 'Paytone One', 'Arial Black', sans-serif;
+  --pr-label: 'Londrina Solid', 'Arial Narrow', sans-serif;
+  --pr-body: 'Figtree', system-ui, sans-serif;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+body { margin: 0; min-height: 100vh; background: var(--pr-ink); color: #fff; font: 400 1rem/1.4 var(--pr-body); }
+
+.pr-top {
+  position: sticky; top: 0; z-index: 2;
+  display: flex; align-items: center; gap: 10px;
+  padding: max(12px, env(safe-area-inset-top)) 16px 12px;
+  background: var(--pr-ink);
+  border-bottom: 4px solid var(--pr-sun);
+}
+.pr-title { font: 400 calc(1.25rem * 1.057) / 1 var(--pr-shout); white-space: nowrap; }
+.pr-conn { margin-left: auto; padding: 4px 10px; border-radius: 999px; font: 600 0.8125rem/1.2 var(--pr-body); background: #fff; color: var(--pr-ink); white-space: nowrap; }
+.pr-conn[data-state="ok"]::before { content: '● '; color: #1F7A45; }
+.pr-conn[data-state="bad"] { background: var(--pr-hot); color: #fff; }
+
+.pr-page { max-width: 560px; margin: 0 auto; padding: 18px 16px max(28px, env(safe-area-inset-bottom)); }
+.pr-card { background: var(--pr-card); border: 3px solid #fff; border-radius: 18px; box-shadow: 5px 5px 0 var(--pr-sun); padding: 14px 16px; margin: 0 0 20px; }
+.pr-shout { font: 400 calc(1.6rem * 1.057) / 1.1 var(--pr-shout); margin: 0 0 8px; }
+.pr-label { display: block; font: 400 1.3rem/1.1 var(--pr-label); letter-spacing: 0.04em; margin: 0 0 6px; color: var(--pr-sun); }
+.pr-kicker { font: 400 1rem/1.1 var(--pr-label); letter-spacing: 0.08em; text-transform: uppercase; margin: 0 0 4px; color: var(--pr-sun); }
+.pr-target-line { margin: 0; font-weight: 600; min-height: 1.4em; }
+.pr-fine { font-size: 0.875rem; color: var(--pr-soft); margin: 6px 0 10px; }
+.pr-note { font-weight: 600; min-height: 1.4em; margin: 10px 0 0; }
+.pr-press { min-height: 1.4em; margin: 0 0 18px; font-weight: 700; text-align: center; color: var(--pr-sun); }
+
+.pr-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 10px;
+  min-height: 52px; padding: 10px 16px;
+  border: 3px solid #fff; border-radius: 14px; background: #fff; color: var(--pr-ink);
+  box-shadow: 0 5px 0 #8C8784;
+  font: 400 1.25rem/1.1 var(--pr-label); letter-spacing: 0.03em;
+  cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+}
+.pr-btn:active:not(:disabled) { translate: 0 4px; box-shadow: 0 1px 0 #8C8784; transition: none; }
+.pr-btn:disabled { opacity: 0.5; cursor: default; }
+.pr-btn:focus-visible, .pr-link:focus-visible, #passphrase:focus-visible { outline: 3px solid var(--pr-sun); outline-offset: 3px; }
+.pr-btn--hot { background: var(--pr-hot); border-color: var(--pr-hot); color: #fff; box-shadow: 0 5px 0 var(--pr-hot-deep); }
+.pr-btn--hot:active:not(:disabled) { box-shadow: 0 1px 0 var(--pr-hot-deep); }
+.pr-btn--big { min-height: 132px; font: 400 calc(1.9rem * 1.057) / 1 var(--pr-shout); }
+.pr-btn--wide { width: 100%; margin-top: 12px; background: transparent; color: #fff; box-shadow: none; }
+
+.pr-pad { display: grid; grid-template-columns: 1fr 1.4fr; gap: 14px; }
+.pr-pad-note { margin: 10px 0 14px; text-align: center; }
+
+.pr-backups { display: grid; gap: 10px; }
+.pr-backup { justify-content: flex-start; width: 100%; }
+.pr-ico { flex: none; width: 46px; height: 26px; display: inline-block; background: center / contain no-repeat; }
+/* A small American flag: 13 stripes and the canton, no stars at this size. */
+.pr-ico--us { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 19 10'%3E%3Crect width='19' height='10' fill='%23fff'/%3E%3Cpath fill='%23B22234' d='M0 0h19v.77H0zM0 1.54h19v.77H0zM0 3.08h19v.77H0zM0 4.62h19v.77H0zM0 6.15h19v.77H0zM0 7.69h19v.77H0zM0 9.23h19V10H0z'/%3E%3Crect width='7.6' height='5.38' fill='%233C3B6E'/%3E%3Crect width='18.6' height='9.6' x='.2' y='.2' fill='none' stroke='%23231F20' stroke-width='.4'/%3E%3C/svg%3E"); }
+.pr-ico--awana { background-image: url('../../../shared/brand/logos/awana-clubs-black.svg'); }
+/* An open book, drawn. */
+.pr-ico--verse { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23231F20' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 6c-2-1.5-5-2-8-1.5v13c3-.5 6 0 8 1.5 2-1.5 5-2 8-1.5v-13c-3-.5-6 0-8 1.5zM12 6v13'/%3E%3C/svg%3E"); }
+
+form { display: grid; gap: 10px; }
+#passphrase { font: 400 1.05rem/1.3 var(--pr-body); padding: 12px; border: 3px solid #fff; border-radius: 12px; background: #fff; color: var(--pr-ink); width: 100%; }
+.pr-link { border: 0; background: none; padding: 6px 0; color: #fff; font: 600 1rem/1.3 var(--pr-body); text-decoration: underline; cursor: pointer; }
+.pr-foot { text-align: center; margin: 8px 0 0; }
+
+@media (prefers-reduced-motion: reduce) { .pr-btn:active:not(:disabled) { translate: none; } }

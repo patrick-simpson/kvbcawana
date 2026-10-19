@@ -231,11 +231,12 @@ export function sanitizeScreenSettings(kind, raw) {
 
 /**
  * One action for a screen of this kind, or null. Only the projector's wall
- * pick carries data, checked exactly as the projector checks a relayed one.
+ * pick (checked exactly as the projector checks a relayed one) and its
+ * ceremony backup (one of PROJECTOR_BACKUPS) carry data.
  * @param {unknown} kind
  * @param {unknown} action
  * @param {unknown} [data]
- * @returns {{action: string, data?: {type: 'countdown'} | {type: 'window', index: number}} | null}
+ * @returns {{action: string, data?: {type: 'countdown'} | {type: 'window', index: number} | {what: string}} | null}
  */
 export function sanitizeScreenAction(kind, action, data) {
   if (!isScreenKind(kind) || typeof action !== 'string' || !SCREEN_ACTIONS[kind].includes(action)) return null;

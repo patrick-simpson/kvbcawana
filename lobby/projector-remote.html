@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="theme-color" content="#231F20" />
+    <meta name="awana-page" content="projector-remote" />
+    <meta name="robots" content="noindex" />
+    <title>Opening ceremony remote</title>
+  </head>
+  <body>
+    <header class="pr-top">
+      <span class="pr-title">Opening ceremony</span>
+      <span id="conn" class="pr-conn" data-state="off" role="status">Signed out</span>
+    </header>
+
+    <main class="pr-page">
+      <noscript><p class="pr-card">This remote needs JavaScript.</p></noscript>
+
+      <section id="signin" class="pr-card" hidden>
+        <h1 class="pr-shout">Sign in</h1>
+        <p>Type the church passphrase to run the game time projector from this phone.</p>
+        <form id="signin-form" autocomplete="off">
+          <label for="passphrase" class="pr-label">Passphrase</label>
+          <input id="passphrase" type="password" autocomplete="current-password" autocapitalize="none" spellcheck="false" enterkeyhint="go" />
+          <button id="signin-btn" type="submit" class="pr-btn pr-btn--hot">Sign in</button>
+        </form>
+        <p id="signin-note" class="pr-note" role="status"></p>
+        <p class="pr-fine">The passphrase is never saved on this phone; only the sign-in is.</p>
+      </section>
+
+      <section id="remote" hidden>
+        <section class="pr-card pr-target" aria-labelledby="target-h">
+          <p id="target-h" class="pr-kicker">Game time projector</p>
+          <p id="target" class="pr-target-line">Looking for the projector…</p>
+        </section>
+
+        <section class="pr-pad" aria-label="The slides">
+          <button id="btn-prev" type="button" class="pr-btn pr-btn--big" data-step="prev"><span aria-hidden="true">‹</span> Back</button>
+          <button id="btn-next" type="button" class="pr-btn pr-btn--big pr-btn--hot" data-step="next">Next <span aria-hidden="true">›</span></button>
+        </section>
+        <p class="pr-fine pr-pad-note">Next and Back move the opening slides, like the arrow keys. Before 6:00, Next starts the ceremony.</p>
+
+        <p id="press-note" class="pr-press" role="status" aria-live="polite"></p>
+
+        <section class="pr-card" aria-labelledby="backup-h">
+          <h2 id="backup-h" class="pr-label">Backups</h2>
+          <p class="pr-fine">Only if the slides are not working. Each one covers the projector until you take it down.</p>
+          <div class="pr-backups">
+            <button type="button" class="pr-btn pr-backup" data-backup="us-flag"><span class="pr-ico pr-ico--us" aria-hidden="true"></span>American flag</button>
+            <button type="button" class="pr-btn pr-backup" data-backup="awana-flag"><span class="pr-ico pr-ico--awana" aria-hidden="true"></span>Awana flag</button>
+            <button type="button" class="pr-btn pr-backup" data-backup="verse"><span class="pr-ico pr-ico--verse" aria-hidden="true"></span>2 Timothy 2:15</button>
+          </div>
+          <button id="btn-backup-end" type="button" class="pr-btn pr-btn--wide">Take the backup down</button>
+        </section>
+
+        <p class="pr-foot"><button id="signout" type="button" class="pr-link">Sign this phone out</button></p>
+      </section>
+    </main>
+    <script type="module" src="/src/projectorRemote/main.js"></script>
+  </body>
+</html>

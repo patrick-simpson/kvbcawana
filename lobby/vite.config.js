@@ -142,6 +142,8 @@ export default defineConfig({
         // One settings page for every screen (ROADMAP.md#settings-page): the signage's
         // own bundle in configure mode, flagged by its awana-page meta.
         settings: resolve(__dirname, 'settings.html'),
+        // The opening-ceremony remote (owner 2026-10-19): a phone page, plain JS on the lobby's sign-in.
+        'projector-remote': resolve(__dirname, 'projector-remote.html'),
       },
     },
   },
