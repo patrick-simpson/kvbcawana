@@ -226,4 +226,38 @@ describe('the Sparks remote on the classroom screen', { skip: SKIP }, () => {
     await page.waitForSelector('#show:not([hidden]) .cr-show-words');
     await page.close();
   });
+
+  // Owner 2026-10-19: "If someone's on a black screen with drawing, that
+  // should still transition to opening. Really the only thing that should
+  // stop the opening from playing properly is a video."
+  it('the opening ceremony goes over the remote\'s text and the black board, never over a playing video', async () => {
+    const word = (up) => ({ type: 'awana-display:ceremony-mirror', up });
+    const mirrorUp = (page) => page.evaluate(() => document.documentElement.classList.contains('cr-mirror'));
+    const page = await open(CLUB_NIGHT);
+    await page.waitForFunction(() => document.documentElement.dataset.phase === 'sparks');
+    const frame = page.frame({ url: /\/lobby\/\?club=sparks/ });
+    const say = (up) => frame.evaluate((m) => window.postMessage({ post: m }, location.origin), word(up));
+    // Text from the remote, then the pen button's black board over it.
+    show(TEXT);
+    await page.waitForSelector('#show:not([hidden]) .cr-show-words');
+    await page.click('#pen-btn');
+    await page.waitForSelector('#board:not([hidden])');
+    await say(true);
+    await page.waitForFunction(() => document.documentElement.classList.contains('cr-mirror'), null, { timeout: 3000 });
+    assert.equal(await page.evaluate(() => getComputedStyle(document.getElementById('lobby')).zIndex), '20');
+    await say(false);
+    await page.waitForFunction(() => !document.documentElement.classList.contains('cr-mirror'));
+    assert.equal(await page.isHidden('#board'), false, 'the board and its drawing are still there');
+    // A playing video: the opening stays off it; paused, it covers it.
+    show(VIDEO);
+    await page.waitForFunction(() => window.__yt.calls.includes('play'));
+    await say(true);
+    await page.waitForTimeout(1300);
+    assert.equal(await mirrorUp(page), false, 'the video plays on');
+    await page.evaluate(() => window.__yt.player.pauseVideo());
+    await page.waitForFunction(() => document.documentElement.classList.contains('cr-mirror'), null, { timeout: 3000 });
+    await page.evaluate(() => window.__yt.player.playVideo());
+    await page.waitForFunction(() => !document.documentElement.classList.contains('cr-mirror'), null, { timeout: 3000 });
+    await page.close();
+  });
 });

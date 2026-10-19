@@ -116,7 +116,7 @@ describe('the opening ceremony', { skip: SKIP }, () => {
     assert.equal(await lobbyShown(page), false, 'waits for the lobby\'s own mirror to arrive first');
     await page.waitForFunction(() => document.documentElement.classList.contains('cr-mirror'), null, { timeout: 3000 });
     assert.equal(await lobbyShown(page), true);
-    assert.equal(await page.evaluate(() => getComputedStyle(document.getElementById('lobby')).zIndex), '7');
+    assert.equal(await page.evaluate(() => getComputedStyle(document.getElementById('lobby')).zIndex), '20');
     await frame.evaluate((m) => window.postMessage({ post: m }, location.origin), word(false));
     await page.waitForFunction(() => !document.documentElement.classList.contains('cr-mirror') && !document.documentElement.classList.contains('cr-mirror-leaving'), null, { timeout: 3000 });
     assert.equal(await lobbyShown(page), false);

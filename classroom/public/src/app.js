@@ -411,13 +411,16 @@ window.addEventListener('message', (event) => {
 /* ── The opening ceremony (owner 2026-10-19) ─────────────────────── */
 // "When the opening is happening ALL screens should show the games projector
 // display. Classroom and journey included." The embedded lobby runs the
-// projector mirror itself (lobby/src/lib/ceremonyMirror.js: from 6:00 until
-// T&T game time) and says when it is up; this page raises the lobby frame
-// over the black for it. A busy screen is not interrupted (owner: "Don't
-// interrupt"): the black board, something the Sparks remote put up, or a
-// /settings preview keeps it down, and it comes up if the screen frees
-// before the opening ends. It waits MIRROR_REVEAL_MS after the word so the
-// lobby's own mirror has finished arriving (never a glimpse of the lobby).
+// projector mirror itself (lobby/src/lib/ceremonyMirror.js: from 10 seconds
+// before 6:00 until T&T game time) and says when it is up; this page raises
+// the lobby frame over EVERYTHING for it (the black, a card, the black board
+// with its drawing, a picture or text from the Sparks remote, a /settings
+// preview). "Really the only thing that should stop the opening from playing
+// properly is a video" (owner): a remote video PLAYING keeps it down (and
+// one started during the opening takes the screen back). Nothing under it is
+// changed; the board and its ink are there again when the opening ends. It
+// waits MIRROR_REVEAL_MS after the word so the lobby's own mirror has
+// finished arriving (never a glimpse of the lobby).
 const MIRROR_REVEAL_MS = 800;
 const MIRROR_LEAVE_MS = 600;
 let mirrorSaid = false;
@@ -434,15 +437,15 @@ window.addEventListener('message', (event) => {
   drawMirror();
 });
 function drawMirror() {
-  const busy = Boolean(board) || Boolean(stageApi && (stageApi.showing() || stageApi.previewLook()));
-  const want = mirrorSaid && !busy && !CONFIGURE && !PREVIEW && Date.now() - mirrorSince >= MIRROR_REVEAL_MS;
+  const video = Boolean(stageApi && stageApi.videoPlaying());
+  const want = mirrorSaid && !video && !CONFIGURE && !PREVIEW && Date.now() - mirrorSince >= MIRROR_REVEAL_MS;
   if (want === mirrorShown) return;
   mirrorShown = want;
   clearTimeout(mirrorLeaveTimer);
   root.classList.toggle('cr-mirror', want);
   root.classList.remove('cr-mirror-leaving');
-  // The opening ended: it fades back to whatever is scheduled. Something
-  // busy taking over: it simply goes (that is on top already).
+  // The opening ended: it fades back to whatever is under it. A video
+  // starting: it simply goes (the video is under it, already playing).
   if (!want && !mirrorSaid && motionOk()) {
     root.classList.add('cr-mirror-leaving');
     mirrorLeaveTimer = window.setTimeout(() => root.classList.remove('cr-mirror-leaving'), MIRROR_LEAVE_MS);
@@ -531,7 +534,7 @@ function preview(what) {
 }
 
 /* ── The Sparks remote (src/stage.js; worker/src/routes.md 10.13) ── */
-let stageApi = /** @type {null | { previewLook: () => string, showing: () => string, pauseVideo: () => void, report: () => void }} */ (null);
+let stageApi = /** @type {null | { previewLook: () => string, showing: () => string, videoPlaying: () => boolean, pauseVideo: () => void, report: () => void }} */ (null);
 async function startStage() {
   try {
     const [rules, mod] = await Promise.all([

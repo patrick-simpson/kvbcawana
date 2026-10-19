@@ -1336,6 +1336,16 @@ html.cursor-hidden #video-controls:not(.force-visible) {
   margin-bottom: 1.25rem;
 }
 
+/* The opening ceremony (owner 2026-10-19; src/schedule/30-ceremony-mirror.js):
+   while the Check-in Display shows the game time projector, it stands over
+   EVERYTHING on this page (views, reading overlays, Settings, the corner
+   buttons): the room sees the opening. Only a playing lesson video keeps
+   html.ceremony-up off. Nothing under it changes. */
+html.ceremony-up #checkin-view {
+  display: block !important;
+  z-index: 70;
+}
+
 /* Club transitions (owner 2026-10-17; src/schedule/29-transition-gap.js):
    the gap's pure black, one fixed layer over every view (the check-in frame
    stays loaded under it) and under the corner buttons (10) and the panels.

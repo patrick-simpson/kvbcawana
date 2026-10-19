@@ -1,8 +1,9 @@
 // The opening ceremony (src/schedule/30-ceremony-mirror.js, owner 2026-10-19:
 // "ALL screens should show the games projector display ... journey
-// included"): the embedded Check-in Display shows the projector itself; this
-// page only hears it go up and down, and never self-updates over it while
-// the room can see it. Only its own frame, at its own origin, is believed.
+// included"; "the only thing that should stop the opening ... is a video"):
+// the embedded Check-in Display shows the projector itself; this page puts
+// that frame over whatever is up unless a lesson video is playing, and never
+// self-updates over it. Only its own frame, at its own origin, is believed.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { bootKiosk, tick, pinClock } from './kiosk-dom.mjs';
@@ -52,13 +53,45 @@ test('only its own frame at its own origin is believed', async () => {
   }
 });
 
-test('a hidden Check-in Display (a lesson, a preview) is not the opening on screen', async () => {
+const covering = (k) => {
+  const view = k.document.getElementById('checkin-view');
+  return k.document.documentElement.classList.contains('ceremony-up') && k.window.getComputedStyle(view).display !== 'none';
+};
+
+test('over another view (the splash, slides, a reading overlay) the opening still comes up; the view is untouched', async () => {
   const k = boot();
   try {
     for (let i = 0; i < 6; i += 1) await tick();
+    k.window.setView('journey');
+    const view = k.document.getElementById('checkin-view');
+    assert.equal(view.classList.contains('hidden'), true);
     say(k, true);
-    k.document.getElementById('checkin-view').classList.add('hidden');
-    assert.equal(k.window.ceremonyMirrorShowing(), false);
+    assert.equal(covering(k), true);
+    assert.equal(k.window.safeToReload(), false);
+    say(k, false);
+    assert.equal(covering(k), false);
+    assert.equal(view.classList.contains('hidden'), true, 'the Journey view is still the view');
+  } finally {
+    k.close();
+  }
+});
+
+test('a playing lesson video keeps it down; a video started during the opening takes the screen back', async () => {
+  const k = boot();
+  try {
+    for (let i = 0; i < 6; i += 1) await tick();
+    const video = k.window.document.getElementById('journey-video');
+    let paused = false;
+    Object.defineProperty(video, 'paused', { configurable: true, get: () => paused });
+    video.setAttribute('src', 'blob:lesson');
+    say(k, true);
+    assert.equal(covering(k), false, 'the video plays on');
+    paused = true;
+    video.dispatchEvent(new k.window.Event('pause'));
+    assert.equal(covering(k), true, 'a paused video is covered');
+    paused = false;
+    video.dispatchEvent(new k.window.Event('play'));
+    assert.equal(covering(k), false);
   } finally {
     k.close();
   }

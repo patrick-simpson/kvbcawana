@@ -431,6 +431,11 @@ export async function createStage(deps) {
     previewLook,
     /** What the remote has up ('' = nothing). */
     showing: () => (stage.show ? stage.show.button.kind : ''),
+    /** A remote video is playing (or buffering) now: the one thing the opening ceremony never covers. */
+    videoPlaying: () => {
+      if (!stage.show || stage.show.button.kind !== 'video' || !player || !playerReady) return false;
+      try { const s = player.getPlayerState(); return s === 1 || s === 3; } catch { return false; }
+    },
     pauseVideo,
     report: () => report(),
     read,

@@ -59,9 +59,10 @@ html, body {
 #lobby.is-entering { z-index: 6; }
 html[data-phase="lobby"] #lobby { visibility: visible; }
 /* The opening ceremony (app.js drawMirror): the lobby frame, showing the game
-   time projector, over the black and the cards; under the remote's swoop. */
+   time projector, over everything: the black, the cards, the black board and
+   its ink, the remote's pictures and words, the welcomes, the pen button. */
 html.cr-mirror #lobby,
-html.cr-mirror-leaving #lobby { visibility: visible; z-index: 7; }
+html.cr-mirror-leaving #lobby { visibility: visible; z-index: 20; }
 
 .cr-black { background: #000000; z-index: 5; display: none; }
 html[data-phase="black"] .cr-black,
