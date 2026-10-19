@@ -31,6 +31,20 @@ Lift a pen from the SMART Board's tray while the Cubbies card, Sparks Large Grou
 3. Put the pen back. Right-click the KVBC Awana icon → **Open the display log**. Near the bottom, lines starting `pen watch:` should say `"lifted":true` for the moment you lifted the pen. If they don't, send the owner those lines (they name SMART Ink's windows, nothing else).
 4. On the next club night, between 6:30 and 6:58, lift a pen once to see the Cubbies card go black, then tap **Show the card again**.
 
+## The Sparks remote (videos, pictures, PDFs and text)
+
+On a phone: **awana.kvbchurch.org/classroom/remote/** (also on awana.kvbchurch.org/links). Sign in with the church passphrase.
+
+- Tap a button and it sweeps onto the classroom TV, full screen. It stays until someone taps **Back to schedule** (even through the black gaps). A video goes back by itself when it finishes.
+- **Videos:** Pause/Play, Back 10s, Skip 10s, Volume − / +, Mute. YouTube may show its own ads now and then.
+- **PDFs:** Back / Next page.
+- **Edit buttons:** up to 4 YouTube videos (paste the link) and 8 more buttons: a picture or PDF (choose a file from the phone, up to 20 MB, or paste a link; a Google Drive share link works if it is shared with "Anyone with the link"), or text (a heading and the words, on the handbook page or the black board). Every leader's remote shows the same buttons.
+- Hold the Sparks logo at the top of the remote for a second. Watch the TV.
+
+## Previewing a look
+
+On awana.kvbchurch.org/settings → **Screens** → **Downstairs classroom**: Cubbies card, Sparks card or Sparks lobby shows on the classroom TV for one minute. If the computer is on but its screen is closed (any time outside club hours), KVBC Awana opens the screen within about 15 seconds.
+
 Address: https://awana.kvbchurch.org/classroom/ (the KVBC Awana app opens it; you never type it).
 
 ## Setting up the PC
