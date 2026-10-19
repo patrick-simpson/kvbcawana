@@ -155,13 +155,17 @@ describe('the black board (owner 2026-10-18)', { skip: SKIP }, () => {
     assert.equal(await visible(page, '#pen-btn'), true);
     await lifted(page);
     await page.waitForSelector('#board:not([hidden])');
-    assert.equal(await page.evaluate(() => getComputedStyle(document.getElementById('board')).backgroundColor), 'rgb(0, 0, 0)');
     assert.equal(await page.getAttribute('#board .cr-chip', 'data-club'), 'cubbies');
     assert.equal(await visible(page, '#board .cr-board-undo'), true);
     assert.equal(await visible(page, '#pen-btn'), false);
-    // The board is on top of the card.
+    // The board is on top of the card (the spill's blob covers the middle as it grows).
     const top = await page.evaluate(() => document.elementFromPoint(innerWidth / 2, innerHeight / 2).closest('#board') !== null);
     assert.equal(top, true);
+    // The ink spills, then the board rests plain black; the button is still up (a minute).
+    assert.equal(await page.evaluate(() => document.getElementById('board').classList.contains('is-spilling')), true);
+    await page.waitForFunction(() => document.getElementById('board').classList.contains('is-spilled'), null, { timeout: 3000 });
+    assert.equal(await page.evaluate(() => getComputedStyle(document.getElementById('board')).backgroundColor), 'rgb(0, 0, 0)');
+    assert.equal(await visible(page, '#board .cr-board-undo'), true);
     await page.click('#board .cr-board-undo');
     await page.waitForSelector('#board', { state: 'hidden' });
     assert.equal(await visible(page, '#cubbies'), true);
@@ -212,6 +216,7 @@ describe('the black board (owner 2026-10-18)', { skip: SKIP }, () => {
   for (const size of [{ width: 1280, height: 720 }, { width: 1920, height: 1080 }, { width: 1024, height: 768 }]) {
     it(`fits at ${size.width}x${size.height}: chip top right, undo bottom left, apart`, async () => {
       const page = await open('?preview=board-cubbies', size);
+      await page.waitForSelector('#board .cr-chip:not([hidden]) svg');
       const b = await page.evaluate(() => {
         const box = (s) => { const r = document.querySelector(s).getBoundingClientRect(); return { l: r.left, t: r.top, r: r.right, b: r.bottom }; };
         return { chip: box('#board .cr-chip'), undo: box('#board .cr-board-undo') };

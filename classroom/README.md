@@ -19,7 +19,7 @@ While a card is up, a Cubbies (or Sparks) child who checks in gets a welcome on 
 
 Lift a pen from the SMART Board's tray while the Cubbies card, Sparks Large Group Time or the Sparks lobby is up, and the screen turns pure black to write on. Only the club's checked-in count (top right) and the check-in welcomes stay on it. It stays black, writing and all, until the next scheduled screen (the 6:58 or 7:28 black gap, or 8:00). Putting the pen back changes nothing.
 
-- **Lifted by accident?** Tap **Show the card again** (bottom left). It is there for the first 10 seconds.
+- **Lifted by accident?** Tap **Show the card again** (bottom left). It is there for the first minute.
 - **Backups:** the small pen button in the bottom-left corner of the cards does the same, and so does a pen touching the board.
 - **White writing:** in SMART Settings (the SMART icon by the clock) → **Pen and Button Settings**, set the **black** pen to write **white**, so it shows on the black board.
 - Once a night, someone small may drop by to admire the writing.

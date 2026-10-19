@@ -173,7 +173,7 @@ export function chipGeometry(labelEm, valueEm) {
    until the next scheduled screen. Putting the pen back changes nothing; a
    "Show the card again" button stays up for BOARD_UNDO_MS in case it was an
    accident. Never in a black gap or with the screen off. */
-export const BOARD_UNDO_MS = 10 * 1000;
+export const BOARD_UNDO_MS = 60 * 1000;
 const BOARD_VIEWS = { cubbies: ['cubbies'], sparks: ['sparks'], lobby: ['sparks'] };
 
 /**
@@ -201,6 +201,18 @@ export function boardUp(board, minutes, clubNight) {
 /** The clubs a board welcomes (and whose count it keeps): the period's own; the lobby's is Sparks. */
 export function boardClubs(view) {
   return BOARD_VIEWS[view] ? [...BOARD_VIEWS[view]] : [];
+}
+
+/** The ink spill's length (style.css cr-spill). */
+export const SPILL_MS = 1000;
+
+/**
+ * How much the spill blob (a wobbly ring whose narrowest radius is 0.39 of
+ * its size) must grow from (x, y) to cover a w x h screen, with a margin.
+ */
+export function spillScale(x, y, w, h, size) {
+  const far = Math.max(Math.hypot(x, y), Math.hypot(w - x, y), Math.hypot(x, h - y), Math.hypot(w - x, h - y));
+  return Math.max(1, (far / (0.39 * size)) * 1.08);
 }
 
 /** The chalk Cubbie (easter egg): once a night, this long after a board goes up. */

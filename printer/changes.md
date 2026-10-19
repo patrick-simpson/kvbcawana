@@ -1,7 +1,7 @@
 ﻿## [10.2.0] - 2026-10-19
 The downstairs classroom's black board.
 
-**Lift a pen, get a black board.** On the downstairs classroom screen, lifting a pen from the SMART Board's tray (SMART Ink's toolbar comes up) turns the Cubbies card, Sparks Large Group Time or the Sparks lobby pure black to write on, until the next scheduled screen. Only the club's checked-in count and the check-in welcomes stay on it. Putting the pen back changes nothing; a "Show the card again" button in the bottom left stays up for 10 seconds in case it was an accident. If this computer cannot see SMART Ink, a pen touching the board or the small pen button in the corner does the same. Set SMART Ink's black pen to write white (SMART Settings, Pen and Button Settings). What SMART Ink shows is written to the display log, for the first test at the board.
+**Lift a pen, get a black board.** On the downstairs classroom screen, lifting a pen from the SMART Board's tray (SMART Ink's toolbar comes up) turns the Cubbies card, Sparks Large Group Time or the Sparks lobby pure black to write on, until the next scheduled screen. Only the club's checked-in count and the check-in welcomes stay on it. Putting the pen back changes nothing; the black spills across the screen like ink from where the pen was, and a "Show the card again" button in the bottom left stays up for a minute in case it was an accident. If this computer cannot see SMART Ink, a pen touching the board or the small pen button in the corner does the same. Set SMART Ink's black pen to write white (SMART Settings, Pen and Button Settings). What SMART Ink shows is written to the display log, for the first test at the board.
 
 ## [10.1.0] - 2026-10-17
 A fourth screen: the downstairs classroom.

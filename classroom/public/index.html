@@ -100,6 +100,16 @@
        Ink draws the writing on its own layer; the canvas draws it only where
        SMART Ink is not running. -->
   <section id="board" class="cr-layer cr-board" aria-label="Writing board" hidden>
+    <!-- The ink spill: black ink bursts from where the pen was (the tray, a
+         touch, the button) and floods the screen, a few drops flying ahead. -->
+    <div class="cr-spill" aria-hidden="true">
+      <svg class="cr-spill-blob" viewBox="-50 -50 100 100"><path d="M46.0,0.0C45.6,8.1 37.6,15.9 32.4,23.5C27.2,31.1 22.4,42.9 14.8,45.7C7.3,48.4 -4.2,42.9 -13.0,39.9C-21.8,36.9 -33.7,34.3 -38.0,27.6C-42.4,21.0 -39.3,9.0 -39.0,0.0C-38.7,-9.0 -40.8,-20.0 -36.4,-26.5C-32.0,-32.9 -21.2,-35.8 -12.7,-39.0C-4.1,-42.2 6.9,-47.9 14.8,-45.7C22.7,-43.4 29.6,-32.9 34.8,-25.3C40.0,-17.7 46.4,-8.1 46.0,0.0Z"/></svg>
+      <i class="cr-spill-drop" style="--dx:-1.6;--dy:-2.2;--ds:0.55"></i>
+      <i class="cr-spill-drop" style="--dx:2.1;--dy:-1.4;--ds:0.4"></i>
+      <i class="cr-spill-drop" style="--dx:-2.4;--dy:0.6;--ds:0.35"></i>
+      <i class="cr-spill-drop" style="--dx:1.2;--dy:2.3;--ds:0.5"></i>
+      <i class="cr-spill-drop" style="--dx:0.3;--dy:-2.8;--ds:0.3"></i>
+    </div>
     <canvas class="cr-board-ink"></canvas>
     <div class="cr-chip" data-club="" role="status" hidden></div>
     <button type="button" class="cr-board-undo" hidden>Show the card again</button>

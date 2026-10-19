@@ -204,7 +204,9 @@ function maybeBear(dateKey, minutes) {
 // (logic.js boardUp); the next scheduled screen takes over.
 let board = /** @type {{ from: number, view: string, at: number } | null} */ (null);
 let undoTimer = 0;
-function startBoard(how) {
+let spillTimer = 0;
+/** @param {string} how  @param {{ x: number, y: number }} [from]  where the ink comes from (default: the pen tray, bottom centre) */
+function startBoard(how, from) {
   if (board || CONFIGURE || PREVIEW) return;
   const c = church(now());
   const p = L.boardPeriod(c.minutes, night.ready && c.clubNight);
@@ -215,12 +217,34 @@ function startBoard(how) {
   clearTimeout(undoTimer);
   undoTimer = window.setTimeout(drawBoard, L.BOARD_UNDO_MS + 50);
   drawBoard();
+  spill(from || { x: window.innerWidth / 2, y: window.innerHeight });
   drawChips(now().getTime());
   drawWelcomes();
+}
+/** The ink spill (style.css cr-spill): black floods the screen from `from`. */
+function spill(from) {
+  clearTimeout(spillTimer);
+  boardEl.classList.remove('is-spilling', 'is-spilled');
+  if (!motionOk()) return;
+  const w = window.innerWidth;
+  const h = window.innerHeight;
+  const size = Math.min(w, h) * 0.4;
+  boardEl.style.setProperty('--spill-x', `${from.x}px`);
+  boardEl.style.setProperty('--spill-y', `${from.y}px`);
+  boardEl.style.setProperty('--spill-size', `${size}px`);
+  boardEl.style.setProperty('--spill-scale', L.spillScale(from.x, from.y, w, h, size).toFixed(3));
+  void boardEl.offsetWidth;
+  boardEl.classList.add('is-spilling');
+  spillTimer = window.setTimeout(() => {
+    boardEl.classList.remove('is-spilling');
+    boardEl.classList.add('is-spilled');
+  }, L.SPILL_MS);
 }
 function endBoard() {
   board = null;
   clearTimeout(undoTimer);
+  clearTimeout(spillTimer);
+  boardEl.classList.remove('is-spilling', 'is-spilled');
   clearInk();
   drawBoard();
 }
@@ -234,11 +258,14 @@ function drawBoard() {
   if (up) sizeInk();
 }
 window.addEventListener(PEN_LIFTED_EVENT, () => startBoard('pen lifted'));
-penBtn.addEventListener('click', () => startBoard('pen button'));
+penBtn.addEventListener('click', () => {
+  const r = penBtn.getBoundingClientRect();
+  startBoard('pen button', { x: r.left + r.width / 2, y: r.top + r.height / 2 });
+});
 // A pen touching a card is the backup for a computer that cannot see SMART
 // Ink's toolbar (the lobby frame takes no pointer events: style.css).
 document.addEventListener('pointerdown', (e) => {
-  if (e.pointerType === 'pen' && !board && e.target !== penBtn && !penBtn.contains(/** @type {Node} */ (e.target))) startBoard('pen touch');
+  if (e.pointerType === 'pen' && !board && e.target !== penBtn && !penBtn.contains(/** @type {Node} */ (e.target))) startBoard('pen touch', { x: e.clientX, y: e.clientY });
 });
 undoBtn.addEventListener('click', () => {
   if (!board) return;

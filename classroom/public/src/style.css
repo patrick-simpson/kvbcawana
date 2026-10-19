@@ -399,6 +399,20 @@ html.cr-welcoming .cr-sparks .cr-sp-ring { translate: calc(-4 * var(--u)) calc(-
    only the club's count chip and the welcomes (z 7) sit on it. */
 .cr-board { background: #000000; z-index: 6; touch-action: none; }
 .cr-board-ink { position: absolute; inset: 0; width: 100%; height: 100%; }
+/* The ink spill (motion only; its rest is simply the black board). A blob of
+   --spill-size centred on the spot the ink comes from (--spill-x/-y), grown
+   by --spill-scale (app.js: enough to cover the farthest corner). */
+.cr-spill { display: none; position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+.cr-spill-blob,
+.cr-spill-drop {
+  position: absolute;
+  left: calc(var(--spill-x, 50vw) - var(--spill-size, 40vmin) / 2);
+  top: calc(var(--spill-y, 100vh) - var(--spill-size, 40vmin) / 2);
+  width: var(--spill-size, 40vmin);
+  height: var(--spill-size, 40vmin);
+}
+.cr-spill-blob { fill: #000000; overflow: visible; }
+.cr-spill-drop { border-radius: 50%; background: #000000; scale: 0; }
 .cr-board-undo,
 .cr-pen-btn {
   position: fixed;
@@ -496,6 +510,17 @@ html[data-phase="configure"] .cr-black { display: none; }
   /* The bear: in from the right, a wave, back out. */
   html.cr-motion .cr-bear.is-peeking { animation: cr-peek 6s ease-in-out forwards; }
 
+  /* The ink spill: the board waits see-through while the ink floods it, then
+     is plain black (its rest); the chip and the undo button land after. */
+  html.cr-motion .cr-board.is-spilling { background: transparent; }
+  html.cr-motion .cr-board.is-spilling .cr-spill { display: block; }
+  html.cr-motion .cr-board.is-spilling .cr-spill-blob { animation: cr-spill 1000ms cubic-bezier(0.3, 0.6, 0.2, 1) forwards; }
+  html.cr-motion .cr-board.is-spilling .cr-spill-drop { animation: cr-spill-drop 700ms cubic-bezier(0.2, 0.8, 0.3, 1) forwards; }
+  html.cr-motion .cr-board.is-spilling .cr-chip,
+  html.cr-motion .cr-board.is-spilling .cr-board-undo { opacity: 0; }
+  html.cr-motion .cr-board.is-spilled .cr-chip { animation: cr-pop 700ms var(--brand-ease-pop, ease-out) backwards; }
+  html.cr-motion .cr-board.is-spilled .cr-board-undo { animation: cr-fade 500ms ease-out 250ms backwards; }
+
   /* The chalk Cubbie: up, a quick squiggle, back down. */
   html.cr-motion .cr-chalk.is-drawing .cr-chalk-cubbie { animation: cr-chalk-peek 2600ms ease-in-out forwards; }
   html.cr-motion .cr-chalk.is-drawing .cr-chalk-line { animation: cr-chalk-draw 2600ms ease-out forwards; }
@@ -544,3 +569,14 @@ html[data-phase="configure"] .cr-black { display: none; }
   100% { translate: 0 0; rotate: 8deg; }
 }
 @keyframes cr-chalk-draw { 0%, 20% { scale: 0 1; opacity: 1; } 50% { scale: 1 1; opacity: 1; } 82% { opacity: 1; } 100% { scale: 1 1; opacity: 0; } }
+@keyframes cr-spill {
+  0% { scale: 0; rotate: 0deg; }
+  18% { scale: calc(var(--spill-scale, 6) * 0.12) calc(var(--spill-scale, 6) * 0.1); rotate: 14deg; }
+  45% { scale: calc(var(--spill-scale, 6) * 0.42) calc(var(--spill-scale, 6) * 0.48); rotate: -8deg; }
+  100% { scale: var(--spill-scale, 6); rotate: 6deg; }
+}
+@keyframes cr-spill-drop {
+  0% { translate: 0 0; scale: 0; }
+  60% { scale: var(--ds); }
+  100% { translate: calc(var(--dx) * var(--spill-size, 40vmin) * 0.6) calc(var(--dy) * var(--spill-size, 40vmin) * 0.6); scale: var(--ds); }
+}

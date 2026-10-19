@@ -176,6 +176,14 @@ describe('the black board (owner 2026-10-18)', () => {
     assert.equal(L.boardUp(lobby, at(19, 59), true), true);
     assert.equal(L.boardUp(lobby, at(20, 0), true), false);
   });
+  it('shows the undo button for a minute', () => assert.equal(L.BOARD_UNDO_MS, 60000));
+  it('the ink spill grows enough to cover the farthest corner from where it starts', () => {
+    const size = 432;
+    for (const [x, y] of [[960, 1080], [0, 0], [1920, 1080], [500, 300]]) {
+      const far = Math.max(Math.hypot(x, y), Math.hypot(1920 - x, y), Math.hypot(x, 1080 - y), Math.hypot(1920 - x, 1080 - y));
+      assert.ok(L.spillScale(x, y, 1920, 1080, size) * 0.39 * size >= far, `${x},${y}`);
+    }
+  });
   it('keeps the period\'s club (the lobby\'s is Sparks)', () => {
     assert.deepEqual(L.boardClubs('cubbies'), ['cubbies']);
     assert.deepEqual(L.boardClubs('sparks'), ['sparks']);
