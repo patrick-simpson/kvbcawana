@@ -31,6 +31,7 @@ const { SCREENS, isScreenPage, screenUrls } = require('./screens');
 const { hoursMinutes, normalizeSettings, parseTime, settingsForScreen } = require('./settings');
 const { shutdownDeadline, shutdownStep } = require('./shutdown');
 const { createPenWatch } = require('./pen-watch');
+const { previewOpenUntil, PREVIEW_POLL_MS } = require('./classroom-preview');
 
 const APP_NAME = 'KVBC Awana';
 const SOURCES_EVERY_MS = 60 * 60 * 1000; // re-read the schedule and feed hourly
@@ -131,6 +132,29 @@ function createDisplay(opts) {
     },
   });
   const timers = new Set();
+  // The classroom screen's /settings preview (worker/src/routes.md 10.13): while
+  // the screen is closed, ask the sync service every PREVIEW_POLL_MS whether a
+  // preview waits; one that does opens the screen until it ends.
+  let previewUntil = 0;
+  let previewAsking = false;
+  async function checkClassroomPreview() {
+    if (!running || previewAsking || urls().screen.id !== 'classroom' || typeof opts.classroomStage !== 'function') return;
+    if (lobby && previewUntil <= Date.now()) return; // open by the schedule: the page itself shows a preview
+    previewAsking = true;
+    try {
+      const until = previewOpenUntil(await opts.classroomStage(), Date.now());
+      if (until > previewUntil + 1000) {
+        previewUntil = until;
+        log('classroom preview: the screen opens until', new Date(until).toISOString());
+        evaluate();
+        later(evaluate, until - Date.now() + 200);
+      }
+    } catch (err) {
+      log('classroom preview check failed', err);
+    } finally {
+      previewAsking = false;
+    }
+  }
   const later = (fn, ms) => { const t = setTimeout(() => { timers.delete(t); fn(); }, ms); timers.add(t); return t; };
   const every = (fn, ms) => { const t = setInterval(fn, ms); timers.add(t); return t; };
 
@@ -447,7 +471,9 @@ function createDisplay(opts) {
     const win = displayWindow(t, sources, hours());
     const tidied = tidy(state.overrides, win, t.getTime());
     if (tidied !== state.overrides) { state.overrides = tidied; saveState(); }
-    const { visible, reason } = SMOKE ? { visible: true, reason: 'manual' } : decideVisibility(win, state.overrides, t.getTime());
+    let { visible, reason } = SMOKE ? { visible: true, reason: 'manual' } : decideVisibility(win, state.overrides, t.getTime());
+    // A /settings preview on the classroom screen opens it for its minute (classroom-preview.js).
+    if (!visible && previewUntil > Date.now() && urls().screen.id === 'classroom') { visible = true; reason = 'preview'; }
     if (reason !== lastReason) { log('state', reason, win.dateKey); lastReason = reason; }
     if (visible) openLobby(); else closeLobby();
     const clubNightAhead = nextClubNight(t, sources, 60, hours()) === win.dateKey && win.minutes < hours().closeMin;
@@ -937,6 +963,7 @@ function createDisplay(opts) {
     evaluate();
     scheduleTick();
     refreshSources();
+    every(checkClassroomPreview, PREVIEW_POLL_MS);
     every(refreshSources, SOURCES_EVERY_MS);
 
     // First run with more than one monitor and none chosen: ask which one.

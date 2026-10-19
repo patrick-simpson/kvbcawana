@@ -1,4 +1,11 @@
-﻿## [10.2.0] - 2026-10-19
+﻿## [10.3.0] - 2026-10-19
+The Sparks remote, and previews of the downstairs classroom screen.
+
+**Preview the classroom screen.** On awana.kvbchurch.org/settings → Screens → Downstairs classroom, the Cubbies card, the Sparks card or the Sparks lobby shows on the classroom TV for one minute. When the classroom computer is on but its screen is closed (outside club hours), this app now opens the screen for that minute and closes it again.
+
+**The Sparks remote** (awana.kvbchurch.org/classroom/remote/) puts YouTube videos, pictures, PDFs and text on the downstairs classroom TV. Nothing to do on the computer for it; the screen page gets it by itself.
+
+## [10.2.0] - 2026-10-19
 The downstairs classroom's black board.
 
 **Lift a pen, get a black board.** On the downstairs classroom screen, lifting a pen from the SMART Board's tray (SMART Ink's toolbar comes up) turns the Cubbies card, Sparks Large Group Time or the Sparks lobby pure black to write on, until the next scheduled screen. Only the club's checked-in count and the check-in welcomes stay on it. Putting the pen back changes nothing; the black spills across the screen like ink from where the pen was, and a "Show the card again" button in the bottom left stays up for a minute in case it was an accident. If this computer cannot see SMART Ink, a pen touching the board or the small pen button in the corner does the same. Set SMART Ink's black pen to write white (SMART Settings, Pen and Button Settings). What SMART Ink shows is written to the display log, for the first test at the board.

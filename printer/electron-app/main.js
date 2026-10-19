@@ -1401,6 +1401,14 @@ app.whenReady().then(async () => {
     setAutostart,
     // A change in the display's Settings window goes up to /settings too.
     onChange: () => { refreshTray(); if (deviceSync) deviceSync.nudge(); },
+    // The classroom screen's /settings preview (display/classroom-preview.js;
+    // worker/src/routes.md 10.13), asked with this computer's own sign-in.
+    classroomStage: async () => {
+      const s = deviceSession();
+      if (!s || !syncClient) return null;
+      const res = await syncClient.syncRequest(s.url, '/v1/classroom/stage?from=app', { session: s.session });
+      return res && res.ok ? res.body : null;
+    },
   });
   syncClient = require(path.join(printServerDir(), 'sync-client.js'));
   syncSession = createSyncSession({ userData, safeStorage, syncClient });

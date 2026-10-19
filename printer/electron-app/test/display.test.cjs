@@ -491,3 +491,32 @@ describe('display/pen-watch (the classroom black board, owner 2026-10-18)', () =
     expect(src.includes("window.dispatchEvent(new Event('awana:pen-lifted'))")).toBe(true);
   });
 });
+
+describe('display/classroom-preview (a /settings preview opens a closed classroom screen, owner 2026-10-18)', () => {
+  const { previewOpenUntil, PREVIEW_GRACE_MS, PREVIEW_MAX_MS } = require('../src/display/classroom-preview');
+  const at = (preview, serverNow = 1000) => ({ stage: { preview }, serverNow });
+
+  it('opens until the preview ends, on this computer\'s clock, with a little grace', () => {
+    expect(previewOpenUntil(at({ look: 'cubbies', until: 61000 }), 500000)).toBe(500000 + 60000 + PREVIEW_GRACE_MS);
+  });
+  it('nothing for no preview, an ended one, a look it does not know, or junk', () => {
+    expect(previewOpenUntil(at(null), 5)).toBe(0);
+    expect(previewOpenUntil(at({ look: 'cubbies', until: 900 }), 5)).toBe(0);
+    expect(previewOpenUntil(at({ look: 'journey', until: 61000 }), 5)).toBe(0);
+    expect(previewOpenUntil(null, 5)).toBe(0);
+    expect(previewOpenUntil({ stage: { preview: { look: 'sparks', until: 'x' } }, serverNow: 1 }, 5)).toBe(0);
+  });
+  it('never longer than two minutes, whatever the answer says', () => {
+    expect(previewOpenUntil(at({ look: 'lobby', until: 1000 + 86400000 }), 0)).toBe(PREVIEW_MAX_MS + PREVIEW_GRACE_MS);
+  });
+  it('display.js asks only for the classroom screen, only while it is closed (or open for a preview), and main.js asks with its own sign-in', () => {
+    const fs = require('node:fs');
+    const path = require('node:path');
+    const src = fs.readFileSync(path.join(__dirname, '../src/display/display.js'), 'utf8');
+    expect(src.includes("urls().screen.id !== 'classroom' || typeof opts.classroomStage !== 'function'")).toBe(true);
+    expect(src.includes('if (lobby && previewUntil <= Date.now()) return;')).toBe(true);
+    expect(src.includes("if (!visible && previewUntil > Date.now() && urls().screen.id === 'classroom') { visible = true; reason = 'preview'; }")).toBe(true);
+    const main = fs.readFileSync(path.join(__dirname, '../main.js'), 'utf8');
+    expect(main.includes("syncClient.syncRequest(s.url, '/v1/classroom/stage?from=app', { session: s.session })")).toBe(true);
+  });
+});
