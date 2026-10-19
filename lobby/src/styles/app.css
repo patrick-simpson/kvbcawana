@@ -1416,6 +1416,7 @@ html, body, #root {
 .panel .screen-state--on .dot { background: var(--brand-tnt); box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand-tnt) 25%, transparent); }
 .panel .screen-overview__state { margin: 0 0 0.6rem; }
 .panel .screens-summary { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+.panel .classroom-preview { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 0.5rem 0; }
 /* A screen opened from the list: the way back sits under its name. */
 .panel--settings .panel-header .settings-screen-back { grid-column: 1 / -1; grid-row: 2; justify-self: start; }
 .panel--opening { display: grid; gap: 1rem; justify-items: start; }

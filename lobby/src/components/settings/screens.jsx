@@ -5,6 +5,7 @@ import {
   forgetScreen, listScreens, loadScreen, renameScreen, saveScreenSettings, sendScreenAction,
 } from '../../hooks/useScreenSync.js';
 import { SCREEN_SPECS, sanitizeScreenSettings } from '../../lib/syncSpecs.js';
+import { call } from '../../lib/workerClient.js';
 
 // The settings page's Screens (ROADMAP.md#settings-page, phase 2): every screen signed in
 // with the passphrase, and the way into any one's own settings. A lobby TV
@@ -239,6 +240,8 @@ export function ScreensSection({ onOpen, goTo }) {
         </PanelCard>
       )}
 
+      <ClassroomPreviewCard />
+
       {groups.map((g) => (
         <PanelCard key={g.kind} title={g.title} tab={g.tab}>
           <ul className="screen-list">
@@ -270,6 +273,73 @@ export function ScreensSection({ onOpen, goTo }) {
         </PanelCard>
       ))}
     </>
+  );
+}
+
+// ── The downstairs classroom: preview a look on its TV (routes.md 10.13) ────
+
+/** The looks, in the classroom's order (shared/classroomRemote.js CLASSROOM_LOOKS). */
+export const CLASSROOM_PREVIEW_LOOKS = [
+  { look: 'cubbies', label: 'Cubbies card' },
+  { look: 'sparks', label: 'Sparks card' },
+  { look: 'lobby', label: 'Sparks lobby' },
+];
+/** How long a preview waits for the TV to say it shows it before saying the computer may be off. */
+export const CLASSROOM_ANSWER_MS = 25 * 1000;
+const PREVIEW_POLL_MS = 3000;
+
+/**
+ * What the card says while a preview runs. Pure.
+ * @param {{ look: string } | null} asked @param {any} state the remote state @param {number} waitedMs how long it has asked
+ */
+export function classroomPreviewWords(asked, state, waitedMs) {
+  if (!asked) return '';
+  const label = CLASSROOM_PREVIEW_LOOKS.find((l) => l.look === asked.look)?.label || 'That look';
+  if (state?.now?.preview === asked.look) return `The classroom TV is showing the ${label.toLowerCase()} for a minute.`;
+  if (waitedMs > CLASSROOM_ANSWER_MS) return 'The classroom TV has not answered. Its computer may be off, or need the newest KVBC Awana.';
+  return `Asking the classroom TV to show the ${label.toLowerCase()}… (the computer opens the screen if it is closed; up to 15 seconds)`;
+}
+
+export function ClassroomPreviewCard() {
+  const [asked, setAsked] = useState(/** @type {{ look: string } | null} */ (null));
+  const [state, setState] = useState(/** @type {any} */ (null));
+  const [note, setNote] = useState('');
+  const [polls, setPolls] = useState(0); // reads since this preview was asked for (one every PREVIEW_POLL_MS)
+
+  useEffect(() => {
+    if (!asked) return undefined;
+    let live = true;
+    const read = () => call('/v1/classroom/remote/state').then((r) => { if (!live) return; if (r.ok) setState(r.body); setPolls((n) => n + 1); });
+    read();
+    const t = setInterval(read, PREVIEW_POLL_MS);
+    const end = setTimeout(() => { setAsked(null); setState(null); }, 65 * 1000);
+    return () => { live = false; clearInterval(t); clearTimeout(end); };
+  }, [asked]);
+
+  const preview = async (look) => {
+    setNote('');
+    const r = await call('/v1/classroom/remote', { method: 'POST', body: { action: 'preview', data: { look } } });
+    if (r.ok) { setState(null); setPolls(0); setAsked({ look }); } else setNote(r.message);
+  };
+  const stop = async () => {
+    const r = await call('/v1/classroom/remote', { method: 'POST', body: { action: 'preview-end' } });
+    if (r.ok) { setAsked(null); setState(null); } else setNote(r.message);
+  };
+
+  return (
+    <PanelCard title="Downstairs classroom" tab="var(--brand-sparks)">
+      <p className="hint panel-intro">
+        Put one look on the classroom TV for a minute, to check it. The classroom computer must be switched on.
+      </p>
+      <div className="classroom-preview" role="group" aria-label="Preview on the classroom TV">
+        {CLASSROOM_PREVIEW_LOOKS.map((l) => (
+          <button key={l.look} type="button" className="secondary" aria-pressed={asked?.look === l.look} onClick={() => preview(l.look)}>{l.label}</button>
+        ))}
+        {asked && <button type="button" className="ghost" onClick={stop}>Back to schedule</button>}
+      </div>
+      <p className="hint" role="status">{classroomPreviewWords(asked, state, Math.max(0, polls - 1) * PREVIEW_POLL_MS) || note}</p>
+      <p className="hint">Videos, pictures, PDFs and text go up from the <a href="/classroom/remote/" target="_blank" rel="noopener">Sparks remote</a>.</p>
+    </PanelCard>
   );
 }
 
