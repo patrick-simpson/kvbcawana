@@ -8,6 +8,7 @@ import { LEAVE_TOTAL, holdThen } from '../lib/landing.js';
 import { HOUSE } from '../lib/kit.js';
 import { useKeydown } from '../hooks/index.js';
 import { slideGesture, useTouch } from '../lib/touch.js';
+import { onRemoteStep } from '../lib/remoteSteps.js';
 import { ColorSweep } from '../components/ColorSweep.jsx';
 import { StepChip } from '../components/StepChip.jsx';
 import { Slide } from './Slide.jsx';
@@ -144,6 +145,14 @@ export const SlideshowView = ({ deck, now, onExit, onFinish, onBareChange }) => 
     if (escArmed) onExit();
     else setEscArmed(true);
   };
+
+  // The opening-ceremony remote's Next and Back are the arrow keys' (App.jsx
+  // hands them over; lib/remoteSteps.js). The ref keeps the newest goTo.
+  const stepRef = useRef(/** @type {(dir: 1 | -1) => void} */ (() => {}));
+  useEffect(() => {
+    stepRef.current = (dir) => (dir === 1 ? goNext() : goPrev());
+  });
+  useEffect(() => onRemoteStep((dir) => stepRef.current(dir)), []);
 
   useKeydown((e) => {
     if (['Space', 'ArrowRight', 'PageDown'].includes(e.code)) {

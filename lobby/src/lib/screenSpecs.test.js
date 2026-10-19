@@ -76,11 +76,23 @@ describe('the other kinds', () => {
   it("the projector's actions are the configure relay's, and a wall pick is checked like the projector checks it", () => {
     const app = readFileSync(resolve(__dirname, '../presentation/App.jsx'), 'utf8');
     expect(app).toContain("listenForRelay('projector', ['select', 'resume']");
-    expect(SCREEN_ACTIONS.projector).toEqual(['select', 'resume']);
+    // The relay's two, then the opening-ceremony remote's four (owner 2026-10-19).
+    expect(SCREEN_ACTIONS.projector).toEqual(['select', 'resume', 'slide-next', 'slide-prev', 'backup', 'backup-end']);
     expect(sanitizeScreenAction('projector', 'select', { type: 'countdown', x: 1 })).toEqual({ action: 'select', data: { type: 'countdown' } });
     expect(sanitizeScreenAction('projector', 'select', { type: 'window', index: 1.5 })).toBeNull();
     expect(sanitizeScreenAction('lobby', 'select', { type: 'countdown' })).toBeNull();
     expect(sanitizeScreenAction('lobby', 'reset-tally', { anything: 1 })).toEqual({ action: 'reset-tally' });
+  });
+
+  it("the ceremony remote's backups carry exactly one known screen", () => {
+    expect(sanitizeScreenAction('projector', 'backup', { what: 'us-flag', extra: 1 })).toEqual({ action: 'backup', data: { what: 'us-flag' } });
+    expect(sanitizeScreenAction('projector', 'backup', { what: 'awana-flag' })).toEqual({ action: 'backup', data: { what: 'awana-flag' } });
+    expect(sanitizeScreenAction('projector', 'backup', { what: 'verse' })).toEqual({ action: 'backup', data: { what: 'verse' } });
+    expect(sanitizeScreenAction('projector', 'backup', { what: 'pirate-flag' })).toBeNull();
+    expect(sanitizeScreenAction('projector', 'backup')).toBeNull();
+    expect(sanitizeScreenAction('projector', 'slide-next', { by: 9 })).toEqual({ action: 'slide-next' });
+    expect(sanitizeScreenAction('projector', 'backup-end')).toEqual({ action: 'backup-end' });
+    expect(sanitizeScreenAction('lobby', 'slide-next')).toBeNull();
   });
 
   it('an unknown kind keeps nothing', () => {

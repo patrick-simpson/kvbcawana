@@ -191,3 +191,30 @@ describe('SlideshowView: the exit toast is a bottom overlay the setup note yield
     again.unmount();
   });
 });
+
+describe("SlideshowView: the opening-ceremony remote's Next and Back are the arrow keys", () => {
+  afterEach(cleanup);
+
+  it('steps forward and back, and past the blackout hands off to games', async () => {
+    const { remoteStep } = await import('../lib/remoteSteps.js');
+    const onFinish = vi.fn();
+    const { container } = render(deck({ onFinish }));
+    act(() => { remoteStep(1); });
+    expect(current(container)).toBe(ORDER[1]);
+    act(() => { remoteStep(1); });
+    act(() => { remoteStep(-1); });
+    expect(current(container)).toBe(ORDER[1]);
+    act(() => { remoteStep(1); });
+    act(() => { remoteStep(1); });
+    expect(current(container)).toBe(ORDER[3]);
+    act(() => { remoteStep(1); });
+    expect(onFinish).toHaveBeenCalledTimes(1);
+  });
+
+  it('nobody hears a step once the deck has gone', async () => {
+    const { remoteStep } = await import('../lib/remoteSteps.js');
+    const { unmount } = render(deck());
+    unmount();
+    expect(remoteStep(1)).toBe(false);
+  });
+});

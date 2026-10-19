@@ -372,6 +372,64 @@
   white-space: nowrap;
   pointer-events: none;
 }
+/* The opening-ceremony remote's backups (components/BackupView.jsx): one
+   screen over whatever is up, under the church's logo and the menus. A flag
+   beside its pledge, or the verse alone. Flat: no blur, no gradient. */
+.pj-backup {
+  position: absolute;
+  inset: 0;
+  z-index: 28;
+  background: #000000;
+}
+.pj-backup__row {
+  position: absolute;
+  left: calc(6 * var(--u));
+  right: calc(6 * var(--u));
+  top: calc(11 * var(--u));
+  bottom: calc(6 * var(--u));
+  display: flex;
+  align-items: center;
+  gap: calc(5 * var(--u));
+}
+.pj-backup__row--verse {
+  justify-content: center;
+  text-align: center;
+  left: calc(12 * var(--u));
+  right: calc(12 * var(--u));
+}
+.pj-backup__flag-box {
+  flex: 0 0 calc(42 * var(--u));
+}
+.pj-backup__flag {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1.9 / 1;
+  height: auto;
+  box-shadow: calc(0.7 * var(--u)) calc(0.7 * var(--u)) 0 rgb(255 255 255 / 0.18);
+}
+.pj-backup__flag--awana {
+  background: #FFFFFF;
+  display: grid;
+  place-items: center;
+}
+.pj-backup__flag--awana img {
+  width: 62%;
+  height: auto;
+}
+.pj-backup__words {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.pj-backup__text {
+  color: #FFFFFF;
+  font-size: calc(3.3 * var(--u));
+  line-height: 1.32;
+  margin: calc(1.6 * var(--u)) 0 0;
+}
+.pj-backup__row--verse .pj-backup__text {
+  font-size: calc(4.2 * var(--u));
+}
+
 /* One fixed cell per figure, for a ticking clock in a face with no
    tabular figures (Londrina). */
 .pj-fig {
@@ -1418,6 +1476,13 @@
 
   /* ── The shutdown screen ── */
   .pj-shutdown { padding-bottom: calc(36 * var(--u)); }
+
+  /* ── The ceremony remote's backups: the flag over its pledge ── */
+  .pj-backup__row { flex-direction: column; justify-content: center; text-align: center; top: calc(24 * var(--u)); bottom: calc(24 * var(--u)); }
+  .pj-backup__flag-box { flex: 0 0 auto; width: calc(80 * var(--u)); }
+  .pj-backup__words { flex: 0 0 auto; }
+  .pj-backup__text { font-size: calc(5.6 * var(--u)); }
+  .pj-backup__row--verse .pj-backup__text { font-size: calc(6.6 * var(--u)); }
 
   /* ── The weather scene: its shapes twice the unit, so a cloud is a cloud ── */
   .pj-wx { --wx-u: calc(2 * var(--u)); }

@@ -147,10 +147,15 @@ export const SCREEN_SPECS = {
  */
 export const SCREEN_ACTIONS = {
   lobby: Object.freeze(['preview-checkin', 'reset-tally', 'board-demo']),
-  projector: Object.freeze(['select', 'resume']),
+  // slide-next/slide-prev and the backups are the opening-ceremony remote's
+  // (owner 2026-10-19; /lobby/projector-remote.html).
+  projector: Object.freeze(['select', 'resume', 'slide-next', 'slide-prev', 'backup', 'backup-end']),
   journey: Object.freeze(['start-downloads', 'pause-downloads', 'resume-downloads', 'stop-downloads', 'delete-downloads']),
   computer: Object.freeze([]),
 };
+
+/** The opening-ceremony remote's backup screens: a flag beside its pledge, or the verse. */
+export const PROJECTOR_BACKUPS = Object.freeze(['us-flag', 'awana-flag', 'verse']);
 
 /** The kinds whose actions wait in the Worker for the screen's next hello (no live channel of their own). */
 export const SCREEN_ACTION_QUEUED_KINDS = Object.freeze(/** @type {readonly ScreenKind[]} */ (['journey']));
@@ -234,6 +239,10 @@ export function sanitizeScreenSettings(kind, raw) {
  */
 export function sanitizeScreenAction(kind, action, data) {
   if (!isScreenKind(kind) || typeof action !== 'string' || !SCREEN_ACTIONS[kind].includes(action)) return null;
+  if (kind === 'projector' && action === 'backup') {
+    const what = /** @type {any} */ (data)?.what;
+    return PROJECTOR_BACKUPS.includes(what) ? { action, data: { what } } : null;
+  }
   if (kind !== 'projector' || action !== 'select') return { action };
   const t = /** @type {any} */ (data);
   if (t && t.type === 'countdown') return { action, data: { type: 'countdown' } };

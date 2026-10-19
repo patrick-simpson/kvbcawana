@@ -16,6 +16,8 @@ import { projectorIdle } from '../lib/buildReload.js';
 import { ViewErrorBoundary, ErrorScreen } from './components/ViewErrorBoundary.jsx';
 import { ChurchMark } from './components/ChurchMark.jsx';
 import { ResumePill } from './components/ResumePill.jsx';
+import { BackupView } from './components/BackupView.jsx';
+import { remoteStep } from './lib/remoteSteps.js';
 import { SetupChecklist } from './components/SetupChecklist.jsx';
 import { CountdownView } from './views/CountdownView.jsx';
 import { GameTimeView } from './views/GameTimeView.jsx';
@@ -32,6 +34,9 @@ import { isTouch, usePortrait, useTouch } from './lib/touch.js';
 
 const OPENING_WINDOW_INDEX = 0;
 const CONFIGURE = FLAGS.configure;
+
+/** A backup screen the remote asked for (already cleaned by useScreenSync; checked again). */
+const isBackup = (t) => Boolean(t) && ['us-flag', 'awana-flag', 'verse'].includes(t.what);
 
 /** A relayed wall pick, checked before the live projector obeys it. */
 const isTarget = (t) => Boolean(t) && typeof t === 'object'
@@ -188,11 +193,39 @@ export const App = () => {
   // Managed from /settings (ROADMAP.md#settings-page, phase 2): registered with the sync
   // Worker, its two switches followed, a wall pick or Resume obeyed. Never
   // from the configure page itself.
+  // The opening-ceremony remote (owner 2026-10-19; /lobby/projector-remote.html).
+  // Next and Back are the arrow keys on the deck; on the countdown a Next
+  // starts the ceremony. A backup (a flag beside its pledge, or 2 Timothy
+  // 2:15) covers the wall until the remote takes it down, Escape does, or a
+  // Next/Back is pressed (which only takes it down: the slide under it is
+  // still the one the room was on).
+  const [backup, setBackup] = useState(/** @type {null | 'us-flag' | 'awana-flag' | 'verse'} */ (null));
+  const remoteStepFor = (dir) => {
+    if (backup) { setBackup(null); return; }
+    if (state.mode === AppMode.SLIDESHOW) remoteStep(dir);
+    else if (state.mode === AppMode.COUNTDOWN && dir === 1) select({ type: 'window', index: OPENING_WINDOW_INDEX });
+  };
+  useEffect(() => {
+    if (!backup) return undefined;
+    const onKey = (e) => {
+      if (e.code !== 'Escape') return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      setBackup(null);
+    };
+    window.addEventListener('keydown', onKey, { capture: true });
+    return () => window.removeEventListener('keydown', onKey, { capture: true });
+  }, [backup]);
+
   useProjectorScreen({
     enabled: !CONFIGURE,
     onAction: (action, target) => {
       if (action === 'resume') resume();
       else if (action === 'select' && isTarget(target)) select(target);
+      else if (action === 'slide-next') remoteStepFor(1);
+      else if (action === 'slide-prev') remoteStepFor(-1);
+      else if (action === 'backup' && isBackup(target)) setBackup(target.what);
+      else if (action === 'backup-end') setBackup(null);
     },
   });
 
@@ -240,7 +273,9 @@ export const App = () => {
       {/* The church's logo, like a broadcast logo: above every view, so no
           slide change or view crossfade ever moves it. The shutdown screen
           signs the night off with the full logo, tagline and all. */}
-      <ChurchMark hidden={bare} full={state.mode === AppMode.SHUTDOWN} />
+      <AnimatePresence>{backup && <BackupView key={backup} what={backup} />}</AnimatePresence>
+
+      <ChurchMark hidden={bare && !backup} full={state.mode === AppMode.SHUTDOWN} />
 
       {touch ? (
         <TouchMenu

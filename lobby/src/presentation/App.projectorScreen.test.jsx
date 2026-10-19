@@ -74,4 +74,22 @@ describe('the projector managed from /settings', () => {
     });
     expect(onAction.mock.calls).toEqual([['select', { type: 'window', index: 2 }], ['resume', undefined]]);
   });
+
+  it("passes the ceremony remote's Next, Back and backups through, cleaned", async () => {
+    fakeWorker();
+    const onAction = vi.fn();
+    render(<Projector onAction={onAction} />);
+    await waitFor(() => expect(loadScreenSlot('projector')?.synced).toBeTruthy());
+    const id = loadScreenSlot('projector').id;
+    act(() => {
+      ringSyncDoorbell({ what: 'screen-action', id, action: 'slide-next' });
+      ringSyncDoorbell({ what: 'screen-action', id, action: 'slide-prev', data: { by: 5 } });
+      ringSyncDoorbell({ what: 'screen-action', id, action: 'backup', data: { what: 'verse', html: '<b>' } });
+      ringSyncDoorbell({ what: 'screen-action', id, action: 'backup', data: { what: 'pirate-flag' } });
+      ringSyncDoorbell({ what: 'screen-action', id, action: 'backup-end' });
+    });
+    expect(onAction.mock.calls).toEqual([
+      ['slide-next', undefined], ['slide-prev', undefined], ['backup', { what: 'verse' }], ['backup-end', undefined],
+    ]);
+  });
 });
