@@ -136,6 +136,7 @@ function createDisplay(opts) {
   // the screen is closed, ask the sync service every PREVIEW_POLL_MS whether a
   // preview waits; one that does opens the screen until it ends.
   let previewUntil = 0;
+  let blackDismissed = false; // the classroom's all-day black screen, put away by hand (memory only)
   let previewAsking = false;
   async function checkClassroomPreview() {
     if (!running || previewAsking || urls().screen.id !== 'classroom' || typeof opts.classroomStage !== 'function') return;
@@ -379,6 +380,7 @@ function createDisplay(opts) {
         return;
       }
       state.overrides = hide(state.overrides, currentWindow());
+      blackDismissed = true;
       saveState();
       log('closed by hand: hidden until the next club night');
     });
@@ -474,13 +476,20 @@ function createDisplay(opts) {
     let { visible, reason } = SMOKE ? { visible: true, reason: 'manual' } : decideVisibility(win, state.overrides, t.getTime());
     // A /settings preview on the classroom screen opens it for its minute (classroom-preview.js).
     if (!visible && previewUntil > Date.now() && urls().screen.id === 'classroom') { visible = true; reason = 'preview'; }
+    // The downstairs classroom keeps its (black) screen up all day (owner
+    // 2026-10-19: "when the screen is not being used the app should launch a
+    // black screen"), so the TV never shows the Windows desktop. Closing it
+    // by hand (or Hide in the tray) puts it away until the next scheduled window.
+    if (win.inWindow) blackDismissed = false;
+    if (!visible && reason === 'off' && urls().screen.id === 'classroom' && !blackDismissed && !SMOKE) { visible = true; reason = 'black'; }
     if (reason !== lastReason) { log('state', reason, win.dateKey); lastReason = reason; }
     if (visible) openLobby(); else closeLobby();
     const clubNightAhead = nextClubNight(t, sources, 60, hours()) === win.dateKey && win.minutes < hours().closeMin;
     // A PC asleep at the shutdown time never shuts down: an armed shutdown
     // keeps it awake past the close until its time comes.
     const shutdownAhead = checkShutdown(t, win);
-    holdAwake(visible || clubNightAhead || shutdownAhead);
+    // The all-day black screen does not keep the PC or its TV awake.
+    holdAwake((visible && reason !== 'black') || clubNightAhead || shutdownAhead);
     updateTray();
   }
 
@@ -871,7 +880,7 @@ function createDisplay(opts) {
         })),
       },
       { label: 'Show now (for 3 hours)', enabled: !scheduledNow(t), click: requestShow },
-      { label: 'Hide until the next club night', enabled: visible, click: () => { state.overrides = hide(state.overrides, currentWindow()); saveState(); evaluate(); } },
+      { label: 'Hide until the next club night', enabled: visible, click: () => { state.overrides = hide(state.overrides, currentWindow()); blackDismissed = true; saveState(); evaluate(); } },
       { label: 'Resume schedule', enabled: overridden, click: () => { state.overrides = NO_OVERRIDES; saveState(); evaluate(); } },
       setupMode
         ? { label: `Back to ${where()}`, click: () => { setupMode = false; placedAs = null; place(true); } }

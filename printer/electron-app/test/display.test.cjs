@@ -520,3 +520,13 @@ describe('display/classroom-preview (a /settings preview opens a closed classroo
     expect(main.includes("syncClient.syncRequest(s.url, '/v1/classroom/stage?from=app', { session: s.session })")).toBe(true);
   });
 });
+
+describe('display: the classroom\'s all-day black screen (owner 2026-10-19)', () => {
+  it('keeps the classroom screen up outside its window, without keeping the PC awake, until put away by hand', () => {
+    const src = require('node:fs').readFileSync(require('node:path').join(__dirname, '../src/display/display.js'), 'utf8');
+    expect(src.includes("if (!visible && reason === 'off' && urls().screen.id === 'classroom' && !blackDismissed && !SMOKE) { visible = true; reason = 'black'; }")).toBe(true);
+    expect(src.includes("holdAwake((visible && reason !== 'black') || clubNightAhead || shutdownAhead);")).toBe(true);
+    expect((src.match(/blackDismissed = true;/g) || []).length).toBe(2);
+    expect(src.includes('if (win.inWindow) blackDismissed = false;')).toBe(true);
+  });
+});

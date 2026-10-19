@@ -1,4 +1,9 @@
-﻿## [10.3.0] - 2026-10-19
+﻿## [10.4.0] - 2026-10-19
+The downstairs classroom screen stays up, black, all day.
+
+**No Windows desktop on the classroom TV.** A computer showing the downstairs classroom screen now keeps it up all day: black outside club hours, the cards on club nights. The black screen does not keep the computer or the TV awake. Closing it (or Hide in the tray) puts it away until the next club night.
+
+## [10.3.0] - 2026-10-19
 The Sparks remote, and previews of the downstairs classroom screen.
 
 **Preview the classroom screen.** On awana.kvbchurch.org/settings → Screens → Downstairs classroom, the Cubbies card, the Sparks card or the Sparks lobby shows on the classroom TV for one minute. When the classroom computer is on but its screen is closed (outside club hours), this app now opens the screen for that minute and closes it again.
