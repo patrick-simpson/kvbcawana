@@ -407,3 +407,87 @@ describe('display/visibility', () => {
     });
   });
 });
+
+describe('display/pen-watch (the classroom black board, owner 2026-10-18)', () => {
+  const { EventEmitter } = require('node:events');
+  const { createPenWatch, parseState, penLifted, READY_LINE, WATCH_PS } = require('../src/display/pen-watch');
+
+  const fakeSpawn = () => {
+    const calls = [];
+    const spawn = (cmd, args) => {
+      const child = new EventEmitter();
+      child.stdout = new EventEmitter();
+      child.stdout.setEncoding = () => {};
+      child.stderr = new EventEmitter();
+      child.killed = false;
+      child.kill = () => { child.killed = true; };
+      calls.push({ cmd, args, child });
+      return child;
+    };
+    return { spawn, calls };
+  };
+  const state = (windows) => `STATE ${JSON.stringify({ procs: ['SMARTInk'], windows })}\n`;
+
+  it('reads the helper\'s state lines, and nothing else', () => {
+    expect(parseState(state(['Ink|Tb|200x40']))).toEqual({ procs: ['SMARTInk'], windows: ['Ink|Tb|200x40'] });
+    expect(parseState('STATE {"procs":"SMARTInk","windows":"A|B|1x1"}')).toEqual({ procs: ['SMARTInk'], windows: ['A|B|1x1'] });
+    expect(parseState('STATE {"procs":null}')).toEqual({ procs: [], windows: [] });
+    expect(parseState('hello')).toBe(null);
+    expect(parseState('STATE {')).toBe(null);
+  });
+
+  it('a pen is lifted when SMART Ink shows more windows than before', () => {
+    const none = { procs: [], windows: [] };
+    const one = { procs: ['SMARTInk'], windows: ['a'] };
+    const two = { procs: ['SMARTInk'], windows: ['a', 'b'] };
+    expect(penLifted(null, none)).toBe(false);
+    expect(penLifted(none, one)).toBe(true);
+    expect(penLifted(one, two)).toBe(true);
+    expect(penLifted(two, one)).toBe(false);
+    expect(penLifted(one, one)).toBe(false);
+    expect(penLifted(one, null)).toBe(false);
+  });
+
+  it('runs one hidden PowerShell on Windows only, tells the page on a lift, and stops', () => {
+    const { spawn, calls } = fakeSpawn();
+    let lifts = 0;
+    const logs = [];
+    const w = createPenWatch({ spawn, platform: 'win32', onLift: () => { lifts += 1; }, log: (...p) => logs.push(p) });
+    w.start();
+    w.start();
+    expect(calls.length).toBe(1);
+    expect(calls[0].cmd).toBe('powershell.exe');
+    expect(calls[0].args.includes('-EncodedCommand')).toBe(true);
+    const out = calls[0].child.stdout;
+    out.emit('data', `${READY_LINE}\n`);
+    out.emit('data', state([]));
+    expect(lifts).toBe(0);
+    out.emit('data', state(['SMART Ink|Toolbar|300x60']).slice(0, 10));
+    out.emit('data', state(['SMART Ink|Toolbar|300x60']).slice(10));
+    expect(lifts).toBe(1);
+    out.emit('data', state([]));
+    out.emit('data', state(['SMART Ink|Toolbar|300x60']));
+    expect(lifts).toBe(2);
+    w.stop();
+    expect(calls[0].child.killed).toBe(true);
+    expect(w.isRunning()).toBe(false);
+    expect(logs.some((p) => String(p[0]).includes('SMART Ink'))).toBe(true);
+
+    const mac = fakeSpawn();
+    createPenWatch({ spawn: mac.spawn, platform: 'darwin', onLift: () => {}, log: () => {} }).start();
+    expect(mac.calls.length).toBe(0);
+  });
+
+  it('the script only looks at window lists (no keys, no screen, no files)', () => {
+    expect(WATCH_PS.includes('GetAsyncKeyState')).toBe(false);
+    expect(WATCH_PS.includes('CopyFromScreen')).toBe(false);
+    expect(/Set-Content|Out-File|Invoke-WebRequest/.test(WATCH_PS)).toBe(false);
+  });
+
+  it('display.js starts it for the classroom screen only and stops it with the screen', () => {
+    const src = require('node:fs').readFileSync(require('node:path').join(__dirname, '../src/display/display.js'), 'utf8');
+    expect(src.includes("if (urls().screen.id === 'classroom' && !SMOKE) penWatch.start();")).toBe(true);
+    expect((src.match(/penWatch\.stop\(\)/g) || []).length).toBe(2);
+    expect(src.includes("window.dispatchEvent(new Event('awana:pen-lifted'))")).toBe(true);
+  });
+});

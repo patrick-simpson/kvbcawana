@@ -1,4 +1,9 @@
-﻿## [10.1.0] - 2026-10-17
+﻿## [10.2.0] - 2026-10-19
+The downstairs classroom's black board.
+
+**Lift a pen, get a black board.** On the downstairs classroom screen, lifting a pen from the SMART Board's tray (SMART Ink's toolbar comes up) turns the Cubbies card, Sparks Large Group Time or the Sparks lobby pure black to write on, until the next scheduled screen. Only the club's checked-in count and the check-in welcomes stay on it. Putting the pen back changes nothing; a "Show the card again" button in the bottom left stays up for 10 seconds in case it was an accident. If this computer cannot see SMART Ink, a pen touching the board or the small pen button in the corner does the same. Set SMART Ink's black pen to write white (SMART Settings, Pen and Button Settings). What SMART Ink shows is written to the display log, for the first test at the board.
+
+## [10.1.0] - 2026-10-17
 A fourth screen: the downstairs classroom.
 
 **Downstairs classroom.** A display computer can now show "Downstairs classroom" (setup, or Settings from the tray). On club nights it shows the Cubbies card from 6:30, Sparks "Large Group Time" from 7:00 and from 7:30 the lobby screen with Sparks children only (pickup list, welcomes, the Sparks count), with two minutes of black either side of each change while the clubs pass at the door. Choosing it sets the hours to 6:30 to 8:00 pm and turns on the 8:00 pm shutdown. While a card (or the black around it) is up, a child of that club who checks in gets a welcome and a ding on that screen. Setting the PC up to wake itself: classroom/README.md.

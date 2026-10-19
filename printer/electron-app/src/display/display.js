@@ -30,6 +30,7 @@ const { findDisplay, rememberDisplay } = require('./displays');
 const { SCREENS, isScreenPage, screenUrls } = require('./screens');
 const { hoursMinutes, normalizeSettings, parseTime, settingsForScreen } = require('./settings');
 const { shutdownDeadline, shutdownStep } = require('./shutdown');
+const { createPenWatch } = require('./pen-watch');
 
 const APP_NAME = 'KVBC Awana';
 const SOURCES_EVERY_MS = 60 * 60 * 1000; // re-read the schedule and feed hourly
@@ -120,6 +121,15 @@ function createDisplay(opts) {
   const where = () => WHERE[urls().screen.id];
 
   let running = false;
+  // The downstairs classroom's black board: SMART Ink's toolbar coming up (a
+  // pen lifted from the tray) is passed to the page (pen-watch.js).
+  const penWatch = createPenWatch({
+    log,
+    onLift: () => {
+      if (!lobby || lobby.isDestroyed() || urls().screen.id !== 'classroom' || !isSitePage(lobby.webContents.getURL())) return;
+      lobby.webContents.executeJavaScript("window.dispatchEvent(new Event('awana:pen-lifted'))").catch(() => {});
+    },
+  });
   const timers = new Set();
   const later = (fn, ms) => { const t = setTimeout(() => { timers.delete(t); fn(); }, ms); timers.add(t); return t; };
   const every = (fn, ms) => { const t = setInterval(fn, ms); timers.add(t); return t; };
@@ -355,6 +365,7 @@ function createDisplay(opts) {
       if (lobby !== thisWindow) return;
       lobby = null;
       placedAs = null;
+      penWatch.stop();
       updateTray();
     });
     lobby.once('ready-to-show', () => place());
@@ -362,6 +373,7 @@ function createDisplay(opts) {
     later(() => { if (lobby && !lobby.isDestroyed() && !lobby.isVisible()) place(); }, 10_000);
     lobby.loadURL(pageUrl());
     log('screen opened', urls().screen.id);
+    if (urls().screen.id === 'classroom' && !SMOKE) penWatch.start();
   }
 
   /**
@@ -384,6 +396,7 @@ function createDisplay(opts) {
   function closeLobby() {
     clearTimeout(retryTimer);
     setupMode = false;
+    penWatch.stop();
     if (!lobby || lobby.isDestroyed()) return;
     // Chromium writes localStorage lazily: commit tonight's login, tally and
     // seen-set before the page goes, so a reboot or power cut loses nothing.
