@@ -484,13 +484,7 @@
   height: auto;
 }
 .pj-backup__flag--awana {
-  background: #FFFFFF;
-  display: grid;
-  place-items: center;
-}
-.pj-backup__flag--awana img {
-  width: 62%;
-  height: auto;
+  aspect-ratio: 3 / 2;
 }
 .pj-backup__words {
   flex: 1 1 0;

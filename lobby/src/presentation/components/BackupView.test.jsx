@@ -24,9 +24,14 @@ describe('the ceremony backups', () => {
     expect(container.textContent).toContain(US_PLEDGE_TEXT.split(' ').slice(0, 3).join(' '));
   });
 
-  it('stands the Awana flag beside the Awana pledge', () => {
+  it('stands the Awana flag, drawn from the church\'s own, beside the Awana pledge', () => {
     const { container } = render(<BackupView what="awana-flag" />);
-    expect(container.querySelector('.pj-backup__flag--awana img')).not.toBeNull();
+    // Drawn from the photo of the church's flag: red field, the globe, both
+    // banners' words and the three-tongued flame.
+    const flag = container.querySelector('svg.pj-backup__flag--awana');
+    expect(flag.getAttribute('viewBox')).toBe('0 0 300 200');
+    expect([...flag.querySelectorAll('text')].map((t) => t.textContent)).toEqual(['AWANA', 'CLUBS']);
+    expect(flag.querySelectorAll('g path')).toHaveLength(4); // grid + three flame tongues
     expect(container.querySelector('.pj-backup__text').textContent.replace(/\s+/g, ' ')).toBe(AWANA_PLEDGE_TEXT);
   });
 
