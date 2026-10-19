@@ -12,8 +12,10 @@
 //                                                          remote page cleans the Worker's answers with it)
 //   club gaps       canonical shared/transitionGap.js -> journey/public/src/shared/ (the kiosk's
 //                                                          black gaps and gap welcomes, byte for byte)
-//   the classroom   the brand kit -> classroom/public/brand/, clubNight.js and transitionGap.js -> classroom/public/src/shared/
-//                   (the downstairs classroom screen, owner 2026-10-17: its schedule asks the rule)
+//   the classroom   the brand kit -> classroom/public/brand/, clubNight.js, transitionGap.js,
+//                   classroomRemote.js, sync-protocol.js and cloud-crypto.js -> classroom/public/src/shared/
+//                   (the downstairs classroom screen, owner 2026-10-17: its schedule asks the rule;
+//                   the Sparks remote, 2026-10-18: its rules and its passphrase sign-in)
 //
 //   committed copies  the CommonJS copies of shared/*.js the Windows app ships
 //                     (printer/print-server/*.js and the display's clubNight.js; table in
@@ -53,7 +55,7 @@ export const JOURNEY_MODULES = ['sync-protocol.js', 'cloud-crypto.js', 'clubNigh
 // What each app holds a copy of. Paths are repo-relative.
 export const COPIES = {
   journey: { kit: 'journey/public/brand', modules: 'journey/public/src/shared' },
-  classroom: { kit: 'classroom/public/brand', modules: 'classroom/public/src/shared', moduleList: ['clubNight.js', 'transitionGap.js'] },
+  classroom: { kit: 'classroom/public/brand', modules: 'classroom/public/src/shared', moduleList: ['clubNight.js', 'transitionGap.js', 'classroomRemote.js', 'sync-protocol.js', 'cloud-crypto.js'] },
   printer: { kit: 'printer/print-server/public/brand', committed: true },
 };
 

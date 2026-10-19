@@ -93,6 +93,11 @@
 
   <div id="black" class="cr-layer cr-black"></div>
 
+  <!-- What the Sparks remote put up (src/stage.js): a YouTube video, a
+       picture, a PDF page or text, over everything but the black board and
+       the welcomes, until someone presses Back. -->
+  <section id="show" class="cr-layer cr-show" aria-live="off" hidden></section>
+
   <!-- The black board (owner 2026-10-18): a leader lifts a SMART Board pen
        (KVBC Awana sees SMART Ink's toolbar), touches the board with a pen, or
        presses the pen button: black to write on until the next scheduled
@@ -122,6 +127,11 @@
     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20l1.2-4.6L15.6 5a2.1 2.1 0 0 1 3 0l.4.4a2.1 2.1 0 0 1 0 3L8.6 18.8 4 20z"/><path d="M13.8 6.8l3.4 3.4"/></svg>
   </button>
 
+  <!-- The handbook swoop: the arcs sweep across, the change happens under them. -->
+  <div id="swoop" class="cr-swoop" aria-hidden="true"><i class="cr-swoop-band"></i></div>
+  <!-- Sparky's flight (a long press on the remote's mark). -->
+  <img id="sparky-fly" class="cr-sparky-fly" src="art/sparky-flying.png" alt="" aria-hidden="true">
+
   <section class="cr-configure" aria-label="Downstairs classroom">
     <h1>Downstairs classroom</h1>
     <p>Nothing to set here: this screen runs by the clock on club nights.</p>
@@ -133,6 +143,7 @@
       <li><b>8:00</b> this computer shuts down (the shutdown setting on the left)</li>
     </ul>
     <p>A Cubbies or Sparks child who checks in while their card is up gets a welcome and a ding.</p>
+    <p>Leaders put YouTube videos, pictures, PDFs and text on this screen from the Sparks remote: awana.kvbchurch.org/classroom/remote/.</p>
     <p>Lifting a SMART Board pen (or touching the board with one, or the small pen button in the bottom left) turns the screen black to write on until the next scheduled screen. Set SMART Ink's black pen to write white (SMART Settings, Pen and Button Settings).</p>
   </section>
 

@@ -212,6 +212,7 @@ function startBoard(how, from) {
   const p = L.boardPeriod(c.minutes, night.ready && c.clubNight);
   if (!p) return;
   board = { from: p.from, view: p.view, at: Date.now() };
+  stageApi?.pauseVideo();
   clubs = L.boardClubs(p.view);
   console.info(`classroom: black board (${how}) until ${Math.floor(p.until / 60)}:${String(p.until % 60).padStart(2, '0')}`);
   clearTimeout(undoTimer);
@@ -254,7 +255,7 @@ function drawBoard() {
   root.classList.toggle('cr-board-up', up);
   boardChip.dataset.club = up ? L.boardClubs(board.view)[0] : '';
   undoBtn.hidden = !(up && (PREVIEW || Date.now() - board.at < L.BOARD_UNDO_MS));
-  penBtn.hidden = up || CONFIGURE || !['cubbies', 'sparks', 'lobby'].includes(phase);
+  penBtn.hidden = up || CONFIGURE || !['cubbies', 'sparks', 'lobby'].includes(phase) || Boolean(stageApi && stageApi.showing());
   if (up) sizeInk();
 }
 window.addEventListener(PEN_LIFTED_EVENT, () => startBoard('pen lifted'));
@@ -329,7 +330,8 @@ function maybeChalk(dateKey) {
 
 /* ── Welcomes: one card per club, for the clubs of the moment ──── */
 let welcomes = L.emptyWelcomes();
-const welcomingNow = () => L.welcomesUp(welcomes, clubs, now().getTime());
+// No welcome over a video the remote put up (owner 2026-10-18); over a picture or text, yes.
+const welcomingNow = () => (stageApi && stageApi.showing() === 'video' ? [] : L.welcomesUp(welcomes, clubs, now().getTime()));
 function drawWelcomes() {
   const up = welcomingNow();
   for (const [club, el] of Object.entries(welcomeEls)) {
@@ -392,6 +394,7 @@ window.addEventListener('message', (event) => {
   if (!frame || event.source !== frame.contentWindow || event.origin !== window.location.origin) return;
   const d = event.data;
   if (!d || typeof d !== 'object' || d.type !== CHECKIN_MESSAGE) return;
+  if (stageApi && stageApi.showing() === 'video') return;
   const r = L.welcomeFor(welcomes, d, clubs, now().getTime());
   if (!r.ding) return;
   welcomes = r.state;
@@ -410,14 +413,18 @@ function tick() {
   // (no card fading out from under the black).
   const boardEnded = Boolean(board) && !L.boardUp(board, c.minutes, clubNight);
   if (boardEnded) endBoard();
-  clubs = board ? L.boardClubs(board.view) : L.welcomeClubsAt(c.minutes, clubNight);
-  setPhase(L.phaseAt(c.minutes, clubNight), first || boardEnded);
+  // A /settings preview shows one look for its minute, whatever the clock says.
+  const look = stageApi ? stageApi.previewLook() : '';
+  const lookClubs = look ? (L.VIEWS.find((v) => v.view === look)?.clubs || []) : null;
+  clubs = board ? L.boardClubs(board.view) : lookClubs || L.welcomeClubsAt(c.minutes, clubNight);
+  setPhase(look || L.phaseAt(c.minutes, clubNight), first || boardEnded);
   first = false;
   drawBoard();
   drawWelcomes();
   drawChips(at.getTime());
   if (phase === 'cubbies' && !board) { drawHoney(c.seconds, at.getMilliseconds()); maybeBear(c.dateKey, c.minutes); }
   maybeChalk(c.dateKey);
+  stageApi?.report();
 }
 
 /* ── A new build: reload when nothing is on screen for someone ──── */
@@ -432,6 +439,7 @@ async function checkBuild() {
     const page = await fetch(`${window.location.pathname}?b=${Date.now()}`, { cache: 'no-store' });
     if (!page.ok || !(await page.text()).includes(v.build)) return;
     if (welcomingNow().length || phase === 'cubbies' || phase === 'sparks' || phase === 'lobby') return; // only while black, no welcome up
+    if (stageApi && (stageApi.showing() || stageApi.previewLook())) return; // nor under something the remote put up
     window.location.reload();
   } catch { /* no news */ }
 }
@@ -472,12 +480,31 @@ function preview(what) {
   }
 }
 
+/* ── The Sparks remote (src/stage.js; worker/src/routes.md 10.13) ── */
+let stageApi = /** @type {null | { previewLook: () => string, showing: () => string, pauseVideo: () => void, report: () => void }} */ (null);
+async function startStage() {
+  try {
+    const [rules, mod] = await Promise.all([
+      import(new URL(`./shared/classroomRemote.js${own.search}`, own).href),
+      import(new URL(`./stage.js${own.search}`, own).href),
+    ]);
+    stageApi = await mod.createStage({
+      rules, root, frame, motionOk,
+      screen: () => ({ phase, board: Boolean(board) }),
+      onChange: () => tick(),
+      // Something new went up: the black board steps aside for it.
+      onShow: () => { if (board) endBoard(); drawWelcomes(); },
+    });
+  } catch { /* the remote's half only; the schedule runs without it */ }
+}
+
 if (CONFIGURE) {
   root.dataset.phase = 'configure';
 } else if (PREVIEW) {
   preview(PREVIEW);
 } else {
   tick();
+  startStage();
   loadNight();
   setInterval(tick, 250);
   setInterval(loadNight, NIGHT_REFRESH_MS);

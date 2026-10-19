@@ -468,6 +468,64 @@ html.cr-welcoming .cr-sparks .cr-sp-ring { translate: calc(-4 * var(--u)) calc(-
   scale: 0 1;
 }
 
+/* ── What the Sparks remote put up (src/stage.js) ───────────────
+   Over the cards and the lobby; under the black board (z 6, later in the
+   page) and the welcomes (z 7). */
+.cr-show { z-index: 6; background: #000000; overflow: hidden; }
+.cr-show #cr-yt,
+.cr-show iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+.cr-show-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+.cr-show-pdf { position: absolute; left: 50%; top: 50%; translate: -50% -50%; max-width: 100%; max-height: 100%; background: #ffffff; }
+.cr-show-missing { position: absolute; inset: 0; display: grid; place-items: center; margin: 0; font-family: var(--cr-label); font-size: calc(3 * var(--u)); color: #ffffff; }
+/* Text on the handbook page (the Sparks card's field, its page and its edge band) ... */
+.cr-show--page { background: #8DC63F; box-shadow: inset calc(4.5 * var(--u)) 0 0 #2E9B48; }
+.cr-show-page {
+  position: absolute;
+  inset: calc(7 * var(--u)) calc(9 * var(--u)) calc(9 * var(--u)) calc(11 * var(--u));
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: calc(3 * var(--u)) calc(5 * var(--u));
+  overflow: hidden;
+}
+.cr-show--page .cr-show-page { background: #ffffff; border-radius: calc(4 * var(--u)); box-shadow: calc(1.2 * var(--u)) calc(1.2 * var(--u)) 0 #1C6B33; }
+.cr-show-heading { margin: 0 0 calc(1.4 * var(--u)); font-family: var(--cr-shout); font-size: calc(3.6 * var(--u) * var(--cr-shout-fit)); line-height: 1.05; color: var(--cr-sparks); }
+.cr-show-words {
+  margin: 0;
+  font-family: var(--cr-shout);
+  font-size: calc(var(--words-size, 8) * var(--u) * var(--cr-shout-fit));
+  line-height: 1.12;
+  color: var(--cr-ink);
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+  text-wrap: balance;
+}
+/* ... or on the black board. */
+.cr-show--board .cr-show-words { color: #ffffff; }
+.cr-show--board .cr-show-heading { color: var(--cr-sun); }
+
+/* The handbook swoop: one sun band with a teal and a lime arc riding its
+   curved edge (hard offsets, no blur), sweeping across in --swoop-ms; the
+   change happens while the band covers the screen. Rest = not drawn. */
+.cr-swoop { position: fixed; inset: 0; z-index: 9; pointer-events: none; overflow: hidden; display: none; }
+.cr-swoop.is-sweeping { display: block; }
+.cr-swoop-band {
+  position: absolute;
+  top: -60vh;
+  left: 0;
+  width: 170vw;
+  height: 220vh;
+  background: var(--cr-sun);
+  border-radius: 0 50% 50% 0 / 0 50% 50% 0;
+  box-shadow: 5vw 0 0 #17A9B5, 10vw 0 0 #8DC63F;
+  rotate: -8deg;
+  translate: -300vw 0;
+}
+.cr-swoop.is-back .cr-swoop-band { border-radius: 50% 0 0 50% / 50% 0 0 50%; box-shadow: -5vw 0 0 #17A9B5, -10vw 0 0 #8DC63F; translate: 300vw 0; }
+
+/* Sparky flies across once (the remote's easter egg). Rest = off the frame. */
+.cr-sparky-fly { position: fixed; z-index: 9; left: 0; top: 0; width: calc(26 * var(--u)); height: auto; pointer-events: none; translate: -40vw 70vh; opacity: 0; }
+
 /* ── Configure mode (KVBC Awana's Settings window) ─────────────── */
 .cr-configure { display: none; }
 html[data-phase="configure"] body { background: #f6f4ef; cursor: auto; }
@@ -520,6 +578,12 @@ html[data-phase="configure"] .cr-black { display: none; }
   html.cr-motion .cr-board.is-spilling .cr-board-undo { opacity: 0; }
   html.cr-motion .cr-board.is-spilled .cr-chip { animation: cr-pop 700ms var(--brand-ease-pop, ease-out) backwards; }
   html.cr-motion .cr-board.is-spilled .cr-board-undo { animation: cr-fade 500ms ease-out 250ms backwards; }
+
+  /* The remote's handbook swoop, a PDF's page turn, Sparky's flight. */
+  html.cr-motion .cr-swoop.is-sweeping .cr-swoop-band { animation: cr-swoop var(--swoop-ms, 1100ms) cubic-bezier(0.45, 0, 0.25, 1) forwards; }
+  html.cr-motion .cr-swoop.is-sweeping.is-back .cr-swoop-band { animation-name: cr-swoop-back; }
+  html.cr-motion .cr-show-pdf.is-turning { animation: cr-turn 450ms var(--brand-ease-settle, ease-out); }
+  html.cr-motion .cr-sparky-fly.is-flying { animation: cr-sparky-fly 2400ms cubic-bezier(0.3, 0.1, 0.3, 1) forwards; }
 
   /* The chalk Cubbie: up, a quick squiggle, back down. */
   html.cr-motion .cr-chalk.is-drawing .cr-chalk-cubbie { animation: cr-chalk-peek 2600ms ease-in-out forwards; }
@@ -579,4 +643,22 @@ html[data-phase="configure"] .cr-black { display: none; }
   0% { translate: 0 0; scale: 0; }
   60% { scale: var(--ds); }
   100% { translate: calc(var(--dx) * var(--spill-size, 40vmin) * 0.6) calc(var(--dy) * var(--spill-size, 40vmin) * 0.6); scale: var(--ds); }
+}
+@keyframes cr-swoop {
+  0% { translate: -300vw 0; }
+  45%, 55% { translate: -40vw 0; }
+  100% { translate: 150vw 0; }
+}
+@keyframes cr-swoop-back {
+  0% { translate: 150vw 0; }
+  45%, 55% { translate: -40vw 0; }
+  100% { translate: -300vw 0; }
+}
+@keyframes cr-turn { from { opacity: 0; translate: calc(-50% + 6 * var(--u)) -50%; } to { opacity: 1; translate: -50% -50%; } }
+@keyframes cr-sparky-fly {
+  0% { translate: -40vw 70vh; rotate: 15deg; opacity: 1; }
+  45% { translate: 40vw 18vh; rotate: -6deg; }
+  70% { translate: 75vw 30vh; rotate: 8deg; }
+  99% { opacity: 1; }
+  100% { translate: 120vw -30vh; rotate: -12deg; opacity: 0; }
 }
