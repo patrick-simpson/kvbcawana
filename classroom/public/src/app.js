@@ -208,6 +208,9 @@ let spillTimer = 0;
 /** @param {string} how  @param {{ x: number, y: number }} [from]  where the ink comes from (default: the pen tray, bottom centre) */
 function startBoard(how, from) {
   if (board || CONFIGURE || PREVIEW) return;
+  // Over something the Sparks remote put up, a lifted (or touching) pen just
+  // draws on it with SMART Ink (owner 2026-10-19); only the pen button blacks it out.
+  if (how !== 'pen button' && stageApi && stageApi.showing()) return;
   const c = church(now());
   const p = L.boardPeriod(c.minutes, night.ready && c.clubNight);
   if (!p) return;
@@ -255,7 +258,7 @@ function drawBoard() {
   root.classList.toggle('cr-board-up', up);
   boardChip.dataset.club = up ? L.boardClubs(board.view)[0] : '';
   undoBtn.hidden = !(up && (PREVIEW || Date.now() - board.at < L.BOARD_UNDO_MS));
-  penBtn.hidden = up || CONFIGURE || !['cubbies', 'sparks', 'lobby'].includes(phase) || Boolean(stageApi && stageApi.showing());
+  penBtn.hidden = up || CONFIGURE || !(['cubbies', 'sparks', 'lobby'].includes(phase) || Boolean(stageApi && stageApi.showing()));
   if (up) sizeInk();
 }
 window.addEventListener(PEN_LIFTED_EVENT, () => startBoard('pen lifted'));

@@ -21,6 +21,7 @@ Lift a pen from the SMART Board's tray while the Cubbies card, Sparks Large Grou
 
 - **Lifted by accident?** Tap **Show the card again** (bottom left). It is there for the first minute.
 - **Backups:** the small pen button in the bottom-left corner of the cards does the same, and so does a pen touching the board.
+- **Over a video, picture, PDF or text from the Sparks remote,** lifting a pen just writes on top of it. The pen button (bottom left) still turns the screen black.
 - **White writing:** in SMART Settings (the SMART icon by the clock) → **Pen and Button Settings**, set the **black** pen to write **white**, so it shows on the black board.
 - Once a night, someone small may drop by to admire the writing.
 

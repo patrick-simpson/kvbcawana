@@ -207,12 +207,16 @@ describe('the Sparks remote on the classroom screen', { skip: SKIP }, () => {
     await page.close();
   });
 
-  it('a lifted pen over a video pauses it and the board goes on top; a new button takes the board down', async () => {
+  it('a lifted pen over a video just draws on it; the pen button blacks it out and pauses the video; a new button takes the board down', async () => {
     const page = await open(CLUB_NIGHT);
     await page.waitForFunction(() => document.documentElement.dataset.phase === 'sparks');
     show(VIDEO);
     await page.waitForFunction(() => window.__yt.calls.includes('play'));
     await page.evaluate(() => window.dispatchEvent(new Event('awana:pen-lifted')));
+    await page.waitForTimeout(400);
+    assert.equal(await page.isHidden('#board'), true);
+    assert.equal(await page.evaluate(() => window.__yt.calls.includes('pause')), false);
+    await page.click('#pen-btn');
     await page.waitForSelector('#board:not([hidden])');
     assert.ok(await page.evaluate(() => window.__yt.calls.includes('pause')));
     const top = await page.evaluate(() => document.elementFromPoint(640, 360).closest('#board') !== null);
