@@ -35,5 +35,16 @@ const code = readFileSync(logic, 'utf8');
 const gapImport = "from './shared/transitionGap.js'";
 if (!code.includes(gapImport)) throw new Error('src/logic.js no longer imports ./shared/transitionGap.js');
 writeFileSync(logic, code.replace(gapImport, `from './shared/transitionGap.js?v=${build}'`));
+// The Sparks remote (remote/index.html): the same ?v= on its own assets
+// (remote.js asks for its modules with its own ?v=).
+export const REMOTE_STAMPED = ['../brand/tokens.css', '../brand/fonts.css', 'remote.css', 'remote.js'];
+const remoteFile = path.join(dir, 'remote', 'index.html');
+let remote = readFileSync(remoteFile, 'utf8');
+for (const asset of REMOTE_STAMPED) {
+  const plain = new RegExp(`(["'])${asset.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?:\\?v=[0-9a-f]+)?\\1`, 'g');
+  if (!plain.test(remote)) throw new Error(`remote/index.html no longer names ${asset}`);
+  remote = remote.replace(plain, (_m, q) => `${q}${asset}?v=${build}${q}`);
+}
+writeFileSync(remoteFile, remote);
 writeFileSync(path.join(dir, 'version.json'), `${JSON.stringify({ build, builtAt: new Date().toISOString() })}\n`);
 console.log(`classroom build ${build}`);

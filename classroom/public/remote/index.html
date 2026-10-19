@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="robots" content="noindex,nofollow" />
+  <meta name="theme-color" content="#B82B32" />
+  <title>Sparks remote</title>
+  <link rel="stylesheet" href="../brand/tokens.css" />
+  <link rel="stylesheet" href="../brand/fonts.css" />
+  <link rel="stylesheet" href="remote.css" />
+</head>
+<body>
+  <header class="top">
+    <button id="mark" type="button" class="top-mark" aria-label="Sparks"><img src="../brand/logos/sparks-white.svg" alt="" width="118" height="40" /></button>
+    <span class="top-title">Remote</span>
+    <span id="conn" class="conn" data-state="off" role="status">Signed out</span>
+  </header>
+
+  <main class="page">
+    <noscript><p class="card">This remote needs JavaScript.</p></noscript>
+
+    <section id="signin" class="card signin" hidden>
+      <h1 class="shout">Sign in</h1>
+      <p>Type the church passphrase to run the downstairs classroom TV from this phone.</p>
+      <form id="signin-form" autocomplete="off">
+        <label for="passphrase" class="label">Passphrase</label>
+        <input id="passphrase" type="password" autocomplete="current-password" autocapitalize="none" spellcheck="false" enterkeyhint="go" />
+        <button id="signin-btn" type="submit" class="btn btn-hot">Sign in</button>
+      </form>
+      <p id="signin-note" class="note" role="status"></p>
+      <p class="fine">The passphrase is never saved on this phone; only the sign-in is.</p>
+    </section>
+
+    <section id="remote" class="remote" hidden>
+      <p id="problem" class="problem" role="status" hidden></p>
+
+      <div class="cols">
+        <div class="col">
+          <section id="now" class="card now" aria-labelledby="now-kicker">
+            <p id="now-kicker" class="kicker">On the classroom TV</p>
+            <h1 id="now-main" class="shout">Asking the classroom TV…</h1>
+            <p id="now-sub" class="now-sub"></p>
+            <button id="btn-back" type="button" class="btn btn-big btn-hot" hidden>Back to schedule</button>
+          </section>
+
+          <section id="video" class="card controls" aria-labelledby="video-h" hidden>
+            <h2 id="video-h" class="label">Video</h2>
+            <div class="pad3">
+              <button type="button" class="btn btn-mid" data-op="seek" data-by="-10">Back 10s</button>
+              <button id="btn-play" type="button" class="btn btn-mid btn-play" data-op="toggle">Pause</button>
+              <button type="button" class="btn btn-mid" data-op="seek" data-by="10">Skip 10s</button>
+            </div>
+            <div class="pad3">
+              <button type="button" class="btn btn-mid" data-op="volume" data-step="-1" aria-label="Volume down">Volume &minus;</button>
+              <button id="btn-mute" type="button" class="btn btn-mid" data-op="mute">Mute</button>
+              <button type="button" class="btn btn-mid" data-op="volume" data-step="1" aria-label="Volume up">Volume +</button>
+            </div>
+          </section>
+
+          <section id="pdf" class="card controls" aria-labelledby="pdf-h" hidden>
+            <h2 id="pdf-h" class="label">PDF pages</h2>
+            <div class="pad2">
+              <button type="button" class="btn btn-big" data-step="-1"><span aria-hidden="true">‹</span> Back</button>
+              <button type="button" class="btn btn-big btn-next" data-step="1">Next <span aria-hidden="true">›</span></button>
+            </div>
+          </section>
+
+          <p id="press-note" class="press-note" role="status" aria-live="polite"></p>
+        </div>
+
+        <div class="col">
+          <section id="buttons" class="buttons" aria-label="Buttons">
+            <div class="row-head">
+              <h2 class="label">Videos</h2>
+            </div>
+            <div id="video-tiles" class="tiles"></div>
+            <div class="row-head">
+              <h2 class="label">Pictures, PDFs and text</h2>
+            </div>
+            <div id="item-tiles" class="tiles"></div>
+            <p id="empty" class="fine" hidden>No buttons yet. Tap <b>Edit buttons</b> to add up to 4 YouTube videos and 8 pictures, PDFs or text.</p>
+            <button id="btn-edit" type="button" class="btn btn-wide">Edit buttons</button>
+          </section>
+
+          <section id="editor" class="editor" aria-labelledby="editor-h" hidden>
+            <h2 id="editor-h" class="shout shout-small">Edit buttons</h2>
+            <p class="fine">Every leader's remote shows the same buttons. Saving changes them for everyone.</p>
+            <h3 class="label">YouTube videos (up to 4)</h3>
+            <div id="edit-videos" class="edit-list"></div>
+            <button id="add-video" type="button" class="btn btn-add">+ Add a video</button>
+            <h3 class="label">Pictures, PDFs and text (up to 8)</h3>
+            <div id="edit-items" class="edit-list"></div>
+            <div class="add-row">
+              <button id="add-file" type="button" class="btn btn-add">+ Picture or PDF</button>
+              <button id="add-text" type="button" class="btn btn-add">+ Text</button>
+            </div>
+            <p id="edit-note" class="note" role="status"></p>
+            <div class="save-row">
+              <button id="edit-cancel" type="button" class="btn">Cancel</button>
+              <button id="edit-save" type="button" class="btn btn-hot">Save buttons</button>
+            </div>
+          </section>
+        </div>
+      </div>
+
+      <p class="foot"><button id="signout" type="button" class="link">Sign this phone out</button></p>
+    </section>
+  </main>
+
+  <template id="video-row">
+    <div class="edit-row">
+      <label class="fine">Name on the button <input class="f-title" type="text" maxlength="60" placeholder="Sparky Song" /></label>
+      <label class="fine">YouTube link <input class="f-link" type="url" inputmode="url" autocapitalize="none" spellcheck="false" placeholder="https://youtu.be/…" /></label>
+      <button type="button" class="link f-remove">Remove</button>
+    </div>
+  </template>
+  <template id="file-row">
+    <div class="edit-row">
+      <label class="fine">Name on the button <input class="f-title" type="text" maxlength="60" placeholder="Handbook page 12" /></label>
+      <p class="f-file fine">No picture or PDF yet.</p>
+      <label class="btn btn-mid f-choose">Choose a file<input class="f-input" type="file" accept="image/jpeg,image/png,image/gif,image/webp,application/pdf" hidden /></label>
+      <label class="fine">…or paste a link to one <input class="f-link" type="url" inputmode="url" autocapitalize="none" spellcheck="false" placeholder="https://…" /></label>
+      <button type="button" class="btn btn-mid f-copy">Use this link</button>
+      <p class="f-progress fine" role="status"></p>
+      <button type="button" class="link f-remove">Remove</button>
+    </div>
+  </template>
+  <template id="text-row">
+    <div class="edit-row">
+      <label class="fine">Name on the button <input class="f-title" type="text" maxlength="60" placeholder="Memory verse" /></label>
+      <label class="fine">Small heading (optional) <input class="f-heading" type="text" maxlength="60" placeholder="Memory verse" /></label>
+      <label class="fine">Words on the screen <textarea class="f-text" rows="4" maxlength="400" placeholder="Love one another. John 13:34"></textarea></label>
+      <fieldset class="f-look"><legend class="fine">Look</legend>
+        <label><input type="radio" value="page" checked /> Handbook page</label>
+        <label><input type="radio" value="board" /> Black board</label>
+      </fieldset>
+      <button type="button" class="link f-remove">Remove</button>
+    </div>
+  </template>
+
+  <script type="module" src="remote.js"></script>
+</body>
+</html>
