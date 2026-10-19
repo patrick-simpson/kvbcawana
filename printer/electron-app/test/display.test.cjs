@@ -530,3 +530,99 @@ describe('display: the classroom\'s all-day black screen (owner 2026-10-19)', ()
     expect(src.includes('if (win.inWindow) blackDismissed = false;')).toBe(true);
   });
 });
+
+describe('display/ink-clear (SMART Ink cleared on the clock, owner 2026-10-19)', () => {
+  const { EventEmitter } = require('node:events');
+  const { createInkClear, inkClearMarks, markPassed, openingMinute, CLEAR_PS, EARLY_S } = require('../src/display/ink-clear');
+  const { createPenWatch, READY_LINE } = require('../src/display/pen-watch');
+  const SCHEDULE = JSON.parse(require('node:fs').readFileSync(require('node:path').join(__dirname, '../../../shared/schedule.json'), 'utf8'));
+  const hms = (h, m, s = 0) => h * 3600 + m * 60 + s;
+  const et = (iso) => new Date(`${iso}-04:00`);
+  const fakeSpawn = () => {
+    const calls = [];
+    const spawn = (cmd, args) => {
+      const child = new EventEmitter();
+      child.stdout = new EventEmitter();
+      child.stdout.setEncoding = () => {};
+      child.stderr = new EventEmitter();
+      child.kill = () => {};
+      calls.push({ cmd, args, child });
+      return child;
+    };
+    return { spawn, calls };
+  };
+
+  it('10 seconds before the opening, then each half hour of the classroom\'s hours', () => {
+    expect(EARLY_S).toBe(10);
+    expect(openingMinute(SCHEDULE, '2026-10-21')).toBe(18 * 60);
+    expect(inkClearMarks(SCHEDULE, '2026-10-21', 20 * 60)).toEqual([hms(17, 59, 50), hms(18, 30), hms(19, 0), hms(19, 30)]);
+    // A special date with its own windows opens when they say.
+    const special = { ...SCHEDULE, specialDates: { '2026-10-28': { windows: [{ kind: 'slideshow', deck: 'opening', start: '18:15', end: '18:20' }] } } };
+    expect(inkClearMarks(special, '2026-10-28', 20 * 60)).toEqual([hms(18, 14, 50), hms(18, 30), hms(19, 0), hms(19, 30)]);
+    expect(inkClearMarks({}, '2026-10-21', 20 * 60)).toEqual([]);
+  });
+
+  it('a mark counts once, as the clock passes it; never across days or a long jump (a PC waking)', () => {
+    const marks = [hms(17, 59, 50), hms(18, 30)];
+    const at = (sec, dateKey = 'd') => ({ dateKey, sec });
+    expect(markPassed(marks, at(hms(17, 59, 49)), at(hms(17, 59, 50)))).toBe(hms(17, 59, 50));
+    expect(markPassed(marks, at(hms(17, 59, 50)), at(hms(17, 59, 51)))).toBe(null);
+    expect(markPassed(marks, null, at(hms(17, 59, 50)))).toBe(null);
+    expect(markPassed(marks, at(hms(17, 59, 49), 'a'), at(hms(17, 59, 50), 'b'))).toBe(null);
+    expect(markPassed(marks, at(hms(18, 0)), at(hms(18, 40)))).toBe(null);
+  });
+
+  it('restarts SMART Ink on a club night at 5:59:50 and 7:00, hushing the pen watch; never on another night or another OS', () => {
+    const { spawn, calls } = fakeSpawn();
+    let hushed = 0;
+    const logs = [];
+    const ink = createInkClear({ spawn, platform: 'win32', log: (...p) => logs.push(p), onClear: () => { hushed += 1; } });
+    const night = { schedule: SCHEDULE, timeZone: 'America/New_York', clubNight: true, closeMin: 20 * 60 };
+    expect(ink.tick(et('2026-10-21T17:59:49'), night)).toBe(null);
+    expect(ink.tick(et('2026-10-21T17:59:50'), night)).toBe(hms(17, 59, 50));
+    expect(calls.length).toBe(1);
+    expect(calls[0].cmd).toBe('powershell.exe');
+    expect(hushed).toBe(1);
+    calls[0].child.stdout.emit('data', 'AWANA-INK CLEARED {"stopped":["SMARTInk"]}\n');
+    calls[0].child.emit('exit', 0);
+    expect(logs.some((p) => String(p[0]).includes('SMART Ink clear:'))).toBe(true);
+    ink.tick(et('2026-10-21T18:59:59'), night);
+    expect(ink.tick(et('2026-10-21T19:00:00'), night)).toBe(hms(19, 0));
+    expect(calls.length).toBe(2);
+    calls[1].child.emit('exit', 0);
+    // Not a club night: nothing.
+    const off = { ...night, clubNight: false };
+    ink.tick(et('2026-10-22T19:29:59'), off);
+    expect(ink.tick(et('2026-10-22T19:30:00'), off)).toBe(null);
+    expect(calls.length).toBe(2);
+    // Not Windows: nothing runs.
+    const mac = fakeSpawn();
+    const macInk = createInkClear({ spawn: mac.spawn, platform: 'darwin', log: () => {} });
+    macInk.tick(et('2026-10-21T18:29:59'), night);
+    macInk.tick(et('2026-10-21T18:30:00'), night);
+    expect(mac.calls.length).toBe(0);
+  });
+
+  it('the script stops SMART Ink and starts it again, and says what it did', () => {
+    expect(CLEAR_PS.includes("'^SMART ?Ink'")).toBe(true);
+    expect(CLEAR_PS.includes('Stop-Process -Force')).toBe(true);
+    expect(CLEAR_PS.includes('Start-Process -FilePath $p')).toBe(true);
+    expect(CLEAR_PS.includes('${env:ProgramFiles(x86)}')).toBe(true);
+    expect(CLEAR_PS.includes('SMART Technologies\\SMART Ink\\SMARTInk.exe')).toBe(true);
+  });
+
+  it('a hushed pen watch does not take SMART Ink coming back for a lifted pen', () => {
+    const { spawn, calls } = fakeSpawn();
+    let lifts = 0;
+    const w = createPenWatch({ spawn, platform: 'win32', onLift: () => { lifts += 1; }, log: () => {} });
+    w.start();
+    const out = calls[0].child.stdout;
+    const state = (windows) => `STATE ${JSON.stringify({ procs: ['SMARTInk'], windows })}\n`;
+    out.emit('data', `${READY_LINE}\n`);
+    out.emit('data', state([]));
+    w.hush(60 * 1000);
+    out.emit('data', state(['SMART Ink|Toolbar|300x60']));
+    expect(lifts).toBe(0);
+    w.stop();
+  });
+});

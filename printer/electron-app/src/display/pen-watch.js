@@ -106,6 +106,13 @@ function createPenWatch(opts) {
   let state = null;
   let retryMs = RETRY_MIN_MS;
   let retryTimer = null;
+  let hushUntil = 0;
+
+  /** No lift is reported for `ms` (SMART Ink restarting: ink-clear.js), and the next state starts afresh. */
+  function hush(ms) {
+    hushUntil = Date.now() + ms;
+    opts.log('pen watch: hushed while SMART Ink restarts');
+  }
 
   function start() {
     if (wanted || platform !== 'win32') return;
@@ -141,7 +148,7 @@ function createPenWatch(opts) {
         if (line === READY_LINE) { ready = true; retryMs = RETRY_MIN_MS; opts.log('pen watch: watching for SMART Ink'); continue; }
         const next = parseState(line);
         if (!next) continue;
-        const lifted = penLifted(state, next);
+        const lifted = penLifted(state, next) && Date.now() >= hushUntil;
         opts.log('pen watch: SMART Ink', { processes: next.procs, windows: next.windows, lifted });
         state = next;
         if (lifted) { try { opts.onLift(); } catch (err) { opts.log('pen watch: page not told', err); } }
@@ -173,7 +180,7 @@ function createPenWatch(opts) {
     if (child) { try { child.kill(); } catch { /* gone already */ } child = null; }
   }
 
-  return { start, stop, isRunning: () => Boolean(child) };
+  return { start, stop, hush, isRunning: () => Boolean(child) };
 }
 
 module.exports = { createPenWatch, parseState, penLifted, READY_LINE, WATCH_PS, PROCESS_PATTERN };

@@ -1,4 +1,9 @@
-﻿## [10.4.0] - 2026-10-19
+﻿## [10.5.0] - 2026-10-19
+The downstairs classroom's SMART Ink is wiped on the clock.
+
+**Clean board for the opening.** On club nights the computer showing the downstairs classroom screen clears SMART Ink's pen marks 10 seconds before the opening ceremony (when the classroom switches to the game time projector), and again on every half hour of club (6:30, 7:00 and 7:30 with the classroom's usual hours). It does this by restarting SMART Ink, so its toolbar disappears for a few seconds; a pen lifted right then may need to go back in the tray and come out again. Lifting a pen while SMART Ink restarts is not taken for a new black board. Each clear is written to the display log.
+
+## [10.4.0] - 2026-10-19
 The downstairs classroom screen stays up, black, all day.
 
 **No Windows desktop on the classroom TV.** A computer showing the downstairs classroom screen now keeps it up all day: black outside club hours, the cards on club nights. The black screen does not keep the computer or the TV awake. Closing it (or Hide in the tray) puts it away until the next club night.

@@ -31,6 +31,7 @@ const { SCREENS, isScreenPage, screenUrls } = require('./screens');
 const { hoursMinutes, normalizeSettings, parseTime, settingsForScreen } = require('./settings');
 const { shutdownDeadline, shutdownStep } = require('./shutdown');
 const { createPenWatch } = require('./pen-watch');
+const { createInkClear, HUSH_MS } = require('./ink-clear');
 const { previewOpenUntil, PREVIEW_POLL_MS } = require('./classroom-preview');
 
 const APP_NAME = 'KVBC Awana';
@@ -131,6 +132,14 @@ function createDisplay(opts) {
       lobby.webContents.executeJavaScript("window.dispatchEvent(new Event('awana:pen-lifted'))").catch(() => {});
     },
   });
+  // The classroom's SMART Ink, cleared 10 s before the opening and on each half
+  // hour of club (ink-clear.js); the pen watch is hushed while it restarts.
+  const inkClear = createInkClear({ log, onClear: () => penWatch.hush(HUSH_MS) });
+  function inkTick() {
+    if (SMOKE || urls().screen.id !== 'classroom') return;
+    const t = now();
+    inkClear.tick(t, { schedule: sources.schedule, timeZone: churchZone(), clubNight: clubNightToday(t, sources), closeMin: hours().closeMin });
+  }
   const timers = new Set();
   // The classroom screen's /settings preview (worker/src/routes.md 10.13): while
   // the screen is closed, ask the sync service every PREVIEW_POLL_MS whether a
@@ -973,6 +982,7 @@ function createDisplay(opts) {
     scheduleTick();
     refreshSources();
     every(checkClassroomPreview, PREVIEW_POLL_MS);
+    every(inkTick, 1000);
     every(refreshSources, SOURCES_EVERY_MS);
 
     // First run with more than one monitor and none chosen: ask which one.
