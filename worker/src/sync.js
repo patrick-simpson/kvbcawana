@@ -52,6 +52,7 @@ import { Friends } from './friends.js';
 import { mountBarf } from './barf.js';
 import { Screens } from './screens.js';
 import { JourneyRemote, mountJourneyRemote } from './journeyRemote.js';
+import { Classroom, mountClassroom } from './classroom.js';
 import { parseSession, sessionBody } from './session.js';
 import { BadRequest, fail, json } from './http.js';
 import { Registry } from './registry.js';
@@ -245,6 +246,15 @@ export class SyncCore {
       ring: (payload) => { this.broadcast(frameText(DOORBELL_EVENT, payload)); },
     });
     mountJourneyRemote(this.registry, this);   // /v1/journey/remote, /v1/journey/remote/state (routes.md 10.9)
+    // The downstairs classroom's Sparks remote (classroom.js, routes.md 10.13): the shared
+    // buttons, their files, what the classroom TV shows, and its report.
+    this.classroom = new Classroom({
+      storage: this.storage,
+      now: this.now,
+      fetchFn: this.fetchFn,
+      ring: (payload) => { this.broadcast(frameText(DOORBELL_EVENT, payload)); },
+    });
+    mountClassroom(this.registry, this);   // /v1/classroom/* (routes.md 10.13)
     // The change log (changes.js, routes.md 10.5): every write path below logs who
     // (device.js), when, which keys, before and after; a module that owns an
     // undoable kind adds its undoer to `undoers`.

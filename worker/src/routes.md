@@ -1505,3 +1505,50 @@ PDFs in ONE message from the owner's Gmail to the downstairs Epson
 - Refusals: 429 `read-busy` with `retryAfterMs`; 502 `signed-out` (the login
   form); 502 with the client's code otherwise (`twotimtwo-down`,
   `login-refused`, `login-backoff`, `timeout`, `network`, `http-404`, ...).
+
+### 10.13 The Sparks remote and the classroom TV (BUILT, owner 2026-10-18)
+
+"Similar to the journey remote, we need a sparks remote ... paste up to 4
+YouTube videos ... a PDF or a image URL or file ... or simply text." A
+leader's phone opens awana.kvbchurch.org/classroom/remote/
+(`classroom/public/remote/`), signs in with the passphrase, edits ONE shared
+list of buttons and presses them; the downstairs classroom TV
+(`classroom/public/src/app.js`) shows what was pressed until someone presses
+Back. /settings → Screens previews a look on the TV for a minute. Code:
+`classroom.js`; rules (one copy, shared with the remote and the TV):
+`../shared/classroomRemote.js`.
+
+| Route | Auth | Request | Answer |
+| --- | --- | --- | --- |
+| `GET /v1/classroom/buttons` | session | | `{rev, savedAt, buttons: {videos: [{id, title, youtube, start}], items: [{id, kind: image\|pdf\|text, title, file?, type?, heading?, text?, look?: page\|board}]}}` |
+| `PUT /v1/classroom/buttons` | session | `{baseRev, buttons}` (cleaned by `sanitizeButtons`: at most 4 videos and 8 items) | `{ok, rev, savedAt, buttons}`; 409 `stale` (with the newest list) when `baseRev` is not the stored rev; 400 `file-missing` when an item names a file that is not finished here. Then every file no button names is deleted (an upload still under way, younger than an hour, stays; the file of the button on the TV stays while it is up) |
+| `POST /v1/classroom/files` | session | `{type, bytes, name?}` (JPEG, PNG, GIF, WebP or PDF, at most 20 MB) | `{ok, id, parts, partBytes}` (96 KiB parts) |
+| `POST /v1/classroom/files` | session | `{url, name?}` (https; a Google Drive share link becomes its download) | the Worker fetches it (25 s, 20 MB), checks its first bytes are a picture or a PDF, stores it: `{ok, id, type, bytes, kind, name}`; 400 `link`/`type`, 413 `too-big`, 502 `unreachable`/`status` |
+| `PUT /v1/classroom/files/<id>/<n>` | session | the part's bytes (`application/octet-stream`), in order (a repeat of the last is taken again) | `{ok, next}`; 409 `order`; 400 `size` |
+| `POST /v1/classroom/files/<id>/done` | session | | `{ok, id, type, bytes, kind}` once every part arrived and the first bytes match the type; 400 `parts`/`type` (a file that is not what it said is deleted) |
+| `GET /v1/classroom/files/<id>` | session | | the file, streamed part by part, its own `Content-Type` |
+| `POST /v1/classroom/remote` | session | `{action, data?}`: `show {button}` \| `back` \| `video {op: toggle\|play\|pause\|mute\|unmute \| seek {by: ±10} \| volume {step: ±1}}` \| `page {step: ±1}` \| `preview {look: cubbies\|sparks\|lobby}` \| `preview-end` \| `sparky`; never free text | `{ok, rev, screenOnline}`; 404 `no-button`; 409 `no-video`/`no-pdf`; 429 past 8 presses at once (4 a second after), per sign-in (the Journey remote's bucket) |
+| `GET /v1/classroom/stage` | session | `?from=app` for KVBC Awana's display (not counted as the screen) | `{stage: {rev, show: {button, at, page} \| null, preview: {look, until} \| null, cmds: [{id, action: video\|sparky, data?, at}]}, watch, serverNow}` |
+| `POST /v1/classroom/now` | session | `{now}` (`sanitizeClassroomNow`: view, button, title, page/pages, video {t, d, paused, muted, volume}, preview, board) | `{ok, watch}` |
+| `GET /v1/classroom/remote/state` | session | | `{buttons, rev, savedAt, stage, now \| null, screenOnline, serverNow, watchMs}` |
+
+- Storage: `classroom:buttons` (one put per edit), `classroom:stage` (one put
+  per press; kept in memory after the first read, so the TV's poll reads
+  nothing), `cmeta:<id>` and `cpart:<id>:<n>` (a 20 MB file is ~214 puts,
+  once). Nothing here names a child: the buttons and files are the church's
+  own lesson material.
+- `show` puts a COPY of the button on the stage (editing or deleting the list
+  never changes what is up). A video/page command needs a video/PDF up. A
+  page turn is clamped to the page count the TV reported. A preview lasts
+  `CLASSROOM_PREVIEW_MS` (one minute).
+- Momentary commands (`cmds`) live `CLASSROOM_CMD_TTL_MS` (20 s), at most 8;
+  the TV runs each id once.
+- Doorbell: every stage change rings `changed {what: 'classroom', rev}`; the
+  TV's embedded lobby passes it up (`lobby/src/lib/embed.js hostDoorbell`,
+  the word and a whole-number rev only) and the TV reads the stage at once.
+  The first remote read after a quiet spell rings it too (`watch: true`), so
+  the TV reports straight away. Without the doorbell the TV reads every 5 s.
+- Watching: the TV posts `now` only while a remote read the state within
+  `CLASSROOM_WATCH_MS` (30 s): on a change, and every 10 s while a video plays.
+- Free plan: reads are memory; writes are one per edit or press; a part is one
+  96 KiB put plus one small meta put.

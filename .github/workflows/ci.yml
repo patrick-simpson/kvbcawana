@@ -487,7 +487,7 @@ jobs:
           if [ -z "$BASE" ]; then
             echo "No base commit to compare against; deploying the Worker."
             echo "changed=true" >> "$GITHUB_OUTPUT"
-          elif git diff --quiet "$BASE" HEAD -- worker lobby/src/lib shared/text.js shared/sync-protocol.js shared/cloud-crypto.js shared/tonight.js shared/pickup.js shared/clubs.js shared/churchSettings.js shared/clubNight.js shared/schedule.json shared/journeyRemote.js .github/workflows/ci.yml; then
+          elif git diff --quiet "$BASE" HEAD -- worker lobby/src/lib shared/text.js shared/sync-protocol.js shared/cloud-crypto.js shared/tonight.js shared/pickup.js shared/clubs.js shared/churchSettings.js shared/clubNight.js shared/schedule.json shared/journeyRemote.js shared/classroomRemote.js .github/workflows/ci.yml; then
             echo "Nothing the Worker is built from changed since $BASE; its deploy is skipped."
             echo "changed=false" >> "$GITHUB_OUTPUT"
           else
