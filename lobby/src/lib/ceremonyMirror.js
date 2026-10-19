@@ -18,6 +18,14 @@ import { resolvePhase } from './schedule.js';
 export const MIRROR_MESSAGE = 'awana-display:projector-mirror';
 /** The hidden frame loads this long before the ceremony, so 6:00 is not a page load. */
 export const MIRROR_PRELOAD_MS = 2 * 60 * 1000;
+/**
+ * Every screen turns over this long BEFORE the ceremony starts (owner
+ * 2026-10-19: "they should start from 10 seconds before start time"), so the
+ * room watches the projector's countdown reach 6:00.
+ */
+export const MIRROR_EARLY_MS = 10 * 1000;
+/** After an early turn-over, the mirror is kept up this long waiting for the projector's own word. */
+export const MIRROR_EARLY_GRACE_MS = 30 * 1000;
 /** A mirror still saying "ceremony" this long after the schedule's ceremony ended is let go anyway. */
 export const MIRROR_OVERRUN_MS = 20 * 60 * 1000;
 
@@ -35,6 +43,16 @@ export function mirrorWanted({ schedule, now, showcase = false, configure = fals
   if (showcase || configure || settingsPage || overlay) return false;
   return resolvePhase(schedule, now) === 'ceremony'
     || resolvePhase(schedule, new Date(now.getTime() + MIRROR_PRELOAD_MS)) === 'ceremony';
+}
+
+/**
+ * The last MIRROR_EARLY_MS before the ceremony starts: the screen shows the
+ * mirror (its countdown) before the projector itself says "ceremony".
+ * @param {{ schedule: any, now: Date }} q
+ */
+export function mirrorEarly({ schedule, now }) {
+  return resolvePhase(schedule, now) !== 'ceremony'
+    && resolvePhase(schedule, new Date(now.getTime() + MIRROR_EARLY_MS)) === 'ceremony';
 }
 
 /**

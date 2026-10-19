@@ -71,3 +71,23 @@ test('a framed lobby shows the opening too and tells its host', async ({ page })
   await expect(mirror).toHaveAttribute('data-up', '1', { timeout: 10000 });
   await expect.poll(() => page.evaluate(() => window.__said)).toEqual([{ type: 'awana-display:ceremony-mirror', up: true }]);
 });
+
+// Owner 2026-10-19: "they should start from 10 seconds before start time".
+// The seam's `early` stands for the last ten seconds before 6:00 (the real
+// rule is lib/ceremonyMirror.js mirrorEarly, unit-tested): the projector's
+// countdown is on the lobby before 6:00, and it stays up through the turn.
+test('ten seconds early the lobby shows the projector counting down, and stays on it into the opening', async ({ page }) => {
+  await liveChannel(page);
+  await page.route(/open-meteo|twotimtwo/, (route) => route.abort());
+  await page.addInitScript(() => {
+    localStorage.setItem('awanaSetupCardDismissed.v1', '1');
+    window.awanaMirrorTuning = { wanted: true, early: true, query: `&now=${encodeURIComponent('2026-09-16T17:59:53-04:00')}` };
+  });
+  await page.goto('/index.html?lowPower=1');
+  const mirror = page.locator('[data-testid="ceremony-mirror"]');
+  const frame = page.frameLocator('.lobby-mirror__frame');
+  await expect(mirror).toHaveAttribute('data-up', '1');
+  await expect(frame.locator('[data-grand-welcome]')).toHaveCount(0);
+  await expect(frame.locator('[data-mode="slideshow"] [data-grand-welcome]')).toBeAttached({ timeout: 15000 });
+  await expect(mirror).toHaveAttribute('data-up', '1');
+});

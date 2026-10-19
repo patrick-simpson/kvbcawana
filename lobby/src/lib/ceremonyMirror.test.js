@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { MIRROR_MESSAGE, MIRROR_PRELOAD_MS, mirrorWanted, mirrorWord } from './ceremonyMirror.js';
+import { MIRROR_EARLY_MS, MIRROR_MESSAGE, MIRROR_PRELOAD_MS, mirrorEarly, mirrorWanted, mirrorWord } from './ceremonyMirror.js';
 import { DEFAULT_SCHEDULE } from './schedule.js';
 
 // The lobby mirrors the game time projector during the opening ceremony
@@ -19,6 +19,17 @@ describe('the ceremony mirror', () => {
     expect(wanted(wed('18:00:00'))).toBe(true);
     expect(wanted(wed('18:04:59'))).toBe(true);
     expect(wanted(wed('18:05:00'))).toBe(false);
+  });
+
+  it('turns over ten seconds before the start (owner 2026-10-19), and no longer once it has started', () => {
+    expect(MIRROR_EARLY_MS).toBe(10 * 1000);
+    const early = (hms) => mirrorEarly({ schedule: DEFAULT_SCHEDULE, now: wed(hms) });
+    expect(early('17:59:49')).toBe(false);
+    expect(early('17:59:50')).toBe(true);
+    expect(early('17:59:59')).toBe(true);
+    expect(early('18:00:00')).toBe(false);
+    expect(early('18:04:55')).toBe(false);
+    expect(mirrorEarly({ schedule: DEFAULT_SCHEDULE, now: new Date('2026-09-17T17:59:55') })).toBe(false);
   });
 
   it('a framed lobby runs it too (the Journey kiosk, the downstairs classroom; owner 2026-10-19)', () => {
