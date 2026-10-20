@@ -159,7 +159,7 @@ function NightRows({ night, session, url }) {
   return (
     <div className="hist-night">
       <div className="hist-actions">
-        <button type="button" className="ghost section-jump" disabled={!state || !state.lines.length}
+        <button type="button" className="ghost section-jump" disabled={!state || !state.lines.length} title={!state || !state.lines.length ? 'No names to download' : undefined}
           onClick={() => downloadText(nightCsv(night, state.lines), `awana-${night}.csv`)}>Download CSV</button>
         <button type="button" className="ghost section-jump" onClick={() => { lockHistory(); setUnlocked(false); setState(null); }}>Lock the names</button>
       </div>

@@ -613,7 +613,7 @@ export default function SettingsPanel({
                     : changed ? 'Changes are live on this screen.' : 'Changes apply as you make them.'}
           </span>
           <button type="button" className="ghost" onClick={undo} disabled={!changed}
-            title="Put every setting back the way it was when you opened Settings (not the sign-in, keys or uploaded files)">
+            title={changed ? "Put every setting back the way it was when you opened Settings (not the sign-in, keys or uploaded files)" : "No changes to undo"}>
             Undo changes
           </button>
           {/* Configure mode (the sound room app's Settings window) has no

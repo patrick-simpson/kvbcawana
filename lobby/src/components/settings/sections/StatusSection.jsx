@@ -123,7 +123,7 @@ export function CalendarRefresh({ calendar }) {
   };
   return (
     <div className="field">
-      <button type="button" className="ghost small section-jump" disabled={busy} onClick={run}>
+      <button type="button" className="ghost small section-jump" disabled={busy} onClick={run} title={busy ? 'Refreshing calendar...' : undefined}>
         {busy ? 'Reading the calendar…' : 'Refresh calendar now'}
       </button>
       {note && <span className={`hint${note.warn ? ' hint--warn' : ''}`} role="status">{note.text}</span>}
