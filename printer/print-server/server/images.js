@@ -4,6 +4,7 @@
 // file ran them). Another module's names are reached as $module.name.
 
 const { CLUB_TABLE, clubKeyByLabel } = require('../clubTable');
+const crypto = require('crypto');
 const http  = require('http');
 const https = require('https');
 const fs    = require('fs');
@@ -23,7 +24,7 @@ Object.defineProperties(exports, {
 // (double-tap on the check-in screen) — one request would then delete the
 // other's file mid-print. A random suffix makes names collision-proof.
 function tmpFilePath(prefix, ext) {
-  return path.join(os.tmpdir(), `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`);
+  return path.join(os.tmpdir(), `${prefix}-${Date.now()}-${crypto.randomBytes(4).toString('hex')}.${ext}`);
 }
 
 // ── Orphaned temp file sweep ──────────────────────────────────────────────────
