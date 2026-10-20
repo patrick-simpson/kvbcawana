@@ -1,0 +1,3 @@
+## 2025-02-12 - Memoizing text measurement components
+**Learning:** Adding `React.memo` blindly to list items that measure text width/ink (like `NameChip` in `CheckoutBoard`) is an anti-pattern when the parent component relies on late-arriving fonts. The parent triggers a re-render when fonts load (`useFontsReady`), and memoizing the child on props alone skips that critical re-render, leaving the text layout broken (e.g. accent marks leaving the chip).
+**Action:** Do not memoize child components that depend on external asynchronous state like font loading triggered by the parent, and avoid micro-optimizing infrequently updating UI like `Stat` components that update every ~30s.
