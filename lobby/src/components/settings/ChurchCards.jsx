@@ -570,7 +570,7 @@ export function NameTagsCard({ church }) {
           {PICKUP_CLUBS.map((c) => <option key={c} value={c}>{c}</option>)}
         </select>
       </div>
-      <div className="laptop-actions"><button type="button" className="primary" disabled={busy !== ''} onClick={leader}>Print leader tag</button></div>
+      <div className="laptop-actions"><button type="button" className="primary" disabled={busy !== ''} onClick={leader} title={busy !== '' ? 'Printing...' : undefined}>Print leader tag</button></div>
       <Note note={notes.leader} />
 
       <h4 className="settings-subhead">One-off name tag</h4>
@@ -586,7 +586,7 @@ export function NameTagsCard({ church }) {
           {PICKUP_CLUBS.map((c) => <option key={c} value={c}>{c}</option>)}
         </select>
       </div>
-      <div className="laptop-actions"><button type="button" className="primary" disabled={busy !== ''} onClick={oneOff}>Print tag</button></div>
+      <div className="laptop-actions"><button type="button" className="primary" disabled={busy !== ''} onClick={oneOff} title={busy !== '' ? 'Printing...' : undefined}>Print tag</button></div>
       <Note note={notes.oneoff} />
 
       <h4 className="settings-subhead">Custom label</h4>
@@ -595,7 +595,7 @@ export function NameTagsCard({ church }) {
         <label htmlFor={`${id}-text`}>Label text</label>
         <input id={`${id}-text`} type="text" maxLength={60} autoComplete="off" value={text} placeholder="VOLUNTEER, KITCHEN, Room 4 Helper…" onChange={(e) => setText(e.target.value)} />
       </div>
-      <div className="laptop-actions"><button type="button" className="primary" disabled={busy !== ''} onClick={custom}>Print custom label</button></div>
+      <div className="laptop-actions"><button type="button" className="primary" disabled={busy !== ''} onClick={custom} title={busy !== '' ? 'Printing...' : undefined}>Print custom label</button></div>
       <Note note={notes.custom} />
     </PanelCard>
   );

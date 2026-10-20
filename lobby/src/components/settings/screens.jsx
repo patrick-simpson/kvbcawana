@@ -225,7 +225,7 @@ export function ScreensSection({ onOpen, goTo }) {
           : screens.length === 0 ? 'No screens yet.'
             : <><strong>{online} of {screens.length}</strong> {screens.length === 1 ? 'screen is' : 'screens are'} on now.</>}
         {' '}
-        <button type="button" className="ghost small" onClick={refresh} disabled={state.loading}>{state.loading ? 'Checking…' : 'Check again'}</button>
+        <button type="button" className="ghost small" onClick={refresh} disabled={state.loading} title={state.loading ? 'Checking screens status...' : undefined}>{state.loading ? 'Checking…' : 'Check again'}</button>
         {state.error && <span className="hint hint--warn"> {state.error}</span>}
       </div>
 
@@ -396,7 +396,7 @@ function ScreenNameAndForget({ screen, onRenamed, onForgotten }) {
         <div className="lookup-row">
           <input id={id} type="text" maxLength={40} value={name} autoComplete="off"
             onChange={(e) => setName(e.target.value)} onBlur={save} onKeyDown={(e) => { if (e.key === 'Enter') save(); }} />
-          <button type="button" className="danger" onClick={forget}>Forget</button>
+          <button type="button" className="danger" onClick={forget} aria-label={`Forget ${name}`}>Forget</button>
         </div>
         <span className="hint" role="status">
           {note && <><strong className={note.warn ? 'hint--warn' : undefined}>{note.text}</strong> </>}

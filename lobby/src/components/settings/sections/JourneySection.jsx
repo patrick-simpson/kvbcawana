@@ -210,7 +210,7 @@ function KioskRow({ kiosk, onPressed }) {
         )}
         <div className="kiosk-lessons__buttons" role="group" aria-label={`Downloads on ${kiosk.name}`}>
           {buttons.map((b) => (
-            <button key={b.action} type="button" disabled={b.disabled || busy}
+            <button key={b.action} type="button" disabled={b.disabled || busy} title={busy ? 'Action in progress' : b.disabled ? 'Action not available' : undefined}
               className={b.action === 'delete-downloads' ? 'danger' : b.action === 'start-downloads' || b.action === 'resume-downloads' ? 'secondary' : 'ghost'}
               onClick={() => press(b.action)} data-action={b.action}>
               {DOWNLOAD_BUTTON_WORDS[/** @type {keyof typeof DOWNLOAD_BUTTON_WORDS} */ (b.action)]}

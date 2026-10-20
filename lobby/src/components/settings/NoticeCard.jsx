@@ -70,7 +70,7 @@ export default function NoticeCard({ draft, onDraft, overviewNotice }) {
         <div className="status-alert status-alert--warn notice-current" role="status" data-testid="notice-current">
           <strong>On the screens now ({levelWords(current.level)}):</strong> {current.message}
           {current.until && <span className="hint"> Comes down {untilWords(current.until)}.</span>}
-          {' '}<button type="button" className="ghost small" onClick={takeDown} disabled={busy}>Take it down</button>
+          {' '}<button type="button" className="ghost small" onClick={takeDown} disabled={busy} title={busy ? 'Taking down notice...' : undefined}>Take it down</button>
         </div>
       )}
       <div className="field">
@@ -96,7 +96,7 @@ export default function NoticeCard({ draft, onDraft, overviewNotice }) {
         <span className="hint">Each screen takes it down by itself after this.</span>
       </div>
       <div className="laptop-actions">
-        <button type="button" className="primary" onClick={send} disabled={busy || !message}>Send to every screen</button>
+        <button type="button" className="primary" onClick={send} disabled={busy || !message} title={!message ? 'Type a message first' : busy ? 'Sending notice...' : undefined}>Send to every screen</button>
       </div>
       {note && <span className={`hint${note.warn ? ' hint--warn' : ''}`} role="status">{note.text}</span>}
     </PanelCard>

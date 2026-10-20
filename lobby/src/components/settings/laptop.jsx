@@ -97,7 +97,7 @@ export function StatusCard({ health, api, onRefresh }) {
         </ul>
       )}
       <div className="laptop-actions">
-        <button type="button" className="ghost" onClick={testPrint} disabled={busy !== ''}>Print a test label</button>
+        <button type="button" className="ghost" onClick={testPrint} disabled={busy !== ''} title={busy !== '' ? 'Printer is busy' : undefined}>Print a test label</button>
         <button type="button" className="ghost" onClick={diagnostics} disabled={busy !== ''}>Run diagnostics</button>
         <button type="button" className="ghost" onClick={clearQueue} disabled={busy !== ''}>Clear print queue</button>
         <button type="button" className="ghost" onClick={rehearsal} disabled={busy !== ''} aria-pressed={Boolean(health.rehearsal)}>

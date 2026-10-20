@@ -69,7 +69,7 @@ export function WeatherFields({ form, set, update, where = 'Look & season' }) {
             onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); lookUpLocation(); } }}
             placeholder="Waterville, Maine"
           />
-          <button type="button" className="ghost" onClick={lookUpLocation} disabled={lookup.state === 'busy'}>
+          <button type="button" className="ghost" onClick={lookUpLocation} disabled={lookup.state === 'busy'} title={lookup.state === 'busy' ? 'Looking up location...' : undefined}>
             Look up
           </button>
         </div>

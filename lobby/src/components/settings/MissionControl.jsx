@@ -39,7 +39,7 @@ function LookedAtIt() {
   };
   return (
     <span className="mission-looked">
-      <button type="button" className="ghost small" onClick={press} disabled={busy}>I looked at it</button>
+      <button type="button" className="ghost small" onClick={press} disabled={busy} title={busy ? 'Checking printer...' : undefined}>I looked at it</button>
       {note && <span className={`hint${note.bad ? ' hint--warn' : ''}`} role="status">{note.text}</span>}
     </span>
   );
