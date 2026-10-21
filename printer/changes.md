@@ -1,4 +1,11 @@
-﻿## [10.5.0] - 2026-10-19
+﻿## [10.6.0] - 2026-10-21
+Every screen wakes at 4:00 pm on club nights.
+
+**Screens start at 4:00 pm, not 5:00.** The lobby, the games projector (its countdown to the 6:00 opening), the Journey kiosk (its check-in display) and the downstairs classroom now come up at 4:00 pm on club nights. The classroom stays black until its 6:30 pm Cubbies card. The end time and the shutdown are unchanged.
+
+**Saved hours move once.** A computer whose saved hours opened after 4:00 pm (5:00 pm before, 6:30 pm for the classroom) is moved to 4:00 pm the first time this version starts, and awana.kvbchurch.org/settings shows the new time. Hours you set after that stay as you set them. If a classroom computer wakes itself, move its wake time to 3:45 pm (classroom/README.md).
+
+## [10.5.0] - 2026-10-19
 The downstairs classroom's SMART Ink is wiped on the clock.
 
 **Clean board for the opening.** On club nights the computer showing the downstairs classroom screen clears SMART Ink's pen marks 10 seconds before the opening ceremony (when the classroom switches to the game time projector), and again on every half hour of club (6:30, 7:00 and 7:30 with the classroom's usual hours). It does this by restarting SMART Ink, so its toolbar disappears for a few seconds; a pen lifted right then may need to go back in the tray and come out again. Lifting a pen while SMART Ink restarts is not taken for a new black board. Each clear is written to the display log.

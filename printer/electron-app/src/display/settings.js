@@ -98,7 +98,24 @@ function settingsForScreen(settings, id) {
   return normalizeSettings({ ...current, screen: screen.id, hours: d.hours, shutdown: { enabled: true, at: d.shutdownAt } });
 }
 
+/**
+ * One-time move to the 4:00 pm start (owner 2026-10-21): a computer whose saved
+ * hours open after 4:00 pm (the old 5:00 pm default, the classroom's 6:30 pm)
+ * now opens at 4:00 pm; the end time and everything else stay. display.js runs
+ * it once per computer (state.hoursFrom4pm), so hours someone sets afterwards
+ * stay.
+ * @param {Settings} settings
+ * @returns {Settings}
+ */
+function moveToFourPm(settings) {
+  const current = normalizeSettings(settings);
+  const open = parseClock(current.hours.start);
+  const wanted = parseClock(DEFAULT_HOURS.start);
+  if (open == null || wanted == null || open <= wanted) return current;
+  return normalizeSettings({ ...current, hours: { start: DEFAULT_HOURS.start, end: current.hours.end } });
+}
+
 module.exports = {
   DEFAULT_SHUTDOWN_AT, DEFAULT_HOURS, DEFAULT_SETTINGS,
-  parseClock, parseTime, normalizeHours, hoursMinutes, normalizeSettings, settingsForScreen,
+  parseClock, parseTime, normalizeHours, hoursMinutes, normalizeSettings, settingsForScreen, moveToFourPm,
 };

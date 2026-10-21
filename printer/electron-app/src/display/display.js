@@ -28,7 +28,7 @@ const { clubNightToday, displayWindow, nextClubNight } = require('./clubNight');
 const { NO_OVERRIDES, decideVisibility, hide, showNow, tidy } = require('./visibility');
 const { findDisplay, rememberDisplay } = require('./displays');
 const { SCREENS, isScreenPage, screenUrls } = require('./screens');
-const { hoursMinutes, normalizeSettings, parseTime, settingsForScreen } = require('./settings');
+const { hoursMinutes, moveToFourPm, normalizeSettings, parseTime, settingsForScreen } = require('./settings');
 const { shutdownDeadline, shutdownStep } = require('./shutdown');
 const { createPenWatch } = require('./pen-watch');
 const { createInkClear, HUSH_MS } = require('./ink-clear');
@@ -941,6 +941,14 @@ function createDisplay(opts) {
     state = { display: null, overrides: NO_OVERRIDES, ...(saved && typeof saved === 'object' ? saved : {}) };
     if (!state.overrides || typeof state.overrides !== 'object') state.overrides = NO_OVERRIDES;
     state.settings = normalizeSettings(state.settings);
+    // Once per computer: hours that opened after 4:00 pm open at 4:00 pm now
+    // (owner 2026-10-21). /settings hears of it through device-sync's usual
+    // "local change" path.
+    if (!state.hoursFrom4pm) {
+      state.settings = moveToFourPm(state.settings);
+      state.hoursFrom4pm = true;
+      saveState();
+    }
     sources = { schedule: null, feed: null, fetchedAt: 0, ...readJson(sourcesPath, {}) };
   }
 

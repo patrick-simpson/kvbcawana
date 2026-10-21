@@ -247,11 +247,18 @@ describe('display/screens', () => {
 describe('display/settings', () => {
   // Moved from lobby/desktop/src/settings.test.js (KVBC Awana v9); vitest -> node:test.
   // The hours are new in v9: per computer, default 5:00 to 8:00 pm.
-  const { DEFAULT_SETTINGS, hoursMinutes, normalizeHours, normalizeSettings, parseClock, parseTime, settingsForScreen } = require('../src/display/settings');
+  const { DEFAULT_SETTINGS, hoursMinutes, moveToFourPm, normalizeHours, normalizeSettings, parseClock, parseTime, settingsForScreen } = require('../src/display/settings');
 
   const HOURS = { start: '16:00', end: '20:00' };
 
   describe('settings', () => {
+    it('moves hours that open after 4:00 pm to 4:00 pm, once, keeping the rest', () => {
+      const old = { screen: 'classroom', hours: { start: '18:30', end: '20:00' }, shutdown: { enabled: true, at: '20:00' } };
+      expect(moveToFourPm(old)).toEqual({ ...old, hours: { start: '16:00', end: '20:00' } });
+      expect(moveToFourPm({ hours: { start: '17:00', end: '20:30' } }).hours).toEqual({ start: '16:00', end: '20:30' });
+      expect(moveToFourPm({ hours: { start: '15:00', end: '20:00' } }).hours).toEqual({ start: '15:00', end: '20:00' });
+      expect(moveToFourPm(undefined)).toEqual(DEFAULT_SETTINGS);
+    });
     it('reads an old state.json (no settings) as the lobby, 5 to 8 pm, with no shutdown', () => {
       expect(normalizeSettings(undefined)).toEqual(DEFAULT_SETTINGS);
       expect(normalizeSettings({})).toEqual({ screen: 'lobby', hours: HOURS, shutdown: { enabled: false, at: '20:15' } });
