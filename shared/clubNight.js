@@ -15,7 +15,7 @@
 //
 // The window is the computer's own hours (the printer app's settings.hours,
 // owner 2026-10-11: "hours per computer"); without hours it is the church's
-// 5:00 to 8:00 pm, exactly what the sound room bridge always used.
+// 4:00 to 8:00 pm (owner 2026-10-21; was 5:00).
 //
 // A club night is decided the same way the signage decides one
 // (lobby/src/lib/calendarLogic.js clubNights() / deriveClubInfo()):
@@ -39,7 +39,7 @@
 
 export const DEFAULT_TIMEZONE = 'America/New_York';
 export const DEFAULT_MEETING_DAY = 3; // Wednesday
-export const OPEN_AT_MIN = 17 * 60; // 5:00 pm
+export const OPEN_AT_MIN = 16 * 60; // 4:00 pm
 export const CLOSE_AT_MIN = 20 * 60; // 8:00 pm
 /** @type {Hours} */
 export const DEFAULT_HOURS = Object.freeze({ openMin: OPEN_AT_MIN, closeMin: CLOSE_AT_MIN });
@@ -134,7 +134,7 @@ const zoneOf = (/** @type {Schedule | null} */ schedule) => (typeof schedule?.ti
  *
  * @param {Date} now
  * @param {{ schedule?: Schedule | null, feed?: Feed | null }} sources
- * @param {Hours} [hours]  this computer's hours (default 5:00 to 8:00 pm)
+ * @param {Hours} [hours]  this computer's hours (default 4:00 to 8:00 pm)
  * @returns {{ inWindow: boolean, windowKey: string | null, dateKey: string, minutes: number }}
  */
 export function displayWindow(now, { schedule = null, feed = null } = {}, hours) {

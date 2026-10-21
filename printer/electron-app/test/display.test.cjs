@@ -79,9 +79,9 @@ describe('display/clubNight', () => {
 
   describe('displayWindow', () => {
     const sources = { schedule: SCHEDULE, feed: FEED };
-    it('opens at 5:00 pm and closes at exactly 8:00 pm on a club night', () => {
-      expect(displayWindow(et('2026-09-30T16:59'), sources).inWindow).toBe(false);
-      expect(displayWindow(et('2026-09-30T17:00'), sources)).toMatchObject({ inWindow: true, windowKey: '2026-09-30' });
+    it('opens at 4:00 pm and closes at exactly 8:00 pm on a club night', () => {
+      expect(displayWindow(et('2026-09-30T15:59'), sources).inWindow).toBe(false);
+      expect(displayWindow(et('2026-09-30T16:00'), sources)).toMatchObject({ inWindow: true, windowKey: '2026-09-30' });
       expect(displayWindow(et('2026-09-30T19:59'), sources).inWindow).toBe(true);
       expect(displayWindow(et('2026-09-30T20:00'), sources)).toMatchObject({ inWindow: false, windowKey: null });
     });
@@ -99,7 +99,7 @@ describe('display/clubNight', () => {
     });
 
     it('pins the hours', () => {
-      expect(OPEN_AT_MIN).toBe(17 * 60);
+      expect(OPEN_AT_MIN).toBe(16 * 60);
       expect(CLOSE_AT_MIN).toBe(20 * 60);
     });
   });
@@ -144,10 +144,10 @@ describe('display/clubNight', () => {
       expect(displayWindow(et('2026-10-14T17:00'), sources, early).inWindow).toBe(false);
     });
 
-    it('bad or missing hours are the old 5:00 to 8:00 pm', () => {
-      for (const bad of [undefined, null, { openMin: 20 * 60, closeMin: 17 * 60 }, { openMin: 'x', closeMin: 3 }]) {
-        expect(displayWindow(et('2026-09-30T16:59'), sources, bad).inWindow).toBe(false);
-        expect(displayWindow(et('2026-09-30T17:00'), sources, bad).inWindow).toBe(true);
+    it('bad or missing hours are the default 4:00 to 8:00 pm', () => {
+      for (const bad of [undefined, null, { openMin: 20 * 60, closeMin: 16 * 60 }, { openMin: 'x', closeMin: 3 }]) {
+        expect(displayWindow(et('2026-09-30T15:59'), sources, bad).inWindow).toBe(false);
+        expect(displayWindow(et('2026-09-30T16:00'), sources, bad).inWindow).toBe(true);
         expect(displayWindow(et('2026-09-30T20:00'), sources, bad).inWindow).toBe(false);
       }
     });
@@ -249,7 +249,7 @@ describe('display/settings', () => {
   // The hours are new in v9: per computer, default 5:00 to 8:00 pm.
   const { DEFAULT_SETTINGS, hoursMinutes, normalizeHours, normalizeSettings, parseClock, parseTime, settingsForScreen } = require('../src/display/settings');
 
-  const HOURS = { start: '17:00', end: '20:00' };
+  const HOURS = { start: '16:00', end: '20:00' };
 
   describe('settings', () => {
     it('reads an old state.json (no settings) as the lobby, 5 to 8 pm, with no shutdown', () => {
@@ -263,7 +263,7 @@ describe('display/settings', () => {
     it('choosing the downstairs classroom brings its 6:30-8:00 pm hours and the 8:00 pm shutdown (owner 2026-10-17)', () => {
       const lobby = normalizeSettings({});
       const classroom = settingsForScreen(lobby, 'classroom');
-      expect(classroom).toEqual({ screen: 'classroom', hours: { start: '18:30', end: '20:00' }, shutdown: { enabled: true, at: '20:00' } });
+      expect(classroom).toEqual({ screen: 'classroom', hours: { start: '16:00', end: '20:00' }, shutdown: { enabled: true, at: '20:00' } });
       // The same screen again keeps what someone changed since.
       const changed = { ...classroom, hours: { start: '18:00', end: '20:00' }, shutdown: { enabled: false, at: '20:00' } };
       expect(settingsForScreen(changed, 'classroom')).toEqual(changed);
@@ -302,7 +302,7 @@ describe('display/settings', () => {
       expect(normalizeHours({ start: '18:00', end: '18:00' })).toEqual(HOURS); // empty
       expect(normalizeHours({ start: '18:00', end: '24:00' })).toEqual(HOURS); // not a time
       expect(normalizeHours({ start: '6pm', end: '8pm' })).toEqual(HOURS);
-      expect(hoursMinutes(undefined)).toEqual({ openMin: 17 * 60, closeMin: 20 * 60 });
+      expect(hoursMinutes(undefined)).toEqual({ openMin: 16 * 60, closeMin: 20 * 60 });
     });
 
     it('reads a clock time of any hour', () => {

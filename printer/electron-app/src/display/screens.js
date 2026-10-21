@@ -8,7 +8,7 @@
 // typed once signs in all of them). Pure: main.js hands it the site's lobby URL.
 //
 // `defaults` (optional): what choosing that screen sets on this computer
-// (settings.js settingsForScreen): the classroom's own hours (6:30 to 8:00 pm)
+// (settings.js settingsForScreen): the classroom's own hours (4:00 to 8:00 pm, black until its 6:30 card)
 // and its 8:00 pm shutdown, owner 2026-10-17. Changed afterwards, they stay.
 'use strict';
 
@@ -22,7 +22,7 @@ const SCREENS = {
   journey: { id: 'journey', name: 'Journey kiosk', short: 'Journey', dir: '../journey/', page: '', background: '#000000' },
   classroom: {
     id: 'classroom', name: 'Downstairs classroom', short: 'the downstairs classroom', dir: '../classroom/', page: '', background: '#000000',
-    defaults: { hours: { start: '18:30', end: '20:00' }, shutdownAt: '20:00' },
+    defaults: { hours: { start: '16:00', end: '20:00' }, shutdownAt: '20:00' },
   },
 };
 

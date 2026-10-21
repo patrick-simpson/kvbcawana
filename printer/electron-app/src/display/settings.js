@@ -16,7 +16,7 @@
 const { DEFAULT_SCREEN, screenFor } = require('./screens');
 
 const DEFAULT_SHUTDOWN_AT = '20:15';
-const DEFAULT_HOURS = Object.freeze({ start: '17:00', end: '20:00' });
+const DEFAULT_HOURS = Object.freeze({ start: '16:00', end: '20:00' });
 // The shutdown is a club-night thing: an evening time, after the screens open.
 const EARLIEST_MIN = 17 * 60;
 const LATEST_MIN = 23 * 60 + 59;
@@ -46,7 +46,7 @@ function parseTime(/** @type {unknown} */ hhmm) {
 
 /**
  * Display hours: both good times with the start before the end (one day, no
- * running past midnight), else the default 5:00 to 8:00 pm.
+ * running past midnight), else the default 4:00 to 8:00 pm.
  * @param {any} raw
  * @returns {HoursSetting}
  */

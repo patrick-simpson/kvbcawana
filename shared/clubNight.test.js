@@ -12,7 +12,7 @@ describe('the shared constants', () => {
   it('are the church\'s: Eastern, Wednesday, 5 to 8 pm', () => {
     expect(DEFAULT_TIMEZONE).toBe('America/New_York');
     expect(DEFAULT_MEETING_DAY).toBe(3);
-    expect(DEFAULT_HOURS).toEqual({ openMin: 17 * 60, closeMin: 20 * 60 });
+    expect(DEFAULT_HOURS).toEqual({ openMin: 16 * 60, closeMin: 20 * 60 });
   });
 });
 
@@ -38,10 +38,10 @@ describe('per-computer hours', () => {
   });
 
   it('move the window and the next-night cutoff', () => {
-    const hours = { openMin: 16 * 60, closeMin: 21 * 60 };
+    const hours = { openMin: 15 * 60, closeMin: 21 * 60 };
     const sources = { schedule: { meeting: { day: 3 }, timezone: 'America/New_York' } };
-    expect(displayWindow(new Date('2026-09-30T16:30:00-04:00'), sources, hours).inWindow).toBe(true);
-    expect(displayWindow(new Date('2026-09-30T16:30:00-04:00'), sources).inWindow).toBe(false);
+    expect(displayWindow(new Date('2026-09-30T15:30:00-04:00'), sources, hours).inWindow).toBe(true);
+    expect(displayWindow(new Date('2026-09-30T15:30:00-04:00'), sources).inWindow).toBe(false);
     expect(displayWindow(new Date('2026-09-30T20:30:00-04:00'), sources, hours).inWindow).toBe(true);
     expect(nextClubNight(new Date('2026-09-30T20:30:00-04:00'), sources, 60, hours)).toBe('2026-09-30');
     expect(nextClubNight(new Date('2026-09-30T20:30:00-04:00'), sources)).toBe('2026-10-07');
@@ -118,9 +118,9 @@ describe('isClubNight', () => {
 
 describe('displayWindow', () => {
   const sources = { schedule: SCHEDULE, feed: FEED };
-  it('opens at 5:00 pm and closes at exactly 8:00 pm on a club night', () => {
-    expect(displayWindow(et('2026-09-30T16:59'), sources).inWindow).toBe(false);
-    expect(displayWindow(et('2026-09-30T17:00'), sources)).toMatchObject({ inWindow: true, windowKey: '2026-09-30' });
+  it('opens at 4:00 pm and closes at exactly 8:00 pm on a club night', () => {
+    expect(displayWindow(et('2026-09-30T15:59'), sources).inWindow).toBe(false);
+    expect(displayWindow(et('2026-09-30T16:00'), sources)).toMatchObject({ inWindow: true, windowKey: '2026-09-30' });
     expect(displayWindow(et('2026-09-30T19:59'), sources).inWindow).toBe(true);
     expect(displayWindow(et('2026-09-30T20:00'), sources)).toMatchObject({ inWindow: false, windowKey: null });
   });
@@ -138,7 +138,7 @@ describe('displayWindow', () => {
   });
 
   it('pins the hours', () => {
-    expect(OPEN_AT_MIN).toBe(17 * 60);
+    expect(OPEN_AT_MIN).toBe(16 * 60);
     expect(CLOSE_AT_MIN).toBe(20 * 60);
   });
 });

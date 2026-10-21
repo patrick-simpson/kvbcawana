@@ -25,7 +25,7 @@ const GOOD = {
 describe('parseHandoff', () => {
   it('reads the sound room\'s settings, with the default hours', () => {
     const h = handoff.parseHandoff(GOOD);
-    assert.deepEqual(h.settings, { screen: 'projector', hours: { start: '17:00', end: '20:00' }, shutdown: { enabled: true, at: '20:30' } });
+    assert.deepEqual(h.settings, { screen: 'projector', hours: { start: '16:00', end: '20:00' }, shutdown: { enabled: true, at: '20:30' } });
     assert.deepEqual(h.monitor, GOOD.display.monitor);
     assert.equal(h.startWithWindows, false);
     assert.equal(h.name, 'Sound room');

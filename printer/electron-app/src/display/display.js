@@ -4,7 +4,7 @@
 // on and stops when it is turned off. Its behaviour is the sound room app's
 // (CLAUDE.md, "The sound room desktop app"), with three changes:
 //
-// - The hours are this computer's (settings.hours, default 17:00 to 20:00),
+// - The hours are this computer's (settings.hours, default 16:00 to 20:00),
 //   not a fixed 5:00 to 8:00 pm (owner, 2026-10-11).
 // - The tray, the updater, Start with Windows and the single-instance lock
 //   belong to main.js, shared with the print server: this module hands
