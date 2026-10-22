@@ -4,7 +4,8 @@
 // notice and the change log. One signed-in request each, through the same
 // `syncAuthed` every other Settings call uses (so every one carries X-Device /
 // X-Device-Name). Never throws; every answer is {ok, status, body, message}.
-// Counts, codes and church-authored text only: nothing here carries a child.
+// Counts, codes and church-authored text, and (Printing → Reprint a name tag, owner
+// 2026-10-22) the desk roster the check-in page also reads: names held in React state only.
 
 import { syncAuthed } from '../hooks/useSync.js';
 

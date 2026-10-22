@@ -63,7 +63,8 @@ What Printing holds (the church-wide settings work from any device; *At the lapt
   activity, place), filled in with the church's 2026-27 schedule until you
   change it; a late check-in's label gets a "Go to:" line naming where the club
   is now.
-- **Tonight's prints** — the list with a *Reprint* on each, and **Reprint this
+- **Reprint a name tag** — tonight's checked-in children, a search box and a
+  *Reprint* on each (no passphrase; /checkin's + menu has the same). **Reprint this
   stretch** (a from and to time; it counts and names them first, and prints only
   when you confirm).
 - **Name tags and labels** — **Leader name tag** (remembered leaders, one tap to

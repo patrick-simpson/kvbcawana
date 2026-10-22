@@ -99,6 +99,13 @@
   .top.no-title h1 { display: none; }
   /* A phone keeps its one header row: Record keeping is for the desk laptop. */
   @media (max-width: 639px) { #record-btn { display: none; } .hdr-btn .wide { display: none; } .hdr-btn.exit, .mode-btn { padding: 0 12px; font-size: 18px; } }
+  /* Reprint a name tag (owner 2026-10-22): tonight's checked-in children, one tap each. */
+  .reprint-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; margin-top: 8px; }
+  .reprint-list button { min-height: 52px; padding: 6px 10px 6px 14px; border: 0; border-radius: 12px; cursor: pointer; text-align: left; position: relative; overflow: hidden;
+    background: #F1F5F9; color: var(--c-blue-deep); font-family: var(--f-shout); font-size: 17px; line-height: 1.1; }
+  .reprint-list button::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 6px; background: var(--c); }
+  .reprint-list button small { display: block; font-family: var(--f-read, inherit); font-weight: 700; font-size: 13px; color: #475569; }
+  .reprint-list .quiet { grid-column: 1 / -1; margin: 0; }
   .round { border: none; cursor: pointer; width: 44px; height: 44px; border-radius: 50%; background: rgba(255,255,255,.18); color: #fff;
     font-size: 28px; line-height: 1; display: grid; place-items: center; }
 
@@ -396,7 +403,7 @@
   <a class="hdr-btn" id="record-btn" target="_blank" rel="noopener" data-nofs hidden>Record keeping</a>
   <button class="hdr-btn exit" id="fs-exit" type="button" data-nofs aria-label="Exit full screen" hidden>Exit<span class="wide"> full screen</span></button>
   <button class="pill" id="count-pill" type="button" hidden>0 in</button>
-  <button class="round" id="menu-btn" type="button" aria-label="More: walk-in name tag, leader tag, custom label" hidden>+</button>
+  <button class="round" id="menu-btn" type="button" aria-label="More: reprint a name tag, walk-in name tag, leader tag, custom label" hidden>+</button>
 </header>
 
 <div class="pin" id="pin-screen">
@@ -467,6 +474,14 @@
         <button type="button" role="radio" data-sort="name">Last name</button>
       </div>
     </div>
+  </div>
+  <div class="menu-sec" id="reprint-panel">
+    <h3>Reprint a name tag</h3>
+    <div class="field">
+      <input type="search" id="reprint-q" maxlength="40" placeholder="Type a name: checked in tonight" autocomplete="off" autocorrect="off" spellcheck="false" aria-label="Find a child checked in tonight to reprint">
+    </div>
+    <div class="reprint-list" id="reprint-list"></div>
+    <p class="err" id="reprint-status" role="alert"></p>
   </div>
   <div class="menu-sec" id="oneoff-panel">
     <h3 id="oneoff-h">Walk-in name tag</h3>
@@ -2987,6 +3002,49 @@ function forgetLeader(l) {
 $('leader-print-selected').addEventListener('click', function() {
   printLeaders(leaderCache.filter(function(l) { return leaderSelection[(l.firstName + ' ' + l.lastName).trim().toLowerCase()]; }));
 });
+
+// Reprint a name tag (owner 2026-10-22): tonight's checked-in children (this page's
+// list), newest roster order, filtered as you type; one tap sends a sealed /reprint job
+// to the stations (the label exactly as it printed; nothing counted, nothing to TwoTimTwo).
+var REPRINT_SHOW = 12;
+var reprintBusy = {};
+function reprintKids() { return KIDS.filter(function(k) { return k.checkedIn && LOCAL.out.indexOf(kidKey(k)) === -1; }); }   // checked out = gone home
+function drawReprint() {
+  var box = $('reprint-list'), q = norm($('reprint-q').value);
+  box.textContent = '';
+  var kids = reprintKids();
+  if (!kids.length) { box.appendChild(el('p', 'quiet', 'Nobody is checked in yet tonight.')); return; }
+  var hits = q ? kids.filter(function(k) { return norm(k.name).split(' ').some(function(w) { return w.indexOf(q) === 0; }) || norm(k.name).indexOf(q) === 0; }) : kids;
+  hits = hits.slice().sort(function(a, b) { return a.name.localeCompare(b.name); });
+  if (!hits.length) { box.appendChild(el('p', 'quiet', 'Nobody checked in tonight matches “' + $('reprint-q').value.trim() + '”.')); return; }
+  hits.slice(0, REPRINT_SHOW).forEach(function(k) {
+    var b = el('button');
+    b.type = 'button';
+    b.style.setProperty('--c', clubOf(k.club).color);
+    b.appendChild(document.createTextNode(k.name));
+    b.appendChild(el('small', null, reprintBusy[kidKey(k)] ? 'Sending…' : (k.club || '')));
+    b.disabled = !!reprintBusy[kidKey(k)];
+    b.setAttribute('aria-label', 'Reprint ' + k.name + '’s name tag');
+    b.onclick = function() { reprintKid(k); };
+    box.appendChild(b);
+  });
+  if (hits.length > REPRINT_SHOW) box.appendChild(el('p', 'quiet', '+' + (hits.length - REPRINT_SHOW) + ' more: type more of the name.'));
+}
+function reprintKid(k) {
+  var key = kidKey(k), status = $('reprint-status');
+  if (reprintBusy[key]) return;
+  reprintBusy[key] = true;
+  status.textContent = '';
+  drawReprint();
+  desk.reprintTag({ name: k.name, clubberId: k.clubberId }).then(function() {
+    delete reprintBusy[key];
+    drawReprint();
+    toast(k.name + '’s name tag sent to the printer.', 4000, null, null, 'good');
+    setTimeout(refreshStatus, 800);
+  }).catch(function(e) { delete reprintBusy[key]; drawReprint(); printFailed(e, status); });
+}
+$('reprint-q').addEventListener('input', drawReprint);
+$('menu-btn').addEventListener('click', function() { $('reprint-q').value = ''; $('reprint-status').textContent = ''; drawReprint(); });
 
 // Custom label: one line of free text. Records nothing at all.
 var customInFlight = false;

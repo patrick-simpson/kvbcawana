@@ -559,6 +559,18 @@ export function createDesk({ cc, fetch: fetchFn, store, base = DESK_API, now = D
     return reprintJob('/print-custom', { text });
   }
 
+  /**
+   * A child's name tag again (owner 2026-10-22: "an easy way to reprint any kids name
+   * tags"): the station's POST /reprint finds tonight's label in its own history by
+   * clubber id (name second) and prints it as it was; never a check-in, never counted.
+   * @param {{ name: string, clubberId?: string | null }} child
+   */
+  async function reprintTag(child) {
+    const name = oneLine(child.name, 80);
+    if (!name) throw new DeskError('refused', 'Pick a child.', { reason: 'no-name' });
+    return reprintJob('/reprint', { name, clubberId: child.clubberId ? String(child.clubberId) : null });
+  }
+
   // ── a late BARF friend (routes.md 5.1) ──────────────────────────────────────
 
   /**
@@ -773,7 +785,7 @@ export function createDesk({ cc, fetch: fetchFn, store, base = DESK_API, now = D
   });
 
   return {
-    signIn, restore, signOut, roster, families, printStatus, tonight, loadStations, checkIn, undo, checkout, oneOffTag, leaderTag, customLabel,
+    signIn, restore, signOut, roster, families, printStatus, tonight, loadStations, checkIn, undo, checkout, oneOffTag, leaderTag, customLabel, reprintTag,
     barfInfo, barfLate, barfRecheck,
     recentAttendance, churchLeaders, rememberLeader, forgetLeader,
     get signedIn() { return !!session; },

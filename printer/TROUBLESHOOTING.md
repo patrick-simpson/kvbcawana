@@ -45,7 +45,7 @@ install folder. (That folder is still named after the app's pre-v5.9.0 name,
 **A check-in worked but no label came out** — the label prints on the
 laptop running KVBC Awana as a print server, signed in with the passphrase.
 Check its tray icon is there and the settings page → Printing → At the
-laptop has no warning; then reprint from Printing → *Tonight's prints*.
+laptop has no warning; then reprint from Printing → *Reprint a name tag* (or the + menu on /checkin).
 
 **Phone shows a kid as not checked in when they are (or vice versa)** —
 the page re-reads the list on its own, so check-ins made on other devices

@@ -1343,6 +1343,18 @@ test('the top bar (owner 2026-10-22): Check out lives there, another device\'s c
   await expect(page.locator('#undo-bar')).toBeHidden();
 
 
+  // The + menu: Reprint a name tag, tonight's checked-in children only, one tap.
+  await page.locator('#menu-btn').click();
+  const reprint = page.locator('#reprint-list');
+  await expect(reprint.getByRole('button')).toHaveText([/Cy Other/, /Eve Later/, /Zed Solo/]);   // Ada was checked out
+  await page.locator('#reprint-q').fill('ev');
+  await expect(reprint.getByRole('button')).toHaveCount(1);
+  await reprint.getByRole('button', { name: 'Reprint Eve Later’s name tag' }).click();
+  await expect(page.locator('#toast')).toContainText('Eve Later’s name tag sent to the printer.');
+  expect(world.tags).toHaveLength(1);
+  expect(await cc.openAsStation(stationRing, world.tags[0].bundle)).toMatchObject({ route: '/reprint', body: { name: 'Eve Later', clubberId: '18' }, source: 'desk' });
+  await page.locator('#reprint-q').fill('nobody');
+  await expect(reprint).toContainText('Nobody checked in tonight matches “nobody”.');
 });
 
 test('scrolled down, the roster refresh keeps the page where it is (owner 2026-10-22)', async ({ page }) => {

@@ -53,6 +53,38 @@ afterEach(() => { cleanup(); vi.restoreAllMocks(); delete window.AWANA_BARF; });
 
 const puts = () => calls.filter((c) => c.method === 'PUT');
 
+describe('Printing: Reprint a name tag (owner 2026-10-22)', () => {
+  const roster = { readAt: 'now', calendarId: '412', kids: [
+    { clubberId: '11', first: 'Ada', last: 'Tester', club: 'Cubbies', clubId: '1', checkedIn: true },
+    { clubberId: '12', first: 'Ben', last: 'Tester', club: 'Sparks', clubId: '2', checkedIn: false },
+    { clubberId: '13', first: 'Cy', last: 'Other', club: 'T&T', clubId: '3', checkedIn: true },
+    { clubberId: '14', first: 'Dee', last: 'Gone', club: 'Puggles', clubId: '4', checkedIn: true, checkedOut: true },
+  ] };
+  beforeEach(() => {
+    const base = serve(state);
+    world.answer = (path, opts) => (path === '/v1/desk/roster' ? { ok: true, status: 200, body: roster } : base(path, opts));
+  });
+
+  it('lists tonight\'s checked-in children with no passphrase, filters as you type, and one tap reprints', async () => {
+    mount();
+    expect(await screen.findByRole('button', { name: 'Reprint Ada Tester’s name tag' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Reprint Cy Other’s name tag' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Reprint Ben Tester’s name tag' })).toBeNull();   // not checked in
+    expect(screen.queryByRole('button', { name: 'Reprint Dee Gone’s name tag' })).toBeNull();     // checked out
+    expect(screen.queryByLabelText('Passphrase')).toBeNull();
+    fireEvent.change(screen.getByLabelText('Find a child checked in tonight'), { target: { value: 'oth' } });
+    expect(screen.queryByRole('button', { name: 'Reprint Ada Tester’s name tag' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Reprint Cy Other’s name tag' }));
+    await waitFor(() => expect(world.job).toHaveBeenCalledTimes(1));
+    const [record, opts] = world.job.mock.calls[0];
+    expect(record).toMatchObject({ route: '/reprint', body: { name: 'Cy Other', clubberId: '13' }, source: 'settings' });
+    expect(opts).toEqual({ historyRow: { first: 'Cy', last: 'Other', club: 'T&T' } });
+    expect(await screen.findByText('Sent Cy’s name tag to the printer.')).toBeTruthy();
+    fireEvent.change(screen.getByLabelText('Find a child checked in tonight'), { target: { value: 'zed' } });
+    expect(screen.getByText('Nobody checked in tonight matches “zed”.')).toBeTruthy();
+  });
+});
+
 describe('Printing: the church cards', () => {
   it('shows the document and saves a toggle at once, against the revision shown, one key', async () => {
     mount();

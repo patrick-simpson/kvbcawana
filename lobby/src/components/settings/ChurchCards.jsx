@@ -7,8 +7,7 @@ import {
   NAME_SIZE_MAX, NAME_SIZE_MIN, PICKUP_CLUBS, cleanScheduleRows, formToTemplate, pickupTicked, probePrintServer, callPrintServer,
   TEMPLATE_FIELDS, templateClubLabel, templateToForm, validStartTime, withTemplate,
 } from '../../lib/printServer.js';
-import { churchNight } from '../../../../shared/cloud-crypto.js';
-import { fetchNightRows, historyUnlocked, unlockHistory } from '../../lib/historyCrypto.js';
+import { call } from '../../lib/workerClient.js';
 import { customRecord, leaderRecord, oneOffRecord, reprintRecord, sendToolJob } from '../../lib/toolJobs.js';
 import { BarfBagsField, FriendsListField, PanelCard, Toggle } from './fields.jsx';
 import '../../styles/laptop.css';
@@ -368,92 +367,96 @@ export function BarfNightCard({ church }) {
   );
 }
 
-/** A child on tonight's list, from an opened history row. */
-function reprintable(rows) {
-  const seen = new Set();
-  const out = [];
-  for (const r of [...rows].reverse()) {
-    if (!['checkin', 'visitor', 'import-checkin', 'reprint'].includes(r.kind)) continue;
-    const rec = r.record || {};
-    const first = typeof rec.first === 'string' ? rec.first : '';
-    if (!first) continue;
-    const last = typeof rec.last === 'string' ? rec.last : '';
-    const key = `${rec.clubberId || ''}|${first}|${last}|${rec.club || ''}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    out.push({ key, first, last, club: typeof rec.club === 'string' ? rec.club : '', clubberId: rec.clubberId ? String(rec.clubberId) : null, ts: Number(rec.ts) || 0 });
-  }
-  return out.slice(0, 30);
+/**
+ * Tonight's checked-in children from the desk roster answer (routes.md 5), A to Z.
+ * @param {any} body
+ * @returns {{ key: string, first: string, last: string, club: string, clubberId: string }[]}
+ */
+export function reprintable(body) {
+  const kids = Array.isArray(body?.kids) ? body.kids : [];
+  return kids
+    .filter((k) => k && k.checkedIn === true && k.checkedOut !== true && typeof k.first === 'string' && k.first)
+    .map((k) => ({ key: String(k.clubberId), first: k.first, last: typeof k.last === 'string' ? k.last : '', club: typeof k.club === 'string' ? k.club : '', clubberId: String(k.clubberId) }))
+    .sort((x, y) => `${x.first} ${x.last}`.localeCompare(`${y.first} ${y.last}`));
 }
 
-/** Tonight's prints: the rows that reached the history (opened with the passphrase), a Reprint on each. */
+/** Matches a typed name: the start of the first or last name, or of the whole name. */
+export function reprintMatches(p, q) {
+  const t = q.trim().toLowerCase();
+  if (!t) return true;
+  const full = `${p.first} ${p.last}`.toLowerCase();
+  return full.startsWith(t) || full.split(/\s+/).some((w) => w.startsWith(t));
+}
+
+const REPRINT_SHOW = 24;
+
+/**
+ * Reprint a name tag (owner 2026-10-22: "an easy way to reprint any kids name tags"):
+ * tonight's checked-in children from the same roster the check-in page reads (no
+ * passphrase: the roster is the signed-in desk's own answer), a search box, and one
+ * tap per child. The job is sealed in this browser to every station: the station's
+ * /reprint prints tonight's label exactly as it was; never a check-in, never counted.
+ */
 export function TonightsPrintsCard() {
   const { signedIn, url } = useSync();
-  const session = loadSyncSession();
-  const [unlocked, setUnlocked] = useState(historyUnlocked());
-  const [pass, setPass] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [state, setState] = useState(/** @type {any} */ (null));
+  const [people, setPeople] = useState(/** @type {any[] | null} */ (null));
+  const [q, setQ] = useState('');
   const [note, setNote] = useState(/** @type {any} */ (null));
   const [sending, setSending] = useState('');
   const [round, setRound] = useState(0);
 
   useEffect(() => {
-    if (!unlocked || !signedIn || !url) return undefined;
+    if (!signedIn || !url) return undefined;
     let live = true;
-    fetchNightRows(url, session, churchNight(Date.now())).then((res) => {
+    call('/v1/desk/roster').then((res) => {
       if (!live) return;
-      if (res.ok) setState({ people: reprintable(res.rows) });
-      else setNote({ bad: true, text: res.message });
+      if (res.ok) setNote(null);
+      if (res.ok && res.body && res.body.noClub) setPeople([]);
+      else if (res.ok) setPeople(reprintable(res.body));
+      else setNote({ bad: true, text: res.message || 'The list could not be read. Try Refresh.' });
     });
     return () => { live = false; };
-  }, [unlocked, signedIn, url, session, round]);
+  }, [signedIn, url, round]);
 
-  const open = async () => {
-    setBusy(true);
-    const res = await unlockHistory(url, session, pass);
-    setBusy(false);
-    setPass('');
-    if (res.ok) { setNote(null); setUnlocked(true); } else setNote({ bad: true, text: res.message });
-  };
   const reprint = async (p) => {
-    if (!window.confirm(`Reprint ${p.first}’s label?`)) return;
     setSending(p.key);
     setNote(null);
     const r = await sendToolJob(reprintRecord({ name: `${p.first} ${p.last}`.trim(), clubberId: p.clubberId }), { historyRow: { first: p.first, last: p.last, club: p.club } });
     setSending('');
-    setNote(r.ok ? { text: `Sent ${p.first}’s label to the printer.${r.history === 'failed' ? ' (It could not be added to the history.)' : ''}` } : { bad: true, text: r.message });
-    if (r.ok) setRound((n) => n + 1);
+    setNote(r.ok ? { text: `Sent ${p.first}’s name tag to the printer.${r.history === 'failed' ? ' (It could not be added to the history.)' : ''}` } : { bad: true, text: r.message });
   };
 
+  const hits = (people || []).filter((p) => reprintMatches(p, q));
   return (
-    <PanelCard title="Tonight’s prints" tab="var(--brand-sun)">
-      {!signedIn && <p className="hint">Sign in under Account &amp; app to see tonight’s prints.</p>}
-      {signedIn && !unlocked && (
-        <form className="hist-unlock" onSubmit={(e) => { e.preventDefault(); if (pass.trim() && !busy) open(); }}>
-          <div className="field">
-            <label htmlFor="prints-pass">Passphrase</label>
-            <input id="prints-pass" type="password" autoComplete="off" value={pass} onChange={(e) => setPass(e.target.value)} />
-            <span className="hint">Children’s names are sealed. The passphrase opens them in this browser only; it is never sent for this, and never saved.</span>
+    <PanelCard title="Reprint a name tag" tab="var(--brand-sun)">
+      {!signedIn && <p className="hint">Sign in under Account &amp; app to reprint tonight’s name tags.</p>}
+      {signedIn && (
+        <div className="field">
+          <label htmlFor="reprint-q">Find a child checked in tonight</label>
+          <div className="display-key-row">
+            <input id="reprint-q" type="search" autoComplete="off" placeholder="Type a first or last name" value={q} onChange={(e) => setQ(e.target.value)} />
+            <button type="button" className="ghost" onClick={() => setRound((n) => n + 1)}>Refresh</button>
           </div>
-          <button type="submit" className="ghost section-jump" disabled={busy || !pass.trim()}>{busy ? 'Opening…' : 'Open the names'}</button>
-        </form>
+          <span className="hint">One tap prints that child’s tag again, exactly as it printed tonight. It is not a second check-in.</span>
+        </div>
       )}
-      {unlocked && !state && !note && <p className="hint" role="status">Opening…</p>}
-      {state && state.people.length === 0 && <p className="hint">Nothing has printed through the service tonight yet.</p>}
-      {state && state.people.length > 0 && (
+      {signedIn && !people && !note && <p className="hint" role="status">Reading tonight’s list…</p>}
+      {people && people.length === 0 && <p className="hint">Nobody is checked in yet tonight.</p>}
+      {people && people.length > 0 && hits.length === 0 && <p className="hint">Nobody checked in tonight matches “{q.trim()}”.</p>}
+      {hits.length > 0 && (
         <ul className="laptop-history">
-          {state.people.map((p) => (
+          {hits.slice(0, REPRINT_SHOW).map((p) => (
             <li key={p.key}>
               <span className="laptop-history__who"><strong>{p.first} {p.last}</strong></span>
               <span className="hint">{p.club}</span>
-              <button type="button" className="ghost" disabled={sending !== ''} aria-label={`Reprint ${p.first}`} onClick={() => reprint(p)}>
+              <button type="button" className="ghost" disabled={sending !== ''} aria-label={`Reprint ${`${p.first} ${p.last}`.trim()}’s name tag`} onClick={() => reprint(p)}>
                 {sending === p.key ? 'Sending…' : 'Reprint'}
               </button>
             </li>
           ))}
         </ul>
       )}
+      {hits.length > REPRINT_SHOW && <p className="hint">+{hits.length - REPRINT_SHOW} more: type more of the name.</p>}
       <Note note={note} />
     </PanelCard>
   );
