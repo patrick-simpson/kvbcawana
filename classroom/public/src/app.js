@@ -190,8 +190,10 @@ function drawHoney(seconds, ms) {
 }
 let bearDoneFor = '';
 try { bearDoneFor = localStorage.getItem(BEAR_KEY) || ''; } catch { /* memory only */ }
+// Off since 2026-10-22 (the Cubbies card is plain black, the count alone); kept for a later night.
+const BEAR_ON = false;
 function maybeBear(dateKey, minutes) {
-  if (!dateKey || bearDoneFor === dateKey || phase !== 'cubbies' || board || !motionOk()) return;
+  if (!BEAR_ON || !dateKey || bearDoneFor === dateKey || phase !== 'cubbies' || board || !motionOk()) return;
   if (minutes !== L.bearMinute(dateKey) || welcomingNow().length) return;
   bearDoneFor = dateKey;
   try { localStorage.setItem(BEAR_KEY, dateKey); } catch { /* memory only */ }
@@ -355,7 +357,8 @@ function drawWelcomes() {
     }
     // On its own card the welcome sits in the card's place; on the black,
     // centred, or side by side when both clubs have one.
-    el.dataset.slot = board ? 'center' : L.cardClub(/** @type {any} */ (phase)) ? 'card' : up.length > 1 ? (club === 'cubbies' ? 'left' : 'right') : 'center';
+    // The Cubbies card is plain black since 2026-10-22: its welcome sits centred, as on the black.
+    el.dataset.slot = board ? 'center' : L.cardClub(/** @type {any} */ (phase)) && phase !== 'cubbies' ? 'card' : up.length > 1 ? (club === 'cubbies' ? 'left' : 'right') : 'center';
     const names = /** @type {HTMLElement} */ (el.querySelector('.cr-welcome-names'));
     const words = L.welcomeWords(welcomes.cards[club].names);
     const size = words.length > 34 ? 4 : words.length > 20 ? 5 : 6.4;

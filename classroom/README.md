@@ -4,7 +4,7 @@ The TV in the downstairs classroom, on club nights:
 
 | Time | On the screen |
 |---|---|
-| 6:00 pm | The Cubbies card (no Cubbies logo), with how many Cubbies are checked in and a welcome for each one who arrives |
+| 6:00 pm | Black, with how many Cubbies are checked in (top right) and a welcome for each Cubbie who arrives |
 | 6:58 pm | Black, while the clubs pass at the door |
 | 7:02 pm | Sparks "Large Group Time", with how many Sparks are checked in |
 | 7:28 pm | Black again |
