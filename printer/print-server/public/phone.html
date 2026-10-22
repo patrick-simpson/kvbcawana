@@ -776,7 +776,7 @@ var TEST_DAY = null;
 // LAST_IN_MS, whichever comes first (lastIn, showUndo; check-out's held Undo outranks it).
 var ONE_TAP_KEY = 'awanaSimpleCheckin.v1';
 var ONE_TAP = (function() { try { return localStorage.getItem(ONE_TAP_KEY) !== 'off'; } catch (e) { return true; } })();
-var LAST_IN_MS = 60 * 1000;
+var LAST_IN_MS = 30 * 1000;   // owner 2026-10-22: half the old minute
 var lastIn = null;             // { kids, label, until, timer }: the last check-in tap, for the big Undo
 // Family order (owner 2026-10-15: "sort family tiles by who usually arrives first with an
 // option to sort by last name"; "Whole season"): the Worker sends each child's `usual`, the
