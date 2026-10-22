@@ -77,6 +77,8 @@ describe('the cards fit', { skip: SKIP }, () => {
     for (const card of ['cubbies', 'sparks']) {
       it(`${card} at ${size.width}x${size.height}: mark, title and chip on screen and apart (Cubbies: no mark)`, async () => {
         const page = await open(`?preview=${card}`, size);
+        // The preview card must be up before anything on it is measured (else an unshown mark reads as hidden).
+        await page.waitForSelector(`#${card}:not([hidden])`, { state: 'visible' });
         const boxes = await page.evaluate((c) => {
           const box = (el) => { const r = el.getBoundingClientRect(); return { l: r.left, t: r.top, r: r.right, b: r.bottom }; };
           const root = document.getElementById(c);
