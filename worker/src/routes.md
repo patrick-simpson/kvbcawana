@@ -1311,6 +1311,26 @@ status: { page: { build } }                   // first 7 hex of the build hash (
   projector only at its usual hellos (its build changes only by reloading).
   No CPU-heavy work: clamps and short string clean-ups.
 
+### 10.7a A computer's display log (BUILT, owner 2026-10-22)
+
+The owner, away from church, needed to see what SMART Ink did on the
+classroom computer ("push that to a settings pane"). A KVBC Awana computer
+(kind `computer`) sends the tail of its display log (`userData\display\display.log`):
+
+- `PUT /v1/screens/<id>/log {lines: string[]}` from the computer itself, after
+  its two-minute hello, only when the tail changed since it last sent one. The
+  app scrubs the Windows user folder (`C:\Users\…`) and any `session=` or
+  `passphrase=` value out first. Any other kind: 400. Unknown id: 404.
+- `GET /v1/screens/<id>/log` -> `{at, lines}` (`at` = when the Worker stored it,
+  ISO; `{at: null, lines: []}` before the first).
+- Both clean the lines with `sanitizeScreenLog` (`lobby/src/lib/syncSpecs.js`):
+  strings only, control characters to spaces, each line at most 300
+  characters, the last 100 lines. The same lines again write nothing.
+- Stored as `screenlog:<id>` (one key, about 30 KB at most); forgetting the
+  screen deletes it. No child's name is in the display log.
+- /settings → Screens: a computer's row has "Display log", which reads it
+  and shows each line's time in Eastern Time.
+
 ### 10.8 A Journey kiosk's commands, and the room document alone (BUILT, owner 2026-10-12)
 
 /settings → Journey works every Journey kiosk's "Lessons on this computer"

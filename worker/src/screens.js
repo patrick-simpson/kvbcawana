@@ -52,6 +52,7 @@ import {
   isScreenId,
   isScreenKind,
   sanitizeScreenAction,
+  sanitizeScreenLog,
   sanitizeScreenSettings,
   sanitizeScreenStatus,
   screenStatusMoved,
@@ -73,6 +74,8 @@ const INDEX = 'screens';
 export const screenSettingsKey = (id) => `screen:${id}`;
 /** @param {string} id */
 export const screenQueueKey = (id) => `screenq:${id}`;
+/** A computer's display log tail, {at, lines} (src/routes.md 10.7a). @param {string} id */
+export const screenLogKey = (id) => `screenlog:${id}`;
 
 /** @param {unknown} kind */
 const queuesActions = (kind) => /** @type {readonly unknown[]} */ (SCREEN_ACTION_QUEUED_KINDS).includes(kind);
@@ -258,6 +261,7 @@ export class Screens {
     this.waiting.delete(oldest.id);
     await this.storage.delete(screenSettingsKey(oldest.id));
     await this.storage.delete(screenQueueKey(oldest.id));
+    await this.storage.delete(screenLogKey(oldest.id));
     return true;
   }
 
@@ -324,6 +328,7 @@ export class Screens {
     }
     await this.storage.delete(screenSettingsKey(id));
     await this.storage.delete(screenQueueKey(id));
+    await this.storage.delete(screenLogKey(id));
     return { ok: true, body: { forgotten: had } };
   }
 
@@ -356,6 +361,34 @@ export class Screens {
     }
     this.ring({ what: 'screen-action', id, ...clean, at });
     return { ok: true, body: { ok: true, delivered: this.liveScreens().has(id) } };
+  }
+
+  /**
+   * PUT /v1/screens/<id>/log {lines}: a KVBC Awana computer's display log tail
+   * (owner 2026-10-22, to see what SMART Ink did from afar). Only a computer
+   * has one; the lines are cleaned (sanitizeScreenLog) and the same lines
+   * again write nothing (the free plan counts writes). Replaces the last one.
+   * @param {string} id @param {any} body @returns {Promise<Result>}
+   */
+  async putLog(id, body) {
+    const r = Screens.pick(await this.index(), id);
+    if (!r) return refuse(404, 'There is no such screen. It may have been forgotten.');
+    if (r.kind !== 'computer') return refuse(400, 'Only a KVBC Awana computer sends a log.');
+    const lines = sanitizeScreenLog(body?.lines);
+    const prev = await this.storage.get(screenLogKey(id));
+    if (prev && JSON.stringify(prev.lines) === JSON.stringify(lines)) return { ok: true, body: { at: prev.at, lines: lines.length, same: true } };
+    const at = new Date(this.now()).toISOString();
+    await this.storage.put(screenLogKey(id), { at, lines });
+    return { ok: true, body: { at, lines: lines.length } };
+  }
+
+  /** GET /v1/screens/<id>/log: {at, lines}; {at: null, lines: []} before the first. @param {string} id @returns {Promise<Result>} */
+  async getLog(id) {
+    const r = Screens.pick(await this.index(), id);
+    if (!r) return refuse(404, 'There is no such screen. It may have been forgotten.');
+    const saved = await this.storage.get(screenLogKey(id));
+    const at = saved && typeof saved.at === 'string' ? saved.at : null;
+    return { ok: true, body: { at, lines: at ? sanitizeScreenLog(saved.lines) : [] } };
   }
 
   /** A stamp strictly after `prev`, so two quick saves still order. @param {string|undefined} prev */

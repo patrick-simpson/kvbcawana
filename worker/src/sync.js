@@ -696,16 +696,18 @@ export class SyncCore {
    *   PUT    /v1/screens/<id>/settings    {settings}
    *   PUT    /v1/screens/<id>/name        {name}
    *   POST   /v1/screens/<id>/action      {action, data?}
+   *   GET    /v1/screens/<id>/log         {at, lines}  a computer's display log tail (routes.md 10.7a)
+   *   PUT    /v1/screens/<id>/log         {lines}      sent by that computer
    *   DELETE /v1/screens/<id>
    * @param {Request} request @param {URL} url
    */
   async screenRoute(request, url) {
-    const m = /^\/v1\/screens(?:\/([^/]+)(?:\/(settings|name|action))?)?$/.exec(url.pathname);
+    const m = /^\/v1\/screens(?:\/([^/]+)(?:\/(settings|name|action|log))?)?$/.exec(url.pathname);
     if (!m) return fail('Not found.', 404);
     const [, id = '', part = ''] = m;
     // 'hello' and 'now' are never ids (an id is 16 to 64 characters).
     const route = !id ? `${request.method} list` : (id === 'hello' || id === 'now') && !part ? `${request.method} ${id}` : `${request.method} ${part}`;
-    const known = ['GET list', 'POST hello', 'POST now', 'GET settings', 'PUT settings', 'PUT name', 'POST action', 'DELETE '];
+    const known = ['GET list', 'POST hello', 'POST now', 'GET settings', 'PUT settings', 'PUT name', 'POST action', 'GET log', 'PUT log', 'DELETE '];
     if (!known.includes(route)) return fail('Not found.', 404);
     if (!(await this.authorized(request))) {
       return fail('This screen is signed out. Type the passphrase again.', 401, { reason: 'signed-out' });
@@ -725,6 +727,8 @@ export class SyncCore {
       case 'PUT settings': res = await this.screenSettings(id, await this.body(request), request, {}); break;
       case 'PUT name': res = await this.screenRename(id, await this.body(request), request, {}); break;
       case 'POST action': res = await this.screens.act(id, await this.body(request)); break;
+      case 'GET log': res = await this.screens.getLog(id); break;
+      case 'PUT log': res = await this.screens.putLog(id, await this.body(request)); break;
       default:
         res = await this.screens.forget(id);
         this.journeyRemote.forget(id);

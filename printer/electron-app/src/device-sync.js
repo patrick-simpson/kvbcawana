@@ -26,6 +26,12 @@
 // (the display, the hours) applies now, print stays on, the hello carries
 // `pendingRoleChange`, and the moment the server is idle the change applies.
 //
+// The display log's tail (log-tail.js, worker/src/routes.md 10.7a) goes up
+// after a good round when it changed since the last one sent, so /settings
+// can show what this computer saw (owner 2026-10-22). A Worker without the
+// route (404) is not asked again until the app restarts; a failure otherwise
+// only means the next round tries again.
+//
 // The app's version and update ride every hello; reportSoon() (main.js calls
 // it when the updater moves) says hello sooner when the update's state
 // changed or its download moved 10 points, never within REPORT_GAP_MS of the
@@ -150,6 +156,7 @@ function writeStore(userData, store) {
  *   apply: (settings: object) => Promise<{ok: boolean, error?: string}>,
  *   busy: () => boolean,                        the print server is printing or has a label waiting
  *   report?: () => object | null,               this app's {app: {version, update}} for the hello (update-progress.js)
+ *   logTail?: () => string[] | null,            the display log's newest lines, scrubbed (log-tail.js)
  *   now?: () => number,
  *   onStatus?: (status: object) => void,
  *   onSignedOut?: (session: {url: string, session: string}) => void,
@@ -173,6 +180,8 @@ async function createDeviceSync(deps) {
   let reportTimer = null;    // a hello for the app's update, waiting out REPORT_GAP_MS
   let lastHelloAt = 0;       // when the last hello went out
   let lastReport = null;     // the report the Worker last took
+  let lastLog = null;        // the log tail the Worker last took (JSON)
+  let logRoute = true;       // false once the Worker said it has no log route
   const clock = deps.now || Date.now;
   let status = { state: 'off', pending: null, error: null, at: null };
 
@@ -257,6 +266,20 @@ async function createDeviceSync(deps) {
     const res = await deps.request(s.url, deps.protocol.SCREEN_HELLO_PATH, { method: 'POST', body, session: s.session });
     if (res && res.ok && report) lastReport = report;
     return res;
+  }
+
+  /** The display log's tail, when it changed since the Worker last took it. */
+  async function sendLog(s, id) {
+    if (!deps.logTail || !logRoute || typeof deps.protocol.screenLogPath !== 'function') return;
+    let lines;
+    try { lines = deps.logTail(); } catch (e) { log('[device] log tail failed:', e && e.message); return; }
+    if (!Array.isArray(lines)) return;
+    const text = JSON.stringify(lines);
+    if (text === lastLog) return;
+    const res = await deps.request(s.url, deps.protocol.screenLogPath(id), { method: 'PUT', body: { lines }, session: s.session });
+    if (res.status === 401) { signedOut(s); return; }
+    if (res.status === 404 && !(res.body && /forgotten/.test(String(res.body.error)))) { logRoute = false; return; }
+    if (res.ok) lastLog = text;
   }
 
   async function put(s, id, settings) {
@@ -361,6 +384,8 @@ async function createDeviceSync(deps) {
     }
     lastLocal = snapshot();
     setStatus({ state: 'ok', error: null });
+    await sendLog(s, id);
+    if (failedToken) return;
     // /settings should see a hold start or end at once, not in two minutes.
     if (JSON.stringify(held) !== heldBefore) {
       const res = await hello(s, id);

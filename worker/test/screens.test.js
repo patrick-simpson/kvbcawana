@@ -580,3 +580,40 @@ describe('routes', () => {
     expect((await s.call('PUT', `/v1/screens/${TV}`, {})).status).toBe(404);
   });
 });
+
+describe("a computer's display log (routes.md 10.7a)", () => {
+  const PC = 'pc_dddddddddddddddddddd';
+
+  it('a computer sends its tail; /settings reads it back cleaned; the same lines write nothing', async () => {
+    const s = setup();
+    await s.signIn();
+    expect((await s.call('GET', `/v1/screens/${PC}/log`)).status).toBe(404);
+    await s.call('POST', '/v1/screens/hello', { id: PC, kind: 'computer', name: 'Classroom' });
+    expect((await s.call('GET', `/v1/screens/${PC}/log`)).body).toEqual({ at: null, lines: [] });
+    const lines = Array.from({ length: 130 }, (_, i) => `2026-10-22T22:00:${String(i % 60).padStart(2, '0')}.000Z line ${i}`);
+    lines.push(`bell\u0007 and ${'x'.repeat(400)}`, 42);
+    expect((await s.call('PUT', `/v1/screens/${PC}/log`, { lines })).status).toBe(200);
+    const got = (await s.call('GET', `/v1/screens/${PC}/log`)).body;
+    expect(got.lines).toHaveLength(100);
+    expect(got.lines[0]).toBe('2026-10-22T22:00:31.000Z line 31');
+    expect(got.lines[99].startsWith('bell  and xxx')).toBe(true);
+    expect(got.lines[99]).toHaveLength(300);
+    expect(typeof got.at).toBe('string');
+    s.tick(60_000);
+    const again = await s.call('PUT', `/v1/screens/${PC}/log`, { lines });
+    expect(again.body).toMatchObject({ same: true, at: got.at });
+  });
+
+  it('only a computer has one, it needs a session, and forgetting the screen deletes it', async () => {
+    const s = setup();
+    await s.signIn();
+    await s.call('POST', '/v1/screens/hello', { id: TV, kind: 'lobby' });
+    expect((await s.call('PUT', `/v1/screens/${TV}/log`, { lines: ['a'] })).status).toBe(400);
+    await s.call('POST', '/v1/screens/hello', { id: PC, kind: 'computer' });
+    await s.call('PUT', `/v1/screens/${PC}/log`, { lines: ['a'] });
+    expect((await s.call('GET', `/v1/screens/${PC}/log`, undefined, '')).status).toBe(401);
+    expect(s.storage.map.has(`screenlog:${PC}`)).toBe(true);
+    await s.call('DELETE', `/v1/screens/${PC}`);
+    expect(s.storage.map.has(`screenlog:${PC}`)).toBe(false);
+  });
+});

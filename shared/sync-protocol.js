@@ -279,3 +279,7 @@ export function screenSettingsPath(id) {
 export function screenNamePath(id) {
   return `/v1/screens/${id}/name`;
 }
+/** A computer's display log tail (src/routes.md 10.7a). @param {string} id */
+export function screenLogPath(id) {
+  return `/v1/screens/${id}/log`;
+}

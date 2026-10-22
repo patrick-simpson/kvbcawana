@@ -38,13 +38,14 @@ test.beforeEach(async ({ page }) => {
     w.calls.push({ method: req.method(), path, body });
     if (path === '/v1/state') return route.fulfill({ json: { settings: null, slides: null, template: null, journey: null, calendar: null, kid: 'abcd1234' } });
     if (path === '/v1/screens') return route.fulfill({ json: { screens: Object.values(w.screens), max: 40 } });
-    const m = /^\/v1\/screens\/([^/]+)(?:\/(settings|name|action))?$/.exec(path);
+    const m = /^\/v1\/screens\/([^/]+)(?:\/(settings|name|action|log))?$/.exec(path);
     if (m && m[2] === 'settings' && req.method() === 'GET') return route.fulfill({ json: { screen: w.screens[m[1]], settings: w.settings[m[1]] } });
     if (m && m[2] === 'settings') {
       w.settings[m[1]] = { savedAt: new Date().toISOString(), settings: body.settings };
       return route.fulfill({ json: { ...w.settings[m[1]], dropped: [] } });
     }
     if (m && m[2] === 'name') { w.screens[m[1]].name = body.name; return route.fulfill({ json: { screen: w.screens[m[1]] } }); }
+    if (m && m[2] === 'log') return route.fulfill({ json: w.logs?.[m[1]] || { at: null, lines: [] } });
     if (m && m[2] === 'action') return route.fulfill({ json: { ok: true, delivered: w.screens[m[1]].online } });
     return route.fulfill({ status: 404, json: { error: 'Not found.' } });
   });
@@ -148,4 +149,29 @@ test('a KVBC Awana computer keeps at least one role, and its hours run forward',
   await row.getByLabel('Display from').blur();
   await expect(row).toContainText('has to be before');
   expect(page.w.settings[PC].settings).toEqual(before);
+});
+
+test("a KVBC Awana computer's display log: read from afar, times in Eastern, the pen lines on their own", async ({ page }) => {
+  const PC = 'pc_eeeeeeeeeeeeeeeeeeee';
+  const now = new Date().toISOString();
+  page.w.screens[PC] = { id: PC, kind: 'computer', name: 'Classroom PC', createdAt: now, lastSeen: now, online: true, live: false };
+  page.w.settings[PC] = { savedAt: now, settings: { printRole: false, displayRole: true, displayFrom: '16:00', displayUntil: '20:00' } };
+  const dialog = page.getByRole('dialog', { name: 'Settings' });
+  await dialog.getByRole('tab', { name: 'Screens', exact: true }).click();
+  await dialog.getByRole('button', { name: 'Open settings for Classroom PC' }).click();
+  const row = dialog.locator(`[data-screen="${PC}"]`);
+  await row.getByRole('button', { name: 'Show the display log' }).click();
+  await expect(row).toContainText('Nothing yet.');
+  page.w.logs = { [PC]: { at: now, lines: [
+    '2026-10-22T22:00:05.000Z screen opened classroom',
+    '2026-10-22T22:01:10.000Z pen watch: SMART Ink {"processes":["SMARTInk"],"windows":["|Toolbar|300x60"],"lifted":false}',
+  ] } };
+  await row.getByRole('button', { name: 'Read it again' }).click();
+  const list = row.getByRole('list', { name: 'Display log for Classroom PC' });
+  await expect(list.getByRole('listitem')).toHaveCount(2);
+  await expect(list).toContainText('Thu 6:00:05 PM');
+  await expect(list).toContainText('screen opened classroom');
+  await row.getByRole('checkbox', { name: 'Only the pen and SMART Ink' }).check();
+  await expect(list.getByRole('listitem')).toHaveCount(1);
+  await expect(list).toContainText('lifted');
 });

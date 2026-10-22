@@ -22,7 +22,7 @@ function fakeWorker() {
     w.calls.push({ method, path: p, body: body === undefined ? undefined : structuredClone(body) });
     if (base !== URL_) return { ok: false, status: 0, body: null };
     if (session !== w.token) return { ok: false, status: 401, body: { error: 'This screen is signed out.' } };
-    const m = /^\/v1\/screens\/([^/]+)(?:\/(settings|name))?$/.exec(p);
+    const m = /^\/v1\/screens\/([^/]+)(?:\/(settings|name|log))?$/.exec(p);
     if (p === '/v1/screens/hello' && method === 'POST') {
       let r = w.screens[body.id];
       if (!r) r = w.screens[body.id] = { id: body.id, kind: body.kind, name: body.name };
@@ -34,6 +34,11 @@ function fakeWorker() {
     if (m && m[2] === 'settings' && method === 'PUT') {
       w.settings[m[1]] = { savedAt: stamp(), settings: ds.cleanSettings(body.settings) };
       return { ok: true, status: 200, body: { ...w.settings[m[1]], dropped: [] } };
+    }
+    if (m && m[2] === 'log' && method === 'PUT') {
+      if (w.noLogRoute) return { ok: false, status: 404, body: { error: 'Not found.' } };
+      w.logs = [...(w.logs || []), body.lines];
+      return { ok: true, status: 200, body: { at: stamp(), lines: body.lines.length } };
     }
     if (m && m[2] === 'name' && method === 'PUT') {
       w.screens[m[1]].name = body.name;
@@ -64,7 +69,7 @@ function fakeTimers() {
 }
 
 /** A computer: roles, hours, a print server that can be busy, main.js's apply. */
-async function computer({ worker = fakeWorker(), print = true, display = false, name = 'Check-in laptop', signedIn = true, report } = {}) {
+async function computer({ worker = fakeWorker(), print = true, display = false, name = 'Check-in laptop', signedIn = true, report, logTail } = {}) {
   const dir = tmp();
   const pc = {
     dir, worker, timers: fakeTimers(), busy: false, applied: [], statuses: [], signedOutWith: [],
@@ -99,6 +104,7 @@ async function computer({ worker = fakeWorker(), print = true, display = false, 
     onSignedOut: (s) => pc.signedOutWith.push(s.session),
     timers: pc.timers,
     report,
+    logTail,
     now: () => pc.clock,
   });
   pc.clock = Date.parse('2026-10-12T15:00:00Z');
@@ -340,6 +346,65 @@ describe("the app's version and update ride the hello", () => {
     pc.sync.stop();
     pc.sync.reportSoon();
     assert.equal(pc.timers.has(0), false);
+  });
+});
+
+describe("the display log's tail goes up after a round (routes.md 10.7a)", () => {
+  const logCalls = (pc) => pc.worker.calls.filter((c) => c.method === 'PUT' && c.path.endsWith('/log'));
+
+  it('sent after a good round, again only when it changed', async () => {
+    let lines = ['2026-10-22T22:00:00.000Z start 10.6.1'];
+    const pc = await computer({ logTail: () => lines });
+    await pc.sync.start();
+    assert.deepEqual(pc.worker.logs, [lines]);
+    pc.timers.run(ds.HELLO_MS);
+    await pc.sync.start();
+    assert.equal(logCalls(pc).length, 1);
+    lines = [...lines, '2026-10-22T22:02:00.000Z pen watch: SMART Ink {"lifted":true}'];
+    pc.timers.run(ds.HELLO_MS);
+    await pc.sync.start();
+    assert.equal(logCalls(pc).length, 2);
+    assert.equal(pc.worker.logs[1].length, 2);
+  });
+
+  it('a Worker without the route is not asked again; no tail, nothing sent; signed out, nothing sent', async () => {
+    const w = fakeWorker();
+    w.noLogRoute = true;
+    let n = 0;
+    const pc = await computer({ worker: w, logTail: () => [`line ${n++}`] });
+    await pc.sync.start();
+    pc.timers.run(ds.HELLO_MS);
+    await pc.sync.start();
+    assert.equal(logCalls(pc).length, 1);
+    const none = await computer({ logTail: () => null });
+    await none.sync.start();
+    assert.equal(logCalls(none).length, 0);
+    const out = await computer({ signedIn: false, logTail: () => ['a'] });
+    await out.sync.start();
+    assert.equal(logCalls(out).length, 0);
+  });
+});
+
+describe('log-tail.js', () => {
+  const { readLogTail, scrubLine } = require('../src/log-tail');
+  it('keeps the newest lines, reaching into the rolled-over file, and scrubs the user folder and sessions', () => {
+    const dir = tmp();
+    const file = path.join(dir, 'display.log');
+    fs.writeFileSync(`${file}.1`, Array.from({ length: 80 }, (_, i) => `old ${i}`).join('\n') + '\n');
+    fs.writeFileSync(file, Array.from({ length: 30 }, (_, i) => `new ${i}`).join('\r\n') + '\r\n');
+    const tail = readLogTail(file);
+    assert.equal(tail.length, 100);
+    assert.equal(tail[0], 'old 10');
+    assert.equal(tail[99], 'new 29');
+    assert.deepEqual(readLogTail(path.join(dir, 'missing.log')), []);
+    assert.equal(scrubLine('at C:\\Users\\Pat Smith\\AppData\\x.js'), 'at C:\\Users\\…\\AppData\\x.js');
+    assert.equal(scrubLine('"C:\\\\Users\\\\pat\\\\x"'), '"C:\\\\Users\\\\…\\\\x"');
+    assert.equal(scrubLine('wss://a/v1/live?session=v1.abc&station=9'), 'wss://a/v1/live?session=…&station=9');
+    assert.equal(scrubLine('Authorization: Bearer v1.abc.def'), 'Authorization: Bearer …');
+  });
+  it('main.js hands device-sync the display log under userData', () => {
+    const main = fs.readFileSync(path.join(__dirname, '..', 'main.js'), 'utf8');
+    assert.match(main, /logTail: \(\) => readLogTail\(path\.join\(userData, 'display', 'display\.log'\)\),/);
   });
 });
 

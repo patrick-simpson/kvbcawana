@@ -282,6 +282,10 @@ function screenSettingsPath(id) {
 function screenNamePath(id) {
   return `/v1/screens/${id}/name`;
 }
+/** A computer's display log tail (src/routes.md 10.7a). @param {string} id */
+function screenLogPath(id) {
+  return `/v1/screens/${id}/log`;
+}
 
 module.exports = {
   SYNC_URL_MAX,
@@ -305,4 +309,5 @@ module.exports = {
   SCREEN_HELLO_PATH,
   screenSettingsPath,
   screenNamePath,
+  screenLogPath,
 };

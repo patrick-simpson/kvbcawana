@@ -1,6 +1,6 @@
 import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { ScreensSection, seenWords } from './screens.jsx';
+import { ScreensSection, easternStamp, isPenLine, logLineWords, seenWords } from './screens.jsx';
 import { PanelCard, RemoteScreenContext, FollowingContext, SettingsPageContext } from './fields.jsx';
 import { _resetSyncForTest } from '../../hooks/useSync.js';
 
@@ -18,6 +18,19 @@ describe('seenWords', () => {
     expect(seenWords('2026-10-11T21:56:00Z', now)).toBe('4 min ago');
     expect(seenWords('nope', now)).toBe('never');
     expect(seenWords('2026-10-07T23:00:00Z', now)).toMatch(/\d/);
+  });
+});
+
+describe("a computer's display log lines", () => {
+  it('splits the stamp off and says it in Eastern Time', () => {
+    expect(logLineWords('2026-10-22T22:42:10.123Z pen watch: SMART Ink {}')).toEqual({ time: 'Thu 6:42:10 PM', text: 'pen watch: SMART Ink {}' });
+    expect(logLineWords('    at Object.<anonymous> (x.js:1)')).toEqual({ time: '', text: '    at Object.<anonymous> (x.js:1)' });
+    expect(easternStamp(Date.parse('2026-12-02T23:00:00Z'))).toBe('Wed 6:00:00 PM');
+  });
+  it('knows the pen and SMART Ink lines', () => {
+    expect(isPenLine('x pen watch: hushed while SMART Ink restarts')).toBe(true);
+    expect(isPenLine('x SMART Ink clear half hour')).toBe(true);
+    expect(isPenLine('x screen opened classroom')).toBe(false);
   });
 });
 

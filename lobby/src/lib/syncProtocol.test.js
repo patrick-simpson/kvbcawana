@@ -16,6 +16,7 @@ import {
   publishRequest,
   readResponse,
   screenNamePath,
+  screenLogPath,
   screenSettingsPath,
   signInWithPassphrase,
   SCREEN_HELLO_PATH,
@@ -86,6 +87,7 @@ describe('building requests', () => {
     expect(SCREEN_HELLO_PATH).toBe('/v1/screens/hello');
     expect(screenSettingsPath('abc')).toBe('/v1/screens/abc/settings');
     expect(screenNamePath('abc')).toBe('/v1/screens/abc/name');
+    expect(screenLogPath('abc')).toBe('/v1/screens/abc/log');
   });
 });
 
@@ -128,7 +130,7 @@ describe('the CommonJS copy the print server and the Electron app load', () => {
       AUTH_PARAMS_PATH, parseAuthParams, signInWithPassphrase,
       SYNC_URL_MAX, UNREACHABLE, buildRequest, isPlausibleDisplayKey, isValidSession, isValidSyncUrl,
       normalizeSyncPassphrase, parseLoginResponse, parseSessionCheck, parseSyncIndex, publishRequest, readResponse,
-      screenNamePath, screenSettingsPath, SCREEN_HELLO_PATH,
+      screenNamePath, screenLogPath, screenSettingsPath, SCREEN_HELLO_PATH,
       SESSION_RE: 0, DISPLAY_KEY_RE: 0, SYNC_TIMEOUT_MS: 0,
     }).sort());
     expect(cjs.SYNC_URL_MAX).toBe(SYNC_URL_MAX);

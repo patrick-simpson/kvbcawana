@@ -395,6 +395,32 @@ export function sanitizeScreenStatus(kind, raw) {
   return null;
 }
 
+/** A computer's display log as /settings shows it (owner 2026-10-22: "push that to a settings pane"): at most this many lines, the newest last. */
+export const SCREEN_LOG_LINES_MAX = 100;
+/** Each line cut to this many characters. */
+export const SCREEN_LOG_LINE_MAX = 300;
+
+/**
+ * The tail of a KVBC Awana computer's display log (userData\display\display.log,
+ * src/routes.md 10.7a), cleaned the same way by the Worker before it stores it
+ * and by /settings before it shows it: strings only, no control characters,
+ * each line cut to SCREEN_LOG_LINE_MAX, the LAST SCREEN_LOG_LINES_MAX kept.
+ * The app scrubs the Windows user folder and any session out first.
+ * @param {unknown} raw
+ * @returns {string[]}
+ */
+export function sanitizeScreenLog(raw) {
+  if (!Array.isArray(raw)) return [];
+  const out = [];
+  for (const line of raw.slice(-SCREEN_LOG_LINES_MAX * 2)) {
+    if (typeof line !== 'string') continue;
+    // eslint-disable-next-line no-control-regex
+    const clean = [...line.replace(/[\u0000-\u001f\u007f-\u009f\u2028\u2029]/g, ' ').trimEnd()].slice(0, SCREEN_LOG_LINE_MAX).join('');
+    if (clean) out.push(clean);
+  }
+  return out.slice(-SCREEN_LOG_LINES_MAX);
+}
+
 /**
  * Has a status moved enough to be worth a storage write before the next
  * once-a-minute one? (The free Durable Object allowance counts writes.) Both

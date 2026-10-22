@@ -1,4 +1,9 @@
-﻿## [10.6.0] - 2026-10-21
+﻿## [10.6.1] - 2026-10-22
+See a computer's display log from anywhere.
+
+**The display log on /settings.** Every computer signed in to the check-in service now sends the last 100 lines of its display log after its two-minute check-in, whenever they changed. On awana.kvbchurch.org/settings → Screens, open a computer's row and press "Show the display log" to read them, with times in Eastern Time; "Only the pen and SMART Ink" narrows it to what the classroom's pen watch saw. Why: the owner could not see why lifting a SMART Board pen did not black out the classroom screen without standing at that computer. The Windows user folder and any sign-in token are scrubbed out before the lines leave the computer.
+
+## [10.6.0] - 2026-10-21
 Every screen wakes at 4:00 pm on club nights.
 
 **Screens start at 4:00 pm, not 5:00.** The lobby, the games projector (its countdown to the 6:00 opening), the Journey kiosk (its check-in display) and the downstairs classroom now come up at 4:00 pm on club nights. The classroom stays black until its 6:30 pm Cubbies card. The end time and the shutdown are unchanged.

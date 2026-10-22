@@ -4,7 +4,7 @@ import { useSync } from '../../hooks/useSync.js';
 import {
   forgetScreen, listScreens, loadScreen, renameScreen, saveScreenSettings, sendScreenAction,
 } from '../../hooks/useScreenSync.js';
-import { SCREEN_SPECS, sanitizeScreenSettings } from '../../lib/syncSpecs.js';
+import { SCREEN_SPECS, sanitizeScreenLog, sanitizeScreenSettings } from '../../lib/syncSpecs.js';
 import { call } from '../../lib/workerClient.js';
 
 // The settings page's Screens (ROADMAP.md#settings-page, phase 2): every screen signed in
@@ -436,8 +436,81 @@ function KindSettings({ screen, onChanged, onGone, goTo }) {
           </div>
         );
       })}
+      {screen.kind === 'computer' && <DisplayLog screen={screen} />}
       <ScreenNameAndForget screen={screen} onRenamed={onChanged} onForgotten={onGone} />
       {note && <p className={`hint${note.warn ? ' hint--warn' : ''}`} role="status">{note.text}</p>}
+    </div>
+  );
+}
+
+// ── A computer's display log (worker/src/routes.md 10.7a) ─────────────────────
+
+const EASTERN = 'America/New_York';
+
+/** "Thu 6:42:10 PM" in Eastern Time. @param {number} t */
+export function easternStamp(t) {
+  return new Date(t).toLocaleString('en-US', { timeZone: EASTERN, weekday: 'short', hour: 'numeric', minute: '2-digit', second: '2-digit' });
+}
+
+/**
+ * One display log line split into its time (Eastern) and the rest. A line
+ * that does not start with the log's own ISO stamp keeps its words, no time.
+ * @param {string} line
+ * @returns {{time: string, text: string}}
+ */
+export function logLineWords(line) {
+  const m = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z)\s+(.*)$/.exec(line);
+  const t = m ? Date.parse(m[1]) : NaN;
+  return Number.isFinite(t) ? { time: easternStamp(t), text: m[2] } : { time: '', text: line };
+}
+
+/** The lines about the pen and SMART Ink (pen-watch.js, ink-clear.js). @param {string} line */
+export const isPenLine = (line) => /pen watch|SMART Ink/i.test(line);
+
+/** @param {{ screen: any }} props */
+function DisplayLog({ screen }) {
+  const [log, setLog] = useState(/** @type {{at: string | null, lines: string[]} | null} */ (null));
+  const [state, setState] = useState(/** @type {'idle' | 'loading' | 'error'} */ ('idle'));
+  const [error, setError] = useState('');
+  const [penOnly, setPenOnly] = useState(false);
+  const read = async () => {
+    setState('loading');
+    const res = await call(`/v1/screens/${encodeURIComponent(screen.id)}/log`);
+    if (res.ok) {
+      setLog({ at: typeof res.body?.at === 'string' ? res.body.at : null, lines: sanitizeScreenLog(res.body?.lines) });
+      setState('idle');
+    } else {
+      setError(res.status === 404 ? 'The check-in service needs its newest version for this.' : res.message);
+      setState('error');
+    }
+  };
+  const lines = log ? (penOnly ? log.lines.filter(isPenLine) : log.lines) : [];
+  return (
+    <div className="display-log">
+      <div className="display-log__bar">
+        <button type="button" className="secondary small" onClick={read} disabled={state === 'loading'}>
+          {state === 'loading' ? 'Reading…' : log ? 'Read it again' : 'Show the display log'}
+        </button>
+        {log && <label className="display-log__filter"><input type="checkbox" checked={penOnly} onChange={(e) => setPenOnly(e.target.checked)} /> Only the pen and SMART Ink</label>}
+      </div>
+      {state === 'error' && <p className="hint hint--warn" role="status">{error}</p>}
+      {log && (log.at === null
+        ? <p className="hint">Nothing yet. {screen.name} sends its log within 2 minutes of coming on, once it has KVBC Awana 10.6.1 or newer.</p>
+        : (
+          <>
+            <p className="hint">The last {log.lines.length} lines {screen.name} wrote, sent {seenWords(log.at)}. Times are Eastern. It sends a new copy every 2 minutes while something changes.</p>
+            {lines.length === 0
+              ? <p className="hint">No lines about the pen or SMART Ink.</p>
+              : (
+                <ol className="display-log__lines" aria-label={`Display log for ${screen.name}`}>
+                  {lines.map((line, i) => {
+                    const w = logLineWords(line);
+                    return <li key={i}>{w.time && <time>{w.time}</time>}<span>{w.text}</span></li>;
+                  })}
+                </ol>
+              )}
+          </>
+        ))}
     </div>
   );
 }

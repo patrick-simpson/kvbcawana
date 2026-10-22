@@ -29,6 +29,7 @@ const { createDisplay } = require('./src/display/display');
 const { createSetupWizard } = require('./src/setup-wizard');
 const { createSyncSession } = require('./src/sync-session');
 const { createDeviceSync } = require('./src/device-sync');
+const { readLogTail } = require('./src/log-tail');
 const stationFace = require('./src/station');
 const { findDisplay } = require('./src/display/displays');
 const { SCREENS } = require('./src/display/screens');
@@ -1434,6 +1435,8 @@ app.whenReady().then(async () => {
     apply: applyDeviceSettings,
     busy: serverBusy,
     report: () => appReport.read(app.getVersion(), updateState),
+    // The display log's tail for /settings (worker/src/routes.md 10.7a): display.js writes it here.
+    logTail: () => readLogTail(path.join(userData, 'display', 'display.log')),
     onStatus: (st) => { console.log('[device]', st.state, st.pending ? `(held: ${JSON.stringify(st.pending)})` : ''); refreshTray(); },
     onSignedOut: (s) => {
       // The app's own sign-in is dropped, as a screen drops its session on a
