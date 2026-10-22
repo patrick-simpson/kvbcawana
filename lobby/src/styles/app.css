@@ -4182,3 +4182,73 @@ html.configure-mode .panel-backdrop { background: #F6F4EF; }
   border: 0;
   background: #000000;
 }
+/* "Opening ceremony in progress" (owner 2026-10-22): on the copy only, top
+   centre (the gym's logo is top left, its weather top right, a pledge starts
+   lower), a white plate with a hot hard offset so it reads on the pure black. */
+.lobby-mirror__label {
+  position: absolute;
+  top: calc(1.4 * var(--lobby-u, 1vw));
+  left: 50%;
+  translate: -50% 0;
+  margin: 0;
+  padding: calc(0.5 * var(--lobby-u, 1vw)) calc(1.4 * var(--lobby-u, 1vw));
+  border-radius: calc(0.8 * var(--lobby-u, 1vw));
+  background: #FFFFFF;
+  color: var(--brand-ink, #231F20);
+  box-shadow: calc(0.35 * var(--lobby-u, 1vw)) calc(0.35 * var(--lobby-u, 1vw)) 0 var(--brand-hot, #F15A28);
+  font-family: var(--font-condensed);
+  font-size: max(14px, calc(1.6 * var(--lobby-u, 1vw)));
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  pointer-events: none;
+}
+/* The switching card (components/MirrorSwitching.jsx; beat sheet there):
+   six club bands across the whole stage, a white plate with an ink offset,
+   the words, and a bar that fills over the five seconds. */
+.mirror-switch {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: var(--brand-ink, #231F20);
+}
+.mirror-switch__bands { position: absolute; inset: 0; display: grid; grid-template-rows: repeat(6, 1fr); }
+.mirror-switch__band { display: block; transform-origin: 0 50%; }
+.mirror-switch__plate {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: calc(0.6 * var(--lobby-u, 1vw));
+  padding: calc(2.4 * var(--lobby-u, 1vw)) calc(4 * var(--lobby-u, 1vw)) calc(2 * var(--lobby-u, 1vw));
+  border-radius: calc(2 * var(--lobby-u, 1vw));
+  background: #FFFFFF;
+  box-shadow: calc(0.9 * var(--lobby-u, 1vw)) calc(0.9 * var(--lobby-u, 1vw)) 0 var(--brand-ink, #231F20);
+}
+.mirror-switch__kicker {
+  margin: 0;
+  font-family: var(--font-condensed);
+  font-size: calc(2.6 * var(--lobby-u, 1vw));
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--brand-hot-deep, #9E3512);
+}
+.mirror-switch__title {
+  margin: 0;
+  font-family: var(--font-shout);
+  font-size: calc(6.3 * var(--lobby-u, 1vw));
+  line-height: 1;
+  text-transform: uppercase;
+  color: var(--brand-blue-deep, #34569A);
+  white-space: nowrap;
+}
+.mirror-switch__track {
+  display: block;
+  width: 100%;
+  height: calc(0.8 * var(--lobby-u, 1vw));
+  margin-top: calc(0.8 * var(--lobby-u, 1vw));
+  border-radius: 999px;
+  background: #E2E8F0;
+  overflow: hidden;
+}
+.mirror-switch__bar { display: block; width: 100%; height: 100%; background: var(--brand-hot, #F15A28); transform-origin: 0 50%; }

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { MIRROR_EARLY_GRACE_MS, MIRROR_OVERRUN_MS, mirrorEarly, mirrorWanted, mirrorWord } from '../lib/ceremonyMirror.js';
+import { MIRROR_EARLY_GRACE_MS, MIRROR_OVERRUN_MS, mirrorEarly, mirrorSwitching, mirrorWanted, mirrorWord } from '../lib/ceremonyMirror.js';
 
 const TICK_MS = 5000;
 /** While the frame is loaded the clock is read finely, so the early turn-over lands on its second. */
@@ -9,7 +9,8 @@ const NEAR_TICK_MS = 250;
  * Test seam (e2e/ceremony-mirror.events.spec.js), read at each use:
  * `window.awanaMirrorTuning = { wanted: true, query: '&now=<ISO>' }` loads the
  * mirror whatever the clock says and time-travels the projector inside it;
- * `early: true` acts as the last ten seconds before the ceremony.
+ * `early: true` acts as the last ten seconds before the ceremony, `switching: true`
+ * as the five before those (the switching card).
  * @returns {{ wanted?: boolean, query?: string }}
  */
 const tuning = () => (typeof window !== 'undefined' && /** @type {any} */ (window).awanaMirrorTuning) || {};
@@ -18,7 +19,8 @@ const tuning = () => (typeof window !== 'undefined' && /** @type {any} */ (windo
  * The lobby's mirror of the projector during the opening ceremony (rules:
  * lib/ceremonyMirror.js). `mounted`: the hidden frame is loaded; `up`: the
  * mirror says its ceremony is on (or it is the last ten seconds before it,
- * the projector's countdown), so the lobby shows it and holds check-ins.
+ * the projector's countdown), so the lobby shows it and holds check-ins;
+ * `switching`: the five seconds before that, the switching card.
  * @param {{ schedule: any, showcase: boolean, configure: boolean, settingsPage: boolean, overlay: boolean }} q
  */
 export function useCeremonyMirror({ schedule, showcase, configure, settingsPage, overlay }) {
@@ -58,6 +60,9 @@ export function useCeremonyMirror({ schedule, showcase, configure, settingsPage,
   const holding = earlySince > 0 && now.getTime() - earlySince < MIRROR_EARLY_GRACE_MS;
   if (earlySince && !early && !holding) setEarlySince(0);
 
+  const up = mounted && (said || early || holding);
+  // The switching card: the five seconds before the early turn-over (owner 2026-10-22).
+  const switching = mounted && !up && (tuning().switching === true || (wanted && mirrorSwitching({ schedule, now })));
   const query = typeof tuning().query === 'string' ? tuning().query : '';
-  return { mounted, up: mounted && (said || early || holding), frameRef, query };
+  return { mounted, up, switching, frameRef, query };
 }

@@ -10,8 +10,11 @@
 // registered screen. The mirror follows the gym projector's slide
 // announcements (slide-go) and backups on the live channel, and tells this
 // page, by one message, when its ceremony starts and ends, so the lobby turns
-// over to it to the second and comes back when T&T game time starts (or the
-// gym starts games early).
+// over to it to the second and comes back at the ceremony's closing blackout
+// (owner 2026-10-22; or when the gym starts games early, or goes back to its
+// countdown). Five seconds before the turn-over each screen shows a
+// "Switching to the opening ceremony" card, and while it copies the gym it
+// says "Opening ceremony in progress" (owner 2026-10-22).
 import { resolvePhase } from './schedule.js';
 
 /** The mirror's message (presentation/App.jsx MIRROR_MESSAGE, the same string; embed.test.js pins both). */
@@ -24,6 +27,12 @@ export const MIRROR_PRELOAD_MS = 2 * 60 * 1000;
  * room watches the projector's countdown reach 6:00.
  */
 export const MIRROR_EARLY_MS = 10 * 1000;
+/**
+ * Before the early turn-over, every screen shows a "Switching to the opening
+ * ceremony" card this long (owner 2026-10-22: "a five second 'switching to
+ * opening ceremony' animation"): 6:00 minus 15 s to minus 10 s.
+ */
+export const MIRROR_SWITCH_MS = 5 * 1000;
 /** After an early turn-over, the mirror is kept up this long waiting for the projector's own word. */
 export const MIRROR_EARLY_GRACE_MS = 30 * 1000;
 /** A mirror still saying "ceremony" this long after the schedule's ceremony ended is let go anyway. */
@@ -53,6 +62,15 @@ export function mirrorWanted({ schedule, now, showcase = false, configure = fals
 export function mirrorEarly({ schedule, now }) {
   return resolvePhase(schedule, now) !== 'ceremony'
     && resolvePhase(schedule, new Date(now.getTime() + MIRROR_EARLY_MS)) === 'ceremony';
+}
+
+/**
+ * The MIRROR_SWITCH_MS just before the early turn-over: the switching card.
+ * @param {{ schedule: any, now: Date }} q
+ */
+export function mirrorSwitching({ schedule, now }) {
+  return resolvePhase(schedule, new Date(now.getTime() + MIRROR_EARLY_MS)) !== 'ceremony'
+    && resolvePhase(schedule, new Date(now.getTime() + MIRROR_EARLY_MS + MIRROR_SWITCH_MS)) === 'ceremony';
 }
 
 /**

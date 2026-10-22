@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { MIRROR_EARLY_MS, MIRROR_MESSAGE, MIRROR_PRELOAD_MS, mirrorEarly, mirrorWanted, mirrorWord } from './ceremonyMirror.js';
+import { MIRROR_EARLY_MS, MIRROR_MESSAGE, MIRROR_PRELOAD_MS, MIRROR_SWITCH_MS, mirrorEarly, mirrorSwitching, mirrorWanted, mirrorWord } from './ceremonyMirror.js';
 import { DEFAULT_SCHEDULE } from './schedule.js';
 
 // The lobby mirrors the game time projector during the opening ceremony
@@ -30,6 +30,17 @@ describe('the ceremony mirror', () => {
     expect(early('18:00:00')).toBe(false);
     expect(early('18:04:55')).toBe(false);
     expect(mirrorEarly({ schedule: DEFAULT_SCHEDULE, now: new Date('2026-09-17T17:59:55') })).toBe(false);
+  });
+
+  it('shows the switching card the five seconds before the turn-over (owner 2026-10-22), on club nights only', () => {
+    expect(MIRROR_SWITCH_MS).toBe(5 * 1000);
+    const switching = (hms) => mirrorSwitching({ schedule: DEFAULT_SCHEDULE, now: wed(hms) });
+    expect(switching('17:59:44')).toBe(false);
+    expect(switching('17:59:45')).toBe(true);
+    expect(switching('17:59:49')).toBe(true);
+    expect(switching('17:59:50')).toBe(false);   // the turn-over itself: the projector's countdown
+    expect(switching('18:02:00')).toBe(false);
+    expect(mirrorSwitching({ schedule: DEFAULT_SCHEDULE, now: new Date('2026-09-17T17:59:47') })).toBe(false);
   });
 
   it('a framed lobby runs it too (the Journey kiosk, the downstairs classroom; owner 2026-10-19)', () => {

@@ -94,6 +94,7 @@ import { useBuildReload } from './hooks/useBuildReload.js';
 import { useTallerThan } from './hooks/useTallerThan.js';
 import { hostCheckin, hostDoorbell, hostMirror, isEmbedded } from './lib/embed.js';
 import { useCeremonyMirror } from './hooks/useCeremonyMirror.js';
+import { MirrorSwitching } from './components/MirrorSwitching.jsx';
 import { isConfigureMode, isSettingsPage, listenForRelay, relayToScreen } from './lib/configureRelay.js';
 import { BACKGROUND_VIDEO_CHANGED_EVENT } from './components/VideoBackground.jsx';
 import { BOARD_DEMO_MS, BUILD_QUIET_MS, SHARE_DEBOUNCE_MS, COUNTS_WITHOUT_NAMES_MS, TONIGHT_STALE_MS, DROPPED_GRACE_MS, EMBED_FULLSCREEN_MESSAGE, LAYER_FAULT_SHOW_MS, MILESTONE_TOAST_MS, OPS_FAILURES_MAX, SETUP_CARD_QUIET_MS } from './lib/constants.js';
@@ -226,9 +227,11 @@ export default function App() {
   // page, mirrored from 6:00 until T&T game time (lib/ceremonyMirror.js). It
   // covers the wall like a promo poster does and holds check-ins the same way
   // (WAITING chip; the names play as one run when the lobby comes back).
-  const { mounted: mirrorMounted, up: mirrorUp, frameRef: mirrorFrameRef, query: mirrorQuery } = useCeremonyMirror({
+  const { mounted: mirrorMounted, up: mirrorCopying, switching: mirrorSwitchingNow, frameRef: mirrorFrameRef, query: mirrorQuery } = useCeremonyMirror({
     schedule: sharedSchedule, showcase: SHOWCASE, configure: CONFIGURE, settingsPage: SETTINGS_PAGE, overlay: FLAGS.overlay,
   });
+  // The switching card (five seconds) then the gym's own picture: one cover.
+  const mirrorUp = mirrorCopying || mirrorSwitchingNow;
   const coverUp = previewUp || mirrorUp;
   // Framed (the classroom, the Journey kiosk), the host is told when the
   // mirror goes up and comes down (lib/embed.js hostMirror): the classroom
@@ -1552,6 +1555,9 @@ export default function App() {
               src={`./countdown.html?mirror=1${config.reduceMotion ? '&vr=1' : ''}${mirrorQuery}`}
               tabIndex={-1}
             />
+            {mirrorSwitchingNow && <MirrorSwitching />}
+            {/* The copy says what it is (owner 2026-10-22), so nobody mistakes it for a stuck screen. */}
+            {mirrorCopying && <p className="lobby-mirror__label" data-testid="ceremony-label">Opening ceremony in progress</p>}
           </M.div>
         </ErrorBoundary>
       )}
