@@ -4,7 +4,7 @@ The TV in the downstairs classroom, on club nights:
 
 | Time | On the screen |
 |---|---|
-| 6:30 pm | The Cubbies card, with how many Cubbies are checked in |
+| 6:00 pm | The Cubbies card (no Cubbies logo), with how many Cubbies are checked in and a welcome for each one who arrives |
 | 6:58 pm | Black, while the clubs pass at the door |
 | 7:02 pm | Sparks "Large Group Time", with how many Sparks are checked in |
 | 7:28 pm | Black again |
@@ -30,7 +30,7 @@ Lift a pen from the SMART Board's tray while the Cubbies card, Sparks Large Grou
 1. On the classroom PC, right-click the KVBC Awana icon by the clock and choose **Show now (for 3 hours)**. On a day without club the screen just stays black; that is fine for this test.
 2. Lift the black pen and write something: the SMART Ink toolbar should come up, and the writing should be white.
 3. Put the pen back. Right-click the KVBC Awana icon → **Open the display log**. Near the bottom, lines starting `pen watch:` should say `"lifted":true` for the moment you lifted the pen. If they don't, send the owner those lines (they name SMART Ink's windows, nothing else).
-4. On the next club night, between 6:30 and 6:58, lift a pen once to see the Cubbies card go black, then tap **Show the card again**.
+4. On the next club night, between 6:05 and 6:58, lift a pen once to see the Cubbies card go black, then tap **Show the card again**.
 
 ## The Sparks remote (videos, pictures, PDFs and text)
 
@@ -50,12 +50,12 @@ Address: https://awana.kvbchurch.org/classroom/ (the KVBC Awana app opens it; yo
 
 ## Setting up the PC
 
-1. Install KVBC Awana from awana.kvbchurch.org and run its setup: choose **Display**, sign in with the church passphrase, and pick the screen **Downstairs classroom**. That sets the hours to 6:30 to 8:00 pm and turns on "Shut down after club" at 8:00 pm (Settings in the tray to check). Leave **Start with Windows** on.
+1. Install KVBC Awana from awana.kvbchurch.org and run its setup: choose **Display**, sign in with the church passphrase, and pick the screen **Downstairs classroom**. That sets the hours to 4:00 to 8:00 pm and turns on "Shut down after club" at 8:00 pm (Settings in the tray to check). Leave **Start with Windows** on.
 2. Turn off sleep: Settings → System → Power → Screen and sleep → **Never** when plugged in.
-3. Make the PC turn itself on every Wednesday before 6:30 pm (it shuts itself down at 8:00). Pick ONE:
-   - **In the BIOS/UEFI (most reliable, works from fully off):** restart, press the setup key (often Del, F2 or F10), find **Power → Wake on RTC / RTC Alarm / Resume by Alarm**, turn it on, set **Wednesday at 3:45 pm** (the screen is up from 4:00 pm, black until its 6:30 card) if the board lets you pick a day. Save and exit. If it only offers "every day", the PC will also wake on other evenings and stay on (the app's 8:00 pm shutdown runs on club nights only), so shut it down by hand those days or prefer the Task Scheduler way. (Some boards call it "Auto Power On".)
+3. Make the PC turn itself on every Wednesday before 4:00 pm (it shuts itself down at 8:00). Pick ONE:
+   - **In the BIOS/UEFI (most reliable, works from fully off):** restart, press the setup key (often Del, F2 or F10), find **Power → Wake on RTC / RTC Alarm / Resume by Alarm**, turn it on, set **Wednesday at 3:45 pm** (the screen is up from 4:00 pm, black until its 6:00 card) if the board lets you pick a day. Save and exit. If it only offers "every day", the PC will also wake on other evenings and stay on (the app's 8:00 pm shutdown runs on club nights only), so shut it down by hand those days or prefer the Task Scheduler way. (Some boards call it "Auto Power On".)
    - **Windows Task Scheduler (wakes from sleep or hibernate, not from shut down):** in that case set the 8:00 pm action to sleep instead of shut down. Task Scheduler → Create Task → Triggers: Weekly, Wednesday, 3:45 pm → Conditions: tick **Wake the computer to run this task** → Actions: Start a program `cmd.exe` with `/c exit`. Also Control Panel → Power Options → Change plan settings → Change advanced power settings → Sleep → **Allow wake timers: Enable**.
-4. Test it once on a Wednesday afternoon: shut down, wait for the wake time, check the app opens the screen at 6:30.
+4. Test it once on a Wednesday afternoon: shut down, wait for the wake time, check the app opens the screen at 4:00 and the Cubbies card comes up at 6:00.
 
 ## For developers
 

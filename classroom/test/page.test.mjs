@@ -57,7 +57,7 @@ async function open(query, size = { width: 1920, height: 1080 }) {
 describe('the clock', { skip: SKIP }, () => {
   // Wednesday 2026-10-14 (a club night by the default rule; no calendar feed served), Eastern daylight time.
   const cases = [
-    ['2026-10-14T22:29:00Z', 'off'], ['2026-10-14T22:31:00Z', 'cubbies'], ['2026-10-14T22:59:00Z', 'black'],
+    ['2026-10-14T21:59:00Z', 'off'], ['2026-10-14T22:01:00Z', 'cubbies'], ['2026-10-14T22:31:00Z', 'cubbies'], ['2026-10-14T22:59:00Z', 'black'],
     ['2026-10-14T23:04:00Z', 'sparks'], ['2026-10-14T23:29:00Z', 'black'], ['2026-10-14T23:33:00Z', 'lobby'], ['2026-10-15T00:01:00Z', 'off'],
     ['2026-10-13T22:40:00Z', 'off'], // a Tuesday
   ];
@@ -75,12 +75,13 @@ describe('the clock', { skip: SKIP }, () => {
 describe('the cards fit', { skip: SKIP }, () => {
   for (const size of [{ width: 1280, height: 720 }, { width: 1920, height: 1080 }, { width: 3840, height: 2160 }, { width: 1024, height: 768 }]) {
     for (const card of ['cubbies', 'sparks']) {
-      it(`${card} at ${size.width}x${size.height}: mark, title and chip on screen and apart`, async () => {
+      it(`${card} at ${size.width}x${size.height}: mark, title and chip on screen and apart (Cubbies: no mark)`, async () => {
         const page = await open(`?preview=${card}`, size);
         const boxes = await page.evaluate((c) => {
           const box = (el) => { const r = el.getBoundingClientRect(); return { l: r.left, t: r.top, r: r.right, b: r.bottom }; };
           const root = document.getElementById(c);
           return {
+            markShown: getComputedStyle(root.querySelector('.cr-mark')).display !== 'none' && root.querySelector('.cr-mark').getClientRects().length > 0,
             mark: box(root.querySelector('.cr-mark')),
             title: c === 'sparks' ? box(root.querySelector('.cr-headline span')) : null,
             chip: box(root.querySelector('.cr-chip')),
@@ -88,8 +89,12 @@ describe('the cards fit', { skip: SKIP }, () => {
         }, card);
         const inside = (b) => b.l >= 0 && b.t >= 0 && b.r <= size.width + 0.5 && b.b <= size.height + 0.5;
         const apart = (a, b) => a.r <= b.l || b.r <= a.l || a.b <= b.t || b.b <= a.t;
-        for (const [name, b] of Object.entries(boxes)) if (b) assert.ok(inside(b), `${name} on screen: ${JSON.stringify(b)}`);
-        assert.ok(apart(boxes.mark, boxes.chip), 'the mark clears the chip');
+        const { markShown, ...placed } = boxes;
+        // Owner 2026-10-22: the Cubbies mark does not show downstairs; the Sparks one does.
+        assert.equal(markShown, card === 'sparks', card === 'sparks' ? 'the Sparks mark shows' : 'the Cubbies mark is hidden');
+        if (!markShown) delete placed.mark;
+        for (const [name, b] of Object.entries(placed)) if (b) assert.ok(inside(b), `${name} on screen: ${JSON.stringify(b)}`);
+        if (markShown) assert.ok(apart(boxes.mark, boxes.chip), 'the mark clears the chip');
         if (boxes.title) assert.ok(apart(boxes.title, boxes.chip), 'the title clears the chip');
         await page.close();
       });
@@ -104,8 +109,8 @@ describe('the opening ceremony', { skip: SKIP }, () => {
   const word = (up) => ({ type: 'awana-display:ceremony-mirror', up });
   const lobbyShown = (page) => page.evaluate(() => getComputedStyle(document.getElementById('lobby')).visibility === 'visible');
   it('the lobby frame comes up over the black while its mirror is up, and goes when it ends', async () => {
-    const page = await open('?now=2026-10-14T22:01:00Z'); // Wednesday 6:01 pm Eastern
-    await page.waitForFunction(() => document.documentElement.dataset.phase === 'off');
+    const page = await open('?now=2026-10-14T22:01:00Z'); // Wednesday 6:01 pm Eastern: the Cubbies card since 2026-10-22
+    await page.waitForFunction(() => document.documentElement.dataset.phase === 'cubbies');
     // Not from the frame: ignored.
     await page.evaluate((m) => window.postMessage(m, location.origin), word(true));
     await page.waitForTimeout(1200);
@@ -120,7 +125,7 @@ describe('the opening ceremony', { skip: SKIP }, () => {
     await frame.evaluate((m) => window.postMessage({ post: m }, location.origin), word(false));
     await page.waitForFunction(() => !document.documentElement.classList.contains('cr-mirror') && !document.documentElement.classList.contains('cr-mirror-leaving'), null, { timeout: 3000 });
     assert.equal(await lobbyShown(page), false);
-    assert.equal(await page.evaluate(() => document.documentElement.dataset.phase), 'off');
+    assert.equal(await page.evaluate(() => document.documentElement.dataset.phase), 'cubbies');
     await page.close();
   });
 });

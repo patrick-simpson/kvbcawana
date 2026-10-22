@@ -3,13 +3,13 @@
 //
 // Club nights only (shared/clubNight.js, asked by app.js), by the church's
 // wall clock (owner 2026-10-16/17). The VIEWS, end to end:
-//   6:30  the Cubbies card        (welcomes Cubbies)
+//   6:00  the Cubbies card        (welcomes Cubbies; owner 2026-10-22, was 6:30)
 //   7:00  Sparks "Large Group Time" (welcomes Sparks)
 //   7:30  the lobby screen, Sparks only (it welcomes Sparks itself)
 //   8:00  off
 // and around every hand-off a pure black gap of TRANSITION_GAP_MIN minutes
 // each side (shared/transitionGap.js, the ONE number for every screen), whose
-// welcomes are both neighbours' clubs. With the gap at 2: 6:30-6:58 Cubbies,
+// welcomes are both neighbours' clubs. With the gap at 2: 6:00-6:58 Cubbies,
 // 6:58-7:02 black, 7:02-7:28 Sparks, 7:28-7:32 black, 7:32-8:00 lobby.
 // Nothing here spells a gap edge: PERIODS is derived.
 
@@ -20,7 +20,7 @@ import {
 
 // The gap welcomes' rules are the shared module's (Journey's kiosk uses the same).
 export { TRANSITION_GAP_MIN, WELCOME_MS, WELCOME_NAMES_MAX, clubIdOf, welcomeWords, emptyWelcomes, welcomeFor, welcomesUp };
-export const CUBBIES_AT = 18 * 60 + 30;
+export const CUBBIES_AT = 18 * 60;
 export const SPARKS_AT = 19 * 60;
 export const LOBBY_AT = 19 * 60 + 30;
 export const CLOSE_AT = 20 * 60;

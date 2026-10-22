@@ -133,6 +133,10 @@ html[data-phase="off"] .cr-black { display: block; }
   translate: -50% -50%;
 }
 .cr-mark { position: relative; display: block; width: 100%; height: auto; }
+/* Owner 2026-10-22: "Cubbies logo shouldn't display downstairs": the Cubbies
+   card's mark, and with it the honey drip that oozed from under it, are off.
+   The card keeps its sky, doodles, wave, count chip, waving Cubbie and welcomes. */
+#cubbies .cr-hero { display: none; }
 
 
 /* The honey (easter egg, 6:54): a flat golden drip gathers under the mark's

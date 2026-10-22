@@ -9,7 +9,7 @@ const at = (h, m) => h * 60 + m;
 describe('the night by the church clock, gaps from shared/transitionGap.js (owner 2026-10-17)', () => {
   it('the gap is the shared one', () => assert.equal(L.TRANSITION_GAP_MIN, 2));
   const cases = [
-    [at(18, 29), 'off'], [at(18, 30), 'cubbies'], [at(18, 57), 'cubbies'],
+    [at(17, 59), 'off'], [at(18, 0), 'cubbies'], [at(18, 30), 'cubbies'], [at(18, 57), 'cubbies'],
     [at(18, 58), 'black'], [at(19, 1), 'black'],
     [at(19, 2), 'sparks'], [at(19, 27), 'sparks'],
     [at(19, 28), 'black'], [at(19, 31), 'black'],
@@ -163,7 +163,7 @@ describe('the black board (owner 2026-10-18)', () => {
     assert.equal(L.boardPeriod(at(18, 40), true).view, 'cubbies');
     assert.equal(L.boardPeriod(at(19, 10), true).view, 'sparks');
     assert.equal(L.boardPeriod(at(19, 40), true).view, 'lobby');
-    for (const m of [at(18, 59), at(19, 29), at(18, 0), at(20, 5)]) assert.equal(L.boardPeriod(m, true), null);
+    for (const m of [at(18, 59), at(19, 29), at(17, 59), at(20, 5)]) assert.equal(L.boardPeriod(m, true), null);   // 17:59: off (the card starts at 6:00 since 2026-10-22)
     assert.equal(L.boardPeriod(at(18, 40), false), null);
   });
   it('lasts until the next scheduled screen', () => {
