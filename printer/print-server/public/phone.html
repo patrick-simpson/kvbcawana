@@ -1499,8 +1499,19 @@ function waitingCub() {
   return box;
 }
 
+// Every redraw keeps the reader's place (owner 2026-10-22: scrolled down, the 15 s roster
+// refresh pulled the page back up): the list holds its height while it is rebuilt, so the
+// browser never clamps the scroll to a briefly empty page, and the scroll is put back after.
 function render() {
   if (!unlockedState) return;
+  var list = $('list'), y = window.scrollY || 0;
+  list.style.minHeight = list.offsetHeight + 'px';
+  try { renderList(); } finally {
+    list.style.minHeight = '';
+    if (y && Math.abs((window.scrollY || 0) - y) > 1) window.scrollTo(0, y);
+  }
+}
+function renderList() {
   var q = $('search').value;
   $('search-clear').hidden = !q;
   var list = $('list');
@@ -1546,7 +1557,7 @@ function renderFamilies(list) {
   if (SORT === 'arrival' && main.some(function(f) { return usualOf(f) != null; })) lead.appendChild(el('span', 'sortnote', ' · earliest arrivals first'));
   list.appendChild(lead);
   var W = list.clientWidth - 24;
-  var H = window.innerHeight - list.getBoundingClientRect().top - 60;
+  var H = window.innerHeight - (list.getBoundingClientRect().top + (window.scrollY || 0)) - 60;   // from the page's top: the same at any scroll
   // Two columns on a phone (three or more on a tablet or the desk), tall
   // enough for the name and a row of children; a long list scrolls.
   // Narrower and shorter tiles than before (owner 2026-10-22: fit more kids), names kept readable.
@@ -2308,7 +2319,7 @@ function renderCheckout(list, q) {
 // names growing with them; past the floor (a long list) the page scrolls as before.
 function fillScreen(grid, list, n) {
   var W = list.clientWidth - 24;
-  var H = window.innerHeight - list.getBoundingClientRect().top - 70 - (document.body.classList.contains('has-undo') ? 130 : 0);
+  var H = window.innerHeight - (list.getBoundingClientRect().top + (window.scrollY || 0)) - 70 - (document.body.classList.contains('has-undo') ? 130 : 0);
   if (W < 200 || H < 120 || !n) return;
   var gap = n <= 3 ? 12 : 10, best = null;
   for (var cols = 1; cols <= n; cols++) {

@@ -1289,6 +1289,31 @@ test('the desk laptop (owner 2026-10-22): a click goes full screen, the big Exit
   await snap(page, 'checkout-fill.png');
 });
 
+test('scrolled down, the roster refresh keeps the page where it is (owner 2026-10-22)', async ({ page }) => {
+  const names = ['Ava', 'Ben', 'Cara', 'Dan', 'Eli', 'Fay', 'Gus', 'Hal', 'Ivy', 'Jon'];
+  const kids = [];
+  for (let i = 0; i < 60; i++) kids.push({ clubberId: String(500 + i), first: names[i % 10], last: `Family${String(i).padStart(2, '0')}`, club: 'Sparks', clubId: '2', checkedIn: false });
+  const { world } = await stubSite(page, { kids, barf: false, simple: true });
+  world.busyFirst = false;
+  world.households = [];
+  await page.clock.install();
+  await signIn(page);
+  const list = page.locator('#list');
+  await expect(list).toContainText('60 families still to come', { timeout: 10_000 });
+  await page.evaluate(() => window.scrollTo(0, 1500));
+  await expect.poll(() => page.evaluate(() => Math.round(window.scrollY))).toBe(1500);
+  const calls = world.rosterCalls;
+  await page.clock.fastForward(20_000);   // past the 15 s roster refresh
+  await expect.poll(() => world.rosterCalls).toBeGreaterThan(calls);
+  await page.waitForTimeout(300);
+  expect(Math.round(await page.evaluate(() => window.scrollY))).toBe(1500);
+  // A child checked in elsewhere (the next refresh redraws the list): still in place.
+  world.kids = world.kids.map((k) => (k.clubberId === '501' ? { ...k, checkedIn: true } : k));
+  await page.clock.fastForward(20_000);
+  await expect(list).toContainText('59 families still to come', { timeout: 8000 });
+  expect(Math.round(await page.evaluate(() => window.scrollY))).toBe(1500);
+});
+
 test('a new familiesAt on the roster answer reads the families again, so a newly registered child joins their family', async ({ page }) => {
   test.setTimeout(60_000);
   const { world } = await stubSite(page);
