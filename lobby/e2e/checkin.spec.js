@@ -1316,7 +1316,10 @@ test('the top bar (owner 2026-10-22): Check out lives there, another device\'s c
   expect(await news.evaluate((e) => e.clientWidth)).toBeGreaterThanOrEqual(140);
   await expect(news).toBeEmpty();
   // A narrower window: the logo is the first thing to go, the title stays.
-  await page.setViewportSize({ width: 1050, height: 1000 });
+  // (A full screen window cannot be resized in every Chromium, CI's included: leave it first.)
+  await page.locator('#fs-exit').click();
+  await expect.poll(() => page.evaluate(() => !!document.fullscreenElement)).toBe(false);
+  await page.setViewportSize({ width: 900, height: 1000 });
   await expect(page.locator('.top .brand')).toBeHidden();
   await expect(page.locator('.top h1')).toBeVisible();
   await page.setViewportSize({ width: 1500, height: 1000 });
