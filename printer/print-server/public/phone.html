@@ -79,7 +79,7 @@
     min-height: 60px; padding: 8px 12px; background: var(--c-blue); color: #fff; }
   .brand { flex: 0 1 200px; min-width: 0; display: block; }
   .brand-logo { display: block; width: 100%; height: auto; aspect-ratio: 1910 / 403; }
-  .top h1 { flex: 1 0 auto; font-family: var(--f-shout); font-weight: 400; font-size: 20px; line-height: 1; white-space: nowrap; }
+  .top h1 { flex: 0 0 auto; font-family: var(--f-shout); font-weight: 400; font-size: 20px; line-height: 1; white-space: nowrap; }
   .pill { border: none; cursor: pointer; height: 40px; padding: 0 14px; border-radius: 20px; background: #fff; color: var(--c-blue-deep);
     font-family: var(--f-label); font-size: 18px; letter-spacing: 0.05em; text-transform: uppercase; white-space: nowrap; }
   /* Record keeping and Exit full screen (owner 2026-10-22): big, plain, in the header row. */
@@ -87,8 +87,18 @@
     background: #fff; color: var(--c-blue-deep); font-family: var(--f-shout); font-size: 20px; line-height: 1; text-decoration: none; white-space: nowrap; }
   .hdr-btn.exit { background: var(--c-sun); color: var(--c-ink); font-size: 22px; padding: 0 22px; }
   .hdr-btn[hidden] { display: none; }
+  /* Who was just checked in or out on another device (owner 2026-10-22), up to NEWS_MS each,
+     in the top bar's free room; the logo gives its room up first (fitHeader). */
+  .hdr-news { flex: 1 1 0; min-width: 0; display: flex; align-items: center; gap: 6px; overflow: hidden; white-space: nowrap; }
+  .hdr-news .news { flex: none; display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 12px 0 8px; border-radius: 17px;
+    background: rgba(255,255,255,.16); color: #fff; font-weight: 700; font-size: 16px; }
+  .hdr-news .news b { font-family: var(--f-label); font-weight: 400; font-size: 14px; letter-spacing: .06em; padding: 2px 7px; border-radius: 9px; background: var(--good); color: #fff; }
+  .hdr-news .news.out b { background: var(--c-sun); color: var(--c-ink); }
+  .hdr-news .more { flex: none; color: #fff; font-weight: 700; font-size: 15px; opacity: .85; }
+  .top.no-logo .brand { display: none; }
+  .top.no-title h1 { display: none; }
   /* A phone keeps its one header row: Record keeping is for the desk laptop. */
-  @media (max-width: 639px) { #record-btn { display: none; } }
+  @media (max-width: 639px) { #record-btn { display: none; } .hdr-btn .wide { display: none; } .hdr-btn.exit, .mode-btn { padding: 0 12px; font-size: 18px; } }
   .round { border: none; cursor: pointer; width: 44px; height: 44px; border-radius: 50%; background: rgba(255,255,255,.18); color: #fff;
     font-size: 28px; line-height: 1; display: grid; place-items: center; }
 
@@ -126,13 +136,15 @@
 
   /* ── Check out (owner 2026-10-15): a mode of this page. The big button at the top
      switches; in checkout mode the same place goes back to Check in. ── */
-  .mode-btn { display: block; width: 100%; min-height: 52px; margin: 0 0 8px; border: 3px solid var(--c-blue-deep); border-radius: 16px; cursor: pointer;
-    background: var(--c-blue-deep); color: #fff; font-family: var(--f-shout); font-size: 24px; letter-spacing: .02em; box-shadow: 0 3px 12px rgba(47,79,138,.25); }
+  /* In the blue top bar since 2026-10-22 (owner: "Check out should also be a button in that blue band"). */
+  .mode-btn { flex: none; display: inline-flex; align-items: center; height: 48px; padding: 0 18px; border: 3px solid #fff; border-radius: 14px; cursor: pointer;
+    background: var(--c-blue-deep); color: #fff; font-family: var(--f-shout); font-size: 20px; line-height: 1; white-space: nowrap; }
   .mode-btn.back { background: #fff; color: var(--c-blue-deep); }
-  #main-screen.no-club .mode-btn { display: none !important; }
+  .mode-btn[hidden] { display: none; }
+  body:has(#main-screen.no-club) .mode-btn, body:has(#pin-screen:not([hidden])) .mode-btn { display: none !important; }
   /* A test day (owner 2026-10-15): a day with no club checks in for real, into TwoTimTwo's
      next meeting, undone overnight by the service. No Check out (TwoTimTwo cannot undo one). */
-  #main-screen.test-day .mode-btn { display: none !important; }
+  body:has(#main-screen.test-day) .mode-btn { display: none !important; }
   .test-note { background: var(--c-sun); color: var(--c-ink); }
   #main-screen.out-mode .barf-btn, #main-screen.out-mode .barf-alert { display: none !important; }
   /* The families not checked out yet: the check-in tiles, larger as fewer are left
@@ -379,8 +391,10 @@
 <header class="top">
   <span class="brand"><img class="brand-logo" src="/brand/logos/kvbc-awana-two-line-white.svg" alt="Kennebec Valley Baptist Church Awana Clubs" width="260" height="55"></span>
   <h1>Check in</h1>
+  <div class="hdr-news" id="hdr-news" aria-live="polite"></div>
+  <button class="mode-btn" id="mode-btn" type="button" hidden>Check out</button>
   <a class="hdr-btn" id="record-btn" target="_blank" rel="noopener" data-nofs hidden>Record keeping</a>
-  <button class="hdr-btn exit" id="fs-exit" type="button" data-nofs hidden>Exit full screen</button>
+  <button class="hdr-btn exit" id="fs-exit" type="button" data-nofs aria-label="Exit full screen" hidden>Exit<span class="wide"> full screen</span></button>
   <button class="pill" id="count-pill" type="button" hidden>0 in</button>
   <button class="round" id="menu-btn" type="button" aria-label="More: walk-in name tag, leader tag, custom label" hidden>+</button>
 </header>
@@ -398,7 +412,6 @@
 
 <main id="main-screen" hidden>
   <div class="search">
-    <button class="mode-btn" id="mode-btn" type="button" hidden>Check out</button>
     <button class="barf-btn" id="barf-btn" type="button" hidden>BARF</button>
     <div class="barf-alert" id="barf-alert" role="alert" hidden></div>
     <div class="box">
@@ -1069,6 +1082,7 @@ function showMainScreen() {
   $('custom-panel').hidden = SIMPLE;
   // Check out (owner 2026-10-15): not on the youth page (the Worker checks Trek and Journey out).
   $('mode-btn').hidden = SIMPLE;
+  fitHeader();
 }
 function showPinScreen(message) {
   closeAll();
@@ -1077,6 +1091,8 @@ function showPinScreen(message) {
   $('count-pill').hidden = true;
   $('menu-btn').hidden = true;
   $('record-btn').hidden = true;
+  $('mode-btn').hidden = true;
+  clearNews();
   $('pin').value = '';
   $('pin-err').textContent = message || '';
   $('pin-btn').textContent = 'Unlock';
@@ -1175,11 +1191,17 @@ function kidKey(k) { return 'id:' + k.clubberId; }
 // A kid this page has a check-in in flight for keeps its object, so a refresh
 // never clobbers the optimistic state.
 function applyRoster(data) {
+  var hadRoster = rosterLoaded;
   rosterLoaded = true;
   if (typeof data.calendarId === 'string' && /^\d{1,9}$/.test(data.calendarId)) setRecordLink(data.calendarId);
   var old = {};
   KIDS.forEach(function(k) { old[kidKey(k)] = k; });
+  var news = [];
   KIDS = (data.kids || []).map(function(k) {
+    // Checked in on another device since the last read (this page's own taps are already marked here).
+    var was = old['id:' + String(k.clubberId)];
+    if (hadRoster && was && !was.checkedIn && k.checkedIn && !Object.prototype.hasOwnProperty.call(STATE, 'id:' + String(k.clubberId))
+      && (!ONLY || ONLY.indexOf(clubKit(k.club || '')) !== -1)) news.push({ name: (String(k.first || '') + ' ' + String(k.last || '')).trim(), out: false });
     return { clubberId: String(k.clubberId), name: (String(k.first || '') + ' ' + String(k.last || '')).trim(), club: k.club || '', clubId: k.clubId || '', checkedIn: !!k.checkedIn, away: k.away === true,
       usual: typeof k.usual === 'number' && k.usual >= 0 && k.usual < 1440 ? k.usual : null };
   }).filter(function(sk) {
@@ -1193,9 +1215,13 @@ function applyRoster(data) {
   var outMoved = false;
   (data.kids || []).forEach(function(k) {
     var key = 'id:' + String(k.clubberId);
-    if (k.checkedOut === true && LOCAL.out.indexOf(key) === -1) { LOCAL.out.push(key); outMoved = true; }
+    if (k.checkedOut === true && LOCAL.out.indexOf(key) === -1) {
+      LOCAL.out.push(key); outMoved = true;
+      if (hadRoster && !OUT[key] && (!ONLY || ONLY.indexOf(clubKit(k.club || '')) !== -1)) news.push({ name: (String(k.first || '') + ' ' + String(k.last || '')).trim(), out: true });
+    }
   });
   if (outMoved) saveLocal();
+  if (news.length) showNews(news);
   // "Not here the last two club nights" from the Worker (owner 2026-10-15): every phone, no passphrase.
   AWAY_READY = data.awayReady === true;
   ITEMS = data.items || { bible: [], friend: [] };
@@ -1688,7 +1714,7 @@ function leaveFull() {
     if (p && p.catch) p.catch(function() {});
   } catch (e) { /* already out */ }
 }
-function showFsButton() { $('fs-exit').hidden = !fsElement(); }
+function showFsButton() { $('fs-exit').hidden = !fsElement(); fitHeader(); }
 document.addEventListener('click', function(ev) {
   if (ev.target && ev.target.closest && ev.target.closest('[data-nofs]')) return;
   enterFull();
@@ -1696,6 +1722,61 @@ document.addEventListener('click', function(ev) {
 document.addEventListener('fullscreenchange', showFsButton);
 document.addEventListener('webkitfullscreenchange', showFsButton);
 $('fs-exit').addEventListener('click', leaveFull);
+
+// ── The top bar: who was just checked in or out elsewhere, and what gives way ─
+// Each name stays NEWS_MS (owner 2026-10-22: "up to ten seconds"), newest first; the
+// ones the bar cannot hold collapse into "+N". Names in memory only, like the list.
+var NEWS_MS = 10 * 1000;
+var NEWS_MAX = 12;
+var newsItems = [];
+var newsTimer = null;
+function showNews(list) {
+  var until = Date.now() + NEWS_MS;
+  list.forEach(function(n) { if (n.name) newsItems.unshift({ name: n.name, out: n.out, until: until }); });
+  newsItems = newsItems.slice(0, NEWS_MAX);
+  drawNews();
+}
+function clearNews() { newsItems = []; drawNews(); }
+function drawNews() {
+  var box = $('hdr-news'), now = Date.now();
+  newsItems = newsItems.filter(function(n) { return n.until > now; });
+  box.textContent = '';
+  if (newsTimer) { clearTimeout(newsTimer); newsTimer = null; }
+  if (!newsItems.length) return;
+  newsItems.forEach(function(n) {
+    var chip = el('span', 'news' + (n.out ? ' out' : ''));
+    chip.appendChild(el('b', null, n.out ? 'OUT' : 'IN'));
+    chip.appendChild(document.createTextNode(n.name));
+    chip.title = n.name + (n.out ? ' was checked out' : ' was checked in') + ' on another device';
+    box.appendChild(chip);
+  });
+  // The chips that do not fit become "+N".
+  var chips = box.querySelectorAll('.news'), right = box.getBoundingClientRect().right, hidden = 0;
+  for (var i = chips.length - 1; i >= 0 && box.scrollWidth > box.clientWidth + 1; i--) { box.removeChild(chips[i]); hidden++; }
+  if (hidden) {
+    var more = el('span', 'more', '+' + hidden);
+    box.appendChild(more);
+    var left = box.querySelectorAll('.news');
+    if (box.scrollWidth > box.clientWidth + 1 && left.length) { box.removeChild(left[left.length - 1]); more.textContent = '+' + (hidden + 1); }
+  }
+  void right;
+  var next = Math.min.apply(null, newsItems.map(function(n) { return n.until; }));
+  newsTimer = setTimeout(drawNews, Math.max(50, next - now));
+}
+// Room in the bar: the logo goes first (owner 2026-10-22), then the title; the names take what is left.
+function fitHeader() {
+  var top = document.querySelector('.top');
+  if (!top) return;
+  top.classList.remove('no-logo', 'no-title');
+  var brand = top.querySelector('.brand');
+  // A squeezed logo is no logo: below 150 px it goes rather than shrink further.
+  var tight = function() { return top.scrollWidth > top.clientWidth + 1 || $('hdr-news').clientWidth < 140 || (brand && brand.clientWidth < 150); };
+  if (tight()) top.classList.add('no-logo');
+  if (top.scrollWidth > top.clientWidth + 1) top.classList.add('no-title');
+  drawNews();
+}
+window.addEventListener('resize', fitHeader);
+document.addEventListener('fullscreenchange', fitHeader);
 $('record-btn').addEventListener('click', leaveFull);
 
 // ── Sheets ─────────────────────────────────────────────────────────────────
@@ -2254,10 +2335,11 @@ function setMode(m) {
   var out = MODE === 'out';
   $('main-screen').classList.toggle('out-mode', out);
   var b = $('mode-btn');
-  b.textContent = out ? '← Back to Check in' : 'Check out';
+  b.textContent = out ? '← Check in' : 'Check out';
   b.classList.toggle('back', out);
   b.setAttribute('aria-label', out ? 'Back to check in' : 'Check out: switch to checking children out');
   if (!ONLY) document.querySelector('.top h1').textContent = out ? 'Check out' : 'Check in';
+  fitHeader();
   $('search').placeholder = out ? 'Type a name to find a family' : 'Type a first or last name';
   $('search').value = '';
   if (openSheet === 'kid-sheet') hideSheet();

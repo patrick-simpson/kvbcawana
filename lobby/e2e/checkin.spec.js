@@ -1136,7 +1136,7 @@ test('check out: the big button switches modes; one tap checks out a whole house
   // The big button: checkout mode, and the same place goes back.
   await modeBtn.click();
   await expect(page.locator('h1')).toHaveText('Check out');
-  await expect(modeBtn).toHaveText('← Back to Check in');
+  await expect(modeBtn).toHaveText('← Check in');
   const tiles = list.locator('.fams.out .fam');
   // Only children checked in and not checked out, Puggles to T&T, grouped by household.
   await expect(tiles).toHaveCount(5);
@@ -1287,6 +1287,62 @@ test('the desk laptop (owner 2026-10-22): a click goes full screen, the big Exit
   expect(room.viewH - room.bottom).toBeLessThan(120);
   expect(room.width).toBeGreaterThan(room.listW - 40);
   await snap(page, 'checkout-fill.png');
+});
+
+test('the top bar (owner 2026-10-22): Check out lives there, another device\'s check-ins and check-outs show for 10 s, the logo gives way first; the + menu reprints a tag; the big Undo stays 30 s', async ({ page }) => {
+  test.setTimeout(90_000);
+  const kids = [
+    { clubberId: '11', first: 'Ada', last: 'Tester', club: 'Cubbies', clubId: '1', checkedIn: true },
+    { clubberId: '13', first: 'Cy', last: 'Other', club: 'T&T', clubId: '3', checkedIn: true },
+    { clubberId: '18', first: 'Eve', last: 'Later', club: 'Sparks', clubId: '2', checkedIn: false },
+    { clubberId: '20', first: 'Zed', last: 'Solo', club: 'Sparks', clubId: '2', checkedIn: false },
+  ];
+  const { world, stationRing } = await stubSite(page, { kids, barf: false, simple: true });
+  world.busyFirst = false;
+  world.households = [];
+  await page.setViewportSize({ width: 1500, height: 1000 });
+  await page.clock.install();
+  await signIn(page);
+  const list = page.locator('#list');
+  await expect(list).toContainText('2 families still to come', { timeout: 10_000 });
+  const top = page.locator('header.top');
+  const news = page.locator('#hdr-news');
+  // Check out is a button in the blue bar now, not a bar above the search.
+  await expect(top.locator('#mode-btn')).toHaveText('Check out');
+  await expect(page.locator('main #mode-btn')).toHaveCount(0);
+  // At 1500 wide everything fits, logo included, with room left for names.
+  await expect(page.locator('#fs-exit')).toBeVisible();
+  await expect(page.locator('.top .brand')).toBeVisible();
+  expect(await news.evaluate((e) => e.clientWidth)).toBeGreaterThanOrEqual(140);
+  await expect(news).toBeEmpty();
+  // A narrower window: the logo is the first thing to go, the title stays.
+  await page.setViewportSize({ width: 1050, height: 1000 });
+  await expect(page.locator('.top .brand')).toBeHidden();
+  await expect(page.locator('.top h1')).toBeVisible();
+  await page.setViewportSize({ width: 1500, height: 1000 });
+  await expect(page.locator('.top .brand')).toBeVisible();
+
+  // Eve is checked in on another phone: her name shows in the bar for 10 s, then goes.
+  world.kids = world.kids.map((k) => (k.clubberId === '18' ? { ...k, checkedIn: true } : k));
+  await page.clock.fastForward(16_000);
+  await expect(news.locator('.news')).toHaveText(['INEve Later'], { timeout: 8000 });
+  await page.clock.fastForward(11_000);
+  await expect(news.locator('.news')).toHaveCount(0);
+  // Ada is checked out on another phone: OUT, then gone.
+  world.kids = world.kids.map((k) => (k.clubberId === '11' ? { ...k, checkedOut: true } : k));
+  await page.clock.fastForward(16_000);
+  await expect(news.locator('.news.out')).toHaveText('OUTAda Tester', { timeout: 8000 });
+  await page.clock.fastForward(11_000);
+  await expect(news.locator('.news')).toHaveCount(0);
+  // This page's own check-in is never news; its big Undo stays 30 s now (was a minute).
+  await list.locator('.fam', { hasText: 'Zed Solo' }).click();
+  await expect(page.locator('#undo-bar')).toBeVisible();
+  await page.clock.fastForward(16_000);
+  await expect(news.locator('.news')).toHaveCount(0);
+  await page.clock.fastForward(15_000);
+  await expect(page.locator('#undo-bar')).toBeHidden();
+
+
 });
 
 test('scrolled down, the roster refresh keeps the page where it is (owner 2026-10-22)', async ({ page }) => {

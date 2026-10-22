@@ -78,7 +78,8 @@ describe('the check-in page', () => {
     assert.match(src, /\$\('mode-btn'\)\.hidden = SIMPLE;/);
     assert.match(src, /MODE = m === 'out' && !SIMPLE && !NO_CLUB && !TEST_DAY \? 'out' : 'in';/);
     // ...or a test day (owner 2026-10-15): TwoTimTwo's check-out cannot be undone overnight
-    assert.match(src, /#main-screen\.test-day \.mode-btn \{ display: none !important; \}/);
+    // (the button sits in the blue top bar since 2026-10-22, outside #main-screen, so the rule asks through :has)
+    assert.match(src, /body:has\(#main-screen\.test-day\) \.mode-btn \{ display: none !important; \}/);
     assert.match(src, /if \(!data\.stale && !data\.restored\) setTestDay\(data\.testDay \|\| null\);/);
     // leaving the page while a household is held asks first
     assert.match(src, /Object\.keys\(WAITING\)\.length \+ HELD\.length > 0;/);
