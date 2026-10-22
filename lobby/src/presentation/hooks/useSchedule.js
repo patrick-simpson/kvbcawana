@@ -68,7 +68,18 @@ export function useSchedule(now, scheduleAdvisory = null) {
   let shouldResume = false;
 
   if (override !== null) {
-    if (override.target.type === 'countdown') {
+    if (override.target.type === 'countdown' && override.target.hold === true) {
+      // Held (owner 2026-10-22, the remote's "Back to the countdown" after an
+      // accidental jump to game time): tonight's start once it has passed (the
+      // clock reads 0:00, it never jumps to next week), kept up across the
+      // evening's boundaries until a Next picks the ceremony, or until the
+      // schedule itself is back on the countdown (before 6:00, after midnight).
+      const tonight = new Date(now);
+      tonight.setHours(cfg.meetingStart.hour, cfg.meetingStart.minute, 0, 0);
+      const target = tonight.getTime() <= now.getTime() && now.getDay() === cfg.meetingDay ? tonight : getNextMeeting(now, cfg);
+      state = { mode: AppMode.COUNTDOWN, target };
+      shouldResume = naturalKey === 'countdown';
+    } else if (override.target.type === 'countdown') {
       state = withAdvisedTarget({ mode: AppMode.COUNTDOWN, target: getNextMeeting(now, cfg) });
       // No timeout: countdown is the safe default (this is also the
       // post-shutdown restart path). Resume when the schedule catches up

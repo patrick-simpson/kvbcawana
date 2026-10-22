@@ -52,6 +52,26 @@ test.describe('the opening-ceremony remote', () => {
     ]);
   });
 
+  test('Back to the countdown takes two taps (owner 2026-10-22): the first only asks, the second sends it', async ({ page }) => {
+    const calls = await stub(page);
+    await page.clock.install();
+    await page.goto('/projector-remote.html');
+    await expect(page.locator('#target')).toHaveText('Gym projector · on');
+    const btn = page.locator('#btn-countdown');
+    await btn.click();
+    await expect(btn).toHaveText('Tap again to go back to the countdown');
+    expect(calls.filter((c) => c.path.endsWith('/action'))).toHaveLength(0);
+    // Left alone, it disarms: the next tap only asks again.
+    await page.clock.fastForward(4500);
+    await expect(btn).toHaveText('Back to the countdown');
+    await btn.click();
+    await btn.click();
+    await expect(page.locator('#press-note')).toHaveText('Back to the countdown: sent ✓');
+    const sent = calls.filter((c) => c.path.endsWith('/action'));
+    expect(sent.map((c) => c.body)).toEqual([{ action: 'to-countdown' }]);
+    await expect(btn).toHaveText('Back to the countdown');
+  });
+
   test('fits a 360 px phone: no sideways scroll, Back and Next big on the first screenful', async ({ page }, info) => {
     await stub(page);
     await page.goto('/projector-remote.html');

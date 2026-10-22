@@ -76,8 +76,10 @@ describe('the other kinds', () => {
   it("the projector's actions are the configure relay's, and a wall pick is checked like the projector checks it", () => {
     const app = readFileSync(resolve(__dirname, '../presentation/App.jsx'), 'utf8');
     expect(app).toContain("listenForRelay('projector', ['select', 'resume']");
-    // The relay's two, then the opening-ceremony remote's four (owner 2026-10-19).
-    expect(SCREEN_ACTIONS.projector).toEqual(['select', 'resume', 'slide-next', 'slide-prev', 'backup', 'backup-end', 'slide-go']);
+    // The relay's two, then the opening-ceremony remote's four (owner 2026-10-19),
+    // then Back to the countdown (owner 2026-10-22).
+    expect(SCREEN_ACTIONS.projector).toEqual(['select', 'resume', 'slide-next', 'slide-prev', 'backup', 'backup-end', 'slide-go', 'to-countdown']);
+    expect(sanitizeScreenAction('projector', 'to-countdown', { type: 'window', index: 3 })).toEqual({ action: 'to-countdown' });
     expect(sanitizeScreenAction('projector', 'select', { type: 'countdown', x: 1 })).toEqual({ action: 'select', data: { type: 'countdown' } });
     expect(sanitizeScreenAction('projector', 'select', { type: 'window', index: 1.5 })).toBeNull();
     expect(sanitizeScreenAction('lobby', 'select', { type: 'countdown' })).toBeNull();

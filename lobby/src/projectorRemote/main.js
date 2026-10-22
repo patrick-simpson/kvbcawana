@@ -16,7 +16,7 @@
 import '../../../shared/brand/fonts.css';
 import './remote.css';
 import { loadSyncSession, resolveSyncUrl, saveSyncSession, syncLogin, syncRequest } from '../lib/syncService.js';
-import { actionFor, pressWords, projectorsFrom, targetWords, targetsFor } from './logic.js';
+import { COUNTDOWN_CONFIRM_MS, actionFor, pressWords, projectorsFrom, targetWords, targetsFor } from './logic.js';
 
 const LIST_MS = 15000;
 const $ = (id) => /** @type {HTMLElement} */ (document.getElementById(id));
@@ -122,6 +122,20 @@ async function start() {
   for (const el of document.querySelectorAll('[data-step]')) el.addEventListener('click', () => press(/** @type {HTMLElement} */ (el).dataset.step || ''));
   for (const el of document.querySelectorAll('[data-backup]')) el.addEventListener('click', () => press(/** @type {HTMLElement} */ (el).dataset.backup || ''));
   $('btn-backup-end').addEventListener('click', () => press('backup-end'));
+  // Back to the countdown asks twice (a mis-tap would undo a ceremony): the first tap arms it.
+  let armTimer = 0;
+  const countdownBtn = $('btn-countdown');
+  const disarm = () => { window.clearTimeout(armTimer); armTimer = 0; countdownBtn.dataset.armed = '0'; countdownBtn.textContent = 'Back to the countdown'; };
+  countdownBtn.addEventListener('click', () => {
+    if (!armTimer) {
+      countdownBtn.dataset.armed = '1';
+      countdownBtn.textContent = 'Tap again to go back to the countdown';
+      armTimer = window.setTimeout(disarm, COUNTDOWN_CONFIRM_MS);
+      return;
+    }
+    disarm();
+    press('countdown');
+  });
   document.addEventListener('visibilitychange', () => {
     if (document.hidden || $('remote').hidden) return;
     refreshList();

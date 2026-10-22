@@ -18,6 +18,7 @@ import { ChurchMark } from './components/ChurchMark.jsx';
 import { ResumePill } from './components/ResumePill.jsx';
 import { BackupView } from './components/BackupView.jsx';
 import { remoteGo, remoteStep } from './lib/remoteSteps.js';
+import { ceremonySlide } from './lib/ceremonySlide.js';
 import { SetupChecklist } from './components/SetupChecklist.jsx';
 import { CountdownView } from './views/CountdownView.jsx';
 import { GameTimeView } from './views/GameTimeView.jsx';
@@ -33,6 +34,8 @@ import { setStingersEnabled, silenceStingers, stingersEnabled, subscribeStingers
 import { isTouch, usePortrait, useTouch } from './lib/touch.js';
 
 const OPENING_WINDOW_INDEX = 0;
+/** The remote's Back to the countdown: held until a Next (hooks/useSchedule.js). */
+const HELD_COUNTDOWN = Object.freeze({ type: 'countdown', hold: true });
 const CONFIGURE = FLAGS.configure;
 // The lobby's copy of the projector during the opening ceremony (?mirror=1;
 // owner 2026-10-19): silent, no menus, never a registered screen.
@@ -248,6 +251,7 @@ export const App = () => {
         else if (s.mode === AppMode.COUNTDOWN) { pendingGo.current = index; select({ type: 'window', index: OPENING_WINDOW_INDEX }); }
       } else if (action === 'backup' && isBackup(data)) setBackup(/** @type {any} */ (data).what);
       else if (action === 'backup-end') setBackup(null);
+      else if (action === 'to-countdown') { setBackup(null); select(HELD_COUNTDOWN); }
     });
   }, [select]);
   useEffect(() => {
@@ -256,8 +260,12 @@ export const App = () => {
     pendingGo.current = null;
     remoteGo(index);
   }, [state]);
-  // ...and tells its host (the lobby) whether the ceremony is on.
-  const ceremony = state.mode === AppMode.SLIDESHOW && state.deck === 'opening';
+  // ...and tells its host (the lobby) whether the ceremony is on: a real
+  // slide of the opening deck, not its closing blackout (owner 2026-10-22:
+  // "the other screens should un duplicate once we get to the pure black screen").
+  const [openingIndex, setOpeningIndex] = useState(0);
+  const onDeckIndex = useCallback((index) => { setOpeningIndex(index); announceSlide(index); }, [announceSlide]);
+  const ceremony = state.mode === AppMode.SLIDESHOW && state.deck === 'opening' && ceremonySlide(openingIndex);
   useEffect(() => {
     if (!MIRROR || window.parent === window) return;
     try { window.parent.postMessage({ type: MIRROR_MESSAGE, ceremony }, window.location.origin); } catch { /* host gone */ }
@@ -272,6 +280,7 @@ export const App = () => {
       else if (action === 'slide-prev') remoteStepFor(-1);
       else if (action === 'backup' && isBackup(target)) setBackup(target.what);
       else if (action === 'backup-end') setBackup(null);
+      else if (action === 'to-countdown') { setBackup(null); select(HELD_COUNTDOWN); }
     },
   });
 
@@ -311,7 +320,7 @@ export const App = () => {
               onSelect={select}
               firstGameIndex={firstGameIndex}
               onBareChange={setBare}
-              onIndexChange={announceSlide}
+              onIndexChange={onDeckIndex}
             />
           </ViewErrorBoundary>
         </motion.div>

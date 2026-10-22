@@ -57,6 +57,9 @@ body { margin: 0; min-height: 100vh; background: var(--pr-ink); color: #fff; fon
 .pr-btn--hot:active:not(:disabled) { box-shadow: 0 1px 0 var(--pr-hot-deep); }
 .pr-btn--big { min-height: 132px; font: 400 calc(1.9rem * 1.057) / 1 var(--pr-shout); }
 .pr-btn--wide { width: 100%; margin-top: 12px; background: transparent; color: #fff; box-shadow: none; }
+/* Back to the countdown (owner 2026-10-22): wide, outlined; its armed state (first tap) turns sun. */
+.pr-btn--countdown { border: 3px solid #fff; }
+.pr-btn--countdown[data-armed="1"] { background: var(--brand-sun, #FFC20E); color: var(--brand-ink, #231F20); border-color: var(--brand-sun, #FFC20E); }
 
 .pr-pad { display: grid; grid-template-columns: 1fr 1.4fr; gap: 14px; }
 .pr-pad-note { margin: 10px 0 14px; text-align: center; }

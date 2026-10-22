@@ -151,7 +151,9 @@ export const SCREEN_ACTIONS = {
   // (owner 2026-10-19; /lobby/projector-remote.html).
   // slide-go is the gym projector telling every mirror (the lobby during the
   // ceremony) which slide it is on: {index}, past the deck's end = games.
-  projector: Object.freeze(['select', 'resume', 'slide-next', 'slide-prev', 'backup', 'backup-end', 'slide-go']),
+  // to-countdown (owner 2026-10-22: "go back to countdown" after an accidental
+  // jump to game time): the countdown, held until the next Next.
+  projector: Object.freeze(['select', 'resume', 'slide-next', 'slide-prev', 'backup', 'backup-end', 'slide-go', 'to-countdown']),
   journey: Object.freeze(['start-downloads', 'pause-downloads', 'resume-downloads', 'stop-downloads', 'delete-downloads']),
   computer: Object.freeze([]),
 };

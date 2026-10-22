@@ -224,3 +224,39 @@ describe('useSchedule schedule advisory (optional 2nd argument, from the `schedu
     expect(target.getHours()).toBe(18);
   });
 });
+
+describe("the remote's Back to the countdown (owner 2026-10-22)", () => {
+  const HELD = { type: 'countdown', hold: true };
+
+  it('after 6:00 it holds the countdown at tonight\'s start (0:00, never next week) across the evening\'s boundaries', () => {
+    const { result, rerender } = renderSchedule(at(18, 7));
+    expect(result.current.state.mode).toBe(AppMode.GAME_TIME);   // pressed into T&T game time by mistake
+    act(() => result.current.select(HELD));
+    expect(result.current.state.mode).toBe(AppMode.COUNTDOWN);
+    expect(result.current.state.target.getTime()).toBe(at(18, 0).getTime());
+    // T&T -> Sparks -> closing -> shutdown: still the countdown, no watchdog.
+    for (const t of [at(18, 31), at(19, 31), at(19, 40)]) {
+      rerender({ now: t });
+      expect(result.current.state.mode).toBe(AppMode.COUNTDOWN);
+      expect(result.current.isOverride).toBe(true);
+    }
+  });
+
+  it('a Next (the opening window) replaces it: the ceremony from the welcome', () => {
+    const { result } = renderSchedule(at(18, 7));
+    act(() => result.current.select(HELD));
+    act(() => result.current.select({ type: 'window', index: 0 }));
+    expect(result.current.state.mode).toBe(AppMode.SLIDESHOW);
+    expect(result.current.state.deck).toBe('opening');
+  });
+
+  it('before 6:00 it is simply the live countdown again (the ceremony still starts at 6:00 by itself)', () => {
+    const { result, rerender } = renderSchedule(at(17, 50));
+    act(() => result.current.select({ type: 'window', index: 1 }));
+    act(() => result.current.select(HELD));
+    expect(result.current.state.mode).toBe(AppMode.COUNTDOWN);
+    expect(result.current.isOverride).toBe(false);
+    rerender({ now: at(18, 0, 1) });
+    expect(result.current.state.mode).toBe(AppMode.SLIDESHOW);
+  });
+});

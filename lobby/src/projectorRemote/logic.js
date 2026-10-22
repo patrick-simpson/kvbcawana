@@ -37,6 +37,7 @@ const WHAT = {
   'awana-flag': 'The Awana flag',
   verse: '2 Timothy 2:15',
   'backup-end': 'Backup down',
+  countdown: 'Back to the countdown',
 };
 
 /**
@@ -53,11 +54,15 @@ export function pressWords(what, results) {
   return `${label} was not sent. Try again.`;
 }
 
+/** How long the first tap of Back to the countdown waits for the second (a mis-tap restarts nothing). */
+export const COUNTDOWN_CONFIRM_MS = 4000;
+
 /** The action and data one press sends. @param {string} what */
 export function actionFor(what) {
   if (what === 'next') return { action: 'slide-next' };
   if (what === 'prev') return { action: 'slide-prev' };
   if (what === 'backup-end') return { action: 'backup-end' };
+  if (what === 'countdown') return { action: 'to-countdown' };
   if (['us-flag', 'awana-flag', 'verse'].includes(what)) return { action: 'backup', data: { what } };
   return null;
 }
