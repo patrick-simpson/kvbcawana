@@ -82,6 +82,13 @@
   .top h1 { flex: 1 0 auto; font-family: var(--f-shout); font-weight: 400; font-size: 20px; line-height: 1; white-space: nowrap; }
   .pill { border: none; cursor: pointer; height: 40px; padding: 0 14px; border-radius: 20px; background: #fff; color: var(--c-blue-deep);
     font-family: var(--f-label); font-size: 18px; letter-spacing: 0.05em; text-transform: uppercase; white-space: nowrap; }
+  /* Record keeping and Exit full screen (owner 2026-10-22): big, plain, in the header row. */
+  .hdr-btn { flex: none; display: inline-flex; align-items: center; height: 48px; padding: 0 18px; border: 0; border-radius: 14px; cursor: pointer;
+    background: #fff; color: var(--c-blue-deep); font-family: var(--f-shout); font-size: 20px; line-height: 1; text-decoration: none; white-space: nowrap; }
+  .hdr-btn.exit { background: var(--c-sun); color: var(--c-ink); font-size: 22px; padding: 0 22px; }
+  .hdr-btn[hidden] { display: none; }
+  /* A phone keeps its one header row: Record keeping is for the desk laptop. */
+  @media (max-width: 639px) { #record-btn { display: none; } }
   .round { border: none; cursor: pointer; width: 44px; height: 44px; border-radius: 50%; background: rgba(255,255,255,.18); color: #fff;
     font-size: 28px; line-height: 1; display: grid; place-items: center; }
 
@@ -162,8 +169,8 @@
   /* Simple check-in (owner 2026-10-15): a family tile with its one-tap "Check in all N" strip. */
   .famw { display: flex; flex-direction: column; gap: 4px; min-height: 0; }
   .famw > .fam { flex: 1 1 auto; min-height: 0; }
-  .famall { flex: 0 0 auto; min-height: 40px; border: 0; border-radius: 12px; cursor: pointer; background: var(--c-blue-deep); color: #fff;
-    font-family: var(--f-shout); font-size: 17px; letter-spacing: .01em; padding: 6px 10px; }
+  .famall { flex: 0 0 auto; min-height: 34px; border: 0; border-radius: 12px; cursor: pointer; background: var(--c-blue-deep); color: #fff;
+    font-family: var(--f-shout); font-size: 16px; letter-spacing: .01em; padding: 4px 10px; }
   .switchrow { display: flex; align-items: center; justify-content: space-between; gap: 14px; cursor: pointer; }
   .switchrow b { font-family: var(--f-shout); font-weight: 400; font-size: 20px; color: var(--c-blue-deep); }
   .switchrow input { appearance: none; -webkit-appearance: none; flex: 0 0 auto; width: 56px; height: 32px; border-radius: 16px; background: #CBD5E1; position: relative; cursor: pointer; transition: background 150ms; margin: 0; }
@@ -177,7 +184,7 @@
   .sortnote { font-weight: 600; color: var(--ink-faint); }
   .fam, .fcard, .card, .famsm { border: none; cursor: pointer; text-align: left; background: #fff; position: relative; overflow: hidden; min-width: 0;
     box-shadow: 0 2px 10px rgba(15,23,42,.08); }
-  .fam { display: flex; flex-direction: column; justify-content: center; gap: 4px; padding: 6px 10px 6px 16px; border-radius: 16px; }
+  .fam { display: flex; flex-direction: column; justify-content: center; justify-content: safe center; gap: 4px; padding: 6px 10px 6px 16px; border-radius: 16px; }
   .fam::before, .fcard::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 7px; background: linear-gradient(var(--stripe)); }
   .fam .fn { font-family: var(--f-shout); font-size: 20px; line-height: 1.05; color: var(--c-blue-deep); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .fam .kids, .fcard .kids { display: flex; flex-wrap: wrap; gap: 2px 8px; font-weight: 700; font-size: 14px; color: #334155; }
@@ -372,6 +379,8 @@
 <header class="top">
   <span class="brand"><img class="brand-logo" src="/brand/logos/kvbc-awana-two-line-white.svg" alt="Kennebec Valley Baptist Church Awana Clubs" width="260" height="55"></span>
   <h1>Check in</h1>
+  <a class="hdr-btn" id="record-btn" target="_blank" rel="noopener" data-nofs hidden>Record keeping</a>
+  <button class="hdr-btn exit" id="fs-exit" type="button" data-nofs hidden>Exit full screen</button>
   <button class="pill" id="count-pill" type="button" hidden>0 in</button>
   <button class="round" id="menu-btn" type="button" aria-label="More: walk-in name tag, leader tag, custom label" hidden>+</button>
 </header>
@@ -1054,6 +1063,7 @@ function showMainScreen() {
   // The youth page too (owner 2026-10-12): its Tonight lists its own clubs, with Undo check-in.
   $('count-pill').hidden = false;
   $('menu-btn').hidden = false;
+  $('record-btn').hidden = false;
   // The youth page's + menu is the walk-in tag alone (its own clubs).
   $('leader-panel').hidden = SIMPLE;
   $('custom-panel').hidden = SIMPLE;
@@ -1066,6 +1076,7 @@ function showPinScreen(message) {
   $('pin-screen').hidden = false;
   $('count-pill').hidden = true;
   $('menu-btn').hidden = true;
+  $('record-btn').hidden = true;
   $('pin').value = '';
   $('pin-err').textContent = message || '';
   $('pin-btn').textContent = 'Unlock';
@@ -1165,6 +1176,7 @@ function kidKey(k) { return 'id:' + k.clubberId; }
 // never clobbers the optimistic state.
 function applyRoster(data) {
   rosterLoaded = true;
+  if (typeof data.calendarId === 'string' && /^\d{1,9}$/.test(data.calendarId)) setRecordLink(data.calendarId);
   var old = {};
   KIDS.forEach(function(k) { old[kidKey(k)] = k; });
   KIDS = (data.kids || []).map(function(k) {
@@ -1537,11 +1549,12 @@ function renderFamilies(list) {
   var H = window.innerHeight - list.getBoundingClientRect().top - 60;
   // Two columns on a phone (three or more on a tablet or the desk), tall
   // enough for the name and a row of children; a long list scrolls.
-  var cols = Math.max(2, Math.floor((W + 8) / (180 + 8)));
+  // Narrower and shorter tiles than before (owner 2026-10-22: fit more kids), names kept readable.
+  var cols = Math.max(2, Math.floor((W + 8) / (168 + 8)));
   var w = (W - 8 * (cols - 1)) / cols;
   var rows = Math.ceil(main.length / cols);
   // Simple check-in: taller tiles, room for a family's "Check in all" strip and fewer mis-taps.
-  var h = Math.max(ONE_TAP ? 118 : 78, Math.min(ONE_TAP ? 160 : 120, (Math.max(200, H) - 8 * (rows - 1)) / rows));
+  var h = Math.max(ONE_TAP ? 96 : 66, Math.min(ONE_TAP ? 112 : 96, (Math.max(200, H) - 8 * (rows - 1)) / rows));
   var grid = el('div', 'fams');
   grid.style.gridTemplateColumns = 'repeat(' + cols + ', minmax(0, 1fr))';
   grid.style.gridAutoRows = Math.floor(h) + 'px';
@@ -1630,6 +1643,49 @@ $('search').addEventListener('keydown', function(e) {
 });
 $('search-clear').addEventListener('click', function() { $('search').value = ''; render(); $('search').focus(); });
 window.addEventListener('resize', function() { if (!$('search').value.trim()) render(); });
+
+// ── Full screen and Record keeping (owner 2026-10-22) ──────────────────────
+// On the desk laptop (a mouse or trackpad, not a phone) any click on the page puts it
+// full screen; the big Exit full screen button takes it out, and the next click puts it
+// back. Record keeping leaves full screen and opens TwoTimTwo's record page for
+// tonight's meeting (the roster's calendarId, else the one the owner gave) in a new tab.
+// (A function declaration with its own strings: a roster restored before this line runs still sets it.)
+var recordCal = recordCal || '';
+function setRecordLink(cal) {
+  recordCal = cal;
+  $('record-btn').href = 'https://kvbchurch.twotimtwo.com/meeting/record?calendar_id=' + encodeURIComponent(cal) + '&club_id=3';
+}
+if (!recordCal) setRecordLink('375');   // the meeting the owner gave, until the roster names tonight's
+function fsElement() { return document.fullscreenElement || document.webkitFullscreenElement || null; }
+function fsWanted() {
+  var root = document.documentElement;
+  if (!(root.requestFullscreen || root.webkitRequestFullscreen)) return false;
+  try { return window.matchMedia('(hover: hover) and (pointer: fine)').matches; } catch (e) { return false; }
+}
+function enterFull() {
+  if (fsElement() || !fsWanted()) return;
+  var root = document.documentElement;
+  try {
+    var p = root.requestFullscreen ? root.requestFullscreen({ navigationUI: 'hide' }) : root.webkitRequestFullscreen();
+    if (p && p.catch) p.catch(function() {});
+  } catch (e) { /* the browser said no: the page works the same windowed */ }
+}
+function leaveFull() {
+  if (!fsElement()) return;
+  try {
+    var p = document.exitFullscreen ? document.exitFullscreen() : document.webkitExitFullscreen();
+    if (p && p.catch) p.catch(function() {});
+  } catch (e) { /* already out */ }
+}
+function showFsButton() { $('fs-exit').hidden = !fsElement(); }
+document.addEventListener('click', function(ev) {
+  if (ev.target && ev.target.closest && ev.target.closest('[data-nofs]')) return;
+  enterFull();
+}, true);
+document.addEventListener('fullscreenchange', showFsButton);
+document.addEventListener('webkitfullscreenchange', showFsButton);
+$('fs-exit').addEventListener('click', leaveFull);
+$('record-btn').addEventListener('click', leaveFull);
 
 // ── Sheets ─────────────────────────────────────────────────────────────────
 var openSheet = null;
@@ -2243,8 +2299,32 @@ function renderCheckout(list, q) {
   list.appendChild(el('div', 'lead', q.trim() ? (shown.length === 1 ? 'Family' : 'Families')
     : waiting + (waiting === 1 ? ' child' : ' children') + ' not checked out yet · tap a family to check them out'));
   var grid = el('div', 'fams out s' + outStep(shown.length));
+  fillScreen(grid, list, shown.length);
   shown.forEach(function(f) { grid.appendChild(outTile(f)); });
   list.appendChild(grid);
+}
+// Check-out tiles fill the room left under the list's header (owner 2026-10-22): the
+// column count that makes each tile biggest, rows as tall as the screen allows, the
+// names growing with them; past the floor (a long list) the page scrolls as before.
+function fillScreen(grid, list, n) {
+  var W = list.clientWidth - 24;
+  var H = window.innerHeight - list.getBoundingClientRect().top - 70 - (document.body.classList.contains('has-undo') ? 130 : 0);
+  if (W < 200 || H < 120 || !n) return;
+  var gap = n <= 3 ? 12 : 10, best = null;
+  for (var cols = 1; cols <= n; cols++) {
+    var w = (W - gap * (cols - 1)) / cols;
+    if (w < 150 && cols > 1) break;
+    var h = (H - gap * (Math.ceil(n / cols) - 1)) / Math.ceil(n / cols);
+    var score = Math.min(w / 2.2, h);   // a tile reads best about twice as wide as tall
+    if (!best || score > best.score) best = { cols: cols, h: h, score: score };
+  }
+  var tall = Math.max(84, Math.floor(best.h));
+  var fn = Math.round(Math.max(20, Math.min(72, tall * 0.22)));
+  grid.style.gap = gap + 'px';
+  grid.style.gridTemplateColumns = 'repeat(' + best.cols + ', minmax(0, 1fr))';
+  grid.style.gridAutoRows = tall + 'px';
+  grid.style.setProperty('--co-fn', fn + 'px');
+  grid.style.setProperty('--co-kid', Math.round(Math.max(14, fn * 0.5)) + 'px');
 }
 function outTile(f) {
   var busy = f.kids.some(function(c) { return OUT[c.recid]; });

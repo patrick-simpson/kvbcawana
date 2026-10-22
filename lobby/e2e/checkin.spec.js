@@ -83,7 +83,7 @@ async function stubSite(page, { kids, barf = true, simple = false } = {}) {
       if (world.busyFirst) { world.busyFirst = false; return route.fulfill(json(429, { ok: false, reason: 'read-busy', retryAfterMs: 1500 })); }
       if (world.noClub) return route.fulfill(json(200, { noClub: true, ...world.noClub, readAt: new Date().toISOString(), kids: [], items: { bible: [], friend: [] } }));
       if (world.testDay) return route.fulfill(json(200, { readAt: new Date().toISOString(), testDay: world.testDay, kids: world.kids, items: { bible: ['Cubbies', 'Sparks'], friend: ['Sparks'] } }));
-      return route.fulfill(json(200, { readAt: new Date().toISOString(), kids: world.kids, items: { bible: ['Cubbies', 'Sparks'], friend: ['Sparks'] }, ...(world.familiesAt ? { familiesAt: world.familiesAt } : {}), ...(world.awayReady ? { awayReady: true } : {}) }));
+      return route.fulfill(json(200, { readAt: new Date().toISOString(), kids: world.kids, items: { bible: ['Cubbies', 'Sparks'], friend: ['Sparks'] }, ...(world.familiesAt ? { familiesAt: world.familiesAt } : {}), ...(world.awayReady ? { awayReady: true } : {}), ...(world.calendarId ? { calendarId: world.calendarId } : {}) }));
     }
     if (p === '/v1/desk/families') {
       world.familiesCalls += 1;
@@ -1234,6 +1234,59 @@ test('check out: the big button switches modes; one tap checks out a whole house
   await expect(modeBtn).toHaveText('Check out');
   await expect(list).toContainText('1 family still to come');
   await expect(list.locator('.fams.out')).toHaveCount(0);
+});
+
+test('the desk laptop (owner 2026-10-22): a click goes full screen, the big Exit button leaves it; Record keeping opens tonight\'s meeting; check-out tiles fill the screen', async ({ page }) => {
+  const kids = [
+    { clubberId: '11', first: 'Ada', last: 'Tester', club: 'Cubbies', clubId: '1', checkedIn: true },
+    { clubberId: '13', first: 'Cy', last: 'Other', club: 'T&T', clubId: '3', checkedIn: true },
+    { clubberId: '18', first: 'Eve', last: 'Later', club: 'Sparks', clubId: '2', checkedIn: false },
+  ];
+  const { world } = await stubSite(page, { kids, barf: false });
+  world.busyFirst = false;
+  world.calendarId = '412';
+  await page.setViewportSize({ width: 1500, height: 1000 });   // the Surface Laptop 2 at its usual scale
+  await signIn(page);
+  const list = page.locator('#list');
+  await expect(list).toContainText('1 family still to come', { timeout: 10_000 });
+
+  // Record keeping: tonight's meeting from the roster, in a new tab, never re-entering full screen.
+  const record = page.locator('#record-btn');
+  await expect(record).toBeVisible();
+  await expect(record).toHaveText('Record keeping');
+  await expect(record).toHaveAttribute('href', 'https://kvbchurch.twotimtwo.com/meeting/record?calendar_id=412&club_id=3');
+  await expect(record).toHaveAttribute('target', '_blank');
+
+  // A click anywhere puts the page full screen; the big button takes it out; the next click puts it back.
+  // (Unlock was the first click: the page is already full screen.)
+  const exit = page.locator('#fs-exit');
+  await expect.poll(() => page.evaluate(() => !!document.fullscreenElement)).toBe(true);
+  await expect(exit).toBeVisible();
+  await expect(exit).toHaveText('Exit full screen');
+  await exit.click();
+  await expect.poll(() => page.evaluate(() => !!document.fullscreenElement)).toBe(false);
+  await expect(exit).toBeHidden();
+  await page.locator('#search').click();
+  await expect.poll(() => page.evaluate(() => !!document.fullscreenElement)).toBe(true);
+  // Record keeping leaves full screen (the link opens its tab; the stub keeps it from going anywhere).
+  await page.route('https://kvbchurch.twotimtwo.com/**', (route) => route.fulfill({ status: 200, contentType: 'text/html', body: '<p>record</p>' }));
+  const popup = page.waitForEvent('popup');
+  await record.click();
+  await (await popup).close();
+  await expect.poll(() => page.evaluate(() => !!document.fullscreenElement)).toBe(false);
+
+  // Check out: two families fill the room under the list's header.
+  await page.locator('#mode-btn').click();
+  const tiles = list.locator('.fams.out .fam');
+  await expect(tiles).toHaveCount(2, { timeout: 8000 });
+  const room = await page.evaluate(() => {
+    const grid = document.querySelector('.fams.out');
+    const r = grid.getBoundingClientRect();
+    return { bottom: r.bottom, width: r.width, viewH: window.innerHeight, listW: document.getElementById('list').clientWidth };
+  });
+  expect(room.viewH - room.bottom).toBeLessThan(120);
+  expect(room.width).toBeGreaterThan(room.listW - 40);
+  await snap(page, 'checkout-fill.png');
 });
 
 test('a new familiesAt on the roster answer reads the families again, so a newly registered child joins their family', async ({ page }) => {

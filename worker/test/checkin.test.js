@@ -466,6 +466,7 @@ describe('every TwoTimTwo read, of every kind, keeps the 5 s clock', () => {
       { clubberId: '663', first: 'Lu', last: 'Tester', club: '', clubId: '3', checkedIn: true },
     ]);
     expect(first.body.readAt).toBe(new Date(t.clock.t).toISOString());
+    expect(first.body.calendarId).toBe('368');   // tonight's meeting, for the page's Record keeping button
     const second = await t.call('GET', '/v1/desk/roster');   // within 30 s: the same read, no new page
     expect(second.body.readAt).toBe(first.body.readAt);
     expect(t.reads.filter((r) => r.path === '/clubber/checkin')).toHaveLength(1);

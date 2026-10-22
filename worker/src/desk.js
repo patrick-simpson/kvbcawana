@@ -598,7 +598,9 @@ export class Desk {
     // "Usually arrives first" (owner 2026-10-15, recent.js): minutes after local midnight, this season.
     const usual = this.recent ? await this.recent.usualOf(kids.map((/** @type {any} */ k) => String(k.clubberId))) : null;
     if (usual) for (const k of kids) { const u = usual.get(String(k.clubberId)); if (u != null) k.usual = u; }
-    return json({ readAt: new Date(r.readAt).toISOString(), ...flag, ...test, ...away, kids, items: itemClubs(r.page.events || []), ...(familiesAt ? { familiesAt } : {}) });
+    // Tonight's meeting (owner 2026-10-22): the page's Record keeping button opens TwoTimTwo's record page for it.
+    const cal = typeof r.page.calendarId === 'string' && /^\d{1,9}$/.test(r.page.calendarId) ? { calendarId: r.page.calendarId } : {};
+    return json({ readAt: new Date(r.readAt).toISOString(), ...flag, ...test, ...away, ...cal, kids, items: itemClubs(r.page.events || []), ...(familiesAt ? { familiesAt } : {}) });
   }
 
   /**
