@@ -1,4 +1,4 @@
-import { useContext, useState } from 'react';
+import { useContext, useState, memo } from 'react';
 import { AnimatePresence, useIsPresent } from 'framer-motion';
 import { M, ZeroAnimationContext } from '../lib/motion.jsx';
 import { DOODLES, EASE, SHAPES } from '../lib/brand.js';
@@ -69,7 +69,7 @@ const FIELD_DOODLES = [
 const EPOCH = typeof performance !== 'undefined' ? performance.now() : 0;
 const sinceEpoch = () => (typeof performance !== 'undefined' ? (performance.now() - EPOCH) / 1000 : 0);
 
-function Doodle({ kind, left, top, size, motion, delay }) {
+const Doodle = memo(function Doodle({ kind, left, top, size, motion, delay }) {
   const shape = DOODLES[kind];
   const [, , vw, vh] = shape.viewBox.split(/\s+/).map(Number);
   return (
@@ -84,7 +84,7 @@ function Doodle({ kind, left, top, size, motion, delay }) {
       </svg>
     </span>
   );
-}
+});
 
 /**
  * The field's crossfade: fade up over the outgoing field (which holds until
@@ -100,7 +100,7 @@ const FIELD_VARIANTS = {
   leave: (wipe) => holdThenLeave(wipe ? SWAP_AT : HANDOFF.field, 0.02, { opacity: 1 }, { opacity: 0 }, 'linear'),
 };
 
-function Field({ theme, wipe, animated }) {
+const Field = memo(function Field({ theme, wipe, animated }) {
   const t = LOBBY_THEMES[theme];
   const present = useIsPresent();
   // How long after page load this field appeared: its loops start that far
@@ -142,7 +142,7 @@ function Field({ theme, wipe, animated }) {
       {body}
     </M.div>
   );
-}
+});
 
 /**
  * The corner tab and the house waves. `away` (a poster or a video is up)
@@ -155,7 +155,7 @@ function Field({ theme, wipe, animated }) {
 // The logo lands a beat after the scene appears, with the first slide's copy.
 const LOGO_HOLD = 0.3;
 
-function Chrome({ away, via, swell, still, logoAway = false }) {
+const Chrome = memo(function Chrome({ away, via, swell, still, logoAway = false }) {
   // Where the chrome is and how it got there, captured once per change of
   // spot (derived state), so a later change of `via` alone never replays it.
   const [state, setState] = useState(() => ({ spot: chromeSpot('home', away, via), from: null, via }));
@@ -197,7 +197,7 @@ function Chrome({ away, via, swell, still, logoAway = false }) {
       </CornerTab>
     </div>
   );
-}
+});
 
 /**
  * The lobby scene behind everything.
