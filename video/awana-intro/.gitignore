@@ -1,0 +1,4 @@
+# Rendered frames, videos and the generated .blend - big, and rebuilt any time
+output/
+# Python's byte-code cache (tools/faststart.py imported by Blender)
+__pycache__/
