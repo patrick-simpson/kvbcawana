@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, render } from '@testing-library/react';
 import FlagshipIntro from './FlagshipIntro.jsx';
@@ -169,10 +171,18 @@ describe('the flagship\'s 3D intro', () => {
     expect(container.querySelector('.flagship').dataset.style).toBe('bounce');
     expect(container.querySelector('.flagship').dataset.version).toBe('glad');
     expect(container.querySelector('video.flagship-intro')).not.toBeNull();
+    // It draws the logo as the video does (the full one, 72u), even in a
+    // phone's narrow 16:9 frame where a plain showing takes the two-line one.
+    expect(container.querySelector('.flagship').classList.contains('flagship--intro')).toBe(true);
+    const css = readFileSync(resolve(__dirname, '../styles/flagship.css'), 'utf8');
+    expect(css).toMatch(/\.flagship--intro \.flagship-mark \{\s*--logo-w: calc\(72 \* var\(--u\)\);/);
+    expect(css).toMatch(/\.flagship--intro \.flagship-logo--full \{\s*display: block;/);
+    expect(css).toMatch(/\.flagship--intro \.flagship-logo--two-line \{\s*display: none;/);
     expect(localStorage.getItem(FLAGSHIP_TURN_KEY)).toBe('1');
     cleanup();
     const plain = render(<FlagshipSlide />);
     expect(plain.container.querySelector('video')).toBeNull();
+    expect(plain.container.querySelector('.flagship').classList.contains('flagship--intro')).toBe(false);
     expect(plain.container.querySelector('.flagship').dataset.style).toBe('pop');
   });
 });

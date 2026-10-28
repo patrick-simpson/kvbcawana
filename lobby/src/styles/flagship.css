@@ -200,3 +200,18 @@
 .flagship-intro.is-shown {
   opacity: 1;
 }
+
+/* A showing that carries on into the intro draws the logo exactly as the
+   video does: the FULL logo, 72u wide, whatever the screen. Only a phone's
+   16:9 frame (owner 2026-10-28: the intro plays there, scaled down) is ever
+   narrower than 722px with the intro on, and there the two-line logo above
+   would jump to the video's full one at the hand-over. */
+.flagship--intro .flagship-mark {
+  --logo-w: calc(72 * var(--u));
+}
+.flagship--intro .flagship-logo--full {
+  display: block;
+}
+.flagship--intro .flagship-logo--two-line {
+  display: none;
+}

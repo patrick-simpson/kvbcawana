@@ -420,7 +420,7 @@ export default function FlagshipSlide({ pick, intro = false, paused = false, onH
 
   return (
     <div
-      className={`flagship flagship--${style} flagship--${version}`}
+      className={`flagship flagship--${style} flagship--${version}${intro ? ' flagship--intro' : ''}`}
       role="img"
       aria-label={flagshipLabel(version)}
       data-style={style}
