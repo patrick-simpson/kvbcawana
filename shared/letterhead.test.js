@@ -1,19 +1,20 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { parseLetter, letterHtml, eventOf, linkify, issueLabel, escapeHtml, LETTERHEAD_SVGS, FIT, MAX_TEXT } from './letterhead.js';
+import { parseLetter, letterHtml, eventOf, linkify, issueLabel, escapeHtml, LETTERHEAD_SVGS, FIT, MAX_TEXT, PLAN_WORDS, PLAN_NOW } from './letterhead.js';
 
 const SAMPLE = readFileSync(resolve(__dirname, '..', 'scripts', 'letterhead', 'test', 'november.txt'), 'utf8');
 const SVGS = Object.fromEntries(Object.keys(LETTERHEAD_SVGS).map((k) => [k, `<svg id="${k}"><title>t</title></svg>`]));
 
 describe('parseLetter: the November sample', () => {
   const l = parseLetter(SAMPLE);
-  it('title, lead, five reminders, a heading, two events, a callout, the signature', () => {
+  it('title, lead, five reminders, a heading, three events, a callout, the signature', () => {
     expect(l.title).toBe('November Update');
-    expect(l.parts.map((p) => p.kind)).toEqual(['lead', 'item', 'item', 'item', 'item', 'item', 'heading', 'event', 'event', 'note']);
+    expect(l.parts.map((p) => p.kind)).toEqual(['lead', 'item', 'item', 'item', 'item', 'item', 'heading', 'event', 'event', 'event', 'note']);
     expect(l.parts[6]).toEqual({ kind: 'heading', text: 'Upcoming Events' });
     expect(l.parts[7]).toMatchObject({ kind: 'event', month: 'NOV', day: '4' });
     expect(l.parts[8]).toMatchObject({ kind: 'event', month: 'NOV', day: '18' });
+    expect(l.parts[9]).toEqual({ kind: 'event', month: 'NOV', day: '25', text: 'No club for Thanksgiving Break.' });
     expect(l.signature).toEqual(['Patrick Simpson', 'Awana Ministry Director', 'awana@kvbchurch.org  |  290-0341']);
   });
 });
@@ -84,6 +85,17 @@ describe('letterHtml', () => {
     expect(html).toContain(`let pt = ${FIT.startPt};`);
     expect(html).toContain(`pt > ${FIT.minPt}`);
     for (const c of ['puggles', 'cubbies', 'sparks', 'tnt', 'trek', 'journey']) expect(html).toContain(`background:var(--brand-${c})`);
+  });
+  it('the five words in order, this year\'s as the one hot pill, never called a plan', () => {
+    expect(PLAN_WORDS).toEqual(['Belong', 'Believe', 'Become', 'Protect', 'Grow']);
+    expect(PLAN_NOW).toBe('Believe');
+    const row = html.match(/<div class="plan">([\s\S]*?)<\/div>/)[1];
+    expect([...row.matchAll(/<b[^>]*>([^<]+)<\/b>/g)].map((m) => m[1])).toEqual(PLAN_WORDS);
+    expect(row.match(/class="now"/g)).toHaveLength(1);
+    expect(row).toContain('<b class="now">Believe</b>');
+    expect(html).not.toMatch(/ministry plan|5-year|five-year/i);
+    const next = letterHtml(parseLetter(SAMPLE), { kitUrl: '', svgs: SVGS, planNow: 'Become' });
+    expect(next).toContain('<b class="now">Become</b>');
   });
   it('flat: no gradient, no blur', () => {
     expect(html).not.toMatch(/gradient|blur\(|filter:/);
