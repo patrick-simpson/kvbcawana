@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from 'react';
+import { memo, useLayoutEffect, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { M } from '../lib/motion.jsx';
 import { DUR, EASE, SHAPES } from '../lib/brand.js';
@@ -293,9 +293,10 @@ export default function CheckoutBoard({ decision, checkout, calm, demo = false, 
  * name sits where it always did.
  * @param {{ name: string }} props
  */
-function NameChip({ name }) {
+// ⚡ Bolt: Memoized NameChip to prevent expensive measureInk (Canvas API) calls on every board re-render
+const NameChip = memo(function NameChip({ name }) {
   const seat = nameChipSeat(measureInk(name, 'shout'));
   return (
     <span className="checkout-name__chip" style={seat ? { '--seat': `${seat}em` } : undefined}>{name}</span>
   );
-}
+});
