@@ -7,8 +7,10 @@
 // from, so it always matches the files deployed beside it.
 //
 // Only files committed under one of these folders can be served that way:
-// Journey's public files (/journey/, functions/journey) and the home page's
-// film (/reel/, functions/reel; printer/public/reel, made by printer/reel/).
+// Journey's public files (/journey/, functions/journey), the home page's
+// film (/reel/, functions/reel; printer/public/reel, made by printer/reel/)
+// and the lobby's 3D intro (/lobby/intro/, functions/lobby/intro;
+// lobby/public/intro, made by video/awana-intro/).
 // Anything else that big, or any other video, is a build output, and fails
 // the build rather than the deploy.
 //
@@ -19,6 +21,7 @@
 export const REPO_FOLDERS = {
   '/journey/': 'journey/public/',
   '/reel/': 'printer/public/reel/',
+  '/lobby/intro/': 'lobby/public/intro/',
 };
 
 export const VIDEO_RELEASE_TAG = 'journey-videos-v2';

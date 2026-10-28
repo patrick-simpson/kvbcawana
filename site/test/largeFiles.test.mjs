@@ -30,7 +30,24 @@ test('a streamed path comes from Journey\'s public files or the film\'s folder, 
   assert.equal(repoPathFor('/reel/../printer/secret.mp4'), null);
   assert.equal(repoPathFor('/reel//x.mp4'), null);
   assert.equal(repoPathFor('/reel/'), null);
-  assert.deepEqual(Object.keys(REPO_FOLDERS).sort(), ['/journey/', '/reel/']);
+  assert.equal(repoPathFor('/lobby/intro/awana-intro.mp4'), 'lobby/public/intro/awana-intro.mp4');
+  assert.equal(repoPathFor('/lobby/assets/clip.mp4'), null);
+  assert.deepEqual(Object.keys(REPO_FOLDERS).sort(), ['/journey/', '/lobby/intro/', '/reel/']);
+});
+
+test('the lobby\'s 3D intro is committed, a web copy, and streamed with Range like the film', () => {
+  const video = path.join(ROOT, 'lobby/public/intro/awana-intro.mp4');
+  assert.ok(existsSync(video), 'lobby/public/intro/awana-intro.mp4 is committed');
+  // video/awana-intro writes it at 6 Mbps (~11 MB for 15 s); a lossless render
+  // committed by mistake would be hundreds.
+  assert.ok(statSync(video).size <= 16 * 1000 * 1000);
+  // Its index is in front of its pictures (tools/faststart.py), so a TV can
+  // start it from the first request through the Function.
+  const head = readFileSync(video).subarray(0, 64 * 1024);
+  const moov = head.indexOf('moov');
+  assert.ok(moov > 0 && (head.indexOf('mdat') === -1 || moov < head.indexOf('mdat')), 'moov before mdat');
+  const fn = readFileSync(path.join(SITE, 'functions/lobby/intro/[[path]].js'), 'utf8');
+  assert.match(fn, /proxyLarge\(context\.request, LARGE_FILES, fetch\)\) \|\| context\.next\(\)/);
 });
 
 test('the film the home page plays is committed, small enough for one request, and streamed with Range', async () => {
