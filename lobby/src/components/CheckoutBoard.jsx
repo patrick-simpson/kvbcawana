@@ -284,7 +284,7 @@ export default function CheckoutBoard({ decision, checkout, calm, demo = false, 
       </M.section>
     </div>
   );
-});
+}
 
 /**
  * One name on the board, in its club's colour. A capital that carries a tall
@@ -294,11 +294,9 @@ export default function CheckoutBoard({ decision, checkout, calm, demo = false, 
  * @param {{ name: string }} props
  */
 // ⚡ Bolt: Memoized NameChip to prevent expensive measureInk (Canvas API) calls on every board re-render
-// ⚡ Bolt: Memoized NameChip to prevent expensive measureInk (Canvas API) calls on every board re-render
-const NameChip = memo(// ⚡ Bolt: Memoized NameChip to prevent expensive measureInk (Canvas API) calls on every board re-render
 const NameChip = memo(function NameChip({ name }) {
   const seat = nameChipSeat(measureInk(name, 'shout'));
   return (
     <span className="checkout-name__chip" style={seat ? { '--seat': `${seat}em` } : undefined}>{name}</span>
   );
-}););
+});
