@@ -36,9 +36,6 @@ export const FIT = Object.freeze({ startPt: 11, minPt: 9.5, stepPt: 0.25 });
 /** Longest text taken (characters); more is cut, never sent to a printer. */
 export const MAX_TEXT = 20000;
 
-/** The footer line under the waves. */
-export const FOOTER_LINE = ['Kennebec Valley Baptist Church', 'Wednesdays at 6:00 PM'];
-
 /**
  * The ministry's five words, one a year, in order (owner 2026-10-28; on the
  * page as the words alone, never named as a plan). PLAN_NOW is this year's,
@@ -190,7 +187,7 @@ function cleanSvg(svg) {
  * the type reached FIT.minPt and the text runs onto a second page.
  * @param {Letter} letter
  * @param {{kitUrl: string, svgs: Record<keyof typeof LETTERHEAD_SVGS, string>,
- *   date?: Date, kicker?: string, footer?: string[], planNow?: string}} opts
+ *   date?: Date, kicker?: string, planNow?: string}} opts
  */
 export function letterHtml(letter, opts) {
   const kit = opts.kitUrl.replace(/\/$/, '');
@@ -211,7 +208,6 @@ export function letterHtml(letter, opts) {
   const sig = name
     ? `<div class="sig"><b>${escapeHtml(name)}</b>${role ? `<em>${escapeHtml(role)}</em>` : ''}${contact.map(linkify).join('<br>')}</div>`
     : '';
-  const footer = (opts.footer || FOOTER_LINE).map(escapeHtml).join('<span>●</span>');
   const now = opts.planNow || PLAN_NOW;
   const plan = PLAN_WORDS.map((w) => (w === now
     ? `<b class="now">${escapeHtml(w)}</b>`
@@ -260,13 +256,11 @@ footer .w{position:absolute;width:5.4in;bottom:-1.55in}
 footer .w svg{width:100%;height:auto;display:block}
 footer .w1{right:-.5in;color:var(--brand-sky)}
 footer .w2{right:-1.7in;bottom:-1.85in;color:var(--brand-blue)}
-footer .plan{position:absolute;left:.75in;bottom:.72in;display:flex;align-items:center;gap:.07in}
+footer .plan{position:absolute;left:.75in;bottom:.5in;display:flex;align-items:center;gap:.07in}
 footer .plan b{font:400 12pt/1 var(--brand-font-label);letter-spacing:.08em;text-transform:uppercase;color:var(--brand-blue-deep);padding:5px 0 4px}
 footer .plan b.now{color:#fff;background:var(--brand-hot);padding:5px 11px 4px;border-radius:8px;box-shadow:2px 2px 0 var(--brand-ink)}
 footer .plan i{width:9px;height:9px;color:var(--brand-sun);display:block}
 footer .plan i svg{width:100%;height:100%;display:block}
-footer .line{position:absolute;left:.75in;bottom:.42in;font:400 10pt/1 var(--brand-font-label);letter-spacing:.08em;text-transform:uppercase;color:var(--brand-blue-deep)}
-footer .line span{color:var(--brand-hot);margin:0 .08in}
 html[data-fit=flow],html[data-fit=flow] body{height:auto;overflow:visible}
 html[data-fit=flow] main{padding-bottom:.3in}
 html[data-fit=flow] footer{position:relative;break-inside:avoid}
@@ -281,8 +275,7 @@ ${body}
 ${sig}
 </main>
 <footer><div class="w w1">${svg.wave}</div><div class="w w2">${svg.wave}</div>
-<div class="plan">${plan}</div>
-<div class="line">${footer}</div></footer>
+<div class="plan">${plan}</div></footer>
 <script>
 (async () => {
   const root = document.documentElement;

@@ -94,6 +94,7 @@ describe('letterHtml', () => {
     expect(row.match(/class="now"/g)).toHaveLength(1);
     expect(row).toContain('<b class="now">Believe</b>');
     expect(html).not.toMatch(/ministry plan|5-year|five-year/i);
+    expect(html).not.toMatch(/Wednesdays at|<div class="line">/);
     const next = letterHtml(parseLetter(SAMPLE), { kitUrl: '', svgs: SVGS, planNow: 'Become' });
     expect(next).toContain('<b class="now">Become</b>');
   });
