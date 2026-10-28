@@ -660,18 +660,27 @@ test('a test day (no club today, owner 2026-10-15): the real list, a yellow stri
   await expect(page.locator('#mode-btn')).toBeVisible();
 });
 
-test('one list by last name (owner 2026-10-28): a family the service marks as away is not split off', async ({ page }) => {
+test('"Not here the last two club nights" from the service (owner 2026-10-15): every phone, even a restored session with no history key', async ({ page }) => {
   test.setTimeout(60_000);
   const { world } = await stubSite(page);
   world.busyFirst = false;
   world.awayReady = true;
-  // The service says Cy was not here the last two club nights: he stays in the one list.
+  // Cy was not here the last two club nights; the Testers and Tia were.
   for (const k of world.kids) k.away = k.clubberId === '13';
   await signIn(page);
-  await expect(page.locator('#list')).toContainText('3 families still to come', { timeout: 10_000 });
-  await expect(page.locator('#list .fams .fam', { hasText: 'Cy Other' })).toHaveCount(1);
-  await expect(page.locator('#list')).not.toContainText('Not here the last two club nights');
+  await expect(page.locator('#list')).toContainText('still to come', { timeout: 10_000 });
+  // A reload restores the session WITHOUT the history key: the page's own reading is off, the service's still works.
+  await page.reload();
+  await expect(page.locator('#list')).toContainText('Not here the last two club nights', { timeout: 10_000 });
+  const lead = page.locator('#list .lead', { hasText: 'still to come' });
+  await expect(lead).toHaveText(/^2 families still to come$/);
+  await expect(page.locator('#list')).toContainText('Cy Other');
   expect(world.historyCalls).toHaveLength(0);
+  // Before both nights are known, nobody is sent to the bottom.
+  world.awayReady = false;
+  await page.reload();
+  await expect(page.locator('#list')).toContainText('3 families still to come', { timeout: 10_000 });
+  await expect(page.locator('#list')).not.toContainText('Not here the last two club nights');
 });
 
 test('simple check-in (owner 2026-10-15): on by default, one tap for a child, "Check in all" for a family, attendance only, Undo', async ({ page }) => {
@@ -807,28 +816,42 @@ async function sealedRow(history, night, kind, record) {
   return { id, night, kind, ...(await cc.sealRow(history.pub, { id, night, kind, record })) };
 }
 
-test('the page reads no attendance history (owner 2026-10-28): Tia, who never came, is in the one list like anyone', async ({ page }) => {
+test('"Not here the last two club nights" is rebuilt in the page from the sealed history, memory only', async ({ page }) => {
   test.setTimeout(60_000);
   const { world, history } = await stubSite(page);
   world.busyFirst = false;
-  // Sealed history the old "Not here" row was built from: nothing reads it now.
+  // Ada was here last week; Cy two weeks ago; Ben checked in and was undone; Tia never came.
   world.history = {
-    '2026-01-14': [await sealedRow(history, '2026-01-14', 'checkin', { ts: 1, first: 'Ada', last: 'Tester', club: 'Cubbies', clubberId: '11', source: 'desk' })],
+    '2026-01-14': [
+      await sealedRow(history, '2026-01-14', 'checkin', { ts: 1, first: 'Ada', last: 'Tester', club: 'Cubbies', clubberId: '11', source: 'desk' }),
+      await sealedRow(history, '2026-01-14', 'checkin', { ts: 2, first: 'Ben', last: 'Tester', club: 'Sparks', clubberId: '12', source: 'desk' }),
+      await sealedRow(history, '2026-01-14', 'undo', { ts: 3, first: 'Ben', last: 'Tester', club: 'Sparks', clubberId: '12', source: 'desk' }),
+    ],
     '2026-01-07': [await sealedRow(history, '2026-01-07', 'checkin', { ts: 1, first: 'Cy', last: 'Other', club: 'T&T', clubberId: '13', source: 'ttt' })],
   };
   await signIn(page);
-  await expect(page.locator('#list')).toContainText('3 families still to come', { timeout: 10_000 });
-  await expect(page.locator('#list .fams .fam', { hasText: 'Tia Youth' })).toHaveCount(1);
-  await page.waitForTimeout(500);
-  await expect(page.locator('#list')).not.toContainText('Not here');
-  // Typing finds her with everyone else; her card says nothing about missed nights.
+  const away = page.locator('.away', { hasText: 'Not here the last two club nights · 1' });
+  await expect(away).toBeVisible({ timeout: 10_000 });
+  await expect(away.locator('.famsm')).toHaveText(/Tia Youth/);
+  await expect(page.locator('.fam', { hasText: 'Tester' })).toHaveCount(1);   // Ada was here: the family is not away
+  await expect(page.locator('.fam', { hasText: 'Cy Other' })).toHaveCount(1);
+  // Typing finds her at the bottom, and her card says so; she checks in like anyone else.
   await search(page).fill('Tia');
-  await expect(page.locator('#list')).not.toContainText('Not here');
-  await page.locator('.fcard', { hasText: 'Tia Youth' }).first().click();
-  await expect(page.locator('#kid-sheet .sub')).toHaveCount(0);
+  await expect(page.locator('.away .lead')).toHaveText('Not here the last two club nights');
+  await page.locator('.away .famsm').click();
+  await expect(page.locator('#kid-sheet .sub')).toHaveText('Not here the last two club nights');
   await page.locator('#kid-sheet').getByRole('button', { name: 'Check in' }).click();
   await expect(page.locator('#toast')).toContainText('Tia Youth is checked in');
-  expect(world.historyCalls).toHaveLength(0);
+  // Worker (D1) reads only: one nights list and each night's rows, once; nothing kept in storage.
+  expect(world.historyCalls.filter((c) => c === '/v1/history/nights')).toHaveLength(1);
+  expect(world.historyCalls.filter((c) => c.startsWith('/v1/history/rows'))).toHaveLength(2);
+  const stored = await page.evaluate(() => JSON.stringify({ ...localStorage, ...sessionStorage }));
+  expect(stored).not.toMatch(/Tia|Cy Other|Ada|privateKey|d":/);
+  // A reload takes up the session without the passphrase: no key, so nobody is shown away.
+  await page.reload();
+  await expect(page.locator('#list')).toContainText('families still to come', { timeout: 10_000 });
+  await page.waitForTimeout(500);
+  await expect(page.locator('.away')).toHaveCount(0);
 });
 
 test('remembered leaders come from the church settings; a new leader tag adds one; no route, no chips', async ({ page }) => {
