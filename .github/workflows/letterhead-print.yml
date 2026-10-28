@@ -1,0 +1,69 @@
+name: Print a letterhead
+
+# Owner 2026-10-28: newsletter text in, the Awana letterhead (shared/letterhead.js,
+# the same drawing as awana.kvbchurch.org/tools/letterhead/) out, COPIES times in
+# ONE PDF, emailed from the owner's Gmail to the downstairs Epson (Epson Connect
+# email print takes no copy count from the mail, so the copies are pages).
+# Started by hand, or by the Claude routine that turns a MailChimp newsletter
+# (Gmail label "Letterhead") into this text. It prints at once, by the owner's
+# choice; a dry run mails one copy to GMAIL_USER instead.
+#
+# Never retried: a send that failed after Gmail took it would print the copies
+# twice. A failure fails the job (GitHub emails the owner).
+# Secrets: the handbook job's GMAIL_USER and GMAIL_APP_PASSWORD.
+
+on:
+  workflow_dispatch:
+    inputs:
+      text:
+        description: 'The letter: first line is the title (see /tools/letterhead/ for the format)'
+        type: string
+        required: true
+      copies:
+        description: 'Copies (1 to 100)'
+        type: string
+        default: '50'
+      to:
+        description: 'Send to (the downstairs Epson)'
+        type: string
+        default: 'kvbcdownstairs@print.epsonconnect.com'
+      dry_run:
+        description: 'Dry run: one copy emailed to GMAIL_USER instead of the printer'
+        type: boolean
+        default: false
+
+permissions: {}
+
+concurrency:
+  group: letterhead-print
+  cancel-in-progress: false
+
+jobs:
+  print:
+    name: Letterhead
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: scripts/letterhead/package-lock.json
+      - name: Install
+        working-directory: scripts/letterhead
+        run: |
+          npm ci
+          npx playwright install --with-deps --only-shell chromium
+      - name: Make and send the letter
+        working-directory: scripts/letterhead
+        env:
+          LETTER_TEXT: ${{ inputs.text }}
+          COPIES: ${{ inputs.copies }}
+          TO: ${{ inputs.to || 'kvbcdownstairs@print.epsonconnect.com' }}
+          DRY_RUN: ${{ inputs.dry_run == true && 'true' || 'false' }}
+          GMAIL_USER: ${{ secrets.GMAIL_USER }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+        run: node letterhead-print.mjs

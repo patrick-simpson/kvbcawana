@@ -1,0 +1,15 @@
+{
+  "name": "letterhead-print",
+  "version": "1.0.0",
+  "private": true,
+  "description": "The letterhead print job: newsletter text in, the Awana letterhead (shared/letterhead.js) as a PDF, COPIES times over, emailed to the downstairs Epson (.github/workflows/letterhead-print.yml).",
+  "type": "module",
+  "scripts": {
+    "start": "node letterhead-print.mjs",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "pdf-lib": "1.17.1",
+    "playwright": "1.56.1"
+  }
+}

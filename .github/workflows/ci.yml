@@ -315,6 +315,27 @@ jobs:
       - run: node --check handbook-print.mjs && node --check smtp.mjs
       - run: npm test
 
+  letterhead:
+    # The letterhead print job's script (scripts/letterhead/, run by
+    # letterhead-print.yml): draws the November sample in Chromium, 50 copies
+    # in one PDF, a stand-in mailer. The text rules are shared/letterhead.test.js
+    # (lobby vitest).
+    name: Letterhead script
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: scripts/letterhead
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-app
+        with:
+          lockfile: scripts/letterhead/package-lock.json
+          working-directory: scripts/letterhead
+      - run: npx playwright install --with-deps --only-shell chromium
+      - run: node --check letterhead-print.mjs
+      - run: npm test
+
   printer:
     name: Club Label Printer
     needs: changes

@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Letterhead · KVBC Awana</title>
+<link rel="stylesheet" href="/lobby/shared/brand/tokens.css">
+<link rel="stylesheet" href="/lobby/shared/brand/fonts.css">
+<style>
+  /* The letterhead maker (owner 2026-10-28): unlisted, signed in with the
+     church passphrase. The page drawing itself is shared/letterhead.js. */
+  @font-face { font-family: 'Figtree'; font-weight: 300 900; src: url('/lobby/shared/brand/fonts/figtree-latin-wght-normal.woff2') format('woff2'); }
+  :root { --ink: var(--brand-ink, #231F20); --paper: #f6f4ef; --line: #d9d4ca; --hot: #CF4518; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--paper); color: var(--ink); font: 400 16px/1.5 var(--brand-font-body); }
+  header.bar { display: flex; align-items: center; gap: 16px; padding: 14px 24px; background: var(--brand-blue); color: #fff; }
+  header.bar img { width: 260px; height: auto; display: block; } /* the two-line logo's minimum (shared/churchLogo.js) */
+  header.bar h1 { margin: 0; font: 400 26px/1 var(--brand-font-display); }
+  header.bar .who { margin-left: auto; display: flex; gap: 10px; align-items: center; font-size: 14px; }
+  .stripe { display: flex; height: 6px; } .stripe span { flex: 1; }
+  button, .btn { font: 400 17px/1 var(--brand-font-label); letter-spacing: .05em; text-transform: uppercase; border: 0; border-radius: 10px; padding: 12px 18px; cursor: pointer; color: var(--ink); background: #fff; box-shadow: 3px 3px 0 var(--ink); }
+  button:active { translate: 2px 2px; box-shadow: 1px 1px 0 var(--ink); }
+  button.hot { background: var(--hot); color: #fff; }
+  button:disabled { opacity: .5; cursor: default; }
+  header.bar button { padding: 8px 12px; font-size: 14px; }
+  #signin { max-width: 440px; margin: 64px auto; padding: 28px; background: #fff; border-radius: 16px; box-shadow: 4px 4px 0 var(--ink); }
+  #signin h2 { margin: 0 0 8px; font: 400 28px/1.1 var(--brand-font-display); }
+  #signin input { width: 100%; font: inherit; padding: 12px; border: 2px solid var(--ink); border-radius: 10px; margin: 12px 0; }
+  #signin .note { min-height: 1.5em; font-size: 14px; color: var(--brand-sparks-deep); }
+  main { display: grid; grid-template-columns: minmax(320px, 1fr) minmax(320px, 1.15fr); gap: 24px; padding: 24px; max-width: 1500px; margin: 0 auto; }
+  .col h2 { margin: 0 0 10px; font: 400 15px/1 var(--brand-font-label); letter-spacing: .08em; text-transform: uppercase; }
+  textarea { width: 100%; height: 62vh; min-height: 360px; resize: vertical; font: 400 15px/1.5 ui-monospace, Menlo, Consolas, monospace; padding: 14px; border: 2px solid var(--ink); border-radius: 12px; background: #fff; color: var(--ink); }
+  details { margin-top: 12px; font-size: 14px; background: #fff; border-radius: 10px; padding: 10px 14px; border: 1px solid var(--line); }
+  details summary { cursor: pointer; font-weight: 700; }
+  details ul { margin: 8px 0 0; padding-left: 20px; }
+  details code { background: var(--brand-cream); padding: 0 4px; border-radius: 4px; }
+  .actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-bottom: 14px; }
+  #fit { font-size: 14px; font-weight: 600; }
+  #fit[data-fit=flow] { color: var(--brand-sparks-deep); }
+  #fit[data-fit=one-page] { color: var(--brand-tnt-deep); }
+  .col.out { position: sticky; top: 16px; align-self: start; }
+  .sheet { position: relative; width: 100%; max-width: calc((100vh - 200px) * 8.5 / 11); aspect-ratio: 8.5 / 11; background: #fff; box-shadow: 4px 4px 0 var(--ink); border-radius: 4px; overflow: hidden; }
+  .sheet iframe { position: absolute; top: 0; left: 0; width: 816px; height: 1056px; border: 0; transform-origin: 0 0; }
+  @media (max-width: 860px) {
+    main { grid-template-columns: 1fr; padding: 16px; } .col.out { position: static; } .sheet { max-width: none; }
+    textarea { height: 40vh; }
+    header.bar { padding: 12px 16px; flex-wrap: wrap; } header.bar h1 { font-size: 20px; }
+  }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<header class="bar">
+  <img src="/lobby/shared/brand/logos/kvbc-awana-two-line-white.svg" alt="Kennebec Valley Baptist Church Awana Clubs">
+  <h1>Letterhead</h1>
+  <div class="who" id="who" hidden><button type="button" id="signout">Sign out</button></div>
+</header>
+<div class="stripe"><span style="background:var(--brand-puggles)"></span><span style="background:var(--brand-cubbies)"></span><span style="background:var(--brand-sparks)"></span><span style="background:var(--brand-tnt)"></span><span style="background:var(--brand-trek)"></span><span style="background:var(--brand-journey)"></span></div>
+
+<form id="signin" hidden>
+  <h2>Sign in</h2>
+  <p>Type the church passphrase to make a letter.</p>
+  <input id="passphrase" type="password" autocomplete="current-password" aria-label="Church passphrase">
+  <button class="hot" id="signin-btn" type="submit">Sign in</button>
+  <p class="note" id="signin-note" role="status"></p>
+</form>
+
+<main id="maker" hidden>
+  <section class="col">
+    <h2>Your text</h2>
+    <textarea id="text" spellcheck="true" aria-label="Letter text" placeholder="November Update
+
+What a great start to the year! (the first paragraph is the lead)
+
+Each paragraph after it gets a sparkle bullet.
+
+Upcoming Events
+
+11/4 - An event gets a date chip.
+
+Patrick Simpson
+Awana Ministry Director
+awana@kvbchurch.org | 290-0341"></textarea>
+    <details>
+      <summary>How the text is laid out</summary>
+      <ul>
+        <li>The first line is the <b>title</b>; the first paragraph is the <b>lead</b>.</li>
+        <li>Every other paragraph (or a line starting <code>- </code>) is a <b>reminder</b> with a sparkle bullet.</li>
+        <li>A short line with no period is a <b>section heading</b> (or start a line with <code>## </code>).</li>
+        <li><code>11/4 - text</code> or <code>Nov 4 - text</code> is an <b>event</b> with a date chip.</li>
+        <li>A paragraph after a section's events is a <b>callout box</b>.</li>
+        <li>The last 2 to 5 short lines are the <b>signature</b>.</li>
+        <li>Web and email addresses become links. Long text shrinks to stay on one page.</li>
+      </ul>
+    </details>
+  </section>
+  <section class="col out">
+    <div class="actions">
+      <button class="hot" type="button" id="print" disabled>Print / Save as PDF</button>
+      <span id="fit" role="status"></span>
+    </div>
+    <div class="sheet" id="sheet"><iframe id="preview" title="Letter preview"></iframe></div>
+  </section>
+</main>
+<script type="module" src="./app.js"></script>
+</body>
+</html>
