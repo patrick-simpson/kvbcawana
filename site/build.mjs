@@ -151,7 +151,7 @@ run(`node scripts/stamp-build.mjs ${hashTree(path.join(ROOT, 'classroom', 'publi
 // /tools/letterhead: the letterhead maker (site/tools/letterhead/, owner 2026-10-28), signed
 // in with the church passphrase. Its page drawing is shared/letterhead.js, copied beside it
 // with the two sign-in modules (the lobby's /lobby/shared/ copy carries no .js). The kit it
-// draws with is the lobby's /lobby/shared/brand/. Never linked; noindex as /tools/* below.
+// draws with is the lobby's /lobby/shared/brand/. On /links (owner); noindex as /tools/* below.
 {
   const toolOut = path.join(OUT, 'tools', 'letterhead');
   mkdirSync(path.join(toolOut, 'shared'), { recursive: true });
