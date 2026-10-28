@@ -197,11 +197,7 @@
   .switchrow input:checked { background: var(--good); }
   .switchrow input:checked::after { translate: 24px 0; }
   /* Family order (owner 2026-10-15): two chips in the + menu, under the Simple check-in switch. */
-  .sortrow { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; }
-  .sortrow b { font-family: var(--f-shout); font-weight: 400; font-size: 20px; color: var(--c-blue-deep); }
-  #sort-pick { grid-template-columns: 1fr 1fr; --c: var(--c-blue); --d: var(--c-blue-deep); }
-  .sortnote { font-weight: 600; color: var(--ink-faint); }
-  .fam, .fcard, .card, .famsm { border: none; cursor: pointer; text-align: left; background: #fff; position: relative; overflow: hidden; min-width: 0;
+  .fam, .fcard, .card { border: none; cursor: pointer; text-align: left; background: #fff; position: relative; overflow: hidden; min-width: 0;
     box-shadow: 0 2px 10px rgba(15,23,42,.08); }
   .fam { display: flex; flex-direction: column; justify-content: center; justify-content: safe center; gap: 4px; padding: 6px 10px 6px 16px; border-radius: 16px; }
   .fam::before, .fcard::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 7px; background: linear-gradient(var(--stripe)); }
@@ -241,13 +237,6 @@
   .kid[data-state] { white-space: normal; font-size: 13px; line-height: 1.2; }
   .kid .st { font-weight: 700; }
   .card .tag { margin-left: auto; font-family: var(--f-label); font-size: 14px; letter-spacing: .05em; text-transform: uppercase; padding: 3px 9px; border-radius: 999px; background: #E2E8F0; color: #475569; white-space: nowrap; }
-  .away { margin-top: 18px; }
-  .away .lead { color: var(--ink-faint); }
-  .awayrow { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; }
-  .famsm { display: flex; align-items: center; gap: 7px; height: 44px; padding: 0 10px; border-radius: 12px; box-shadow: 0 1px 4px rgba(15,23,42,.08); }
-  .famsm .dots { display: flex; gap: 3px; flex: none; }
-  .famsm .nm { font-family: var(--f-shout); font-size: 16px; color: #334155; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0; }
-  .famsm .n { font-weight: 700; font-size: 13px; color: var(--ink-faint); background: #F1F5F9; border-radius: 999px; padding: 1px 7px; }
 
   /* ── Sheets ── */
   .scrim { position: fixed; inset: 0; background: rgba(15,23,42,.36); opacity: 0; pointer-events: none; transition: opacity .2s ease; z-index: 20; }
@@ -352,15 +341,15 @@
   .toast :focus-visible { outline-color: var(--c-sun); }
 
   /* ── Jelly: the touch check-in's, the lobby's spring ── */
-  .fam, .fcard, .card, .famsm, .btn, .go1, .opt, .pill, .round, .row button, .cpick button, .mode-btn, .undo-btn { transform-origin: 50% 100%;
+  .fam, .fcard, .card, .btn, .go1, .opt, .pill, .round, .row button, .cpick button, .mode-btn, .undo-btn { transform-origin: 50% 100%;
     transition-property: scale, translate, border-color, background; transition-duration: 520ms;
     transition-timing-function: cubic-bezier(.34,1.56,.64,1);
     transition-timing-function: linear(0, 0.213, 0.605, 0.93, 1.103, 1.142, 1.106, 1.05, 1.006, 0.984, 0.98, 0.986, 0.994, 1, 1.002, 1.003, 1); }
-  .fam:active, .fcard:active, .card:active, .famsm:active, .go1:active { scale: 1.03 .92; translate: 0 3px; transition-duration: 80ms; transition-timing-function: ease-out; }
+  .fam:active, .fcard:active, .card:active, .go1:active { scale: 1.03 .92; translate: 0 3px; transition-duration: 80ms; transition-timing-function: ease-out; }
   .btn:active, .opt:active, .pill:active, .round:active, .row button:active, .cpick button:active, .mode-btn:active, .undo-btn:active { scale: 1.06 .9; translate: 0 3px; transition-duration: 80ms; transition-timing-function: ease-out; }
   .card.in:active { scale: none; translate: none; }
   @keyframes land { 0% { opacity: 0; translate: 0 16px; scale: .84 1.16; } 45% { opacity: 1; translate: 0 -3px; scale: 1.07 .93; } 70% { translate: 0 0; scale: .98 1.02; } 100% { opacity: 1; translate: 0 0; scale: 1 1; } }
-  .fam, .fcard, .card, .famsm, .tile, .noclub { animation: land 480ms cubic-bezier(.3,.7,.4,1) both; }
+  .fam, .fcard, .card, .tile, .noclub { animation: land 480ms cubic-bezier(.3,.7,.4,1) both; }
   .stay { animation: none !important; }
   .ghosts { position: fixed; inset: 0; pointer-events: none; z-index: 4; overflow: hidden; }
   .ghosts > * { position: fixed; display: block !important; margin: 0 !important; }
@@ -467,13 +456,6 @@
       <span><b>Simple check-in</b><br><span class="quiet">One tap checks a child in; a family has its own “Check in all” button. No Bible or Brought a friend boxes.</span></span>
       <input type="checkbox" id="simple-toggle" role="switch">
     </label>
-    <div class="sortrow" role="radiogroup" aria-labelledby="sort-h">
-      <span id="sort-h"><b>Order families by</b></span>
-      <div class="cpick" id="sort-pick">
-        <button type="button" role="radio" data-sort="arrival">Usually first</button>
-        <button type="button" role="radio" data-sort="name">Last name</button>
-      </div>
-    </div>
   </div>
   <div class="menu-sec" id="reprint-panel">
     <h3>Reprint a name tag</h3>
@@ -752,16 +734,6 @@ var STATE = {};                // child key -> { status: 'pending'|'waiting'|'do
 var SERVER_TONIGHT = null;     // GET /v1/desk/tonight: the Worker's own count, when it answers
 var OPS = {};                  // Tonight row key -> { kind: 'undo'|'checkout', status: 'pending'|'waiting', left? } (the same queue)
 var LOCAL = { night: '', walkins: [], out: [], at: {} };   // what only this page knows tonight
-// Who was here the last two club nights: { names: {normName: true}, ids: {clubberId: true} }
-// or null. Built in THIS page's memory from the sealed history (desk.recentAttendance(),
-// opened with the history key the passphrase sign-in unwrapped), never stored; null
-// (nobody shown as away) until it is ready, and for good when it cannot be read.
-var RECENT = null;
-var recentAskedAt = 0;
-// The Worker's own answer (recent.js, owner 2026-10-15): each roster child carries `away`
-// once the last two club nights are known; then it wins over RECENT, on every phone.
-var AWAY_READY = false;
-var RECENT_RETRY_MS = 5 * 60 * 1000;
 var rosterLoaded = false;
 var unlockedState = false;
 var unlockInFlight = false;
@@ -806,13 +778,9 @@ var ONE_TAP_KEY = 'awanaSimpleCheckin.v1';
 var ONE_TAP = (function() { try { return localStorage.getItem(ONE_TAP_KEY) !== 'off'; } catch (e) { return true; } })();
 var LAST_IN_MS = 30 * 1000;   // owner 2026-10-22: half the old minute
 var lastIn = null;             // { kids, label, until, timer }: the last check-in tap, for the big Undo
-// Family order (owner 2026-10-15: "sort family tiles by who usually arrives first with an
-// option to sort by last name"; "Whole season"): the Worker sends each child's `usual`, the
-// average minutes after midnight it was first seen this season (recent.js usualOf). A family
-// goes by its earliest child's usual; families never timed follow, by last name. This phone's
-// choice, in the + menu.
-var SORT_KEY = 'awanaCheckinSort.v1';
-var SORT = (function() { try { return localStorage.getItem(SORT_KEY) === 'name' ? 'name' : 'arrival'; } catch (e) { return 'arrival'; } })();           // { today, next, meeting } on a day with no club: a test day (desk.js TEST DAYS)
+// Family order (owner 2026-10-28: "should only order by last name, skip the most recent
+// check-in thingy"): families by last name (groupFamilies), always; no "usually first"
+// order and no "Not here the last two club nights" row.           // { today, next, meeting } on a day with no club: a test day (desk.js TEST DAYS)
 var NO_CLUB_POLL_MS = 60 * 1000;
 var noClubWords = null;        // desk-transport.js's words for the note
 
@@ -1127,7 +1095,6 @@ function signOut(message) {
   KIDS = [];
   HOUSEHOLDS = null; familiesAt = 0; familiesStamp = null;
   SERVER_TONIGHT = null;
-  RECENT = null; recentAskedAt = 0;
   leaderSelection = {};
   renderLeaderChips([]);
   rosterLoaded = false; rosterTries = 0; lastRosterAt = 0; rosterSlow = false;
@@ -1217,8 +1184,7 @@ function applyRoster(data) {
     var was = old['id:' + String(k.clubberId)];
     if (hadRoster && was && !was.checkedIn && k.checkedIn && !Object.prototype.hasOwnProperty.call(STATE, 'id:' + String(k.clubberId))
       && (!ONLY || ONLY.indexOf(clubKit(k.club || '')) !== -1)) news.push({ name: (String(k.first || '') + ' ' + String(k.last || '')).trim(), out: false });
-    return { clubberId: String(k.clubberId), name: (String(k.first || '') + ' ' + String(k.last || '')).trim(), club: k.club || '', clubId: k.clubId || '', checkedIn: !!k.checkedIn, away: k.away === true,
-      usual: typeof k.usual === 'number' && k.usual >= 0 && k.usual < 1440 ? k.usual : null };
+    return { clubberId: String(k.clubberId), name: (String(k.first || '') + ' ' + String(k.last || '')).trim(), club: k.club || '', clubId: k.clubId || '', checkedIn: !!k.checkedIn };
   }).filter(function(sk) {
     return !ONLY || ONLY.indexOf(clubKit(sk.club)) !== -1;
   }).map(function(sk) {
@@ -1237,8 +1203,6 @@ function applyRoster(data) {
   });
   if (outMoved) saveLocal();
   if (news.length) showNews(news);
-  // "Not here the last two club nights" from the Worker (owner 2026-10-15): every phone, no passphrase.
-  AWAY_READY = data.awayReady === true;
   ITEMS = data.items || { bible: [], friend: [] };
   $('down-note').hidden = !data.stale;
   fillClubSelects();
@@ -1331,27 +1295,6 @@ function itemsFor(club) {
   var has = function(list) { return (list || []).some(function(c) { return clubKit(c) && clubKit(c) === clubKit(club); }); };
   return { bible: has(ITEMS.bible), friend: has(ITEMS.friend) };
 }
-function isAway(f) {
-  if (AWAY_READY) return f.kids.every(function(k) { return !!(k.kid && k.kid.away === true); });
-  if (!RECENT) return false;
-  return f.kids.every(function(k) { return !RECENT.names[norm(k.name)] && !(k.kid && RECENT.ids[k.kid.clubberId]); });
-}
-// After the roster is on screen, never in the way of a check-in: the history's
-// last two club nights, read once (again after a while if it could not be).
-function loadRecent() {
-  if (RECENT || AWAY_READY || SIMPLE || !desk || !desk.canReadHistory) return;   // the Worker's answer wins
-  if (recentAskedAt && Date.now() - recentAskedAt < RECENT_RETRY_MS) return;
-  recentAskedAt = Date.now();
-  desk.recentAttendance(2).then(function(r) {
-    if (!r || !unlockedState) return;
-    var names = {}, ids = {};
-    r.names.forEach(function(n) { names[norm(n)] = true; });
-    r.ids.forEach(function(id) { ids[id] = true; });
-    RECENT = { names: names, ids: ids };
-    if (!$('fampage').classList.contains('on') && openSheet !== 'kid-sheet') render();
-  });
-}
-
 // ── Smooth redraws (the touch check-in's): keyed tiles, FLIP, pop-outs ─────
 var SPRING = 'linear(0, 0.213, 0.605, 0.93, 1.103, 1.142, 1.106, 1.05, 1.006, 0.984, 0.98, 0.986, 0.994, 1, 1.002, 1.003, 1)';
 var kd = { prev: {}, next: {}, fresh: 0 };
@@ -1478,18 +1421,6 @@ function famCard(f, hits) {
   b.onclick = function() { famClick(f); };
   return withAllButton(b, f);
 }
-function awayButton(f, prefix) {
-  var b = keyed('button', 'famsm', prefix + f.key);
-  b.dataset.names = names(f);
-  var dots = el('span', 'dots');
-  f.kids.forEach(function(c) { var d = el('span', 'dot'); d.style.setProperty('--c', clubOf(c.clubName).color); dots.appendChild(d); });
-  b.appendChild(dots);
-  b.appendChild(el('span', 'nm', f.kids.length === 1 ? f.kids[0].name : f.name));
-  if (f.kids.length > 1) b.appendChild(el('span', 'n', String(f.kids.length)));
-  b.setAttribute('aria-label', famLabel(f));
-  b.onclick = function() { famClick(f); };
-  return b;
-}
 function kidCard(p) {
   var club = clubOf(p.clubName);
   var b = keyed('button', 'card' + (p.checkedIn ? ' in' : ''), 'c:' + p.recid);
@@ -1571,31 +1502,11 @@ function renderList() {
   renderCount();
 }
 
-// A family's usual arrival: its earliest child's (null when none was ever timed).
-function usualOf(f) {
-  var best = null;
-  f.kids.forEach(function(k) { var u = k.kid && k.kid.usual; if (typeof u === 'number' && isFinite(u) && (best == null || u < best)) best = u; });
-  return best;
-}
-// SORT 'arrival': timed families first, earliest first; the rest keep groupFamilies' last-name order.
-function byArrival(fams) {
-  if (SORT !== 'arrival') return fams;
-  return fams.map(function(f, i) { return { f: f, i: i, u: usualOf(f) }; }).sort(function(a, b) {
-    if (a.u != null && b.u != null) return a.u - b.u || a.i - b.i;
-    if (a.u != null) return -1;
-    if (b.u != null) return 1;
-    return a.i - b.i;
-  }).map(function(x) { return x.f; });
-}
-// Families still to come (the search box is empty): the "Not here" list too.
+// Families still to come (the search box is empty), by last name.
 function renderFamilies(list) {
-  var all = groupFamilies(waitingPeople(), HOUSEHOLDS);
-  if (!all.length) { list.appendChild(el('div', 'cheer', 'Everyone’s checked in!')); return; }
-  var main = byArrival(all.filter(function(f) { return !isAway(f); }));
-  var away = all.filter(isAway);
-  if (!main.length) { main = away; away = []; }
+  var main = groupFamilies(waitingPeople(), HOUSEHOLDS);
+  if (!main.length) { list.appendChild(el('div', 'cheer', 'Everyone’s checked in!')); return; }
   var lead = el('div', 'lead', main.length + (main.length === 1 ? ' family' : ' families') + ' still to come');
-  if (SORT === 'arrival' && main.some(function(f) { return usualOf(f) != null; })) lead.appendChild(el('span', 'sortnote', ' · earliest arrivals first'));
   list.appendChild(lead);
   var W = list.clientWidth - 24;
   var H = window.innerHeight - (list.getBoundingClientRect().top + (window.scrollY || 0)) - 60;   // from the page's top: the same at any scroll
@@ -1612,18 +1523,10 @@ function renderFamilies(list) {
   grid.style.gridAutoRows = Math.floor(h) + 'px';
   main.forEach(function(f) { grid.appendChild(famTile(f, { w: w, h: h })); });
   list.appendChild(grid);
-  if (away.length) {
-    var box = el('div', 'away');
-    box.appendChild(el('div', 'lead', 'Not here the last two club nights · ' + away.length));
-    var row = el('div', 'awayrow');
-    away.forEach(function(f) { row.appendChild(awayButton(f, 'a:')); });
-    box.appendChild(row);
-    list.appendChild(box);
-  }
 }
 
-// Typing: households first, then the children on their own panel, "Did you
-// mean" families, and families not here lately only at the bottom.
+// Typing: households first, then the children on their own panel, then "Did you
+// mean" families.
 function renderSearch(list, q) {
   var everyone = KIDS.map(person);
   var r = searchPeople(everyone, q);
@@ -1643,14 +1546,9 @@ function renderSearch(list, q) {
   }
   var exact = famsFor(r.matches);
   var near = norm(q).length >= 3 ? famsFor(r.close) : [];
-  var away = exact.concat(near).filter(isAway);
-  exact = exact.filter(function(f) { return !isAway(f); });
-  near = near.filter(function(f) { return !isAway(f); });
-  var awayKid = {};
-  away.forEach(function(f) { f.kids.forEach(function(k) { awayKid[k.recid] = true; }); });
   // A child who is a family of one is already their family card; the panel
   // lists the brothers and sisters the cards hold, and anyone already in.
-  var kids = r.matches.filter(function(p) { return !awayKid[p.recid] && (p.checkedIn || (famOf[p.recid] && famOf[p.recid].kids.length > 1)); });
+  var kids = r.matches.filter(function(p) { return p.checkedIn || (famOf[p.recid] && famOf[p.recid].kids.length > 1); });
 
   if (exact.length) {
     list.appendChild(el('div', 'sec', exact.length === 1 ? 'Family' : 'Families'));
@@ -1672,15 +1570,7 @@ function renderSearch(list, q) {
     panel.appendChild(g3);
     list.appendChild(panel);
   }
-  if (away.length) {
-    var box = el('div', 'away');
-    box.appendChild(el('div', 'lead', 'Not here the last two club nights'));
-    var row = el('div', 'awayrow');
-    away.forEach(function(f) { row.appendChild(awayButton(f, 's:')); });
-    box.appendChild(row);
-    list.appendChild(box);
-  }
-  if (!exact.length && !near.length && !kids.length && !away.length) {
+  if (!exact.length && !near.length && !kids.length) {
     list.appendChild(el('div', 'note', 'No child matches “' + q.trim() + '”. Not on the list? Tap + for a walk-in name tag.'));
   }
 }
@@ -1872,7 +1762,6 @@ function openKid(p) {
   s.appendChild(el('div', 'bar'));
   s.appendChild(el('div', 'nm', p.name));
   s.appendChild(el('div', 'cl', p.clubName || ''));
-  if (isAway({ kids: [p] })) s.appendChild(el('div', 'sub', 'Not here the last two club nights'));
   if (items.bible || items.friend) {
     var opts = el('div', 'opts');
     if (items.bible) opts.appendChild(optButton('Bible', choice.bible, function(v) { choice.bible = v; }));
@@ -2668,7 +2557,6 @@ function refreshAll() {
       rosterFetchInFlight = false;
       paint();
       scheduleRosterPoll();
-      setTimeout(loadRecent, 0);
     });
   }).catch(function(e) {
     rosterFetchInFlight = false;
@@ -2883,21 +2771,6 @@ function checkoutEntry(entry) {
 // reprint job, never a check-in, nothing sent to TwoTimTwo). The youth page's
 // menu is the walk-in tag alone, for its own clubs.
 $('menu-btn').addEventListener('click', function() { refreshLeaders(); fillClubSelects(); $('simple-toggle').checked = ONE_TAP; showSheet('menu-sheet'); });
-function paintSort() {
-  document.querySelectorAll('#sort-pick button').forEach(function(b) {
-    var on = b.dataset.sort === SORT;
-    b.setAttribute('aria-checked', on ? 'true' : 'false');
-  });
-}
-paintSort();
-document.querySelectorAll('#sort-pick button').forEach(function(b) {
-  b.addEventListener('click', function() {
-    SORT = b.dataset.sort === 'name' ? 'name' : 'arrival';
-    try { localStorage.setItem(SORT_KEY, SORT); } catch (e) { /* this load only */ }
-    paintSort();
-    render();
-  });
-});
 $('simple-toggle').checked = ONE_TAP;
 $('simple-toggle').addEventListener('change', function() {
   ONE_TAP = $('simple-toggle').checked;

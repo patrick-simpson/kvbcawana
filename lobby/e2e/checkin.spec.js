@@ -660,27 +660,18 @@ test('a test day (no club today, owner 2026-10-15): the real list, a yellow stri
   await expect(page.locator('#mode-btn')).toBeVisible();
 });
 
-test('"Not here the last two club nights" from the service (owner 2026-10-15): every phone, even a restored session with no history key', async ({ page }) => {
+test('one list by last name (owner 2026-10-28): a family the service marks as away is not split off', async ({ page }) => {
   test.setTimeout(60_000);
   const { world } = await stubSite(page);
   world.busyFirst = false;
   world.awayReady = true;
-  // Cy was not here the last two club nights; the Testers and Tia were.
+  // The service says Cy was not here the last two club nights: he stays in the one list.
   for (const k of world.kids) k.away = k.clubberId === '13';
   await signIn(page);
-  await expect(page.locator('#list')).toContainText('still to come', { timeout: 10_000 });
-  // A reload restores the session WITHOUT the history key: the page's own reading is off, the service's still works.
-  await page.reload();
-  await expect(page.locator('#list')).toContainText('Not here the last two club nights', { timeout: 10_000 });
-  const lead = page.locator('#list .lead', { hasText: 'still to come' });
-  await expect(lead).toHaveText(/^2 families still to come$/);
-  await expect(page.locator('#list')).toContainText('Cy Other');
-  expect(world.historyCalls).toHaveLength(0);
-  // Before both nights are known, nobody is sent to the bottom.
-  world.awayReady = false;
-  await page.reload();
   await expect(page.locator('#list')).toContainText('3 families still to come', { timeout: 10_000 });
+  await expect(page.locator('#list .fams .fam', { hasText: 'Cy Other' })).toHaveCount(1);
   await expect(page.locator('#list')).not.toContainText('Not here the last two club nights');
+  expect(world.historyCalls).toHaveLength(0);
 });
 
 test('simple check-in (owner 2026-10-15): on by default, one tap for a child, "Check in all" for a family, attendance only, Undo', async ({ page }) => {
@@ -735,54 +726,56 @@ test('simple check-in (owner 2026-10-15): on by default, one tap for a child, "C
   expect(await page.evaluate(() => localStorage.getItem('awanaSimpleCheckin.v1'))).toBe('off');
 });
 
-test('family order (owner 2026-10-15): earliest usual arrival first by default, last name from the + menu', async ({ page }) => {
+test('family order (owner 2026-10-28: "only order by last name"): usual arrival times are ignored, and there is no order switch', async ({ page }) => {
   const { world } = await stubSite(page, { simple: true });
   world.busyFirst = false;
+  // An old choice of "usually first" on this phone changes nothing.
+  await page.addInitScript(() => localStorage.setItem('awanaCheckinSort.v1', 'arrival'));
   // Tester (no times), Zed Solo usually 6:20, the Pairs usually 6:05 (Bo) and 6:40 (Amy).
   world.kids.push({ clubberId: '20', first: 'Zed', last: 'Solo', club: 'Sparks', clubId: '2', checkedIn: false, usual: 18 * 60 + 20 },
     { clubberId: '30', first: 'Amy', last: 'Pair', club: 'Cubbies', clubId: '1', checkedIn: false, usual: 18 * 60 + 40 },
     { clubberId: '31', first: 'Bo', last: 'Pair', club: 'Sparks', clubId: '2', checkedIn: false, usual: 18 * 60 + 5 });
   world.households = [...world.households, ['Amy Pair', 'Bo Pair']];
   await signIn(page);
-  await expect(page.locator('#list')).toContainText('earliest arrivals first', { timeout: 10_000 });
+  await expect(page.locator('#list')).toContainText('still to come', { timeout: 10_000 });
+  await expect(page.locator('#list')).not.toContainText('earliest arrivals first');
   const order = () => page.locator('#list .fams .fam').evaluateAll((els) => els.map((e) => e.textContent));
   const firstOf = async (names) => { const o = await order(); return names.map((n) => o.findIndex((t) => t.includes(n))); };
-  const [pair, solo, tester] = await firstOf(['Pair', 'Zed Solo', 'Tester']);
+  // Other, Pair, Solo, Tester: by last name.
+  const [other, pair, solo, tester] = await firstOf(['Cy Other', 'Pair', 'Zed Solo', 'Tester']);
+  expect(other).toBeLessThan(pair);
   expect(pair).toBeLessThan(solo);
   expect(solo).toBeLessThan(tester);
-  // Last name, from the + menu, kept on this phone.
-  await page.locator('#menu-btn').click();
-  await expect(page.getByRole('radio', { name: 'Usually first' })).toHaveAttribute('aria-checked', 'true');
-  await page.getByRole('radio', { name: 'Last name' }).click();
-  await page.locator('#menu-close').click();
-  await expect(page.locator('#list')).not.toContainText('earliest arrivals first');
-  const [pair2, solo2, tester2] = await firstOf(['Pair', 'Zed Solo', 'Tester']);
-  expect(pair2).toBeLessThan(solo2);
-  expect(solo2).toBeLessThan(tester2);   // P, S, T: alphabetical happens to agree here...
-  world.kids.find((k) => k.clubberId === '20').last = 'Aaron';   // ...so move Zed to the front of the alphabet
+  // The earliest arrival with a late last name stays where the alphabet puts it.
+  world.kids.find((k) => k.clubberId === '31').usual = 17 * 60;
+  world.kids.find((k) => k.clubberId === '20').last = 'Aaron';
   await page.reload();
   await expect(page.locator('#list')).toContainText('still to come', { timeout: 10_000 });
-  const [pair3, solo3] = await firstOf(['Pair', 'Zed Aaron']);
-  expect(solo3).toBeLessThan(pair3);
-  expect(await page.evaluate(() => localStorage.getItem('awanaCheckinSort.v1'))).toBe('name');
+  const [aaron, other2, pair2] = await firstOf(['Zed Aaron', 'Cy Other', 'Pair']);
+  expect(aaron).toBe(0);
+  expect(other2).toBeLessThan(pair2);
+  // The + menu has no order to choose.
+  await page.locator('#menu-btn').click();
+  await expect(page.getByRole('radio', { name: 'Usually first' })).toHaveCount(0);
+  await expect(page.getByRole('radio', { name: 'Last name' })).toHaveCount(0);
 });
 
-test('the youth page has the big Undo and the family order too', async ({ page }) => {
+test('the youth page has the big Undo, and families by last name', async ({ page }) => {
   const { world } = await stubSite(page, { simple: true });
   world.busyFirst = false;
   // Tia Youth (no times) and Max Early, usually 6:02.
   world.kids.push({ clubberId: '40', first: 'Max', last: 'Early', club: 'Journey', clubId: '6', checkedIn: false, usual: 18 * 60 + 2 });
   await signIn(page, '/checkin/ym/');
-  await expect(page.locator('#list')).toContainText('2 families still to come · earliest arrivals first', { timeout: 10_000 });
+  await expect(page.locator('#list .lead', { hasText: 'still to come' })).toHaveText(/^2 families still to come$/, { timeout: 10_000 });
   await expect(page.locator('#list .fams .fam').first()).toHaveText(/Max Early/);
   // One tap, then the big Undo, which undoes it on TwoTimTwo.
   await page.locator('.fam', { hasText: 'Max Early' }).click();
   await expect(page.locator('#undo-msg')).toHaveText('Checked in: Max Early', { timeout: 10_000 });
   await page.locator('#undo-btn').click();
   await expect.poll(() => world.posts.filter((p) => p.path === '/v1/desk/undo' && p.body.clubberId === '40').length).toBe(1);
-  // The order is in its + menu.
+  // By last name (Early, Youth), with no order switch in its + menu.
   await page.locator('#menu-btn').click();
-  await expect(page.getByRole('radio', { name: 'Last name' })).toBeVisible();
+  await expect(page.getByRole('radio', { name: 'Last name' })).toHaveCount(0);
 });
 
 test('a wrong passphrase stays on the sign-in, and a signed-out session returns to it', async ({ page }) => {
@@ -814,42 +807,28 @@ async function sealedRow(history, night, kind, record) {
   return { id, night, kind, ...(await cc.sealRow(history.pub, { id, night, kind, record })) };
 }
 
-test('"Not here the last two club nights" is rebuilt in the page from the sealed history, memory only', async ({ page }) => {
+test('the page reads no attendance history (owner 2026-10-28): Tia, who never came, is in the one list like anyone', async ({ page }) => {
   test.setTimeout(60_000);
   const { world, history } = await stubSite(page);
   world.busyFirst = false;
-  // Ada was here last week; Cy two weeks ago; Ben checked in and was undone; Tia never came.
+  // Sealed history the old "Not here" row was built from: nothing reads it now.
   world.history = {
-    '2026-01-14': [
-      await sealedRow(history, '2026-01-14', 'checkin', { ts: 1, first: 'Ada', last: 'Tester', club: 'Cubbies', clubberId: '11', source: 'desk' }),
-      await sealedRow(history, '2026-01-14', 'checkin', { ts: 2, first: 'Ben', last: 'Tester', club: 'Sparks', clubberId: '12', source: 'desk' }),
-      await sealedRow(history, '2026-01-14', 'undo', { ts: 3, first: 'Ben', last: 'Tester', club: 'Sparks', clubberId: '12', source: 'desk' }),
-    ],
+    '2026-01-14': [await sealedRow(history, '2026-01-14', 'checkin', { ts: 1, first: 'Ada', last: 'Tester', club: 'Cubbies', clubberId: '11', source: 'desk' })],
     '2026-01-07': [await sealedRow(history, '2026-01-07', 'checkin', { ts: 1, first: 'Cy', last: 'Other', club: 'T&T', clubberId: '13', source: 'ttt' })],
   };
   await signIn(page);
-  const away = page.locator('.away', { hasText: 'Not here the last two club nights · 1' });
-  await expect(away).toBeVisible({ timeout: 10_000 });
-  await expect(away.locator('.famsm')).toHaveText(/Tia Youth/);
-  await expect(page.locator('.fam', { hasText: 'Tester' })).toHaveCount(1);   // Ada was here: the family is not away
-  await expect(page.locator('.fam', { hasText: 'Cy Other' })).toHaveCount(1);
-  // Typing finds her at the bottom, and her card says so; she checks in like anyone else.
+  await expect(page.locator('#list')).toContainText('3 families still to come', { timeout: 10_000 });
+  await expect(page.locator('#list .fams .fam', { hasText: 'Tia Youth' })).toHaveCount(1);
+  await page.waitForTimeout(500);
+  await expect(page.locator('#list')).not.toContainText('Not here');
+  // Typing finds her with everyone else; her card says nothing about missed nights.
   await search(page).fill('Tia');
-  await expect(page.locator('.away .lead')).toHaveText('Not here the last two club nights');
-  await page.locator('.away .famsm').click();
-  await expect(page.locator('#kid-sheet .sub')).toHaveText('Not here the last two club nights');
+  await expect(page.locator('#list')).not.toContainText('Not here');
+  await page.locator('.fcard', { hasText: 'Tia Youth' }).first().click();
+  await expect(page.locator('#kid-sheet .sub')).toHaveCount(0);
   await page.locator('#kid-sheet').getByRole('button', { name: 'Check in' }).click();
   await expect(page.locator('#toast')).toContainText('Tia Youth is checked in');
-  // Worker (D1) reads only: one nights list and each night's rows, once; nothing kept in storage.
-  expect(world.historyCalls.filter((c) => c === '/v1/history/nights')).toHaveLength(1);
-  expect(world.historyCalls.filter((c) => c.startsWith('/v1/history/rows'))).toHaveLength(2);
-  const stored = await page.evaluate(() => JSON.stringify({ ...localStorage, ...sessionStorage }));
-  expect(stored).not.toMatch(/Tia|Cy Other|Ada|privateKey|d":/);
-  // A reload takes up the session without the passphrase: no key, so nobody is shown away.
-  await page.reload();
-  await expect(page.locator('#list')).toContainText('families still to come', { timeout: 10_000 });
-  await page.waitForTimeout(500);
-  await expect(page.locator('.away')).toHaveCount(0);
+  expect(world.historyCalls).toHaveLength(0);
 });
 
 test('remembered leaders come from the church settings; a new leader tag adds one; no route, no chips', async ({ page }) => {
