@@ -846,17 +846,16 @@ export default function App() {
   // Memoized on exactly the inputs buildCalendarSlides reads: a fresh array
   // every render used to restart the background slideshow's hold timer on
   // every App re-render (i.e. every event), stalling the show on one slide.
-  const { calendarEnabled, calendarWelcomeText, calendarShowWelcome, calendarShowNextWeek, calendarShowRemaining } = config;
+  const { calendarEnabled, calendarShowWelcome, calendarShowNextWeek, calendarShowRemaining } = config;
   const calendarSlides = useMemo(() => calendarSlidesFor({
     enabled: calendarEnabled,
     events: calendar.events,
     todayStr,
     specialDates,
-    welcomeText: calendarWelcomeText,
     showWelcome: calendarShowWelcome,
     showNextWeek: calendarShowNextWeek,
     showRemaining: calendarShowRemaining,
-  }), [calendarEnabled, calendar.events, todayStr, specialDates, calendarWelcomeText, calendarShowWelcome, calendarShowNextWeek, calendarShowRemaining]);
+  }), [calendarEnabled, calendar.events, todayStr, specialDates, calendarShowWelcome, calendarShowNextWeek, calendarShowRemaining]);
 
   // This season's event promos (src/lib/promos.js) — ONE slot however many are
   // live today, because three extra slides in an eight-slide deck would turn

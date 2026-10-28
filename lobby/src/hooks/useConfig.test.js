@@ -58,7 +58,6 @@ describe('sanitizeOverrides', () => {
     const overrides = {
       calendarEnabled: false,
       calendarUrl: 'https://example.org/calendar',
-      calendarWelcomeText: 'Welcome to KVB Awana!',
       showWeatherChip: true,
       weatherLocationName: 'Waterville, Maine',
       weatherLat: 44.552,

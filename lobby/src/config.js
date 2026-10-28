@@ -337,9 +337,6 @@ const config = {
   // with Ctrl+Shift+X when something looks wrong mid-event.
   panicMode: false,
 
-  // What the welcome slide says on an ordinary club night (special
-  // nights use their calendar title instead).
-  calendarWelcomeText: 'Welcome to Awana!',
 
   // Turn individual auto-slides off without losing the others.
   calendarShowWelcome: true,

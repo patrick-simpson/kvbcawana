@@ -40,7 +40,6 @@ export const SHARED_SPEC = {
   weatherUnits: { type: 'enum', values: ['fahrenheit', 'celsius'] },
   calendarEnabled: { type: 'bool' },
   calendarUrl: { type: 'url', max: 300 },
-  calendarWelcomeText: { type: 'string', max: 80 },
   calendarShowWelcome: { type: 'bool' },
   calendarShowNextWeek: { type: 'bool' },
   calendarShowRemaining: { type: 'bool' },

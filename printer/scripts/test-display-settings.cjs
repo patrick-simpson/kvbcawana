@@ -174,7 +174,7 @@ async function main() {
     check('a missing body is a 400', (await post('/api/display-settings', {})).status === 400);
     const phrases = {};
     for (let i = 0; i < 15; i += 1) phrases[`club${i}`] = 'p'.repeat(80);
-    const big = await post('/api/display-settings', { settings: { clubPhrases: phrases, weatherLocationName: 'x'.repeat(80), calendarWelcomeText: 'y'.repeat(80) } });
+    const big = await post('/api/display-settings', { settings: { clubPhrases: phrases, weatherLocationName: 'x'.repeat(80) } });
     check('the largest settings the caps admit still publish', big.status === 200, JSON.stringify(big.body));
   }
 

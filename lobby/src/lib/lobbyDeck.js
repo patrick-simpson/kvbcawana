@@ -41,15 +41,14 @@ export function visibleManualSlides(slides, todayStr) {
  * The calendar's auto-slides, or none with the calendar off.
  * @param {{
  *   enabled: boolean, events: any, todayStr: string, specialDates: any,
- *   welcomeText: any, showWelcome: any, showNextWeek: any, showRemaining: any,
+ *   showWelcome: any, showNextWeek: any, showRemaining: any,
  * }} q
  */
 export function calendarSlidesFor({
-  enabled, events, todayStr, specialDates, welcomeText, showWelcome, showNextWeek, showRemaining,
+  enabled, events, todayStr, specialDates, showWelcome, showNextWeek, showRemaining,
 }) {
   if (!enabled) return [];
   return buildCalendarSlides(deriveClubInfo(events, todayStr, specialDates), {
-    calendarWelcomeText: welcomeText,
     calendarShowWelcome: showWelcome,
     calendarShowNextWeek: showNextWeek,
     calendarShowRemaining: showRemaining,

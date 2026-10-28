@@ -186,11 +186,11 @@ describe('SettingsPanel: live apply, Undo and Done', () => {
     const props = happyProps();
     render(<SettingsPanel {...props} />);
     section('Slides & look');
-    const welcome = screen.getByLabelText('Calendar welcome wording (regular nights)');
-    fireEvent.change(welcome, { target: { value: 'Welcome to KVB Awana!' } });
+    const url = screen.getByLabelText('Calendar page URL');
+    fireEvent.change(url, { target: { value: 'https://example.org/calendar' } });
     expect(props.onChange).not.toHaveBeenCalled();
-    fireEvent.blur(welcome);
-    expect(props.onChange).toHaveBeenCalledWith({ calendarWelcomeText: 'Welcome to KVB Awana!' });
+    fireEvent.blur(url);
+    expect(props.onChange).toHaveBeenCalledWith({ calendarUrl: 'https://example.org/calendar' });
   });
 
   it('Enter in a typed field applies it too', () => {

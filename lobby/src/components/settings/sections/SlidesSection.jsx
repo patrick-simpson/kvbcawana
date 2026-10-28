@@ -197,15 +197,6 @@ export function CalendarSlidesCard({ form, set, today }) {
       />
       {form.calendarEnabled && (
         <>
-          <div className="field">
-            <label htmlFor="calwelcome">Calendar welcome wording (regular nights)</label>
-            <input
-              id="calwelcome" type="text" maxLength="80" value={form.calendarWelcomeText}
-              onChange={set('calendarWelcomeText')}
-              placeholder="Welcome to Awana!"
-            />
-            <span className="hint">Special nights use their calendar title instead — "Welcome to Water Night!".</span>
-          </div>
           <Toggle checked={form.calendarShowWelcome} onChange={set('calendarShowWelcome')}
             title="Welcome slide" hint="Tonight's greeting — or a pointer to the next club night." />
           <Toggle checked={form.calendarShowNextWeek} onChange={set('calendarShowNextWeek')}

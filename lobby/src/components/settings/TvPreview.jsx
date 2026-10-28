@@ -113,8 +113,8 @@ export function Stage({ form, focus, noticeDraft, publishedSlide, today, tonight
   const scene = sceneForSkin(skin) || 'sky';
   const slide = useMemo(() => (publishedSlide && !isVideoSlide(publishedSlide)
     ? publishedSlide
-    : { eyebrow: 'Tonight', text: form.calendarWelcomeText || 'Welcome to Awana!', subtext: 'A sample slide', textSize: 'auto' }),
-  [publishedSlide, form.calendarWelcomeText]);
+    : { eyebrow: 'Tonight', text: 'Welcome to Awana!', subtext: 'A sample slide', textSize: 'auto' }),
+  [publishedSlide]);
   const [sample] = useState(() => demoCheckout(getAllClubs(), SAMPLE_BOARD_NAMES, Date.now()));
   const decision = decideBoard({ checkout: sample, namesAbove: Number(form.checkoutBoardNamesAbove) || 0, staleMin: 120, now: sample.at, demo: true });
   const items = cornerItemsFor(form);

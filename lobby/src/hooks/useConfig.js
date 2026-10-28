@@ -76,7 +76,6 @@ const VALIDATORS = {
   aprilFools: bool,
   particleEffect: oneOf('auto', 'off', 'snow', 'rain', 'sparkle'),
   weatherTheme: bool,
-  calendarWelcomeText: string,
   calendarShowWelcome: bool,
   calendarShowNextWeek: bool,
   calendarShowRemaining: bool,
