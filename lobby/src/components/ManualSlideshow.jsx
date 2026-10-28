@@ -363,6 +363,14 @@ const playMuted = (el) => { el?.play?.()?.catch?.(() => {}); };
 function introPlayable() {
   if (typeof window === 'undefined') return false;
   if (window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches) return false;
+  // A phone or tablet shows the 16:9 frame centred (app.css, pointer: coarse):
+  // the intro plays in that frame, scaled down to the phone's width.
+  const touch = window.matchMedia?.('(pointer: coarse)')?.matches
+    && !document.documentElement.classList.contains('embedded');
+  if (touch) {
+    const width = Math.min(window.innerWidth, window.innerHeight * 16 / 9);
+    return introFits(width, (width * 9) / 16, true);
+  }
   return introFits(window.innerWidth, window.innerHeight);
 }
 

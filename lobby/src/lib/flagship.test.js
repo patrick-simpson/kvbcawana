@@ -120,6 +120,9 @@ describe('the 3D intro', () => {
     expect(introFits(1024, 768)).toBe(false); // 4:3
     expect(introFits(1920, 1200)).toBe(false); // 16:10
     expect(introFits(1920, 0)).toBe(false);
+    expect(introFits(390, 219.375)).toBe(false); // a phone's frame: too small for a TV
+    expect(introFits(390, 219.375, true)).toBe(true); // the phone's own 16:9 frame scales it down
+    expect(introFits(390, 300, true)).toBe(false); // not a 16:9 frame
   });
 
   it('begins and ends on the bounce style with the glad line, and is timed inside the video', () => {

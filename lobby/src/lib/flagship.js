@@ -186,15 +186,18 @@ export function flagshipIntroLap(lap) {
 }
 
 /**
- * Can a screen this size show it seamlessly? The video is 16:9 and is the
- * slide as a 16:9 screen draws it, with the FULL logo (a 16:9 screen under
- * 722px wide draws the two-line logo, flagship.css). Any other shape keeps
- * the plain flagship.
+ * Can a screen this size show it? The video is 16:9 and is the slide as a
+ * 16:9 screen draws it, with the FULL logo (a 16:9 screen under 722px wide
+ * draws the two-line logo, flagship.css). Any other shape keeps the plain
+ * flagship. A phone (`framed`, owner 2026-10-28) shows the 16:9 frame at its
+ * own width and the video scales down to it, so the size floor is waived.
  * @param {number} width
  * @param {number} height
+ * @param {boolean} [framed]  the screen is a phone's 16:9 frame (lobby.css)
  */
-export function introFits(width, height) {
-  return width >= 722 && height > 0 && Math.abs(width / height - 16 / 9) <= 0.03;
+export function introFits(width, height, framed = false) {
+  if (!(height > 0) || Math.abs(width / height - 16 / 9) > 0.03) return false;
+  return framed || width >= 722;
 }
 
 /** Test seam: forget the memory turn. */
