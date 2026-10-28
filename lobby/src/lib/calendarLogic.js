@@ -193,14 +193,9 @@ export function buildCalendarSlides(info, cfg = {}) {
         slides.push(slide('cal_welcome', {
           eyebrow: 'Tonight', text: `Welcome to ${title}!`, subtext: note, theme: 'sky', textSize: 'xl',
         }));
-      } else {
-        slides.push(slide('cal_welcome', {
-          eyebrow: 'Awana Clubs',
-          text: String(cfg.calendarWelcomeText || 'Welcome to Awana!'),
-          theme: 'sky',
-          textSize: 'xl',
-        }));
       }
+      // A regular night gets no welcome slide: the flagship welcome already
+      // says "Welcome to Awana!" at the head of the deck (owner 2026-10-28).
     } else if (info.nextNight) {
       // Off-day: point at the next night. Store/regular titles are not
       // announced — the date alone is the message.

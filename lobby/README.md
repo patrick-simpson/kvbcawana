@@ -206,9 +206,9 @@ church's Awana calendar and generates slides on its own (Settings →
 **Slides** → **Calendar slides**):
 
 - **Welcome** — "Welcome to Water Night!" on special nights (the calendar
-  title after any "` - `note" becomes a subtitle), or your own wording
-  ("Welcome to Awana!") on regular nights. On non-club days it points to
-  the next club night instead.
+  title after any "` - `note" becomes a subtitle). On regular nights there is
+  no welcome slide: the flagship already says "Welcome to Awana!". On non-club
+  days it points to the next club night instead.
 - **Next week** — "Next week is Backwards Night!" when something special is
   coming, "No club this/next week" on break weeks (with the comeback date),
   or "Club is on a break" across long gaps like summer. **Awana Store nights

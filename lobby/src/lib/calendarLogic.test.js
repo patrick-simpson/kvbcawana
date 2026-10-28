@@ -183,10 +183,11 @@ describe('buildCalendarSlides', () => {
     expect(welcome.eyebrow).toBe('Tonight');
   });
 
-  it('regular tonight → configurable welcome wording', () => {
+  it('regular tonight → no welcome slide (the flagship welcomes already)', () => {
     const info = deriveClubInfo([club('2026-09-16'), club('2026-09-23')], '2026-09-16');
     const slides = buildCalendarSlides(info, { calendarWelcomeText: 'Welcome to KVB Awana!' });
-    expect(byId(slides, 'cal_welcome').text).toBe('Welcome to KVB Awana!');
+    expect(byId(slides, 'cal_welcome')).toBeUndefined();
+    expect(JSON.stringify(slides)).not.toMatch(/Welcome to KVB Awana/);
   });
 
   it('off-day → points at the next night; special titles announced, regular just dated', () => {
@@ -440,7 +441,6 @@ describe('calendar slides in the lobby frame', () => {
   it('tonight and the countdown need no frame of their own', () => {
     const info = deriveClubInfo([club('2026-09-09'), club('2026-09-16')], '2026-09-09');
     const slides = buildCalendarSlides(info, {});
-    expect(byId(slides, 'cal_welcome').frame).toBeUndefined();
     expect(byId(slides, 'cal_remaining').frame).toBeUndefined();
   });
 });
