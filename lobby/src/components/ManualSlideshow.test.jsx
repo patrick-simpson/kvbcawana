@@ -563,3 +563,102 @@ describe('ManualSlideshow: a promo slot that sits out a lap', () => {
     expect(nextStep(0, [deck[0], { ...slot, promos: [null] }])).toBe(2);
   });
 });
+
+// The flagship's 3D intro (FlagshipIntro.jsx): which pass plays it, on which
+// screens, and that the intro (not the slideshow's timer) ends that showing.
+describe('ManualSlideshow: the flagship\'s 3D intro', () => {
+  const flagship = { id: 'flagship_welcome', type: 'flagship', durationSec: 10 };
+  const next = { id: 's_n', eyebrow: '', text: 'Next up', theme: 'sky', durationSec: 5 };
+  const media = { currentTime: 0, ended: false, readyState: 4, paused: true };
+  const props = ['currentTime', 'ended', 'readyState', 'paused'];
+  let size;
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    size = { w: window.innerWidth, h: window.innerHeight };
+    Object.assign(media, { currentTime: 0, ended: false, readyState: 4, paused: true });
+    const proto = window.HTMLMediaElement.prototype;
+    for (const p of props) Object.defineProperty(proto, p, { configurable: true, get: () => media[p], set: (v) => { media[p] = v; } });
+    proto.canPlayType = vi.fn(() => 'probably');
+    proto.play = vi.fn(() => { media.paused = false; return Promise.resolve(); });
+    proto.pause = vi.fn(() => { media.paused = true; });
+  });
+  afterEach(() => {
+    cleanup();
+    vi.useRealTimers();
+    const proto = window.HTMLMediaElement.prototype;
+    for (const p of props) delete proto[p];
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: size.w });
+    Object.defineProperty(window, 'innerHeight', { configurable: true, value: size.h });
+  });
+  const screenOf = (w, h) => {
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: w });
+    Object.defineProperty(window, 'innerHeight', { configurable: true, value: h });
+  };
+  const at = (ms) => act(() => vi.advanceTimersByTime(ms));
+  const intro = () => document.querySelector('video.flagship-intro');
+  const chrome = () => document.querySelector('.lobby-chrome');
+
+  it('plays on the second pass on a 16:9 screen, owns that showing\'s end, and hands the tab and waves over', () => {
+    screenOf(1920, 1080);
+    const keys = [];
+    const onSlide = ({ key }) => { if (keys.at(-1) !== key) keys.push(key); };
+    render(<ManualSlideshow slides={[flagship, next]} slideshowDelaySec={5} onSlide={onSlide} />);
+    expect(intro()).toBeNull(); // the first pass: the plain flagship
+    at(10_000);
+    expect(keys.at(-1)).toBe('1:s_n');
+    at(5_000); // the second pass
+    expect(keys.at(-1)).toBe('2:flagship_welcome');
+    expect(intro()).not.toBeNull();
+    // (A showing that left may still be fading out beside it: ask the one playing.)
+    expect(intro().closest('.flagship').dataset.style).toBe('bounce');
+    expect(intro().closest('.flagship').dataset.version).toBe('glad');
+    // No 10 s timer: the showing outlives it while the video plays.
+    at(4_100);
+    media.currentTime = 0.1;
+    at(400);
+    expect(chrome().className).toContain('lobby-chrome--handed-over');
+    for (let k = 0; k < 60; k += 1) { // six seconds of video playing
+      media.currentTime += 0.1;
+      at(100);
+    }
+    // 10.5 s in: a plain showing would have gone; this one is still up.
+    expect(keys.at(-1)).toBe('2:flagship_welcome');
+    media.currentTime = 14.5;
+    at(100);
+    expect(chrome().className).not.toContain('lobby-chrome--handed-over');
+    media.ended = true;
+    at(100);
+    expect(keys.at(-1)).toBe('2:flagship_welcome');
+    at(1_000); // the tail, then the deck moves on
+    expect(keys.at(-1)).toBe('3:s_n');
+    expect(chrome().className).not.toContain('lobby-chrome--handed-over');
+  });
+
+  it('keeps the plain flagship on a screen the video is not (4:3), and under zero animation', () => {
+    screenOf(1024, 768);
+    render(<ManualSlideshow slides={[flagship, next]} slideshowDelaySec={5} />);
+    at(10_000);
+    at(5_000);
+    expect(document.querySelector('.flagship')).not.toBeNull();
+    expect(intro()).toBeNull();
+    cleanup();
+    screenOf(1920, 1080);
+    render(
+      <ZeroAnimationContext.Provider value>
+        <ManualSlideshow slides={[flagship, next]} slideshowDelaySec={5} />
+      </ZeroAnimationContext.Provider>,
+    );
+    at(10_000);
+    at(5_000);
+    expect(document.querySelector('.flagship')).not.toBeNull();
+    expect(intro()).toBeNull();
+  });
+
+  it('a flagship alone never plays it (there is no next pass)', () => {
+    screenOf(1920, 1080);
+    render(<ManualSlideshow slides={[flagship]} slideshowDelaySec={5} />);
+    at(60_000);
+    expect(intro()).toBeNull();
+  });
+});

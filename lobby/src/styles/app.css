@@ -358,6 +358,17 @@ html, body, #root {
 .lobby-chrome--logo-away .lobby-tab__logo {
   opacity: 0;
 }
+/* The flagship's 3D intro is up (FlagshipIntro.jsx): its video draws the
+   tab and the waves itself, exactly where these stand at its first and last
+   frames, and flies them off in 3D. These step aside over it (and come back
+   the same way), opacity only, so the hand-over is never seen. The fade is
+   FLAGSHIP_INTRO.fade (src/lib/flagship.js; a test keeps the two equal). */
+.lobby-chrome {
+  transition: opacity var(--intro-fade, 0.15s) linear;
+}
+.lobby-chrome--handed-over {
+  opacity: 0;
+}
 .lobby-tab__logo--two-line {
   width: calc(15 * var(--u));
   height: auto;

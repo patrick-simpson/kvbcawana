@@ -1,4 +1,4 @@
-import { useContext, useState } from 'react';
+import { useContext, useEffect, useRef, useState } from 'react';
 import { AnimatePresence, useIsPresent } from 'framer-motion';
 import { M, ZeroAnimationContext } from '../lib/motion.jsx';
 import { DOODLES, EASE, SHAPES } from '../lib/brand.js';
@@ -6,6 +6,7 @@ import {
   HANDOFF, SWAP_AT, chromeMove, chromeSpot, holdThenLand, holdThenLeave, swellKeyframes,
 } from '../lib/lobbyMotion.js';
 import { LOBBY_THEMES, lobbyTheme } from '../lib/lobbyFrame.js';
+import { cssAnimation, resumeFromRest, settleToRest } from '../lib/ambientRest.js';
 import CornerTab from './brand/CornerTab.jsx';
 import Wave from './brand/Wave.jsx';
 import ChurchLogo from './brand/ChurchLogo.jsx';
@@ -155,7 +156,26 @@ function Field({ theme, wipe, animated }) {
 // The logo lands a beat after the scene appears, with the first slide's copy.
 const LOGO_HOLD = 0.3;
 
-function Chrome({ away, via, swell, still, logoAway = false }) {
+/**
+ * How soon the rolling sunflower wave is home once asked (`ambientRest`):
+ * well inside the flagship intro's lead (FLAGSHIP_INTRO.lead, 4 s), so it
+ * is still when the video takes the waves over.
+ */
+export const AMBIENT_REST_MS = 3000;
+
+function Chrome({ away, via, swell, still, logoAway = false, handedOver = false, ambientRest = false }) {
+  // The sunflower wave's roll, brought to rest while asked and let go after
+  // (src/lib/ambientRest.js).
+  const sun = useRef(/** @type {HTMLDivElement | null} */ (null));
+  useEffect(() => {
+    if (!ambientRest) return undefined;
+    const roll = cssAnimation(sun.current, 'lobby-roll');
+    const cancel = settleToRest(roll, AMBIENT_REST_MS);
+    return () => {
+      cancel();
+      resumeFromRest(roll);
+    };
+  }, [ambientRest]);
   // Where the chrome is and how it got there, captured once per change of
   // spot (derived state), so a later change of `via` alone never replays it.
   const [state, setState] = useState(() => ({ spot: chromeSpot('home', away, via), from: null, via }));
@@ -172,9 +192,9 @@ function Chrome({ away, via, swell, still, logoAway = false }) {
   // so dropping them while the chrome was away swelled it again on return.
   const swelling = !still && swell > 0 ? swellKeyframes('-16%') : null;
   return (
-    <div className={`lobby-chrome lobby-chrome--${current.spot}${away ? ' lobby-chrome--away' : ''}${logoAway ? ' lobby-chrome--logo-away' : ''}`} aria-hidden="true">
+    <div className={`lobby-chrome lobby-chrome--${current.spot}${away ? ' lobby-chrome--away' : ''}${logoAway ? ' lobby-chrome--logo-away' : ''}${handedOver ? ' lobby-chrome--handed-over' : ''}`} aria-hidden="true">
       <M.div className="lobby-waves" initial={false} animate={waves.animate} transition={waves.transition}>
-        <Wave className="lobby-wave lobby-wave--sun lobby-ambient lobby-ambient--roll" color="var(--brand-sun)" />
+        <Wave ref={sun} className="lobby-wave lobby-wave--sun lobby-ambient lobby-ambient--roll" color="var(--brand-sun)" />
         {/* Remounted per hand-off, so each count plays its swell once. */}
         <Wave
           key={swell}
@@ -218,6 +238,8 @@ function Chrome({ away, via, swell, still, logoAway = false }) {
  *   chromeAway?: boolean,
  *   chromeVia?: string,
  *   logoAway?: boolean,
+ *   chromeHandedOver?: boolean,
+ *   ambientRest?: boolean,
  *   swell?: number,
  *   children?: import('react').ReactNode,
  * }} props
@@ -233,6 +255,10 @@ export default function CatalogScene({
   // The flagship's big logo is up: the tab's small one steps aside (one logo
   // on screen at a time, never two of the same mark; app.css).
   logoAway = false,
+  // The flagship's 3D intro: its video is drawing the tab and the waves, so
+  // the scene's own step aside (app.css .lobby-chrome--handed-over), and the
+  // rolling wave comes to rest before it takes them (FlagshipIntro.jsx).
+  chromeHandedOver = false, ambientRest = false,
   children,
 }) {
   const key = lobbyTheme(theme);
@@ -270,7 +296,15 @@ export default function CatalogScene({
 
       <div className="lobby-content">{children}</div>
 
-      <Chrome away={chromeAway} via={chromeVia} swell={swell} still={still} logoAway={logoAway} />
+      <Chrome
+        away={chromeAway}
+        via={chromeVia}
+        swell={swell}
+        still={still}
+        logoAway={logoAway}
+        handedOver={chromeHandedOver}
+        ambientRest={ambientRest}
+      />
     </div>
   );
 }

@@ -11,7 +11,7 @@ import SlideCopy from './SlideCopy.jsx';
 import Wave from './brand/Wave.jsx';
 import PromoSlide from './PromoSlide.jsx';
 import FlagshipSlide from './FlagshipSlide.jsx';
-import { isFlagshipSlide } from '../lib/flagship.js';
+import { flagshipIntroLap, introFits, isFlagshipSlide } from '../lib/flagship.js';
 import { isPromoSlide, promoForLap } from '../lib/promos.js';
 import {
   holdsCheckIns,
@@ -176,9 +176,6 @@ export default function ManualSlideshow({ slides, slideshowDelaySec, clubTint = 
   // slideshow just hands it the promo rather than the slot when the promo
   // names its own hold.
   const held = promo?.durationSec != null ? promo : slide;
-  const holdMs = slides.length <= 1 || !slide
-    ? null
-    : isVideoSlide(slide) ? videoSlideTimerMs(slide) : slideDurationMs(held, slideshowDelaySec);
 
   // Which slide is up, as one key: the step (so the same slide coming round
   // again is a new showing) and its id (so an editor save that swaps what is
@@ -190,6 +187,27 @@ export default function ManualSlideshow({ slides, slideshowDelaySec, clubTint = 
   const theme = resolveTheme(slide, safe);
   const transition = useSlideTransition({ key: slideKey, special, kind, theme });
   const zero = useContext(ZeroAnimationContext);
+
+  // Now and then the flagship carries on into the 3D intro video (src/lib/
+  // flagship.js, FlagshipIntro.jsx): on the passes flagshipIntroLap picks, with
+  // motion on, on a screen it fits. Decided once per showing (a resize
+  // mid-showing changes nothing). The intro then owns the showing's end, the
+  // way a video slide's `ended` does, and hands the scene's tab and waves
+  // over to the video and back.
+  const wantIntro = kind === 'flagship' && !zero && !still && slides.length > 1 && flagshipIntroLap(lap);
+  const [introFor, setIntroFor] = useState({ key: '', on: false });
+  let intro = introFor.on;
+  if (introFor.key !== slideKey) {
+    intro = wantIntro && introPlayable();
+    setIntroFor({ key: slideKey, on: intro });
+  }
+  const [handOver, setHandOver] = useState({ key: '', away: false, rest: false });
+  const handedOver = handOver.key === slideKey && handOver.away;
+  const ambientRest = handOver.key === slideKey && handOver.rest;
+
+  const holdMs = slides.length <= 1 || !slide || intro
+    ? null
+    : isVideoSlide(slide) ? videoSlideTimerMs(slide) : slideDurationMs(held, slideshowDelaySec);
 
   // The hold timer, pausable: time already spent on this slide survives a
   // pause, so names on screen stop the clock instead of resetting it.
@@ -225,6 +243,20 @@ export default function ManualSlideshow({ slides, slideshowDelaySec, clubTint = 
     else advance();
   }, [advance]);
 
+  // The intro's two callbacks belong to ITS showing: an intro still fading
+  // out after the deck moved on (AnimatePresence keeps it a moment) must not
+  // advance the deck again or touch the next slide's chrome.
+  const keyNow = useRef(slideKey);
+  useLayoutEffect(() => {
+    keyNow.current = slideKey;
+  }, [slideKey]);
+  const introHandOver = (/** @type {{ away: boolean, rest: boolean }} */ state) => {
+    if (keyNow.current === slideKey) setHandOver({ key: slideKey, ...state });
+  };
+  const introFinished = () => {
+    if (keyNow.current === slideKey) finishVideo();
+  };
+
   // Told before the frame is painted (a layout effect, not a passive one): App
   // turns what stands over the lobby (the first-run card) off the moment a
   // held slide mounts. Passive, the report landed a frame or more after the
@@ -255,6 +287,8 @@ export default function ManualSlideshow({ slides, slideshowDelaySec, clubTint = 
         // ...but its small logo steps aside while the flagship's big one is
         // up: the same mark twice on one screen reads as a doubling.
         logoAway={kind === 'flagship'}
+        chromeHandedOver={handedOver}
+        ambientRest={ambientRest}
         chromeVia={transition.via}
         swell={transition.swells}
         clubTint={clubTint}
@@ -305,7 +339,12 @@ export default function ManualSlideshow({ slides, slideshowDelaySec, clubTint = 
               visit so its entrance plays from the top. */}
           {kind === 'flagship' && (
             <Media key={`${slide.id}:${step}`} wipe={transition.wipe}>
-              <FlagshipSlide />
+              <FlagshipSlide
+                intro={intro}
+                paused={paused}
+                onHandOver={intro ? introHandOver : undefined}
+                onFinished={intro ? introFinished : undefined}
+              />
             </Media>
           )}
         </Presence>
@@ -316,6 +355,16 @@ export default function ManualSlideshow({ slides, slideshowDelaySec, clubTint = 
 }
 
 const playMuted = (el) => { el?.play?.()?.catch?.(() => {}); };
+
+/**
+ * Can this screen play the flagship's 3D intro? Its shape (introFits), and
+ * the OS's reduced motion (a 3D fly-through is all motion) says no.
+ */
+function introPlayable() {
+  if (typeof window === 'undefined') return false;
+  if (window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches) return false;
+  return introFits(window.innerWidth, window.innerHeight);
+}
 
 function VideoSlide({ slide, loop, onFinished }) {
   const [src, setSrc] = useState(null);

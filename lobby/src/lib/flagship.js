@@ -144,6 +144,59 @@ function defaultStore() {
   }
 }
 
+// ── The 3D intro (owner 2026-10-27) ─────────────────────────────────────
+// Now and then a showing of the flagship carries on into the 15 s 3D intro
+// video (video/awana-intro/: Blender, rendered from the brand kit). Its first
+// and last frames ARE this slide in its bounce style with the glad line, at
+// rest (measured off the lobby by video/awana-intro/tools/measure-lobby.mjs),
+// so the showing plays that pick, settles, and the video takes over on an
+// identical frame; at its end it hands back the same way and the deck moves
+// on. FlagshipIntro.jsx plays it.
+
+/** One pass in this many plays the intro (the second pass, then every fourth). */
+export const FLAGSHIP_INTRO_EVERY = 4;
+
+/** The video, beside the lobby's own files (lobby/public/intro/; streamed by site/functions on the site). */
+export const FLAGSHIP_INTRO_SRC = './intro/awana-intro.mp4';
+
+/**
+ * The showing the video begins and ends on.
+ * @type {Readonly<{ style: 'bounce', version: 'glad' }>}
+ */
+export const FLAGSHIP_INTRO_PICK = Object.freeze({ style: 'bounce', version: 'glad' });
+
+/**
+ * Its timing, in seconds. `lead`: the video starts this long into the
+ * showing, once the slide is at rest. `fade`: each hand-over (video in, the
+ * scene's tab and waves out, and back). `homeAt`: the video's own time from
+ * which it is the lobby again (its world has flattened back), when the tab
+ * and waves take back over. `tail`: the slide holds this long after the
+ * video ends. `waitMax`: a video not ready this long after `lead` is skipped
+ * (the showing ends like any other, at FLAGSHIP_DURATION_SEC). `stall`: a
+ * video stuck this long mid-play is let go.
+ */
+export const FLAGSHIP_INTRO = Object.freeze({ lead: 4, fade: 0.15, homeAt: 14.2, tail: 1, waitMax: 6, stall: 6 });
+
+/**
+ * Is this pass (the deck's `lap`) one that plays the intro?
+ * @param {number} lap
+ */
+export function flagshipIntroLap(lap) {
+  return Number.isInteger(lap) && lap % FLAGSHIP_INTRO_EVERY === 1;
+}
+
+/**
+ * Can a screen this size show it seamlessly? The video is 16:9 and is the
+ * slide as a 16:9 screen draws it, with the FULL logo (a 16:9 screen under
+ * 722px wide draws the two-line logo, flagship.css). Any other shape keeps
+ * the plain flagship.
+ * @param {number} width
+ * @param {number} height
+ */
+export function introFits(width, height) {
+  return width >= 722 && height > 0 && Math.abs(width / height - 16 / 9) <= 0.03;
+}
+
 /** Test seam: forget the memory turn. */
 export function resetFlagshipTurn() {
   memoryTurn = 0;

@@ -180,3 +180,23 @@
   height: calc(100% * 0.12 / 6.84 + 1px);
   display: block;
 }
+
+/* The 3D intro (FlagshipIntro.jsx): the video over the whole slide, unseen
+   until its first frame, which is this slide at rest, so fading it in (and
+   out at its end, on the same frame) changes nothing on screen. Over the
+   logo and its line, under the scene's tab and waves (app.css hands those
+   over: .lobby-chrome--handed-over). */
+.flagship-intro {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  z-index: 3;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--intro-fade, 0.15s) linear;
+}
+.flagship-intro.is-shown {
+  opacity: 1;
+}

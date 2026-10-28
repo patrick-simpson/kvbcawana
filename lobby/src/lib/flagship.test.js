@@ -3,6 +3,7 @@ import {
   FLAGSHIP_DURATION_SEC, flagshipOnAir, FLAGSHIP_ID, FLAGSHIP_SLIDE, isFlagshipSlide, withFlagship,
   FLAGSHIP_LINES, FLAGSHIP_STYLES, FLAGSHIP_TURN_KEY, FLAGSHIP_VERSIONS, flagshipLabel, flagshipPick,
   nextFlagshipPick, resetFlagshipTurn,
+  FLAGSHIP_INTRO, FLAGSHIP_INTRO_EVERY, FLAGSHIP_INTRO_PICK, FLAGSHIP_INTRO_SRC, flagshipIntroLap, introFits,
 } from './flagship.js';
 import { holdsCheckIns, slideDurationMs } from './slides.js';
 import { sanitizeSlides } from './slides.js';
@@ -96,5 +97,53 @@ describe('which welcome plays (owner 2026-10-13: "one of each on each load, mix 
     expect(flagshipLabel('glad')).toBe('Kennebec Valley Baptist Church Awana Clubs. Strengthening the next generation of lifelong disciples for Christ. We\u2019re so glad you\u2019re here!');
     expect(flagshipLabel('welcome')).toBe('Welcome to Kennebec Valley Baptist Church Awana Clubs. Strengthening the next generation of lifelong disciples for Christ');
     for (const v of FLAGSHIP_VERSIONS) expect(flagshipLabel(v)).not.toMatch(/\u2014/);
+  });
+});
+
+describe('the 3D intro', () => {
+  it('plays on the second pass of a screen, then every fourth, never on the first', () => {
+    const laps = Array.from({ length: 12 }, (_, lap) => lap).filter(flagshipIntroLap);
+    expect(laps).toEqual([1, 5, 9]);
+    expect(FLAGSHIP_INTRO_EVERY).toBe(4);
+    expect(flagshipIntroLap(-3)).toBe(false);
+    expect(flagshipIntroLap(1.5)).toBe(false);
+    expect(flagshipIntroLap(Number.NaN)).toBe(false);
+  });
+
+  it('only plays on a 16:9 screen wide enough for the full logo (the frame the video IS)', () => {
+    expect(introFits(1920, 1080)).toBe(true);
+    expect(introFits(1280, 720)).toBe(true);
+    expect(introFits(3840, 2160)).toBe(true);
+    expect(introFits(1366, 768)).toBe(true); // 16:9 to within a pixel
+    expect(introFits(722, 406)).toBe(true);
+    expect(introFits(640, 360)).toBe(false); // the two-line logo stands in there
+    expect(introFits(1024, 768)).toBe(false); // 4:3
+    expect(introFits(1920, 1200)).toBe(false); // 16:10
+    expect(introFits(1920, 0)).toBe(false);
+  });
+
+  it('begins and ends on the bounce style with the glad line, and is timed inside the video', () => {
+    expect(FLAGSHIP_INTRO_PICK).toEqual({ style: 'bounce', version: 'glad' });
+    expect(FLAGSHIP_STYLES).toContain(FLAGSHIP_INTRO_PICK.style);
+    expect(FLAGSHIP_VERSIONS).toContain(FLAGSHIP_INTRO_PICK.version);
+    // Both hand-overs (video in, then the tab and waves out) fit inside the
+    // video's opening still (frames 1-18 at 30 fps, video/awana-intro).
+    expect(FLAGSHIP_INTRO.fade * 2).toBeLessThan(18 / 30);
+    // The tab and waves come back after its world has flattened (frame 418)
+    // and before it ends (15 s).
+    expect(FLAGSHIP_INTRO.homeAt).toBeGreaterThan(418 / 30);
+    expect(FLAGSHIP_INTRO.homeAt).toBeLessThan(15);
+    expect(FLAGSHIP_INTRO_SRC).toBe('./intro/awana-intro.mp4');
+  });
+});
+
+describe('the 3D intro\'s fade, written twice', () => {
+  it('is the same number in flagship.js and both stylesheets', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { resolve } = await import('node:path');
+    const css = (f) => readFileSync(resolve(__dirname, '../styles', f), 'utf8');
+    const fade = `var(--intro-fade, ${FLAGSHIP_INTRO.fade}s)`;
+    expect(css('flagship.css')).toContain(fade);
+    expect(css('app.css')).toContain(fade);
   });
 });

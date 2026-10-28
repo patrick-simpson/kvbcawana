@@ -5,8 +5,9 @@ import { keyframes, landsAt, EASE_OUT } from './promos/kit.jsx';
 import { ARRIVAL, squishLand, withSquish } from '../lib/squish.js';
 import { fireWelcome } from '../lib/confetti.js';
 import {
-  FLAGSHIP_LINES, flagshipLabel, nextFlagshipPick,
+  FLAGSHIP_INTRO_PICK, FLAGSHIP_LINES, flagshipLabel, nextFlagshipPick,
 } from '../lib/flagship.js';
+import FlagshipIntro from './FlagshipIntro.jsx';
 import { LOGO_ARRIVAL, LOGO_INK, LOGO_WHITE, logoLetters, parseChurchLogo } from '../../../shared/churchLogo.js';
 import fullSvg from '../../../shared/brand/logos/kvbc-awana-full.svg?raw';
 import twoLineSvg from '../../../shared/brand/logos/kvbc-awana-two-line.svg?raw';
@@ -50,6 +51,12 @@ import twoLineSvg from '../../../shared/brand/logos/kvbc-awana-two-line.svg?raw'
 //                  wave's edge crosses the logo's middle)
 //           after  the glad line lands
 // Nothing moves after the last landing: about 3 s in (bounce, pop), 6.2 s (parade).
+//
+// The 3D intro (`intro`, ManualSlideshow's choice, now and then): the bounce
+// + glad showing (FLAGSHIP_INTRO_PICK) without taking this screen's turn,
+// then FlagshipIntro.jsx carries it on into the video and back; it owns the
+// showing's end (`onFinished`) and tells the scene when to hand its tab and
+// waves over (`onHandOver`).
 //
 // Rules (CLAUDE.md, "Flagship welcome slide", the M rule): every animated
 // element is M.*, every beat is a keyframe list that holds and then lands,
@@ -361,14 +368,21 @@ function Parade({ sheet }) {
 /**
  * The flagship welcome slide, full-bleed behind the check-in moment.
  * `pick` fixes the style and wording (tests); without it each showing takes
- * this screen's next turn.
- * @param {{ pick?: { style: 'bounce' | 'pop' | 'parade', version: 'glad' | 'welcome' } }} props
+ * this screen's next turn. `intro` plays the 3D intro (see above); `paused`
+ * is names on screen, for it.
+ * @param {{
+ *   pick?: { style: 'bounce' | 'pop' | 'parade', version: 'glad' | 'welcome' },
+ *   intro?: boolean,
+ *   paused?: boolean,
+ *   onHandOver?: (state: { away: boolean, rest: boolean }) => void,
+ *   onFinished?: () => void,
+ * }} props
  */
-export default function FlagshipSlide({ pick } = {}) {
+export default function FlagshipSlide({ pick, intro = false, paused = false, onHandOver, onFinished } = {}) {
   const zero = useContext(ZeroAnimationContext);
   // Fixed when the slide first appears: no re-render ever replays a beat.
   const [show] = useState(() => {
-    const { style, version } = pick ?? nextFlagshipPick();
+    const { style, version } = pick ?? (intro ? FLAGSHIP_INTRO_PICK : nextFlagshipPick());
     const sheet = beatSheet(style, version);
     return {
       sheet,
@@ -449,6 +463,8 @@ export default function FlagshipSlide({ pick } = {}) {
           )}
         </Ink>
       </div>
+
+      {intro && <FlagshipIntro paused={paused} onHandOver={onHandOver} onFinished={onFinished} />}
     </div>
   );
 }
