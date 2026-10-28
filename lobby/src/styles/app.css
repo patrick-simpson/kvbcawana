@@ -182,6 +182,23 @@ html, body, #root {
   --band-top: calc(3.1 * var(--u));
 }
 
+/* A phone or tablet (a touch screen, owner 2026-10-28): the lobby is framed
+   to the 16:9 picture a 1920x1080 TV shows, centred, with black bars where
+   the phone is taller or wider, instead of the studio filling the whole
+   screen. The TV, the Journey embed and the OBS overlay keep the full stage.
+   --u already equals 1% of this box's width (min(1vw, 1.7778vh)). */
+@media (pointer: coarse) {
+  html:not(.embedded):not(.overlay-mode),
+  html:not(.embedded):not(.overlay-mode) body {
+    background: #000;
+  }
+  html:not(.embedded):not(.overlay-mode) .stage {
+    margin: auto;
+    width: min(100vw, calc(100dvh * 16 / 9));
+    height: min(100dvh, calc(100vw * 9 / 16));
+  }
+}
+
 /* Overlay mode (?overlay=1): the page becomes a transparent layer for
    OBS / ProPresenter browser sources — banners and confetti only.
    ?chroma=RRGGBB sets an inline solid key color on .stage instead. */
