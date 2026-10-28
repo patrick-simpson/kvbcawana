@@ -25,9 +25,12 @@
 /** The kit files the page draws, relative to shared/brand/. */
 export const LETTERHEAD_SVGS = Object.freeze({
   logo: 'logos/kvbc-awana-two-line-ink.svg',
-  sparkle: 'doodles/sparkle-4pt.svg',
-  ring: 'doodles/ring.svg',
+  tab: 'shapes/tab-b-sparks.svg',
   wave: 'shapes/wave-tnt.svg',
+  sparkle: 'doodles/sparkle-4pt.svg',
+  sparkleX: 'doodles/sparkle-4pt-x.svg',
+  dot: 'doodles/dot.svg',
+  dash: 'doodles/dash.svg',
 });
 
 /** Body type size: where it starts, the floor, the step (points). */
@@ -44,7 +47,7 @@ export const MAX_TEXT = 20000;
 export const PLAN_WORDS = Object.freeze(['Belong', 'Believe', 'Become', 'Protect', 'Grow']);
 export const PLAN_NOW = 'Believe';
 
-const CLUBS = ['puggles', 'cubbies', 'sparks', 'tnt', 'trek', 'journey'];
+const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
 const MONTH_WORD = /^(jan(uary)?|feb(ruary)?|mar(ch)?|apr(il)?|may|june?|july?|aug(ust)?|sept?(ember)?|oct(ober)?|nov(ember)?|dec(ember)?)\.?$/i;
 
@@ -193,16 +196,14 @@ export function letterHtml(letter, opts) {
   const kit = opts.kitUrl.replace(/\/$/, '');
   const svg = Object.fromEntries(Object.entries(opts.svgs).map(([k, v]) => [k, cleanSvg(v)]));
   const date = opts.date || new Date();
-  let bullet = 0;
   const body = letter.parts.map((p) => {
     if (p.kind === 'lead') return `<p class="lead">${linkify(p.text)}</p>`;
-    if (p.kind === 'heading') return `<h2><span>${escapeHtml(p.text)}</span></h2>`;
+    if (p.kind === 'heading') return `<h2>${escapeHtml(p.text)}</h2>`;
     if (p.kind === 'note') return `<div class="note">${linkify(p.text)}</div>`;
     if (p.kind === 'event') {
-      return `<div class="event"><div class="date"><small>${p.month}</small><b>${p.day}</b></div><p>${linkify(p.text)}</p></div>`;
+      return `<div class="event"><b class="when">${p.month} ${p.day}</b><p>${linkify(p.text)}</p></div>`;
     }
-    const club = CLUBS[bullet++ % CLUBS.length];
-    return `<p class="item" style="--c:var(--brand-${club})"><i>${svg.sparkle}</i>${linkify(p.text)}</p>`;
+    return `<p class="item">${linkify(p.text)}</p>`;
   }).join('\n');
   const [name, role, ...contact] = letter.signature;
   const sig = name
@@ -210,9 +211,17 @@ export function letterHtml(letter, opts) {
     : '';
   const now = opts.planNow || PLAN_NOW;
   const plan = PLAN_WORDS.map((w) => (w === now
-    ? `<b class="now">${escapeHtml(w)}</b>`
-    : `<b>${escapeHtml(w)}</b>`)).join(`<i>${svg.sparkle}</i>`);
+    ? `<b class="now">${escapeHtml(w)}<span class="swash">${svg.dash.replace('<svg ', '<svg preserveAspectRatio="none" ')}</span></b>`
+    : `<b>${escapeHtml(w)}</b>`)).join(`<i>${svg.dot}</i>`);
+  const [mon, year] = issueLabel(letter.title, date).split(' ');
+  const month = MONTH_NAMES[MONTHS.indexOf(mon)] || mon;
   const title = escapeHtml(letter.title || 'Awana News');
+  // Catalog text pages (2026-27 catalog pp. 4, 6, 10, 18): a wavy corner tab
+  // names the page, ONE colour family carries it (Awana blue, hot as the one
+  // accent), the headline shouts in caps in that colour, sub-heads are plain
+  // label caps, bullets plain dots, a callout a solid rounded plate, pale
+  // organic shapes in the bottom corners, doodles scattered in small groups.
+  // No drop shadows on a text page.
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><title>${title}</title>
 <link rel="stylesheet" href="${kit}/tokens.css"><link rel="stylesheet" href="${kit}/fonts.css">
@@ -220,61 +229,65 @@ export function letterHtml(letter, opts) {
 @font-face{font-family:'Figtree';font-style:normal;font-weight:300 900;src:url('${kit}/fonts/figtree-latin-wght-normal.woff2') format('woff2'),url('${kit}/fonts/Figtree-Variable.ttf') format('truetype')}
 @page{size:Letter;margin:0}
 *{box-sizing:border-box;margin:0}
-html{--lh-size:${FIT.startPt}pt}
+html{--lh-size:${FIT.startPt}pt;--lh-c:var(--brand-blue);--lh-deep:var(--brand-blue-deep)}
 html,body{width:8.5in;height:11in}
-body{position:relative;overflow:hidden;background:#fff;color:var(--brand-ink);font:400 var(--lh-size)/1.48 var(--brand-font-body);-webkit-print-color-adjust:exact;print-color-adjust:exact}
-a{color:var(--brand-blue-deep);font-weight:700;text-decoration:none}
-header{display:flex;align-items:flex-end;justify-content:space-between;padding:.5in .6in .16in}
-header .logo svg{width:2.95in;height:auto;display:block}
-.chip small{display:inline-block;font:400 10pt/1 var(--brand-font-label);letter-spacing:.06em;color:#fff;background:var(--brand-hot);padding:4px 9px 3px;border-radius:7px 7px 0 0;margin-left:2px}
-.chip b{display:block;font:400 21pt/1 var(--brand-font-display);color:#fff;background:var(--brand-blue);padding:6px 13px 7px;border-radius:0 9px 9px 9px;box-shadow:3px 3px 0 var(--brand-ink);white-space:nowrap}
-.stripe{display:flex;height:7px}
-.stripe span{flex:1}
-main{padding:.26in .75in 0}
-h1{font:400 3em/1.02 var(--brand-font-display);margin-bottom:.12in;display:flex;align-items:center;gap:.14in}
-h1 .doodles{flex:none;display:flex;gap:5px;align-items:flex-start;color:var(--brand-hot)}
-h1 .doodles svg{width:15px;height:15px;display:block}
-h1 .doodles svg:nth-child(2){width:9px;height:9px;margin-top:-6px;color:var(--brand-sun)}
-h1 .doodles svg:nth-child(3){width:11px;height:11px;margin-top:10px;color:var(--brand-cubbies)}
-.lead{font-size:1.16em;font-weight:600;margin-bottom:.1in}
-.item{position:relative;padding-left:.27in;margin-bottom:.1in}
-.item i{position:absolute;left:0;top:.02in;width:.17in;height:.17in;color:var(--c)}
-.item i svg{width:100%;height:100%;display:block}
-h2{margin:.18in 0 .1in}
-h2 span{display:inline-block;font:400 15pt/1 var(--brand-font-label);letter-spacing:.07em;text-transform:uppercase;color:#fff;background:var(--brand-trek);padding:6px 14px 5px;border-radius:4px 14px 4px 14px;box-shadow:3px 3px 0 var(--brand-trek-deep)}
-.event{display:flex;gap:.16in;align-items:flex-start;margin-bottom:.1in;break-inside:avoid}
-.date{flex:none;width:.62in;text-align:center;background:var(--brand-sun);border-radius:8px;box-shadow:3px 3px 0 var(--brand-ink);padding:4px 0 5px}
-.date small{display:block;font:400 9pt/1 var(--brand-font-label);letter-spacing:.08em}
-.date b{display:block;font:400 19pt/1 var(--brand-font-display)}
-.event p{padding-top:.03in}
-.note{margin-top:.14in;padding:.1in .16in;background:var(--brand-cream);border-radius:10px;outline:1.5px solid var(--brand-orange-deep);outline-offset:3px;break-inside:avoid}
-.sig{margin-top:.22in;break-inside:avoid}
-.sig b{display:block;font:400 15pt/1.1 var(--brand-font-display)}
-.sig em{display:block;font:400 11pt/1.2 var(--brand-font-label);letter-spacing:.05em;text-transform:uppercase;color:var(--brand-sparks-deep);font-style:normal;margin:2px 0 3px}
-footer{position:absolute;left:0;right:0;bottom:0;height:1.3in;overflow:hidden}
-footer .w{position:absolute;width:5.4in;bottom:-1.55in}
-footer .w svg{width:100%;height:auto;display:block}
-footer .w1{right:-.5in;color:var(--brand-sky)}
-footer .w2{right:-1.7in;bottom:-1.85in;color:var(--brand-blue)}
-footer .plan{position:absolute;left:.75in;bottom:.5in;display:flex;align-items:center;gap:.07in}
-footer .plan b{font:400 12pt/1 var(--brand-font-label);letter-spacing:.08em;text-transform:uppercase;color:var(--brand-blue-deep);padding:5px 0 4px}
-footer .plan b.now{color:#fff;background:var(--brand-hot);padding:5px 11px 4px;border-radius:8px;box-shadow:2px 2px 0 var(--brand-ink)}
-footer .plan i{width:9px;height:9px;color:var(--brand-sun);display:block}
-footer .plan i svg{width:100%;height:100%;display:block}
+body{position:relative;overflow:hidden;background:#fff;color:#2b2829;font:400 var(--lh-size)/1.5 var(--brand-font-body);-webkit-print-color-adjust:exact;print-color-adjust:exact}
+a{color:var(--lh-deep);font-weight:600;text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:2px}
+svg{display:block;overflow:visible}
+header{position:relative;height:1.72in}
+.tab{position:absolute;top:0;left:0;width:3.55in;color:var(--lh-c)}
+.tab svg{width:100%;height:auto}
+.tab-words{position:absolute;top:.48in;left:.62in;color:#fff;font:400 11pt/1 var(--brand-font-label);letter-spacing:.12em;text-transform:uppercase}
+.tab-words b{display:block;font-weight:400;font-size:21pt;letter-spacing:.05em;margin-top:6px}
+.logo{position:absolute;top:.52in;right:.62in;width:2.8in;color:var(--brand-ink)}
+.logo svg{width:100%;height:auto}
+.dd{position:absolute;width:var(--s);height:var(--s);color:var(--c)}
+.dd svg{width:100%;height:100%}
+main{padding:.12in .95in 0 .75in}
+h1{font:400 2.75em/.98 var(--brand-font-display);text-transform:uppercase;letter-spacing:.01em;color:var(--lh-deep);margin-bottom:.14in;max-width:5.6in}
+.lead{font-size:1.13em;font-weight:600;color:var(--brand-ink);margin-bottom:.12in;max-width:6.4in}
+.item{position:relative;padding-left:.2in;margin-bottom:.07in}
+.item::before{content:'';position:absolute;left:.02in;top:.6em;width:5px;height:5px;border-radius:50%;background:var(--lh-c)}
+h2{font:400 1.5em/1 var(--brand-font-label);letter-spacing:.05em;text-transform:uppercase;color:var(--lh-deep);margin:.22in 0 .1in}
+.event{display:grid;grid-template-columns:.78in 1fr;align-items:baseline;margin-bottom:.07in;break-inside:avoid}
+.event .when{font:400 1.2em/1 var(--brand-font-label);letter-spacing:.06em;color:var(--brand-hot);white-space:nowrap}
+.note{margin-top:.16in;padding:.13in .2in .14in;background:var(--lh-c);color:#fff;border-radius:16px;break-inside:avoid;max-width:6.4in}
+.note a{color:#fff}
+.sig{margin-top:.24in;break-inside:avoid}
+.sig b{display:block;font:400 14pt/1.1 var(--brand-font-display);color:var(--brand-ink)}
+.sig em{display:block;font:400 10.5pt/1.2 var(--brand-font-label);letter-spacing:.07em;text-transform:uppercase;color:var(--lh-deep);font-style:normal;margin:3px 0 2px}
+footer{position:absolute;left:0;right:0;bottom:0;height:1.35in;overflow:hidden}
+footer .w{position:absolute;bottom:0}
+footer .w svg{width:100%;height:auto}
+footer .w1{left:-.2in;width:4.4in;bottom:-1.38in;transform:scaleX(-1);color:var(--brand-cream)}
+footer .w2{right:-.55in;width:3.3in;bottom:-1.02in;color:var(--brand-sky)}
+footer .plan{position:absolute;left:.75in;bottom:.5in;display:flex;align-items:center;gap:.1in}
+footer .plan b{position:relative;font:400 12.5pt/1 var(--brand-font-label);letter-spacing:.09em;text-transform:uppercase;color:var(--lh-deep)}
+footer .plan b.now{color:var(--brand-hot)}
+footer .plan .swash{position:absolute;left:-6%;right:-6%;top:100%;height:6px;margin-top:2px;color:var(--brand-hot)}
+footer .plan .swash svg{width:100%;height:100%}
+footer .plan i{width:4px;height:4px;color:var(--brand-sun)}
+footer .plan i svg{width:100%;height:100%}
 html[data-fit=flow],html[data-fit=flow] body{height:auto;overflow:visible}
 html[data-fit=flow] main{padding-bottom:.3in}
 html[data-fit=flow] footer{position:relative;break-inside:avoid}
 @media screen{html{background:#fff}}
 </style></head><body>
-<header><div class="logo">${svg.logo}</div>
-<div class="chip"><small>${escapeHtml(opts.kicker || 'AWANA NEWS')}</small><b>${escapeHtml(issueLabel(letter.title, date))}</b></div></header>
-<div class="stripe">${CLUBS.map((c) => `<span style="background:var(--brand-${c})"></span>`).join('')}</div>
+<header>
+<div class="tab">${svg.tab}<div class="tab-words">${escapeHtml(opts.kicker || 'Awana News')}<b>${escapeHtml(month)} ${escapeHtml(year)}</b></div></div>
+<span class="dd" style="--s:17px;--c:var(--brand-hot);left:3.95in;top:.62in">${svg.sparkle}</span>
+<span class="dd" style="--s:10px;--c:var(--brand-sky);left:4.32in;top:.48in">${svg.sparkleX}</span>
+<span class="dd" style="--s:6px;--c:var(--brand-sun);left:4.22in;top:.98in">${svg.dot}</span>
+<div class="logo">${svg.logo}</div>
+</header>
 <main>
-<h1>${title}<span class="doodles">${svg.sparkle}${svg.ring}${svg.sparkle}</span></h1>
+<h1>${title}</h1>
 ${body}
 ${sig}
 </main>
 <footer><div class="w w1">${svg.wave}</div><div class="w w2">${svg.wave}</div>
+<span class="dd" style="--s:13px;--c:var(--brand-hot);right:1.25in;bottom:.95in">${svg.sparkle}</span>
+<span class="dd" style="--s:8px;--c:var(--lh-c);right:1.02in;bottom:1.08in">${svg.sparkleX}</span>
 <div class="plan">${plan}</div></footer>
 <script>
 (async () => {

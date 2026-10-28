@@ -80,27 +80,34 @@ describe('letterHtml', () => {
     expect(html).not.toContain('<title>t</title>');
     expect(LETTERHEAD_SVGS.logo).toBe('logos/kvbc-awana-two-line-ink.svg');
   });
-  it('Letter, no margins, the fit script with FIT\'s numbers, and every club colour on the stripe', () => {
+  it('Letter, no margins, the fit script with FIT\'s numbers', () => {
     expect(html).toContain('@page{size:Letter;margin:0}');
     expect(html).toContain(`let pt = ${FIT.startPt};`);
     expect(html).toContain(`pt > ${FIT.minPt}`);
-    for (const c of ['puggles', 'cubbies', 'sparks', 'tnt', 'trek', 'journey']) expect(html).toContain(`background:var(--brand-${c})`);
+  });
+  it('the catalog\'s text page: corner tab, ONE colour family, caps headline, plain bullets, no tiles', () => {
+    expect(html).toContain('<div class="tab"><svg id="tab">');
+    expect(html).toContain('November 2026');
+    expect(html).toMatch(/h1\{[^}]*text-transform:uppercase/);
+    expect(html).not.toMatch(/--brand-(puggles|cubbies|sparks|tnt|trek|journey)/);
+    expect(html).not.toMatch(/class="item" style=|class="date"|class="stripe"|class="chip"/);
+    expect(html).toContain('<b class="when">NOV 25</b>');
   });
   it('the five words in order, this year\'s as the one hot pill, never called a plan', () => {
     expect(PLAN_WORDS).toEqual(['Belong', 'Believe', 'Become', 'Protect', 'Grow']);
     expect(PLAN_NOW).toBe('Believe');
     const row = html.match(/<div class="plan">([\s\S]*?)<\/div>/)[1];
-    expect([...row.matchAll(/<b[^>]*>([^<]+)<\/b>/g)].map((m) => m[1])).toEqual(PLAN_WORDS);
+    expect([...row.matchAll(/<b[^>]*>([^<]+)/g)].map((m) => m[1])).toEqual(PLAN_WORDS);
     expect(row.match(/class="now"/g)).toHaveLength(1);
-    expect(row).toContain('<b class="now">Believe</b>');
+    expect(row).toContain('<b class="now">Believe<span class="swash">');
     expect(html).not.toMatch(/ministry plan|5-year|five-year/i);
     expect(html).not.toMatch(/Wednesdays at|<div class="line">/);
     const next = letterHtml(parseLetter(SAMPLE), { kitUrl: '', svgs: SVGS, planNow: 'Become' });
-    expect(next).toContain('<b class="now">Become</b>');
+    expect(next).toContain('<b class="now">Become<span class="swash">');
   });
-  it('flat: no gradient, no blur', () => {
+  it('flat: no gradient, no blur, no drop shadows on a text page', () => {
     expect(html).not.toMatch(/gradient|blur\(|filter:/);
-    for (const m of html.matchAll(/box-shadow:([^;}]+)/g)) expect(m[1].trim().split(/\s+/)[2]).toBe('0');
+    expect(html).not.toMatch(/box-shadow|text-shadow/);
   });
   it('a letter\'s own text can never become markup', () => {
     const evil = letterHtml(parseLetter('<script>x</script>\n\n<img src=x onerror=y>.'), { kitUrl: '', svgs: SVGS });
