@@ -192,7 +192,9 @@ html, body, #root {
   html:not(.embedded):not(.overlay-mode) body {
     background: #000;
   }
-  html:not(.embedded):not(.overlay-mode) .stage {
+  /* An open operator panel (Settings, the slide editor, the first-run card)
+     keeps the whole phone: its buttons must not fall outside the 16:9 box. */
+  html:not(.embedded):not(.overlay-mode) .stage:not(:has(.panel)) {
     margin: auto;
     width: min(100vw, calc(100dvh * 16 / 9));
     height: min(100dvh, calc(100vw * 9 / 16));

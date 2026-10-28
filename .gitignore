@@ -1,0 +1,27 @@
+node_modules
+site/dist
+site/.wrangler
+site/lib/large-files.generated.js
+# Sync Worker
+worker/.wrangler/
+worker/.dev.vars
+
+# Generated copies of the family's shared files (scripts/family-assets.mjs):
+# the brand kit and the sync modules each have ONE canonical file; every app gets
+# its own full local copy at build time. Never edit or commit these.
+journey/public/brand/
+journey/public/src/shared/
+printer/print-server/public/brand/
+classroom/public/brand/
+classroom/public/src/shared/
+# This week's lesson video is an asset on the journey-videos-v2 release
+# (journey/public/current-lesson-video.json is its pointer); never committed.
+journey/public/current-lesson-video.mp4
+
+# Helper agents' temporary working copies
+.claude/worktrees/
+
+# The film's soundtrack ("Happy Dance", MercyMe) is not ours to publish: never committed
+printer/reel/music/*.mp3
+printer/reel/music/*.m4a
+printer/reel/music/*.wav
