@@ -56,6 +56,8 @@ export const ACTION_WORDS = {
   volume: 'Volume',
   begin: 'Begin lesson',
   pick: 'Lesson',
+  'video-end': 'End video',
+  'show-journey': 'Go to Journey',
 };
 
 /* The six picker choices, as the kiosk's own picker names them. */
@@ -202,6 +204,23 @@ export function slidesButton(now) {
   if (view === 'video' || view === 'intro') return { hidden: false, label: 'Skip to teaching slides', confirm: true };
   if (view === 'splash') return { hidden: false, label: 'Skip to teaching slides', confirm: false };
   return { hidden: false, label: 'Start teaching slides', confirm: false };
+}
+
+/* "End video" (owner 2026-10-28): only while a video (or the lesson intro
+   starting one) is up; it stops it and puts the lesson's start screen back,
+   so it takes a second tap within SLIDES_CONFIRM_MS. */
+export function endVideoButton(now) {
+  const view = now && now.view;
+  return { hidden: view !== 'video' && view !== 'intro', label: 'End video', confirm: true };
+}
+export const END_CONFIRM_WORDS = 'Tap again to stop it';
+
+/* "Go to the Journey screen" (owner 2026-10-28): only while the screen shows
+   the Check-in Display or Trek's card; it brings up the Journey screen (the
+   lesson's start screen), as the ⇄ button on the screen does. */
+export function journeyButton(now) {
+  const view = now && now.view;
+  return { hidden: view !== 'checkin' && view !== 'trek', label: 'Go to the Journey screen' };
 }
 
 /* The second tap's words, shown for SLIDES_CONFIRM_MS after the first. */

@@ -2,7 +2,8 @@
    Owner 2026-10-13: "build a way to advance slides for Journey on a phone.
    Doing it on the phone should advance the slide for all." A leader's phone
    presses Next (or Back, Start teaching slides, Play/Pause, Back 15s, Skip
-   15s, Mute, Volume - / +, Begin, or picks a lesson) and EVERY Journey kiosk does it. The
+   15s, Mute, Volume - / +, Begin, End video, Go to Journey, or picks a
+   lesson) and EVERY Journey kiosk does it. The
    press reaches this page through public/src/sync.js (the sync Worker keeps
    it for 20 seconds; the embedded Check-in Display's doorbell makes this
    page collect it within about a second), which hands each one to
@@ -36,7 +37,7 @@
 
 // What the phone may ask: exactly shared/journeyRemote.js
 // JOURNEY_REMOTE_ACTIONS (test/phone-remote.test.mjs pins the two lists).
-const REMOTE_COMMANDS = ['slide-next', 'slide-prev', 'slides-start', 'play', 'pause', 'toggle-pause', 'seek', 'mute', 'unmute', 'volume', 'begin', 'pick'];
+const REMOTE_COMMANDS = ['slide-next', 'slide-prev', 'slides-start', 'play', 'pause', 'toggle-pause', 'seek', 'mute', 'unmute', 'volume', 'begin', 'pick', 'video-end', 'show-journey'];
 // One volume press moves the lesson video's volume by this many percent (owner 2026-10-15).
 const REMOTE_VOLUME_STEP_PCT = 10;
 // The deck's four pictures, in Awana's order (20-teaching-slides.js).
@@ -165,6 +166,37 @@ function remoteStartSlides() {
   return startTeachingSlides(week, () => setView(lessonDoneView())) ? null : 'no-slides';
 }
 
+/* "End video" (owner 2026-10-28): the video (or the lesson intro still
+   starting it) stops and the lesson's start screen is back, as at 6:30: the
+   splash offers "Resume at m:ss" from where the scheduled lesson got to (a
+   picked lesson's preview is simply over; previews keep no place). The
+   Journey view stays up whatever the schedule says: like the ⇄ button, a
+   view the operator chose is never fought by the 15 s poll. */
+function remoteEndVideo() {
+  if (!remoteVideoUp() && !lessonIntroActive()) return 'no-video';
+  if (previewMode) {
+    // endPreview() would hand the screen to the schedule's view; here the
+    // operator asked for the start screen.
+    previewMode = false;
+    previewFallbackUrl = null;
+    previewWeek = null;
+  }
+  stopJourneyContent();
+  setView('journey');
+  return null;
+}
+
+/* "Go to Journey" (owner 2026-10-28): from the Check-in Display or Trek's
+   card to the Journey screen (its start screen, or whatever it was showing),
+   as the ⇄ button does from the Check-in Display. Over a club transition's
+   black the black goes, as for the button. */
+function remoteShowJourney() {
+  if (!journeyView.classList.contains('hidden')) return 'already';
+  dismissGap();
+  setView('journey');
+  return null;
+}
+
 /* A lesson from the phone's picker: the configure relay's checks, and never
    over a running lesson without `force`. Settings, a handout / Read Prep or
    the caption question has already skipped it (runRemoteCommand), as it
@@ -252,6 +284,10 @@ function runRemoteCommand(action, data) {
       setMuted(false);
       return null;
     }
+    case 'video-end':
+      return remoteEndVideo();
+    case 'show-journey':
+      return remoteShowJourney();
     case 'begin':
       if (lessonIntroActive() || remoteVideoUp() || slideshowActive()) return 'already';
       if (!isAwaitingPlay()) return 'not-splash';

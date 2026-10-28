@@ -53,6 +53,8 @@ let pendingPick = null;
 let pendingPress = null; // this phone's latest press, until the screen names it: { action, id, at }
 let slidesArmedAt = 0; // the first tap of a two-tap "Skip to teaching slides" (Date.now())
 let slidesArmTimer = null;
+let endArmedAt = 0; // the first tap of a two-tap "End video" (Date.now())
+let endArmTimer = null;
 let wakeLock = null;
 let memorySession = '';
 
@@ -234,6 +236,10 @@ function render() {
   // Begin: only on the lesson's start screen, big and hot (anywhere else the screen skips it).
   $('btn-begin').hidden = !(now && now.view === 'splash');
   setText($('btn-begin'), logic.beginWords(now));
+  // Go to the Journey screen: only over the Check-in Display or Trek's card.
+  const journey = logic.journeyButton(now);
+  $('btn-journey').hidden = journey.hidden;
+  setText($('btn-journey'), journey.label);
 
   // Slide buttons: Next reads Finish on the last slide (the kiosk's own word).
   const onSlides = now && now.view === 'slides' && now.slide;
@@ -241,6 +247,7 @@ function render() {
   $('slide-pad').classList.toggle('is-quiet', !onSlides);
   setText($('next-label'), onSlides && now.slide.n === now.slide.of ? 'Finish' : 'Next');
   renderSlidesButton(now);
+  renderEndButton(now);
 
   // Video buttons follow the video.
   const v = now && now.view === 'video' ? now.video : null;
@@ -285,6 +292,18 @@ function renderSlidesButton(now) {
   if (!armed) slidesArmedAt = 0;
   button.classList.toggle('is-armed', Boolean(armed));
   setText(button, armed ? logic.SLIDES_CONFIRM_WORDS : b.label);
+}
+
+/* "End video": only while a video (or the lesson intro) is up; its first tap
+   only asks for a second. */
+function renderEndButton(now) {
+  const b = logic.endVideoButton(now);
+  const button = $('btn-end');
+  button.hidden = b.hidden;
+  const armed = !b.hidden && endArmedAt && Date.now() - endArmedAt < logic.SLIDES_CONFIRM_MS;
+  if (!armed) endArmedAt = 0;
+  button.classList.toggle('is-armed', Boolean(armed));
+  setText(button, armed ? logic.END_CONFIRM_WORDS : b.label);
 }
 
 function showProblem() {
@@ -434,6 +453,24 @@ function onPadClick(event) {
     renderSlidesButton(now);
     return;
   }
+  if (action === 'video-end') {
+    const kiosk = state && logic.pickKiosk(state.kiosks);
+    const now = kiosk ? kiosk.now : null;
+    // It stops the video for the room: the first tap only asks for a second.
+    if (!(endArmedAt && Date.now() - endArmedAt < logic.SLIDES_CONFIRM_MS)) {
+      endArmedAt = Date.now();
+      flash(button);
+      renderEndButton(now);
+      clearTimeout(endArmTimer);
+      endArmTimer = setTimeout(() => { const k = state && logic.pickKiosk(state.kiosks); renderEndButton(k ? k.now : null); }, logic.SLIDES_CONFIRM_MS + 50);
+      return;
+    }
+    endArmedAt = 0;
+    clearTimeout(endArmTimer);
+    press(action, undefined, button);
+    renderEndButton(now);
+    return;
+  }
   if (action === 'seek') { press('seek', { by: Number(button.dataset.by) }, button); return; }
   if (action === 'volume') { press('volume', { step: Number(button.dataset.step) }, button); return; }
   press(action, undefined, button);
@@ -571,7 +608,7 @@ async function start() {
   [rules, logic] = await Promise.all([import(`../src/shared/journeyRemote.js${V}`), import(`./logic.js${V}`)]);
   $('signin-form').addEventListener('submit', signIn);
   $('signout').addEventListener('click', signOut);
-  for (const id of ['btn-begin', 'btn-prev', 'btn-next', 'btn-slides']) $(id).addEventListener('click', onPadClick);
+  for (const id of ['btn-begin', 'btn-journey', 'btn-prev', 'btn-next', 'btn-slides']) $(id).addEventListener('click', onPadClick);
   document.querySelector('.video').addEventListener('click', onPadClick);
   $('week').addEventListener('change', renderChoices);
   $('choices').addEventListener('click', onChoice);

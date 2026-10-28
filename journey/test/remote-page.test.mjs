@@ -84,7 +84,9 @@ for (const viewport of [{ width: 390, height: 844 }, { width: 360, height: 740 }
         assert.ok(c.x >= 0 && c.x + c.w <= viewport.width + 0.5, `${c.id} fits across (${c.x}+${c.w})`);
         assert.ok(c.h >= 44, `${c.id} is ${c.h}px tall`);
       }
-      const big = await page.$$eval('.video [data-action]', (els) => els.map((el) => el.getBoundingClientRect().height));
+      // The video card's buttons on screen (End video is hidden with no video up).
+      const big = await page.$$eval('.video [data-action]', (els) => els.filter((el) => el.offsetParent !== null).map((el) => el.getBoundingClientRect().height));
+      assert.ok(big.length >= 6, `${big.length} video buttons on screen`);
       for (const h of big) assert.ok(h >= 72, `video buttons ${h}px tall`);
       // The header stays on one line, its status pill inside the right gutter.
       const conn = await box(page, '#conn');
@@ -439,6 +441,50 @@ test('the controls follow the screen: Begin on the start screen, the video\'s bu
     for (let i = 0; i < 50 && presses().length < 2; i += 1) await page.waitForTimeout(20);
     assert.deepEqual(presses().slice(1), [{ action: 'slides-start' }]);
     await page.waitForFunction(() => document.getElementById('btn-slides').textContent === 'Skip to teaching slides');
+    await context.close();
+  });
+});
+
+test('End video takes two taps and sends video-end; Go to the Journey screen shows over the Check-in Display (owner 2026-10-28)', { skip }, async () => {
+  await withBrowser(async (browser) => {
+    const id = 'jk_aaaaaaaaaaaaaaaaaaaa';
+    const { page, calls, ctl, context } = await openRemote(browser, { width: 360, height: 740 }, {
+      kiosks: [{ id, name: 'Journey kiosk', online: true, now: { view: 'checkin', week: 5, title: 'Unit 2, Lesson 1: Worldview', preview: false, wait: null, last: null, at: null } }],
+    });
+    const presses = () => calls.filter((c) => c.path === '/v1/journey/remote').map((c) => c.body);
+    await waitForMain(page, 'Check-in display');
+    // Over the Check-in Display: a big hot button to the Journey screen, on the first screenful; no End video.
+    await page.waitForSelector('#btn-journey:not([hidden])');
+    assert.equal(await page.textContent('#btn-journey'), 'Go to the Journey screen');
+    const go = await box(page, '#btn-journey');
+    assert.ok(go.height >= 112 && go.y + go.height <= 740, `Go ${go.height}px tall, ends at ${go.y + go.height}px`);
+    assert.equal(await page.isVisible('#btn-end'), false);
+    await page.click('#btn-journey');
+    for (let i = 0; i < 50 && presses().length < 1; i += 1) await page.waitForTimeout(20);
+    assert.deepEqual(presses(), [{ action: 'show-journey' }]);
+
+    // A video: End video in the video card, thumb-sized; the Journey button gone.
+    ctl.kiosks = [{ id, name: 'Journey kiosk', online: true, now: NOW.video(5, 765, 902, false, 60) }];
+    await waitForMain(page, 'Video 12:4');
+    assert.equal(await page.isVisible('#btn-journey'), false);
+    await page.waitForSelector('#btn-end:not([hidden])');
+    const end = await box(page, '#btn-end');
+    assert.ok(end.height >= 72, `End video ${end.height}px tall`);
+    // It stops the video for the room: the first tap only asks.
+    await page.click('#btn-end');
+    await page.waitForFunction(() => document.getElementById('btn-end').textContent === 'Tap again to stop it');
+    await page.waitForTimeout(250);
+    assert.deepEqual(presses().slice(1), [], 'nothing sent on the first tap');
+    await page.click('#btn-end');
+    for (let i = 0; i < 50 && presses().length < 2; i += 1) await page.waitForTimeout(20);
+    assert.deepEqual(presses().slice(1), [{ action: 'video-end' }]);
+    await page.waitForFunction(() => document.getElementById('btn-end').textContent === 'End video');
+
+    // The start screen: neither.
+    ctl.kiosks = [{ id, name: 'Journey kiosk', online: true, now: { view: 'splash', week: 5, title: 'Unit 2, Lesson 1: Worldview', preview: false, wait: null, last: null, at: null } }];
+    await waitForMain(page, 'Ready to begin');
+    assert.equal(await page.isVisible('#btn-end'), false);
+    assert.equal(await page.isVisible('#btn-journey'), false);
     await context.close();
   });
 });

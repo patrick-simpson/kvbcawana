@@ -6,6 +6,7 @@ import {
   CHOICES, PRESS_ANSWER_MS, REASON_WORDS, SLIDES_CONFIRM_WORDS,
 } from '../public/remote/logic.js';
 import { JOURNEY_PICKER_CHOICES, JOURNEY_REMOTE_REASONS } from '../../shared/journeyRemote.js';
+import * as logic from '../public/remote/logic.js';
 
 const slides = (n, of, kind = 'title', lines = []) => ({ view: 'slides', week: 5, title: 'Unit 2, Lesson 1: Worldview', preview: false, wait: null, slide: { n, of, kind, heading: null, lines }, last: null, at: null });
 
@@ -130,4 +131,30 @@ test('which controls lead, and the Start teaching slides button for each view', 
   assert.deepEqual(slidesButton({ view: 'checkin' }), { hidden: false, label: 'Start teaching slides', confirm: false });
   assert.deepEqual(slidesButton(null), { hidden: false, label: 'Start teaching slides', confirm: false });
   assert.equal(SLIDES_CONFIRM_WORDS, 'Tap again to end the video');
+});
+
+test('End video shows only over a video or the lesson intro, and always asks for a second tap (owner 2026-10-28)', () => {
+  for (const view of ['video', 'intro']) {
+    assert.deepEqual(logic.endVideoButton({ view }), { hidden: false, label: 'End video', confirm: true });
+  }
+  for (const view of ['splash', 'slides', 'checkin', 'trek', 'idle']) {
+    assert.equal(logic.endVideoButton({ view }).hidden, true, view);
+  }
+  assert.equal(logic.endVideoButton(null).hidden, true);
+  assert.equal(logic.END_CONFIRM_WORDS, 'Tap again to stop it');
+  assert.equal(logic.ACTION_WORDS['video-end'], 'End video');
+});
+
+test('Go to the Journey screen shows only over the Check-in Display or Trek\'s card (owner 2026-10-28)', () => {
+  for (const view of ['checkin', 'trek']) {
+    assert.deepEqual(logic.journeyButton({ view }), { hidden: false, label: 'Go to the Journey screen' });
+  }
+  for (const view of ['splash', 'video', 'intro', 'slides', 'idle']) {
+    assert.equal(logic.journeyButton({ view }).hidden, true, view);
+  }
+  assert.equal(logic.journeyButton(null).hidden, true);
+  assert.equal(logic.ACTION_WORDS['show-journey'], 'Go to Journey');
+  // The screen's answers read plainly on the phone.
+  assert.equal(logic.lastWords({ last: { action: 'video-end', ok: true } }), 'End video: done ✓');
+  assert.equal(logic.lastWords({ last: { action: 'show-journey', ok: false, reason: 'already' } }), 'Go to Journey skipped: It was already doing that.');
 });

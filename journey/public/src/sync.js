@@ -118,7 +118,7 @@
   var DOORBELL_MESSAGE = 'awana-display:sync-doorbell';
   // What the phone remote may ask: exactly shared/journeyRemote.js
   // JOURNEY_REMOTE_ACTIONS (test/phone-remote.test.mjs reads this line).
-  var PHONE_ACTIONS = ['slide-next', 'slide-prev', 'slides-start', 'play', 'pause', 'toggle-pause', 'seek', 'mute', 'unmute', 'volume', 'begin', 'pick'];
+  var PHONE_ACTIONS = ['slide-next', 'slide-prev', 'slides-start', 'play', 'pause', 'toggle-pause', 'seek', 'mute', 'unmute', 'volume', 'begin', 'pick', 'video-end', 'show-journey'];
   var PHONE_ACTIONS_MAX = 12;
   var PHONE_SEEN_MAX = 64;
   var PRESS_ID_RE = /^[A-Za-z0-9_-]{1,40}$/;

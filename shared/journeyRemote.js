@@ -21,6 +21,9 @@ export const JOURNEY_REMOTE_ACTIONS = Object.freeze([
   'slide-next', 'slide-prev', 'slides-start',
   'play', 'pause', 'toggle-pause', 'seek', 'mute', 'unmute', 'volume',
   'begin', 'pick',
+  // owner 2026-10-28: end the video, back to the lesson's start screen; and
+  // from the Check-in Display (or Trek's card) to the Journey screen.
+  'video-end', 'show-journey',
 ]);
 
 /** The kiosk's picker choices (journey/src/schedule/19-picker-final-step.js PICKER_CHOICES). */

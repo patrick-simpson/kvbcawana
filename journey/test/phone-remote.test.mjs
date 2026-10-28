@@ -172,6 +172,59 @@ test('Begin on the splash, then Play/Pause, ±15 s and Mute act on the video; th
   }
 });
 
+test('End video stops the video and brings the start screen back; Go to Journey leaves the Check-in Display (owner 2026-10-28)', async () => {
+  const { k, $, press, now } = await boot();
+  try {
+    // Noon: the schedule shows the Check-in Display.
+    assert.equal(now().view, 'checkin');
+    assert.equal(press('video-end'), false);
+    assert.equal(now().last.reason, 'no-video');
+    assert.equal(press('show-journey', undefined, 'go-j'), true);
+    await ticks();
+    assert.equal(now().view, 'splash', 'the lesson start screen');
+    assert.equal(shown($('checkin-view')), false);
+    assert.equal(press('show-journey'), false);
+    assert.equal(now().last.reason, 'already');
+    // The 15 s poll never fights a view the operator chose.
+    k.window.pollSchedule();
+    assert.equal(now().view, 'splash');
+
+    // Begin, then End video: back to the start screen, the video let go.
+    assert.equal(press('begin'), true);
+    for (let i = 0; i < 40 && now().view !== 'video'; i += 1) await sleep(10);
+    assert.equal(now().view, 'video');
+    assert.equal(press('video-end', undefined, 'end-1'), true);
+    await ticks();
+    assert.equal(now().view, 'splash');
+    assert.equal(now().last.id, 'end-1');
+    assert.equal(k.video.hasAttribute('src'), false);
+    assert.equal(shown(k.video), false);
+    assert.equal(press('video-end'), false, 'nothing left to end');
+
+    // A picked lesson (a preview): End video goes to the start screen too,
+    // and the preview is over.
+    const week = LESSONS.lessons.find((l) => l.week !== CURRENT.week).week;
+    assert.equal(press('pick', { week, choice: 'student' }), true);
+    for (let i = 0; i < 40 && now().view !== 'video'; i += 1) await sleep(10);
+    assert.equal(now().view, 'video');
+    assert.equal(now().preview, true);
+    assert.equal(press('video-end'), true);
+    await ticks();
+    assert.equal(now().view, 'splash');
+    assert.equal(now().preview, false);
+    assert.equal(now().week, CURRENT.week, 'the scheduled lesson start screen');
+
+    // Slides are not a video: End video leaves them alone.
+    assert.equal(press('slides-start'), true);
+    await ticks();
+    assert.equal(now().view, 'slides');
+    assert.equal(press('video-end'), false);
+    assert.equal(now().view, 'slides');
+  } finally {
+    await k.close();
+  }
+});
+
 test('a plain browser: a phone press is not a tap, so the video stays muted and Unmute says why', async () => {
   const { k, press, now } = await boot({ device: DESKTOP });
   try {

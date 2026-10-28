@@ -188,6 +188,8 @@ body {
 .slide-pad.is-quiet .btn-next { background: #fff; color: var(--r-hot-deep); border-color: var(--r-hot-deep); box-shadow: 0 6px 0 var(--r-hot-deep); }
 .btn-wide { width: 100%; margin: 0 0 22px; min-height: 64px; background: var(--r-tint); }
 /* Its first tap over a running lesson: the second one ends the video. */
+/* End video (two taps): back to the lesson's start screen. Armed = hot. */
+.btn-end.is-armed,
 .btn-wide.is-armed { background: var(--r-hot); color: #fff; border-color: var(--r-hot-deep); box-shadow: 0 5px 0 var(--r-hot-deep); }
 /* Begin (Resume at m:ss): only on the lesson's start screen, the one thing to press. */
 .btn-begin { width: 100%; margin: 0 0 22px; }
