@@ -85,9 +85,8 @@ describe('letterHtml', () => {
     expect(html).toContain(`let pt = ${FIT.startPt};`);
     expect(html).toContain(`pt > ${FIT.minPt}`);
   });
-  it('the catalog\'s text page: corner tab, ONE colour family, caps headline, plain bullets, no tiles', () => {
-    expect(html).toContain('<div class="tab"><svg id="tab">');
-    expect(html).toContain('November 2026');
+  it('the catalog\'s text page: no corner tab (owner), ONE colour family, caps headline, plain bullets, no tiles', () => {
+    expect(html).not.toMatch(/class="tab|Awana News/i);
     expect(html).toMatch(/h1\{[^}]*text-transform:uppercase/);
     expect(html).not.toMatch(/--brand-(puggles|cubbies|sparks|tnt|trek|journey)/);
     expect(html).not.toMatch(/class="item" style=|class="date"|class="stripe"|class="chip"/);

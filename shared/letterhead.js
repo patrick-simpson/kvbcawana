@@ -25,7 +25,6 @@
 /** The kit files the page draws, relative to shared/brand/. */
 export const LETTERHEAD_SVGS = Object.freeze({
   logo: 'logos/kvbc-awana-two-line-ink.svg',
-  tab: 'shapes/tab-b-sparks.svg',
   wave: 'shapes/wave-tnt.svg',
   sparkle: 'doodles/sparkle-4pt.svg',
   sparkleX: 'doodles/sparkle-4pt-x.svg',
@@ -47,7 +46,6 @@ export const MAX_TEXT = 20000;
 export const PLAN_WORDS = Object.freeze(['Belong', 'Believe', 'Become', 'Protect', 'Grow']);
 export const PLAN_NOW = 'Believe';
 
-const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
 const MONTH_WORD = /^(jan(uary)?|feb(ruary)?|mar(ch)?|apr(il)?|may|june?|july?|aug(ust)?|sept?(ember)?|oct(ober)?|nov(ember)?|dec(ember)?)\.?$/i;
 
@@ -190,12 +188,11 @@ function cleanSvg(svg) {
  * the type reached FIT.minPt and the text runs onto a second page.
  * @param {Letter} letter
  * @param {{kitUrl: string, svgs: Record<keyof typeof LETTERHEAD_SVGS, string>,
- *   date?: Date, kicker?: string, planNow?: string}} opts
+ *   planNow?: string}} opts
  */
 export function letterHtml(letter, opts) {
   const kit = opts.kitUrl.replace(/\/$/, '');
   const svg = Object.fromEntries(Object.entries(opts.svgs).map(([k, v]) => [k, cleanSvg(v)]));
-  const date = opts.date || new Date();
   const body = letter.parts.map((p) => {
     if (p.kind === 'lead') return `<p class="lead">${linkify(p.text)}</p>`;
     if (p.kind === 'heading') return `<h2>${escapeHtml(p.text)}</h2>`;
@@ -213,11 +210,9 @@ export function letterHtml(letter, opts) {
   const plan = PLAN_WORDS.map((w) => (w === now
     ? `<b class="now">${escapeHtml(w)}<span class="swash">${svg.dash.replace('<svg ', '<svg preserveAspectRatio="none" ')}</span></b>`
     : `<b>${escapeHtml(w)}</b>`)).join(`<i>${svg.dot}</i>`);
-  const [mon, year] = issueLabel(letter.title, date).split(' ');
-  const month = MONTH_NAMES[MONTHS.indexOf(mon)] || mon;
   const title = escapeHtml(letter.title || 'Awana News');
-  // Catalog text pages (2026-27 catalog pp. 4, 6, 10, 18): a wavy corner tab
-  // names the page, ONE colour family carries it (Awana blue, hot as the one
+  // Catalog text pages (2026-27 catalog pp. 4, 6, 10, 18; no corner tab here,
+  // owner 2026-10-28): ONE colour family carries it (Awana blue, hot as the one
   // accent), the headline shouts in caps in that colour, sub-heads are plain
   // label caps, bullets plain dots, a callout a solid rounded plate, pale
   // organic shapes in the bottom corners, doodles scattered in small groups.
@@ -234,12 +229,8 @@ html,body{width:8.5in;height:11in}
 body{position:relative;overflow:hidden;background:#fff;color:#2b2829;font:400 var(--lh-size)/1.5 var(--brand-font-body);-webkit-print-color-adjust:exact;print-color-adjust:exact}
 a{color:var(--lh-deep);font-weight:600;text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:2px}
 svg{display:block;overflow:visible}
-header{position:relative;height:1.72in}
-.tab{position:absolute;top:0;left:0;width:3.55in;color:var(--lh-c)}
-.tab svg{width:100%;height:auto}
-.tab-words{position:absolute;top:.48in;left:.62in;color:#fff;font:400 11pt/1 var(--brand-font-label);letter-spacing:.12em;text-transform:uppercase}
-.tab-words b{display:block;font-weight:400;font-size:21pt;letter-spacing:.05em;margin-top:6px}
-.logo{position:absolute;top:.52in;right:.62in;width:2.8in;color:var(--brand-ink)}
+header{position:relative;height:1.42in}
+.logo{position:absolute;top:.55in;left:.75in;width:2.8in;color:var(--brand-ink)}
 .logo svg{width:100%;height:auto}
 .dd{position:absolute;width:var(--s);height:var(--s);color:var(--c)}
 .dd svg{width:100%;height:100%}
@@ -274,10 +265,9 @@ html[data-fit=flow] footer{position:relative;break-inside:avoid}
 @media screen{html{background:#fff}}
 </style></head><body>
 <header>
-<div class="tab">${svg.tab}<div class="tab-words">${escapeHtml(opts.kicker || 'Awana News')}<b>${escapeHtml(month)} ${escapeHtml(year)}</b></div></div>
-<span class="dd" style="--s:17px;--c:var(--brand-hot);left:3.95in;top:.62in">${svg.sparkle}</span>
-<span class="dd" style="--s:10px;--c:var(--brand-sky);left:4.32in;top:.48in">${svg.sparkleX}</span>
-<span class="dd" style="--s:6px;--c:var(--brand-sun);left:4.22in;top:.98in">${svg.dot}</span>
+<span class="dd" style="--s:17px;--c:var(--brand-hot);right:1.15in;top:.66in">${svg.sparkle}</span>
+<span class="dd" style="--s:10px;--c:var(--brand-sky);right:.82in;top:.52in">${svg.sparkleX}</span>
+<span class="dd" style="--s:6px;--c:var(--brand-sun);right:.92in;top:1.02in">${svg.dot}</span>
 <div class="logo">${svg.logo}</div>
 </header>
 <main>
