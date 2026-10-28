@@ -13,9 +13,11 @@
 // takes before anything has been stored.
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { JSDOM } from 'jsdom';
 
-const REPO = path.dirname(new URL(import.meta.url).pathname).replace(/\/test$/, '');
+// fileURLToPath, not URL.pathname: '/C:/...' is no path on Windows.
+const REPO = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const PUBLIC = path.join(REPO, 'public');
 
 // The page's schedule is the kiosk's LOCAL time of day (Journey 18:30-19:30), so a
