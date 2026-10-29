@@ -60,6 +60,13 @@ def arg(name, default=None):
 MODE = arg("--mode", "build")        # build | preview | final | stills
 OUT_DIR = arg("--out", os.path.join(HERE, "output"))
 FPS, F_END = 30, 450
+# The frame rate the video is RENDERED at (--fps 60, owner 2026-10-28: "super
+# smooth"). The timeline below stays in 30 fps frames; Blender's time
+# stretching plays it RATE / 30 times as many frames, so at 60 fps every even
+# frame is the 30 fps render's frame (frame 2N = frame N) and only the odd
+# ones are new: frames_final_60 can start from frames_final copied over.
+RATE = int(arg("--fps", FPS))
+assert RATE % FPS == 0, "--fps must be a multiple of 30"
 random.seed(2152)                      # 2 Tim 2:15 - same "random" every run
 
 # ------------------------------------------------------------- the timeline --
@@ -327,8 +334,9 @@ def reset_scene():
     bpy.ops.wm.read_factory_settings(use_empty=True)
     sc = bpy.context.scene
     sc.name = "Awana Intro"
-    sc.render.fps = FPS
-    sc.frame_start, sc.frame_end = 1, F_END
+    sc.render.fps = RATE
+    sc.render.frame_map_old, sc.render.frame_map_new = FPS, RATE
+    sc.frame_start, sc.frame_end = 1, F_END * RATE // FPS
     sc.unit_settings.system = "METRIC"
     return sc
 
@@ -1428,7 +1436,7 @@ def setup_render(sc, mode):
     r.resolution_x, r.resolution_y = 1920, 1080
     r.resolution_percentage = 100
     r.use_motion_blur = True
-    r.motion_blur_shutter = 0.35
+    r.motion_blur_shutter = 0.35 * RATE / FPS     # the same exposure at any frame rate
     r.film_transparent = False
     cy.use_adaptive_sampling = True
     cy.use_denoising = True
@@ -1487,10 +1495,10 @@ def setup_render(sc, mode):
 
 
 LOBBY_COPY = os.path.join(REPO, "lobby", "public", "intro", "awana-intro.mp4")
-WEB_KBPS = 6000          # the lobby's copy: ~11 MB for 15 s, crisp on flat colour
+WEB_KBPS = 6000 if RATE == FPS else 9000   # the lobby's copy: ~11 MB (30 fps) / ~17 MB (60 fps) for 15 s
 
 
-def encode_mp4(frames_dir, out_path, fps=FPS, web=False):
+def encode_mp4(frames_dir, out_path, fps=RATE, web=False):
     """Glue the PNG frames into one high-quality H.264 .mp4. `web`: the
     lobby's copy instead (lobby/src/components/FlagshipIntro.jsx plays it):
     a steady bitrate, a keyframe every second, and its index moved to the
@@ -1599,7 +1607,7 @@ def build():
 def main():
     if MODE == "encode":      # just glue already-rendered frames into a video
         which = arg("--which", "final")
-        fd = os.path.join(OUT_DIR, f"frames_{which}")
+        fd = os.path.join(OUT_DIR, f"frames_{which}" + ("" if RATE == FPS else f"_{RATE}"))
         name = "Awana Intro - PREVIEW.mp4" if which == "preview" else "Awana Intro.mp4"
         bpy.ops.wm.read_factory_settings(use_empty=True)
         encode_mp4(fd, os.path.join(OUT_DIR, name))
@@ -1608,7 +1616,7 @@ def main():
         return
     if MODE == "web":         # just the lobby's copy, from the finished frames
         bpy.ops.wm.read_factory_settings(use_empty=True)
-        encode_mp4(os.path.join(OUT_DIR, "frames_final"), LOBBY_COPY, web=True)
+        encode_mp4(os.path.join(OUT_DIR, "frames_final" + ("" if RATE == FPS else f"_{RATE}")), LOBBY_COPY, web=True)
         return
     sc = build()
     mode = MODE if MODE in ("preview", "final", "stills") else "final"
@@ -1622,7 +1630,7 @@ def main():
         sc.render.use_overwrite = True; sc.render.use_placeholder = False
         for f in frames:
             sc.frame_set(f)
-            sc.render.filepath = os.path.join(OUT_DIR, "stills", f"frame_{f:04d}.png")
+            sc.render.filepath = os.path.join(OUT_DIR, "stills", f"frame_{f:04d}" + ("" if RATE == FPS else f"_{RATE}") + ".png")
             bpy.ops.render.render(write_still=True)
             print(f"[awana] still {f} done", flush=True)
     elif MODE in ("preview", "final"):
@@ -1635,7 +1643,7 @@ def main():
                 print("[awana] sleep blocked while rendering")
             except Exception:
                 pass
-        frames_dir = os.path.join(OUT_DIR, f"frames_{MODE}")
+        frames_dir = os.path.join(OUT_DIR, f"frames_{MODE}" + ("" if RATE == FPS else f"_{RATE}"))
         os.makedirs(frames_dir, exist_ok=True)
         # a frame that was mid-render when the laptop slept is an empty
         # placeholder file: delete those so they get rendered again
@@ -1646,7 +1654,7 @@ def main():
         sc.render.filepath = os.path.join(frames_dir, "frame_####")
         bpy.ops.render.render(animation=True)
         name = "Awana Intro - PREVIEW.mp4" if MODE == "preview" else "Awana Intro.mp4"
-        encode_mp4(frames_dir, os.path.join(OUT_DIR, name), fps=FPS // sc.frame_step)
+        encode_mp4(frames_dir, os.path.join(OUT_DIR, name), fps=RATE // sc.frame_step)
         if MODE == "final":
             # ...and the lobby's own copy (commit it to put it on the TVs)
             encode_mp4(frames_dir, LOBBY_COPY, web=True)

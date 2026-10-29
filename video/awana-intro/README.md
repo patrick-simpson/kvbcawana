@@ -22,6 +22,15 @@ out again with no visible jump.
 To start a render over from scratch (after changing the scene), delete the
 `output/frames_final` folder first: finished frames are never re-rendered.
 
+**60 fps (what the lobby plays since 2026-10-28, owner: "super smooth").** Add
+`--fps 60` to the render command (`blender --factory-startup -b -P
+awana_intro.py -- --mode final --fps 60`). The timeline stays in 30 fps frames
+and Blender's time stretching plays it twice as many frames, so frame 2N at
+60 fps IS frame N at 30 fps. Copy each `frames_final/frame_N.png` to
+`frames_final_60/frame_2N.png` first and only the in-between frames are
+rendered (half the time). The 60 fps frames live in `output/frames_final_60`;
+the lobby's copy is 9 Mbps, about 17 MB.
+
 ## On the lobby screens
 
 The lobby's flagship welcome slide now and then carries on into this video
