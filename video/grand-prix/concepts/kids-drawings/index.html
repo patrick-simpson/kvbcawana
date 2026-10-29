@@ -1,0 +1,300 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>kids-drawings</title>
+<style>html,body{margin:0;background:#000}canvas{display:block}</style></head>
+<body><canvas id="c" width="960" height="540"></canvas>
+<script src="brand.js"></script>
+<script>
+// "Kids' dream cars". PLACEHOLDER drawings: the real version uses clubbers' own drawings.
+// Each drawing is made procedurally (seeded, so every frame matches): wobbly crayon outlines,
+// uneven scribble fill that misses and overshoots the lines, waxy speckle texture.
+// Beat sheet (seconds):
+// 0.0-2.9  six drawings drop onto the table one by one
+// 2.9-4.7  card 1
+// 4.7-7.6  each car lifts off its paper as a cut-out (hole left in the sheet), wheels start spinning
+// 7.5-8.4  they zoom off; the club-colour lanes wipe in
+// 8.4-11.6 the race (dog wins by a nose)
+// 11.6-13.8 card 2
+// 13.8-20  end card (at rest from 15.0)
+const ctx = document.getElementById('c').getContext('2d');
+const DW = 600, DH = 420; // drawing space
+const K = { red: '#E3342F', blue: '#2B5FD9', yellow: '#F6C915', green: '#2EA84F', orange: '#F58220', purple: '#7E3FA3',
+  brown: '#8A5A2E', tan: '#E0A04E', pink: '#F27BA8', black: '#2A2A2A', gray: '#8C8C8C', sky: '#5BB8EE', dkgreen: '#1E7D3A', white: '#FFFFFF' };
+
+function mk(w = DW, h = DH) { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; }
+
+// --- crayon primitives -------------------------------------------------------
+function wob(pts, R, amp, closed) {
+  // subdivide and wobble with low-frequency noise
+  const out = []; const n = pts.length; const ph = R() * 10, ph2 = R() * 10;
+  const segs = closed ? n : n - 1;
+  for (let i = 0; i < segs; i++) {
+    const a = pts[i], b = pts[(i + 1) % n]; const len = Math.hypot(b[0] - a[0], b[1] - a[1]); const st = Math.max(2, Math.ceil(len / 14));
+    for (let s = 0; s < st; s++) { const t = s / st; const x = lerp(a[0], b[0], t), y = lerp(a[1], b[1], t); const k = out.length * 0.35;
+      out.push([x + amp * Math.sin(k + ph) * 0.7 + (R() - 0.5) * amp * 0.5, y + amp * Math.sin(k * 1.3 + ph2) * 0.7 + (R() - 0.5) * amp * 0.5]); }
+  }
+  if (!closed) out.push(pts[n - 1]);
+  else { const f = out[0], s2 = out[2] || out[0]; out.push([f[0] + (R() - 0.5) * 6, f[1] + (R() - 0.5) * 6]); out.push([s2[0] + (R() - 0.3) * 8, s2[1] + (R() - 0.3) * 8]); } // overshoot
+  return out;
+}
+function ell(cx, cy, rx, ry, n = 22) { const p = []; for (let i = 0; i < n; i++) { const a = i / n * Math.PI * 2; p.push([cx + Math.cos(a) * rx, cy + Math.sin(a) * ry]); } return p; }
+function stroke(c, pts, col, w, R, passes = 3) {
+  c.save(); c.lineCap = 'round'; c.lineJoin = 'round'; c.strokeStyle = col;
+  for (let p = 0; p < passes; p++) {
+    c.globalAlpha = 0.6 + R() * 0.3; c.lineWidth = w * (0.55 + R() * 0.45); c.beginPath();
+    pts.forEach(([x, y], i) => { const jx = x + (R() - 0.5) * w * 0.6, jy = y + (R() - 0.5) * w * 0.6; i ? c.lineTo(jx, jy) : c.moveTo(jx, jy); });
+    c.stroke();
+  }
+  c.restore();
+}
+function fill(c, pts, col, R, opt = {}) {
+  const sp = (opt.spacing || 9) * 1.35, ang = opt.angle ?? (R() * 0.8 - 0.4) + (R() < 0.5 ? 0 : Math.PI / 2.3);
+  let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9; pts.forEach(([x, y]) => { x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y); });
+  const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2, rad = Math.hypot(x1 - x0, y1 - y0) / 2 + 10;
+  const zig = (clip) => {
+    c.save();
+    if (clip) { c.beginPath(); pts.forEach(([x, y], i) => i ? c.lineTo(x, y) : c.moveTo(x, y)); c.closePath(); c.clip(); }
+    c.translate(cx, cy); c.rotate(ang); c.strokeStyle = col; c.lineCap = 'round'; c.lineJoin = 'round';
+    c.lineWidth = (opt.w || 11) * 0.85; c.globalAlpha = opt.alpha || 0.78;
+    c.beginPath(); let first = true;
+    for (let y = -rad; y < rad; y += sp * (0.6 + R() * 0.7) * (1 + 0.6 * Math.max(0, Math.sin(y * 0.03 + cx)))) {
+      if (R() < (opt.gaps ?? 0.13)) { first = true; continue; } // missed bits
+      const xa = -rad + R() * rad * 0.35, xb = rad - R() * rad * 0.35;
+      if (first) { c.moveTo(xa, y); first = false; }
+      c.lineTo(xb, y + sp * 0.5); c.lineTo(xa, y + sp);
+    }
+    c.stroke(); c.restore();
+  };
+  zig(true);
+  // a couple of scribbles over the line
+  if (opt.over !== false) {
+    c.save(); c.strokeStyle = col; c.lineWidth = 7; c.globalAlpha = 0.75; c.lineCap = 'round';
+    for (let k = 0; k < 2; k++) { const p = pts[Math.floor(R() * pts.length)]; c.beginPath(); c.moveTo(p[0] - 8, p[1] - 6); c.lineTo(p[0] + 10 * (R() - 0.3), p[1] + 9 * (R() - 0.2)); c.lineTo(p[0] - 4, p[1] + 6); c.stroke(); }
+    c.restore();
+  }
+}
+function wax(cv, R, n = 6500) { // waxy crayon speckle: knock tiny holes out of what is drawn
+  const c = cv.getContext('2d'); c.save(); c.globalCompositeOperation = 'destination-out';
+  for (let i = 0; i < n; i++) { c.globalAlpha = 0.25 + R() * 0.6; const x = R() * cv.width, y = R() * cv.height; c.fillRect(x, y, 1 + R() * 2.5, 1 + R() * 1.5); }
+  c.restore();
+}
+function shape(c, pts, col, line, R, opt = {}) { const w = wob(pts, R, opt.amp ?? 8, true); if (col) fill(c, w, col, R, opt); stroke(c, w, line, opt.lw || 7, R); return w; }
+function scribbleCircle(c, cx, cy, r, col, R, lw = 5) { // a kid's round-and-round circle
+  const p = []; const turns = 1.25 + R() * 0.3; for (let i = 0; i <= 40 * turns; i++) { const a = i / 40 * Math.PI * 2 + R() * 0.05; const rr = r * (0.94 + 0.1 * Math.sin(i * 0.4) + (R() - 0.5) * 0.04); p.push([cx + Math.cos(a) * rr, cy + Math.sin(a) * rr]); }
+  stroke(c, p, col, lw, R, 2);
+}
+
+// --- scenery for each sheet ---------------------------------------------------
+function scenery(c, R, i) {
+  // sun in a corner with rays
+  const sx = i % 2 ? 70 : 530, sy = 62;
+  fill(c, wob(ell(sx, sy, 38, 38), R, 3, true), K.yellow, R, { spacing: 8, over: false });
+  scribbleCircle(c, sx, sy, 40, K.orange, R, 5);
+  for (let k = 0; k < 9; k++) { const a = k / 9 * Math.PI * 2 + 0.2; stroke(c, [[sx + Math.cos(a) * 52, sy + Math.sin(a) * 52], [sx + Math.cos(a) * (74 + R() * 14), sy + Math.sin(a) * (74 + R() * 14)]], K.orange, 6, R, 2); }
+  // grass/road along the bottom
+  const g = []; for (let x = -10; x <= DW + 10; x += 16) g.push([x, 360 + (R() - 0.5) * 8]);
+  stroke(c, g, K.green, 9, R);
+  for (let x = 10; x < DW; x += 13 + R() * 10) stroke(c, [[x, 362], [x + (R() - 0.5) * 8, 340 - R() * 14]], K.green, 4, R, 2);
+  // a cloud or two
+  const cx = i % 2 ? 360 : 200; const cl = [];
+  for (let k = 0; k <= 32; k++) { const a = k / 32 * Math.PI * 2; const bump = 1 + 0.22 * Math.abs(Math.sin(a * 3)); cl.push([cx + Math.cos(a) * 62 * bump, 70 + Math.sin(a) * 26 * bump]); }
+  stroke(c, wob(cl, R, 2, true), K.sky, 5, R, 2);
+  if (i % 3 === 0) { // birds
+    for (let k = 0; k < 2; k++) { const bx = 300 + k * 60, by = 130 + k * 12; stroke(c, [[bx - 14, by], [bx - 6, by - 8], [bx, by], [bx + 6, by - 8], [bx + 14, by]], K.black, 3, R, 2); }
+  }
+}
+
+// --- the six cars (body only; wheels separate so they can spin) ---------------
+const CARS = [
+  { name: 'wings', lane: 'sparks', wheels: [[205, 305, 38], [400, 305, 38]], body(c, R) {
+      shape(c, [[255, 205], [150, 80], [215, 100], [180, 60], [270, 120], [330, 200]], K.yellow, K.orange, R, { lw: 5 }); // wing
+      for (let k = 0; k < 3; k++) stroke(c, [[230 + k * 18, 180], [180 + k * 22, 105 + k * 8]], K.orange, 3, R, 2);
+      shape(c, [[140, 300], [140, 240], [205, 232], [245, 182], [350, 180], [390, 230], [462, 240], [466, 300]], K.red, K.black, R);
+      shape(c, [[255, 228], [262, 196], [300, 194], [300, 228]], K.sky, K.black, R, { lw: 4, spacing: 7 });
+      shape(c, [[315, 228], [315, 194], [345, 194], [372, 228]], K.sky, K.black, R, { lw: 4, spacing: 7 });
+      shape(c, [[440, 255], [460, 252], [462, 268], [442, 270]], K.yellow, K.black, R, { lw: 3 }); // headlight
+    } },
+  { name: 'rocket', lane: 'cubbies', wheels: [[215, 308, 32], [370, 308, 32]], body(c, R) {
+      shape(c, [[150, 262], [70, 230], [105, 262], [55, 268], [100, 285], [72, 310], [150, 292]], K.orange, K.red, R, { lw: 5 }); // flame
+      fill(c, wob([[150, 268], [108, 262], [130, 280], [150, 286]], R, 2, true), K.yellow, R, { over: false, w: 8 });
+      shape(c, [[165, 222], [135, 170], [215, 214]], K.red, K.black, R, { lw: 5 }); // fins
+      shape(c, [[150, 295], [150, 220], [385, 208], [490, 252], [385, 298]], K.blue, K.black, R);
+      for (const x of [230, 290, 350]) { fill(c, wob(ell(x, 245, 16, 16), R, 1.5, true), K.yellow, R, { over: false, w: 7, spacing: 6 }); scribbleCircle(c, x, 245, 17, K.black, R, 4); }
+    } },
+  { name: 'hotdog', lane: 'sparks', wheels: [[195, 318, 30], [405, 318, 30]], body(c, R) {
+      shape(c, ell(300, 272, 185, 52, 26), K.tan, K.brown, R);
+      shape(c, ell(298, 238, 212, 30, 26), K.red, '#8B1E1E', R, { lw: 5 });
+      const m = []; for (let x = 120; x <= 470; x += 12) m.push([x, 232 + Math.sin(x * 0.09) * 10]);
+      stroke(c, m, K.yellow, 8, R);
+      // googly eyes on the sausage
+      for (const ex of [470, 492]) { fill(c, wob(ell(ex, 214, 12, 12), R, 1, true), K.white, R, { over: false, w: 6 }); scribbleCircle(c, ex, 214, 13, K.black, R, 3); fill(c, ell(ex + 3, 217, 4, 4), K.black, R, { over: false, w: 5, spacing: 3 }); }
+      stroke(c, [[478, 246], [490, 252], [500, 244]], K.black, 4, R, 2); // smile
+    } },
+  { name: 'dog', lane: 'tnt', wheels: [[205, 305, 36], [400, 305, 36]], body(c, R) {
+      // dog in the driver's seat
+      shape(c, ell(320, 190, 46, 42), K.tan, K.brown, R);
+      shape(c, [[285, 165], [262, 175], [262, 232], [282, 225]], K.brown, K.brown, R, { lw: 4 }); // floppy ear
+      shape(c, ell(362, 202, 22, 15), K.tan, K.brown, R, { lw: 4 });
+      fill(c, ell(381, 197, 6, 5), K.black, R, { over: false, w: 6, spacing: 3 });
+      fill(c, ell(330, 178, 5, 6), K.black, R, { over: false, w: 6, spacing: 3 });
+      shape(c, [[356, 214], [366, 214], [366, 240], [356, 238]], K.pink, K.red, R, { lw: 3 }); // tongue
+      scribbleCircle(c, 395, 224, 16, K.black, R, 5); // steering wheel
+      shape(c, [[140, 300], [138, 240], [460, 240], [472, 300]], K.green, K.dkgreen, R);
+      stroke(c, [[250, 246], [254, 292]], K.dkgreen, 4, R, 2);
+      shape(c, [[455, 252], [470, 252], [471, 266], [456, 266]], K.yellow, K.black, R, { lw: 3 });
+    } },
+  { name: 'shark', lane: 'trek', wheels: [[210, 312, 34], [390, 312, 34]], body(c, R) {
+      shape(c, [[290, 212], [315, 135], [350, 218]], K.gray, K.black, R, { lw: 5 }); // fin
+      shape(c, [[135, 270], [92, 210], [115, 268], [88, 330], [140, 292]], K.gray, K.black, R, { lw: 5 }); // tail
+      shape(c, [[132, 270], [175, 228], [300, 208], [420, 222], [488, 262], [432, 302], [150, 302]], K.gray, K.black, R);
+      fill(c, wob([[200, 290], [420, 288], [450, 296], [180, 300]], R, 2, true), K.white, R, { over: false, w: 8 });
+      const t = []; for (let x = 425; x <= 478; x += 9) t.push([x, 262], [x + 4.5, 274]); stroke(c, t, K.black, 3, R, 2);
+      fill(c, ell(420, 240, 7, 7), K.black, R, { over: false, w: 6, spacing: 3 });
+      for (let k = 0; k < 3; k++) stroke(c, [[360 + k * 12, 250], [356 + k * 12, 270]], K.black, 3, R, 2); // gills
+    } },
+  { name: 'monster', lane: 'journey', wheels: [[215, 298, 62], [405, 298, 62]], body(c, R) {
+      shape(c, [[160, 240], [160, 186], [258, 180], [288, 128], [384, 128], [404, 182], [462, 188], [462, 240]], K.purple, K.black, R);
+      shape(c, [[300, 176], [306, 142], [340, 142], [340, 176]], K.sky, K.black, R, { lw: 4, spacing: 7 });
+      shape(c, [[350, 176], [350, 142], [376, 142], [392, 176]], K.sky, K.black, R, { lw: 4, spacing: 7 });
+      // flames decal
+      stroke(c, [[175, 225], [200, 200], [210, 218], [235, 196], [245, 216], [270, 198], [275, 226]], K.orange, 6, R);
+      stroke(c, [[210, 240], [212, 262]], K.gray, 6, R, 2); stroke(c, [[405, 240], [405, 262]], K.gray, 6, R, 2); // suspension
+    } },
+];
+const ORDER_LANES = ['puggles', 'cubbies', 'sparks', 'tnt', 'trek', 'journey'];
+
+function wheelSprite(r, R) {
+  const s = Math.ceil(r * 2 + 30), cv = mk(s, s), c = cv.getContext('2d'), m = s / 2;
+  fill(c, wob(ell(m, m, r, r), R, 2, true), '#3A3A3A', R, { over: false, spacing: 7, w: 10, gaps: 0.04 });
+  scribbleCircle(c, m, m, r, K.black, R, 6);
+  fill(c, wob(ell(m, m, r * 0.38, r * 0.38), R, 1.5, true), '#BBBBBB', R, { over: false, spacing: 5, w: 6 });
+  stroke(c, [[m - r * 0.8, m], [m + r * 0.8, m]], '#D8D8D8', 5, R, 2);
+  stroke(c, [[m, m - r * 0.8], [m, m + r * 0.8]], '#D8D8D8', 5, R, 2);
+  wax(cv, R, s * s / 60);
+  return cv;
+}
+function tinted(src, col) { const cv = mk(src.width, src.height), c = cv.getContext('2d'); c.drawImage(src, 0, 0); c.globalCompositeOperation = 'source-in'; c.fillStyle = col; c.fillRect(0, 0, cv.width, cv.height); return cv; }
+function dilate(src, rad, col) { const t = tinted(src, col), cv = mk(src.width, src.height), c = cv.getContext('2d'); for (let a = 0; a < 24; a++) { const q = a / 24 * Math.PI * 2; c.drawImage(t, Math.cos(q) * rad, Math.sin(q) * rad); } c.drawImage(t, 0, 0); return cv; }
+
+const D = [];
+function build() {
+  CARS.forEach((car, i) => {
+    const R = rng(1234 + i * 977);
+    const body = mk(); car.body(body.getContext('2d'), R); wax(body, R);
+    const wheels = car.wheels.map(([x, y, r]) => ({ x, y, r, spr: wheelSprite(r, R) }));
+    const full = mk(); const fc = full.getContext('2d'); fc.drawImage(body, 0, 0);
+    wheels.forEach(w => fc.drawImage(w.spr, w.x - w.spr.width / 2, w.y - w.spr.height / 2));
+    // solid silhouette (fill internal holes left by the speckle) then the white cut-out border
+    const solid = dilate(full, 3, '#000');
+    const cut = dilate(solid, 12, '#FFFFFF');
+    const shadow = tinted(cut, C.ink);
+    const scene = mk(); const sc = scene.getContext('2d'); scenery(sc, R, i); wax(scene, R, 1800);
+    D.push({ car, body, wheels, cut, shadow, scene, rot: (R() - 0.5) * 0.12 });
+  });
+}
+
+// --- staging --------------------------------------------------------------------
+const SHEET_S = 0.45; // sheet scale in the grid (270 x 189)
+const GRID = [[165, 140], [480, 140], [795, 140], [165, 395], [480, 395], [795, 395]];
+const LIFT = i => 4.9 + i * 0.42;
+const TABLE = C.sky;
+
+function drawCarSprite(c, d, T, s, lift, spin) {
+  // origin at the drawing's centre; lift 0..1 sets the hard offset of the shadow
+  const off = 12 * lift / s;
+  if (lift > 0) { c.drawImage(d.shadow, -DW / 2 + off, -DH / 2 + off); c.drawImage(d.cut, -DW / 2, -DH / 2); }
+  c.drawImage(d.body, -DW / 2, -DH / 2);
+  d.wheels.forEach(w => { c.save(); c.translate(w.x - DW / 2, w.y - DH / 2); c.rotate(spin); c.drawImage(w.spr, -w.spr.width / 2, -w.spr.height / 2); c.restore(); });
+}
+
+function table(T) {
+  ctx.fillStyle = TABLE; ctx.fillRect(0, 0, W, H);
+  D.forEach((d, i) => {
+    const t0 = 0.15 + i * 0.4, p = prog(T, t0, 0.5);
+    if (p <= 0) return;
+    const [gx, gy] = GRID[i];
+    const drop = E.settle(p), s = SHEET_S * lerp(1.35, 1, drop), sh = lerp(22, 7, drop);
+    ctx.save(); ctx.translate(gx, gy); ctx.rotate(d.rot + lerp(0.12, 0, drop) * (i % 2 ? 1 : -1));
+    ctx.scale(s, s);
+    ctx.fillStyle = C.ink; ctx.fillRect(-DW / 2 + sh / s, -DH / 2 + sh / s, DW, DH);
+    ctx.fillStyle = '#FFFEF9'; ctx.fillRect(-DW / 2, -DH / 2, DW, DH);
+    ctx.drawImage(d.scene, -DW / 2, -DH / 2);
+    const L = LIFT(i), lp = prog(T, L, 0.5);
+    if (T < L) { drawCarSprite(ctx, d, T, s, 0, 0); ctx.restore(); return; }
+    // the hole in the paper where the car was cut out
+    ctx.save(); ctx.translate(-DW / 2, -DH / 2); ctx.drawImage(tinted(d.cut, TABLE), 0, 0); ctx.restore();
+    ctx.restore();
+  });
+  // lifted cars above every sheet
+  D.forEach((d, i) => {
+    const L = LIFT(i); if (T < L) return;
+    const [gx, gy] = GRID[i];
+    const lp = E.pop(prog(T, L, 0.46));
+    let x = gx, y = gy - 14 * lp + Math.sin((T - L) * 7 + i) * 4 * lp;
+    // zoom off to the right
+    const z = prog(T, 7.55 + (5 - i) * 0.06, 0.6); x += Math.pow(z, 2.2) * 1300;
+    const s = SHEET_S * lerp(1, 1.12, lp);
+    ctx.save(); ctx.translate(x, y); ctx.rotate(d.rot * (1 - lp) + Math.sin((T - L) * 5 + i) * 0.04 * lp); ctx.scale(s, s);
+    drawCarSprite(ctx, d, T, s, lp, (T - L) * 9);
+    ctx.restore();
+  });
+}
+
+// race lanes: 6 club colours, scrolling dashes, a checkered finish arriving from the right
+const LANE_H = 90;
+const RACE = [ // per lane: which drawing, pace and late surge (dog wins by a nose)
+  { d: 2, base: -20, surge: 0.55, gag: '' },
+  { d: 1, base: 20, surge: 0.72, gag: 'rocket' },
+  { d: 0, base: 0, surge: 0.66, gag: 'fly' },
+  { d: 3, base: 0, surge: 0.90, gag: '' },
+  { d: 4, base: -10, surge: 0.60, gag: '' },
+  { d: 5, base: 10, surge: 0.50, gag: 'bounce' },
+];
+function lanes(T, clipP) {
+  ctx.save();
+  if (clipP < 1) { const sl = 140; const x0 = lerp(W + sl, -sl, E.wipe(clipP)); ctx.beginPath(); ctx.moveTo(x0 + sl, 0); ctx.lineTo(W + 400, 0); ctx.lineTo(W + 400, H); ctx.lineTo(x0, H); ctx.closePath(); ctx.clip(); }
+  const travel = Math.max(0, T - 8.2) * 520 - Math.max(0, T - 11.0) * 520 * 0.0; // track scroll
+  ORDER_LANES.forEach((k, i) => {
+    const y = i * LANE_H;
+    ctx.fillStyle = i === 1 ? C.cubbies[0] : C[k][0]; ctx.fillRect(0, y, W, LANE_H);
+    ctx.fillStyle = C[k][1]; ctx.fillRect(0, y + LANE_H - 8, W, 8);
+    ctx.fillStyle = 'rgba(255,255,255,1)';
+    for (let x = -((travel) % 120); x < W; x += 120) ctx.fillRect(x, y + LANE_H / 2 - 3, 56, 6);
+  });
+  // finish line arrives from the right
+  const fx = finishX(T);
+  if (fx < W + 40) for (let i = 0; i < 540 / 18; i++) for (let j = 0; j < 2; j++) { ctx.fillStyle = (i + j) % 2 ? C.ink : C.white; ctx.fillRect(fx + j * 18, i * 18, 18, 18); }
+  // cars
+  RACE.forEach((rc, i) => {
+    const d = D[rc.d], cy = i * LANE_H + LANE_H / 2 - 24;
+    let x = carX(rc, T);
+    let y = cy + Math.sin(T * 14 + i * 2) * 2;
+    let rot = Math.sin(T * 9 + i) * 0.03;
+    if (rc.gag === 'fly') { const f = Math.sin(clamp((T - 9.6) / 1.1) * Math.PI); y -= f * 34; rot -= f * 0.12; }
+    if (rc.gag === 'bounce') { y -= Math.abs(Math.sin(T * 6)) * 14; }
+    const s = 0.4;
+    ctx.save(); ctx.translate(x, y); ctx.rotate(rot); ctx.scale(s, s);
+    // flat speed streaks
+    ctx.fillStyle = C.white; for (let k = 0; k < 3; k++) ctx.fillRect(-DW / 2 - 40 - k * 50, -40 + k * 40, 90 + k * 20, 9);
+    drawCarSprite(ctx, d, T, s, 1, T * 22);
+    ctx.restore();
+  });
+  ctx.restore();
+}
+function finishX(T) { return lerp(1100, 700, E.settle(prog(T, 10.3, 0.9))); }
+function carX(rc, T) {
+  const enter = E.settle(prog(T, 8.3, 0.9));
+  let x = lerp(-200, 330 + rc.base, enter) + Math.sin(T * 1.7 + rc.d * 1.9) * 40 * enter * (1 - E.settle(prog(T, 10.2, 0.5)));
+  x += Math.pow(Math.max(0, T - 10.6), 2) * rc.surge * 700;
+  return x;
+}
+
+window.render = function (T) {
+  ctx.clearRect(0, 0, W, H);
+  if (T < 8.6) table(T);
+  if (T >= 7.9 && T < 12.3) lanes(T, prog(T, 7.9, 0.6));
+  card(ctx, T, 2.9, 4.7, 1);
+  if (T < 14.4) card(ctx, T, 11.6, 99, 2);
+  endCard(ctx, T, 13.8);
+};
+brandReady().then(() => { build(); window.render(0); window.READY = true; });
+</script></body></html>

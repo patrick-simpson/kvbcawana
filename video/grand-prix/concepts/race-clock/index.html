@@ -1,0 +1,192 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>race-clock</title>
+<style>html,body{margin:0;background:#000}canvas{display:block}</style></head>
+<body><canvas id="c" width="960" height="540"></canvas>
+<script src="brand.js"></script>
+<script>
+// "The race clock": built on the church's real race-day timer screen.
+// Beat sheet (seconds):
+// 0.00-3.85 countdown "The race begins in..." 0:03.50 -> 0:00.00 (brand digits, push-in, colour heats up)
+// 3.85-5.60 card 1
+// 5.60-10.05 finish-line timer: four lanes arm one by one, run, slow-motion finish, splits flash
+// 10.05-11.20 photo-finish freeze, places 1-4
+// 11.20-13.80 card 2
+// 13.80-20.00 end card (at rest from 15.0)
+const ctx = document.getElementById('c').getContext('2d');
+const LANES = [
+  { n: 1, club: 'sparks', t: 2.947, place: 2 },
+  { n: 2, club: 'tnt', t: 3.006, place: 4 },
+  { n: 3, club: 'puggles', t: 2.913, place: 1 },
+  { n: 4, club: 'journey', t: 2.981, place: 3 },
+];
+const GO = 6.8;
+function raceR(T) {
+  if (T < GO) return 0;
+  if (T < 8.8) return 2.88 * (T - GO) / 2.0;
+  if (T < 10.0) return 2.88 + 0.13 * (T - 8.8) / 1.2;
+  return 3.01;
+}
+function tWhenR(r) { return 8.8 + (r - 2.88) / 0.13 * 1.2; }
+
+// Fixed-cell digits so the proportional face never jitters.
+function digits(c, str, cx, base, size, fill, shadow, off) {
+  c.font = `${size}px "Paytone One"`; c.textAlign = 'center';
+  const cw = ch => (ch >= '0' && ch <= '9') ? size * 0.64 : size * 0.3;
+  let w = 0; for (const ch of str) w += cw(ch);
+  let x = cx - w / 2;
+  for (const ch of str) {
+    const m = x + cw(ch) / 2;
+    if (shadow) { c.fillStyle = shadow; c.fillText(ch, m + off, base + off); }
+    c.fillStyle = fill; c.fillText(ch, m, base);
+    x += cw(ch);
+  }
+}
+
+function countdown(T) {
+  ctx.fillStyle = C.blue; ctx.fillRect(0, 0, W, H);
+  const left = clamp(3.5 - Math.max(0, T - 0.35), 0, 3.5);
+  const zero = T >= 3.85;
+  // push in over the whole countdown
+  const z = 1 + 0.14 * E.wipe(prog(T, 0.3, 3.6));
+  ctx.save(); ctx.translate(W / 2, H / 2); ctx.scale(z, z); ctx.translate(-W / 2, -H / 2);
+  // big inset screen plate (the real timer is a screen within the room)
+  ctx.fillStyle = C.blueDeep; ctx.fillRect(70, 70, W - 140, H - 160);
+  const la = E.settle(prog(T, 0.05, 0.5));
+  ctx.globalAlpha = clamp(la * 2);
+  shoutText(ctx, 'The race begins in...', W / 2, lerp(140, 128, la), 44, C.white, C.ink, 4, 'Londrina Solid');
+  ctx.globalAlpha = 1;
+  const s = Math.floor(left), hund = Math.floor((left - s) * 100 + 1e-6);
+  const str = `0:0${s}.${String(hund).padStart(2, '0')}`;
+  // whole-second bump
+  const sinceTick = (3.5 - left) % 1; const bumpP = left < 3.5 ? prog(((T - 0.35) - (0.5)) % 1 + 0, 0, 0.18) : 1;
+  const tickAge = left <= 0 ? T - 3.85 : ((T - 0.85) % 1 + 1) % 1;
+  const bump = T > 0.85 ? 1 + 0.08 * (1 - E.settle(clamp(tickAge / 0.25))) : 1;
+  const pin = E.pop(prog(T, 0.15, 0.46));
+  const col = left > 2 ? C.white : left > 1 ? C.cream : left > 0 ? C.sun : C.hot;
+  ctx.save(); ctx.translate(W / 2, 320); ctx.scale(pin * bump, pin * bump);
+  const shake = left < 1 && left > 0 ? Math.sin(T * 90) * 2.5 : 0;
+  digits(ctx, str, shake, 70, 190, col, C.ink, 10);
+  ctx.restore();
+  // second pips along the bottom of the screen plate
+  for (let i = 0; i < 4; i++) {
+    const lit = left <= 3 - i + 0.0001 && T > 0.35;
+    const cl = C[LANES[i].club];
+    ctx.fillStyle = C.ink; ctx.fillRect(210 + i * 140 + 4, 418 + 4, 120, 18);
+    ctx.fillStyle = lit ? cl[0] : C.blue; ctx.fillRect(210 + i * 140, 418, 120, 18);
+  }
+  ctx.restore();
+  if (zero && T < 3.92) { ctx.fillStyle = C.hot; ctx.fillRect(0, 0, W, H); digits(ctx, '0:00.00', W / 2, 390, 190 * z, C.white, C.ink, 10); }
+}
+
+const LY = i => 205 + i * 80, X0 = 196, FIN = 744, X1 = 784;
+function carFront(l, r) { return 290 + (FIN - 290) * Math.pow(r / l.t, 1.25); }
+function drawCar(c, fx, cy, cl, speed) {
+  if (speed > 0.02) { // flat speed streaks
+    c.fillStyle = C.white;
+    for (let k = 0; k < 3; k++) c.fillRect(fx - 80 - speed * (60 + k * 30), cy - 8 + k * 7, speed * (50 + k * 18), 3);
+  }
+  const p = [[-74, 8], [-74, -6], [-44, -8], [-34, -15], [-20, -15], [-12, -5], [0, 2], [-2, 8]];
+  const poly = (dx, dy, col) => { c.fillStyle = col; c.beginPath(); p.forEach(([x, y], i) => i ? c.lineTo(fx + x + dx, cy + y + dy) : c.moveTo(fx + x + dx, cy + y + dy)); c.closePath(); c.fill(); };
+  poly(4, 4, C.ink); poly(0, 0, cl[0]);
+  c.fillStyle = cl[1]; c.fillRect(fx - 58, cy - 3, 26, 5);
+  c.fillStyle = C.ink;
+  for (const wx of [-60, -14]) { c.beginPath(); c.arc(fx + wx, cy + 9, 7, 0, 7); c.fill(); }
+}
+
+function race(c, T, opt = {}) {
+  const r = opt.r ?? raceR(T);
+  c.fillStyle = C.blue; c.fillRect(0, 0, W, H);
+  // running clock
+  if (!opt.noClock) {
+    const ci = E.settle(prog(T, 5.75, 0.5));
+    c.globalAlpha = clamp(ci * 2);
+    const shown = Math.min(r, 3.006);
+    const done = r >= 3.006;
+    digits(c, shown.toFixed(3), W / 2, lerp(150, 140, ci), 118, done ? C.sun : C.white, C.ink, 8);
+    c.globalAlpha = 1;
+  }
+  LANES.forEach((l, i) => {
+    const y = LY(i), cl = C[l.club];
+    const lin = E.settle(prog(T, 5.6 + i * 0.07, 0.5));
+    c.save(); c.translate(lerp(-W, 0, lin), 0);
+    // track (the silver aluminium, flat)
+    c.fillStyle = C.ink; c.fillRect(X0 + 5, y + 5, X1 - X0, 64);
+    c.fillStyle = C.cloud; c.fillRect(X0, y, X1 - X0, 64);
+    c.fillStyle = C.sky; c.fillRect(X0, y + 52, X1 - X0, 4);
+    // checkered finish line
+    for (let k = 0; k < 8; k++) for (let j = 0; j < 2; j++) { c.fillStyle = (k + j) % 2 ? C.ink : C.white; c.fillRect(FIN + j * 8, y + k * 8, 8, 8); }
+    // lane plate: arms one by one
+    const arm = prog(T, 6.0 + i * 0.2, 0.46), lit = arm > 0 || opt.lit;
+    const sc = lit ? E.pop(arm) : 1;
+    c.save(); c.translate(104, y + 32); c.scale(lit ? lerp(0.9, 1, sc) : 1, lit ? lerp(0.9, 1, sc) : 1);
+    c.fillStyle = C.ink; c.fillRect(-80 + 5, -32 + 5, 160, 64);
+    c.fillStyle = lit ? cl[0] : C.blueDeep; c.fillRect(-80, -32, 160, 64);
+    shoutText(c, `LANE ${l.n}`, 0, 13, 36, lit ? C.white : C.blue, lit ? cl[1] : null, 3, 'Londrina Solid');
+    c.restore();
+    // car
+    c.save(); c.beginPath(); c.rect(X0, y - 20, X1 - X0, 100); c.clip();
+    const fx = carFront(l, r);
+    const sp = T > GO && T < 10.0 && !opt.still ? (T < 8.8 ? 1 : 0.35) : 0;
+    drawCar(c, fx, y + 34, cl, sp);
+    c.restore();
+    // split readout
+    const bx = 800;
+    const fin = r >= l.t && !opt.noSplit;
+    c.fillStyle = C.ink; c.fillRect(bx + 5, y + 5, 136, 64);
+    c.fillStyle = fin ? cl[0] : C.blueDeep; c.fillRect(bx, y, 136, 64);
+    if (fin) {
+      const age = T - tWhenR(l.t);
+      const blink = age < 0.36 && Math.floor(age / 0.06) % 2 === 1;
+      if (!blink) digits(c, l.t.toFixed(3), bx + 68, y + 46, 40, C.white, cl[1], 3);
+    } else {
+      digits(c, '-.---', bx + 68, y + 46, 40, C.blue, null, 0);
+    }
+    c.restore();
+  });
+}
+
+const off = document.createElement('canvas'); off.width = W; off.height = H; const octx = off.getContext('2d');
+function photoFinish(T) {
+  race(ctx, T);
+  const p = prog(T, 10.12, 0.5);
+  ctx.fillStyle = C.ink; ctx.fillRect(0, 0, W, H);
+  const RP = 2.93;
+  race(octx, T, { r: RP, noClock: true, noSplit: true, lit: true, still: true });
+  const sx = 436, sy = 200, sw = 352, sh = 300; // finish-line crop
+  const dw = 540, dh = sh * dw / sw;
+  ctx.save();
+  ctx.translate(W / 2, H / 2 + lerp(60, 0, E.settle(p)));
+  ctx.rotate(lerp(-0.12, -0.03, E.settle(p)));
+  const b = 14;
+  ctx.fillStyle = C.hot; ctx.fillRect(-dw / 2 - b + 10, -dh / 2 - b + 10, dw + 2 * b, dh + 2 * b);
+  ctx.fillStyle = C.white; ctx.fillRect(-dw / 2 - b, -dh / 2 - b, dw + 2 * b, dh + 2 * b);
+  ctx.drawImage(off, sx, sy, sw, sh, -dw / 2, -dh / 2, dw, dh);
+  // places pop onto the cars, in finishing order
+  const k = dw / sw;
+  [...LANES].sort((a, b2) => a.place - b2.place).forEach((l, j) => {
+    const i = LANES.indexOf(l);
+    const q = E.pop(prog(T, 10.4 + j * 0.14, 0.46));
+    if (q <= 0) return;
+    const fx = carFront(l, RP), cy = LY(i) + 34;
+    const x = (fx - 40 - sx) * k - dw / 2, y = (cy - sy) * k - dh / 2 - 6;
+    ctx.save(); ctx.translate(x, y); ctx.scale(q, q);
+    ctx.fillStyle = C.ink; ctx.beginPath(); ctx.arc(4, 4, 27, 0, 7); ctx.fill();
+    ctx.fillStyle = l.place === 1 ? C.sun : C.white; ctx.beginPath(); ctx.arc(0, 0, 27, 0, 7); ctx.fill();
+    shoutText(ctx, String(l.place), 0, 13, 38, C.ink, null, 0);
+    ctx.restore();
+  });
+  ctx.restore();
+}
+
+window.render = function (T) {
+  ctx.clearRect(0, 0, W, H);
+  if (T < 4.5) countdown(T);
+  else if (T < 10.05) race(ctx, T);
+  else if (T < 10.12) { ctx.fillStyle = C.white; ctx.fillRect(0, 0, W, H); }
+  else if (T < 11.9) photoFinish(T);
+  card(ctx, T, 3.85, 5.6, 1);
+  if (T < 14.4) card(ctx, T, 11.2, 99, 2);
+  endCard(ctx, T, 13.8);
+};
+brandReady().then(() => { window.render(0); window.READY = true; });
+</script></body></html>
