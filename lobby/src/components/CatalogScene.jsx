@@ -6,7 +6,7 @@ import {
   HANDOFF, SWAP_AT, chromeMove, chromeSpot, holdThenLand, holdThenLeave, swellKeyframes,
 } from '../lib/lobbyMotion.js';
 import { LOBBY_THEMES, lobbyTheme } from '../lib/lobbyFrame.js';
-import { cssAnimation, resumeFromRest, settleToRest } from '../lib/ambientRest.js';
+import { ambientLoops, cssAnimation, resumeFromRest, settleToRest } from '../lib/ambientRest.js';
 import CornerTab from './brand/CornerTab.jsx';
 import Wave from './brand/Wave.jsx';
 import ChurchLogo from './brand/ChurchLogo.jsx';
@@ -101,9 +101,22 @@ const FIELD_VARIANTS = {
   leave: (wipe) => holdThenLeave(wipe ? SWAP_AT : HANDOFF.field, 0.02, { opacity: 1 }, { opacity: 0 }, 'linear'),
 };
 
-function Field({ theme, wipe, animated }) {
+function Field({ theme, wipe, animated, rest = false }) {
   const t = LOBBY_THEMES[theme];
   const present = useIsPresent();
+  // The clouds' drift and the doodles' float and twinkle, brought to rest
+  // while asked (a promo that ends on this field at rest is up over it,
+  // GrandPrixPromo.jsx) and let go after, from where they rest.
+  const root = useRef(/** @type {HTMLDivElement | null} */ (null));
+  useEffect(() => {
+    if (!rest || !animated) return undefined;
+    const loops = ambientLoops(root.current);
+    const cancels = loops.map((loop) => settleToRest(loop, AMBIENT_REST_MS));
+    return () => {
+      cancels.forEach((cancel) => cancel());
+      loops.forEach(resumeFromRest);
+    };
+  }, [rest, animated]);
   // How long after page load this field appeared: its loops start that far
   // in, so they run in step with every other field's.
   const [phase] = useState(sinceEpoch);
@@ -131,6 +144,7 @@ function Field({ theme, wipe, animated }) {
   if (!animated) return <div className={className} style={style} aria-hidden="true">{body}</div>;
   return (
     <M.div
+      ref={root}
       className={className}
       style={style}
       aria-hidden="true"
@@ -159,7 +173,8 @@ const LOGO_HOLD = 0.3;
 /**
  * How soon the rolling sunflower wave is home once asked (`ambientRest`):
  * well inside the flagship intro's lead (FLAGSHIP_INTRO.lead, 4 s), so it
- * is still when the video takes the waves over.
+ * is still when the video takes the waves over. The field's loops
+ * (`fieldRest`) are given the same time.
  */
 export const AMBIENT_REST_MS = 3000;
 
@@ -240,6 +255,7 @@ function Chrome({ away, via, swell, still, logoAway = false, handedOver = false,
  *   logoAway?: boolean,
  *   chromeHandedOver?: boolean,
  *   ambientRest?: boolean,
+ *   fieldRest?: boolean,
  *   swell?: number,
  *   children?: import('react').ReactNode,
  * }} props
@@ -259,6 +275,10 @@ export default function CatalogScene({
   // the scene's own step aside (app.css .lobby-chrome--handed-over), and the
   // rolling wave comes to rest before it takes them (FlagshipIntro.jsx).
   chromeHandedOver = false, ambientRest = false,
+  // A promo that ends on this scene at rest (GrandPrixPromo.jsx) is up over
+  // it: the field's clouds and doodles come to rest too, so the picture
+  // under the video's last frame is that frame.
+  fieldRest = false,
   children,
 }) {
   const key = lobbyTheme(theme);
@@ -272,7 +292,7 @@ export default function CatalogScene({
   const [heldTint, setHeldTint] = useState(clubTint);
   if (clubTint && clubTint !== heldTint) setHeldTint(clubTint);
 
-  const field = <Field key={key} theme={key} wipe={wipe} animated={animated} />;
+  const field = <Field key={key} theme={key} wipe={wipe} animated={animated} rest={fieldRest} />;
 
   return (
     <div

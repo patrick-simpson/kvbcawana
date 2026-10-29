@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cssAnimation, restPlan, resumeFromRest, settleToRest } from './ambientRest.js';
+import { ambientLoops, cssAnimation, restPlan, resumeFromRest, settleToRest } from './ambientRest.js';
 import { AMBIENT_REST_MS } from '../components/CatalogScene.jsx';
 import { FLAGSHIP_INTRO } from './flagship.js';
 
@@ -67,5 +67,18 @@ describe('bringing the rolling wave to rest', () => {
     expect(cssAnimation(/** @type {any} */ ({}), 'lobby-roll')).toBeNull();
     const el = { getAnimations: () => [{ animationName: 'lobby-drift-a' }, { animationName: 'lobby-roll', id: 'r' }] };
     expect(cssAnimation(/** @type {any} */ (el), 'lobby-roll')).toMatchObject({ id: 'r' });
+  });
+});
+
+describe('every ambient loop in a field', () => {
+  it('finds the running CSS loops on the field’s .lobby-ambient pieces, and nothing else', () => {
+    const drift = { animationName: 'lobby-drift-a' };
+    const twinkle = { animationName: 'lobby-twinkle' };
+    const motion = { id: 'framer' }; // a script animation, not a CSS loop
+    const pieces = [{ getAnimations: () => [drift] }, { getAnimations: () => [twinkle, motion] }, {}];
+    const root = { querySelectorAll: (sel) => (sel === '.lobby-ambient' ? pieces : []) };
+    expect(ambientLoops(/** @type {any} */ (root))).toEqual([drift, twinkle]);
+    expect(ambientLoops(null)).toEqual([]);
+    expect(ambientLoops(/** @type {any} */ ({}))).toEqual([]);
   });
 });

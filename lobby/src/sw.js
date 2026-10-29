@@ -117,7 +117,7 @@ self.addEventListener('fetch', (event) => {
   // freshness probe are the two questions a cache must never answer.
   if (url.searchParams.has('awanaBuild') || url.pathname.endsWith('/version.json')) return;
   if (url.pathname === '/api' || url.pathname.startsWith('/api/')) return;
-  // Videos (the flagship's 3D intro, ./intro/*.mp4) are the browser's own:
+  // Videos (the flagship's 3D intro, ./intro/*.mp4; promo videos, ./promos/*.mp4) are the browser's own:
   // a <video> asks for byte ranges, and a 206 answer can never be stored
   // (Cache API), so cache-first would refetch the whole file on every play;
   // the site streams them with Range (site/functions) and the browser's own

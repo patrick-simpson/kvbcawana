@@ -4,6 +4,7 @@ import BarfEpicPromo, { DETAILS as BARF_EPIC_DETAILS } from './promos/BarfEpicPr
 import ParentsPromo, { DETAILS as PARENTS_DETAILS } from './promos/ParentsPromo.jsx';
 import SnowAlertsPromo, { DETAILS as SNOW_ALERTS_DETAILS } from './promos/SnowAlertsPromo.jsx';
 import FinalistsPromo, { DETAILS as FINALISTS_DETAILS } from './promos/FinalistsPromo.jsx';
+import GrandPrixPromo, { DETAILS as GRAND_PRIX_DETAILS } from './promos/GrandPrixPromo.jsx';
 
 export { RotatingDetail, splatPath, landsAt, keyframes } from './promos/kit.jsx';
 
@@ -16,7 +17,9 @@ export { RotatingDetail, splatPath, landsAt, keyframes } from './promos/kit.jsx'
 // art lives in its own file under ./promos/, built from ./promos/kit.jsx.
 // This file is only the index. The snow-alerts slide (Nov to Mar, the
 // text-message sign-up) rides the same slot on its own cadence and wears the
-// lobby's kit rather than a poster's faces; see src/lib/snowAlerts.js.
+// lobby's kit rather than a poster's faces; see src/lib/snowAlerts.js. The
+// Awana Grand Prix (January to race day, 2027) is a video, not a showreel,
+// that ends on the lobby's own screen (./promos/GrandPrixPromo.jsx).
 // ─────────────────────────────────────────────────────────────
 
 // Every line each poster says in its one rotating detail slot, in order.
@@ -29,6 +32,7 @@ export const PROMO_DETAILS = Object.freeze({
   parents: PARENTS_DETAILS,
   snowAlerts: SNOW_ALERTS_DETAILS,
   finalists: FINALISTS_DETAILS,
+  grandPrix: GRAND_PRIX_DETAILS,
 });
 
 const NO_DETAILS = Object.freeze([]);
@@ -56,6 +60,7 @@ const SCENES = {
   parents: ParentsPromo,
   snowAlerts: SnowAlertsPromo,
   finalists: FinalistsPromo,
+  grandPrix: GrandPrixPromo,
 };
 
 /**
@@ -63,9 +68,23 @@ const SCENES = {
  * descriptor from buildPromoSlot(); an unknown kind renders nothing
  * rather than a broken frame, the same "missing data shows nothing"
  * rule the rest of the background follows.
+ *
+ * The rest is for a promo that ends on the lobby itself (`exit:
+ * 'seamless'`, GrandPrixPromo) and is ignored by the showreels: `still` (no
+ * motion: show the finished poster), `lead` (seconds before it starts: the
+ * stinger's swap), `onScene` (the scene behind it to rest, its chrome home)
+ * and `onFinished` (it has ended its showing).
+ *
+ * @param {{
+ *   promo: any,
+ *   still?: boolean,
+ *   lead?: number,
+ *   onScene?: (state: { rest: boolean, home: boolean }) => void,
+ *   onFinished?: () => void,
+ * }} props
  */
-export default function PromoSlide({ promo }) {
+export default function PromoSlide({ promo, still, lead, onScene, onFinished }) {
   const Scene = promo && SCENES[promo.kind];
   if (!Scene) return null;
-  return <Scene promo={promo} lines={detailsFor(promo)} />;
+  return <Scene promo={promo} lines={detailsFor(promo)} still={still} lead={lead} onScene={onScene} onFinished={onFinished} />;
 }

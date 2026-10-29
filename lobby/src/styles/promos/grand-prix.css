@@ -1,0 +1,16 @@
+/* The Awana Grand Prix promo (src/components/promos/GrandPrixPromo.jsx): a
+   video, full-bleed, or under zero animation its end card at rest. No colour
+   of its own: until the video's first frame is drawn the lobby's field shows
+   through (never a black frame). Its last second is the lobby's own sky
+   screen, so on a 16:9 screen it lies exactly over the scene; `cover` keeps
+   any other shape filled edge to edge. */
+.grand-prix-promo__video,
+.grand-prix-promo__still {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+}

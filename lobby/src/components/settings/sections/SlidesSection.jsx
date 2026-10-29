@@ -14,10 +14,13 @@ export const SOURCE_LABELS = {
   video: 'Looping video',
 };
 
-// The last day any fall promo can show. Past it, and outside the snow season
-// (when the snow-alerts slide rides the same switch), the toggle has nothing
-// to turn off, so it leaves the page instead of sitting there all year.
-const PROMOS_END = SEASON_PROMOS.reduce((max, p) => (p.eventDate > max ? p.eventDate : max), '');
+// The last day any fall promo can show, and the Grand Prix video's window.
+// Past them, and outside the snow season (when the snow-alerts slide rides the
+// same switch), the toggle has nothing to turn off, so it leaves the page
+// instead of sitting there all year.
+const lastDay = (list) => list.reduce((max, p) => (p.eventDate > max ? p.eventDate : max), '');
+const GRAND_PRIX = SEASON_PROMOS.find((p) => p.kind === 'grandPrix');
+const PROMOS_END = lastDay(SEASON_PROMOS.filter((p) => p !== GRAND_PRIX));
 
 /** A published deck that arrived but is not the chosen source: say so, with the way back. */
 export function IgnoredDeckNotice({ form, update, syncedDeck }) {
@@ -44,7 +47,8 @@ export function PreviewPromosCard({ onPreviewPromo }) {
         wait and then play in full, as they do for the real thing. Click the screen or press Esc to stop early.
       </p>
       {[
-        { id: 'fall', label: 'Fall posters', keys: PREVIEW_PROMOS.filter((p) => !p.key.startsWith('snow')) },
+        { id: 'fall', label: 'Fall posters', keys: PREVIEW_PROMOS.filter((p) => !p.key.startsWith('snow') && p.key !== 'grandPrix') },
+        { id: 'grand-prix', label: 'Awana Grand Prix (January to race day)', keys: PREVIEW_PROMOS.filter((p) => p.key === 'grandPrix') },
         { id: 'snow', label: 'Snow alerts (November to March)', keys: PREVIEW_PROMOS.filter((p) => p.key.startsWith('snow')) },
       ].map((g) => (
         <div className="field" key={g.id}>
@@ -182,9 +186,11 @@ export function SlidesCard({ form, set, slideCount, onEditSlides, syncedDeck, on
 
 export function CalendarSlidesCard({ form, set, today }) {
   const fallLive = !PROMOS_END || today <= PROMOS_END;
+  const grandPrixLive = Boolean(GRAND_PRIX) && today <= GRAND_PRIX.eventDate;
   const snowLive = inSnowSeason(today);
   const promoHint = [
     fallLive && 'Poster Contest, BARF Night, Parents’ Night: animated, dated, retire themselves.',
+    grandPrixLive && 'The Awana Grand Prix video, January 1 through race day (March 20).',
     snowLive && 'The snow-alerts sign-up (QR for kvbchurch.org/alerts), Nov to Mar: about one pass in six, every other pass when snow is forecast for club night.',
   ].filter(Boolean).join(' ');
   return (
@@ -205,7 +211,7 @@ export function CalendarSlidesCard({ form, set, today }) {
             title="Nights-remaining slide" hint="A countdown nudge once fewer than 10 club nights remain." />
         </>
       )}
-      {(fallLive || snowLive) && (
+      {(fallLive || grandPrixLive || snowLive) && (
         <Toggle checked={form.seasonPromos} onChange={set('seasonPromos')}
           title="Season promos" hint={promoHint} />
       )}

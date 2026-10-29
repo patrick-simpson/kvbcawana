@@ -39,6 +39,22 @@ export function cssAnimation(el, name) {
 }
 
 /**
+ * Every ambient CSS loop running inside `root` (app.css `.lobby-ambient`: the
+ * field's drifting clouds, floating and twinkling doodles). A promo that ends
+ * on the lobby at rest (GrandPrixPromo.jsx) brings them all home under it.
+ * @param {Element | null | undefined} root
+ * @returns {Animation[]}
+ */
+export function ambientLoops(root) {
+  if (!root || typeof root.querySelectorAll !== 'function') return [];
+  return [...root.querySelectorAll('.lobby-ambient')].flatMap((el) => (
+    typeof el.getAnimations === 'function'
+      ? el.getAnimations().filter((a) => typeof /** @type {any} */ (a).animationName === 'string')
+      : []
+  ));
+}
+
+/**
  * Bring `anim` to rest within `withinMs` and hold it there. Returns a
  * cancel function (stops the settling where it is, nothing else).
  * @param {Animation | null} anim

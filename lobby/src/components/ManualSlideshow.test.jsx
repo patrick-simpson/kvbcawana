@@ -6,6 +6,8 @@ import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import ManualSlideshow, { MISSING_VIDEO_SKIP_MS, nextStep } from './ManualSlideshow.jsx';
 import { ZeroAnimationContext } from '../lib/motion.jsx';
 import { getVideo } from '../lib/videoStore.js';
+import { SEAMLESS_GRACE_SEC, previewPromo } from '../lib/promos.js';
+import { GRAND_PRIX } from './promos/GrandPrixPromo.jsx';
 
 vi.mock('../lib/videoStore.js', () => ({
   getVideo: vi.fn(),
@@ -660,5 +662,152 @@ describe('ManualSlideshow: the flagship\'s 3D intro', () => {
     render(<ManualSlideshow slides={[flagship]} slideshowDelaySec={5} />);
     at(60_000);
     expect(intro()).toBeNull();
+  });
+});
+
+// A promo that ENDS on the lobby itself (src/lib/promos.js `exit: 'seamless'`):
+// the Grand Prix video, whose last second is the lobby's sky screen at rest.
+// It comes in under the stinger; the field behind it is the sky; once it plays,
+// the scene's ambient loops (hidden under it) come to rest; inside its still
+// end card the tab and waves come home over it; it ends its own showing, and
+// the deck moves on with an ordinary change, no stinger.
+describe('ManualSlideshow: a promo that ends on the lobby (the Grand Prix video)', () => {
+  const gp = previewPromo('grandPrix', null, '2027-01-05');
+  const slot = { id: 'season_promo', type: 'promo', durationSec: 15, promos: [gp] };
+  const before = { id: 's_a', eyebrow: '', text: 'Before', theme: 'night', durationSec: 5 };
+  const after = { id: 's_b', eyebrow: '', text: 'After', theme: 'sky', durationSec: 5 };
+  const media = { currentTime: 0, ended: false, paused: true, duration: 30 };
+  const props = ['currentTime', 'ended', 'paused', 'duration'];
+  // The scene's CSS loops, as the Web Animations API would show them.
+  let loops;
+  const loopOf = (el) => {
+    if (!loops.has(el)) {
+      const anim = {
+        animationName: el.classList.contains('lobby-ambient--roll') ? 'lobby-roll' : 'lobby-loop', playState: 'running', playbackRate: 1, currentTime: 900,
+        effect: { getComputedTiming: () => ({ duration: 3000, progress: 0.3 }), getTiming: () => ({ delay: 0 }) },
+        pause: vi.fn(() => { anim.playState = 'paused'; }),
+        play: vi.fn(() => { anim.playState = 'running'; }),
+      };
+      loops.set(el, anim);
+    }
+    return loops.get(el);
+  };
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    Object.assign(media, { currentTime: 0, ended: false, paused: true, duration: 30 });
+    const proto = window.HTMLMediaElement.prototype;
+    for (const p of props) Object.defineProperty(proto, p, { configurable: true, get: () => media[p], set: (v) => { media[p] = v; } });
+    proto.canPlayType = vi.fn(() => 'probably');
+    proto.play = vi.fn(() => { media.paused = false; return Promise.resolve(); });
+    proto.pause = vi.fn(() => { media.paused = true; });
+    loops = new Map();
+    window.Element.prototype.getAnimations = function getAnimations() {
+      return this.classList.contains('lobby-ambient') ? [loopOf(this)] : [];
+    };
+  });
+  afterEach(() => {
+    cleanup();
+    vi.useRealTimers();
+    const proto = window.HTMLMediaElement.prototype;
+    for (const p of props) delete proto[p];
+    delete window.Element.prototype.getAnimations;
+  });
+  const at = (ms) => act(() => vi.advanceTimersByTime(ms));
+  const playTo = (to) => {
+    while (media.currentTime < to - 1e-9) {
+      media.currentTime = Math.min(to, +(media.currentTime + 0.1).toFixed(3));
+      at(100);
+    }
+  };
+  const chrome = () => document.querySelector('.lobby-chrome').className;
+  const stingers = () => document.querySelectorAll('.slide-stinger').length;
+  const ambient = () => [...document.querySelectorAll('.lobby-field:not(.is-leaving) .lobby-ambient, .lobby-wave--sun')];
+
+  it('wipes in on the sky, rests the scene, brings the chrome home under its end, and leaves with no stinger', () => {
+    const keys = [];
+    render(<ManualSlideshow slides={[before, slot, after]} slideshowDelaySec={5} onSlide={({ key }) => keys.push(key)} />);
+    expect(document.querySelector('.catalog-scene--night')).not.toBeNull();
+    at(5000); // → the promo, under the stinger
+    expect(keys.at(-1)).toBe('1:season_promo');
+    expect(stingers()).toBe(1);
+    const wave = document.querySelector('.slide-stinger');
+    // The field behind it is the one its last frame is drawn on.
+    expect(document.querySelector('.catalog-scene--sky')).not.toBeNull();
+    expect(chrome()).toContain('lobby-chrome--away');
+    expect(document.querySelector('video.grand-prix-promo__video')).not.toBeNull();
+    // It starts as the wave covers the screen.
+    at(500);
+    expect(window.HTMLMediaElement.prototype.play).not.toHaveBeenCalled();
+    at(200);
+    expect(window.HTMLMediaElement.prototype.play).toHaveBeenCalledTimes(1);
+    media.currentTime = 0.05;
+    at(100);
+    // Playing: the field's loops and the sunflower wave's roll come to rest.
+    expect(ambient().length).toBeGreaterThan(6);
+    for (const el of ambient()) expect(loops.get(el)?.playbackRate, el.className).toBeLessThan(0);
+    playTo(GRAND_PRIX.homeAt - 0.2);
+    expect(chrome()).toContain('lobby-chrome--away');
+    playTo(GRAND_PRIX.homeAt + 0.1);
+    // The tab and waves are home, over the identical picture.
+    expect(chrome()).toContain('lobby-chrome--home');
+    expect(chrome()).not.toContain('lobby-chrome--away');
+    // The video owns the end: past its 30 s hold the showing is still up.
+    playTo(29.9);
+    at(1500);
+    expect(keys.at(-1)).toBe('1:season_promo');
+    media.ended = true;
+    at(100);
+    // ...and it leaves like an ordinary slide: no second stinger (the one
+    // that brought it in is not swept again), chrome home.
+    expect(keys.at(-1)).toBe('2:s_b');
+    expect(stingers()).toBe(1);
+    expect(document.querySelector('.slide-stinger')).toBe(wave);
+    expect(chrome()).toContain('lobby-chrome--home');
+    expect(document.querySelector('.catalog-scene--sky')).not.toBeNull();
+    expect(shows('After')).toBe(true);
+    // The loops are let go, from where they rest.
+    for (const el of ambient()) expect(loops.get(el).playbackRate).toBe(1);
+  });
+
+  it('a video that never ends cannot hold the deck: its hold plus the grace is the cap', () => {
+    const keys = [];
+    render(<ManualSlideshow slides={[before, slot, after]} slideshowDelaySec={5} onSlide={({ key }) => keys.push(key)} />);
+    at(5000);
+    at(700);
+    media.currentTime = 1;
+    at(100);
+    at((gp.durationSec + SEAMLESS_GRACE_SEC) * 1000 - 900);
+    expect(keys.at(-1)).toBe('1:season_promo');
+    at(200);
+    expect(keys.at(-1)).toBe('2:s_b');
+  });
+
+  it('under zero animation it is the end card for its own hold, with the chrome home over it', () => {
+    const keys = [];
+    render(
+      <ZeroAnimationContext.Provider value>
+        <ManualSlideshow slides={[before, slot, after]} slideshowDelaySec={5} onSlide={({ key }) => keys.push(key)} />
+      </ZeroAnimationContext.Provider>,
+    );
+    at(5000);
+    expect(document.querySelector('video')).toBeNull();
+    expect(document.querySelector('img.grand-prix-promo__still')).not.toBeNull();
+    expect(chrome()).toContain('lobby-chrome--home');
+    at(gp.durationSec * 1000 - 100);
+    expect(keys.at(-1)).toBe('1:season_promo');
+    at(200);
+    expect(keys.at(-1)).toBe('2:s_b');
+  });
+
+  it('an ordinary poster still wipes out, and keeps the field it came in on', () => {
+    const poster = { id: 'season_promo', type: 'promo', durationSec: 8, promos: [{ id: 'promo_contest', kind: 'contest', eventDate: '2026-10-14', tonight: false, countdown: '3 club nights left', afterContest: false }] };
+    render(<ManualSlideshow slides={[before, poster, after]} slideshowDelaySec={5} />);
+    at(5000);
+    expect(document.querySelector('.catalog-scene--night')).not.toBeNull();
+    const wave = document.querySelector('.slide-stinger');
+    at(8000);
+    // Keyed per wipe: leaving swept a new one.
+    expect(document.querySelector('.slide-stinger')).not.toBe(wave);
   });
 });

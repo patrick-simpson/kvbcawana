@@ -187,4 +187,26 @@ describe('nextTransition', () => {
     const edited = nextTransition(a, showing('0:a', { theme: 'night', special: true }));
     expect(edited).toMatchObject({ key: '0:a', theme: 'night', special: true, via: 'boot', wipes: 0, swells: 0 });
   });
+
+  // A promo whose last frame IS the lobby at rest (the Grand Prix video,
+  // src/lib/promos.js `exit: 'seamless'`): it still comes in under the
+  // stinger, but leaves like an ordinary slide, and the field wears its theme.
+  it('a seamless-exit slide wipes in, wears its own theme, and leaves without the stinger', () => {
+    const a = firstTransition(showing('0:a', { theme: 'night' }));
+    const promo = nextTransition(a, showing('1:p', { kind: 'promo', special: true, theme: 'sky', exit: 'seamless' }));
+    expect(promo).toMatchObject({ via: 'wipe', wipe: true, wipes: 1, theme: 'sky', exit: 'seamless' });
+    const after = nextTransition(promo, showing('2:b', { theme: 'sky' }));
+    expect(after).toMatchObject({ via: 'reveal', wipe: false, wipes: 1, swells: 0, theme: 'sky' });
+    expect(after.exit).toBeUndefined();
+    // Into another held slide it still wipes: that one wants the stinger.
+    const held = nextTransition(promo, showing('2:h', { special: true }));
+    expect(held).toMatchObject({ via: 'wipe', wipe: true, wipes: 2 });
+  });
+
+  it('an ordinary held promo still wipes out, and keeps the field it came in on', () => {
+    const a = firstTransition(showing('0:a', { theme: 'night' }));
+    const promo = nextTransition(a, showing('1:p', { kind: 'promo', special: true, theme: 'sky' }));
+    expect(promo).toMatchObject({ via: 'wipe', theme: 'night' });
+    expect(nextTransition(promo, showing('2:b', { theme: 'sky' }))).toMatchObject({ via: 'wipe', wipe: true, wipes: 2 });
+  });
 });

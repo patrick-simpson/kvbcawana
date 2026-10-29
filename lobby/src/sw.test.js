@@ -97,10 +97,10 @@ describe('service worker: what may become the offline shell', () => {
     expect(sw.put).toHaveLength(0);
   });
 
-  it('leaves videos (the flagship intro) to the browser: byte ranges are never answered from or put in a cache', async () => {
+  it('leaves videos (the flagship intro, the Grand Prix promo) to the browser: byte ranges are never answered from or put in a cache', async () => {
     let fetched = 0;
     const sw = boot({ fetchImpl: async () => { fetched += 1; return response({ status: 206 }); } });
-    for (const url of ['https://church.github.io/lobby/intro/awana-intro.mp4', 'https://church.github.io/lobby/intro/x.WEBM']) {
+    for (const url of ['https://church.github.io/lobby/intro/awana-intro.mp4', 'https://church.github.io/lobby/intro/x.WEBM', 'https://church.github.io/lobby/promos/grand-prix.mp4']) {
       let result;
       sw.listeners.fetch({
         request: { method: 'GET', url, mode: 'no-cors', headers: { get: (h) => (h === 'range' ? 'bytes=0-' : null) } },

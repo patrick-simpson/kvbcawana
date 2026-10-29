@@ -115,7 +115,8 @@ describe('the promo holds', () => {
   // A promo still carries its OWN hold, which is what the slideshow reads.
   it('gives every descriptor in the table its own duration', () => {
     // The finalists' showreel is 21 s: six posters take their bow (each with its zoom) before the call.
-    expect(SEASON_PROMOS.map((p) => p.durationSec)).toEqual([15, 15, 15, 15, 21]);
+    // The Grand Prix is a 30 s video.
+    expect(SEASON_PROMOS.map((p) => p.durationSec)).toEqual([15, 15, 15, 15, 21, 30]);
   });
 });
 
@@ -148,7 +149,8 @@ describe('buildPromoSlot', () => {
   it('shows Parents\' Night (and the finalists to vote on) ON November 4 and nothing at all on the 5th', () => {
     expect(kinds(slot('2026-11-04'))).toEqual(['parents', 'finalists']);
     expect(slot('2026-11-05')).toBeNull();
-    expect(slot('2027-01-06')).toBeNull();
+    // ...and nothing again until the Grand Prix opens on New Year's Day.
+    expect(slot('2026-12-31')).toBeNull();
   });
 
   it('nothing shows before the season opens', () => {
@@ -199,9 +201,42 @@ describe('buildPromoSlot', () => {
     expect(buildPromoSlot(season, 'tomorrow')).toBeNull();
   });
 
-  it('every descriptor in the table is one of the five known kinds', () => {
+  it('every descriptor in the table is one of the six known kinds', () => {
     expect(SEASON_PROMOS.map((p) => p.kind).sort())
-      .toEqual(['barfEpic', 'contest', 'finalists', 'friend', 'parents']);
+      .toEqual(['barfEpic', 'contest', 'finalists', 'friend', 'grandPrix', 'parents']);
+  });
+
+  // The Grand Prix video (owner 2026-10-29: "Get that one set to show up on
+  // the displays starting in January."), through race day inclusive.
+  it('shows the Grand Prix from New Year’s Day through race day, inclusive, and never after', () => {
+    const spring = [club('2027-01-06'), club('2027-02-24'), club('2027-03-17'), club('2027-03-24')];
+    const kinds = (day) => (buildPromoSlot(spring, day)?.promos ?? []).filter(Boolean).map((p) => p.kind);
+    expect(kinds('2026-12-31')).toEqual([]);
+    expect(kinds('2027-01-01')).toEqual(['grandPrix']);
+    expect(kinds('2027-02-10')).toEqual(['grandPrix']);
+    expect(kinds('2027-03-20')).toEqual(['grandPrix']);
+    expect(kinds('2027-03-21')).toEqual([]);
+    const gp = buildPromoSlot(spring, '2027-03-20').promos[0];
+    expect(gp).toMatchObject({
+      id: 'promo_grand_prix', eventDate: '2027-03-20', tonight: true, durationSec: 30, exit: 'seamless', theme: 'sky',
+    });
+    // Like every promo, it needs the calendar feed.
+    expect(buildPromoSlot([], '2027-02-10')).toBeNull();
+  });
+
+  it('only a promo that ends on the lobby itself carries an exit and a theme', () => {
+    const s = slot('2026-09-23');
+    for (const p of s.promos) {
+      expect(p).not.toHaveProperty('exit');
+      expect(p).not.toHaveProperty('theme');
+    }
+    expect(SEASON_PROMOS.filter((p) => p.exit).map((p) => [p.kind, p.exit, p.theme])).toEqual([['grandPrix', 'seamless', 'sky']]);
+  });
+
+  it('shares the snow season’s laps: the snow slide one lap in six, the Grand Prix the other five', () => {
+    const spring = [club('2027-01-06'), club('2027-01-13')];
+    const s = buildPromoSlot(spring, '2027-01-04', { snowAlerts: true });
+    expect(s.promos.map((p) => (p ? p.kind : null))).toEqual(['snowAlerts', 'grandPrix', 'grandPrix', 'grandPrix', 'grandPrix', 'grandPrix']);
   });
 
   it('shows the finalists from the day they were picked through the vote at Parents’ Night, inclusive', () => {
@@ -296,7 +331,7 @@ describe('buildPromoSlot with the snow-alerts slide', () => {
 
 describe('previewPromo: Settings → Slides → Preview the promos', () => {
   it('offers every poster and both snow versions', () => {
-    expect(PREVIEW_PROMOS.map((p) => p.key)).toEqual(['contest', 'friend', 'barfEpic', 'parents', 'finalists', 'snowAlerts', 'snowAlertsStorm']);
+    expect(PREVIEW_PROMOS.map((p) => p.key)).toEqual(['contest', 'friend', 'barfEpic', 'parents', 'finalists', 'grandPrix', 'snowAlerts', 'snowAlertsStorm']);
     for (const p of PREVIEW_PROMOS) expect(previewPromo(p.key, season, '2026-10-01')).not.toBeNull();
     expect(previewPromo('nope', season, '2026-10-01')).toBeNull();
   });
@@ -306,6 +341,13 @@ describe('previewPromo: Settings → Slides → Preview the promos', () => {
     expect(d).toMatchObject({ id: 'promo_contest', kind: 'contest', eventDate: '2026-10-14', tonight: false, durationSec: 15 });
     expect(d.countdown).toBe(countdownLabel(nightsUntil(season, '2026-10-01', '2026-10-14'), '2026-10-01', '2026-10-14'));
     expect(previewPromo('friend', season, '2026-10-14')).toMatchObject({ tonight: true, countdown: 'Tonight!' });
+  });
+
+  it('previews the Grand Prix video long before January, with its seamless ending', () => {
+    expect(PREVIEW_PROMOS.find((p) => p.key === 'grandPrix')?.label).toBe('Grand Prix (video)');
+    expect(previewPromo('grandPrix', season, '2026-10-29')).toMatchObject({
+      id: 'promo_grand_prix', kind: 'grandPrix', eventDate: '2027-03-20', tonight: false, durationSec: 30, exit: 'seamless', theme: 'sky',
+    });
   });
 
   it('plays a poster whose night has passed, naming its date instead of a count', () => {

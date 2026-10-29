@@ -12,7 +12,7 @@ import Wave from './brand/Wave.jsx';
 import PromoSlide from './PromoSlide.jsx';
 import FlagshipSlide from './FlagshipSlide.jsx';
 import { flagshipIntroLap, introFits, isFlagshipSlide } from '../lib/flagship.js';
-import { isPromoSlide, promoForLap } from '../lib/promos.js';
+import { SEAMLESS_GRACE_SEC, isPromoSlide, promoForLap } from '../lib/promos.js';
 import {
   holdsCheckIns,
   isVideoSlide,
@@ -184,8 +184,17 @@ export default function ManualSlideshow({ slides, slideshowDelaySec, clubTint = 
   const canHold = slides.length > 1 && slides.some((s) => !holdsCheckIns(s));
   const special = Boolean(slide) && canHold && holdsCheckIns(slide);
   const kind = !slide ? null : isVideoSlide(slide) ? 'video' : isPromoSlide(slide) ? 'promo' : isFlagshipSlide(slide) ? 'flagship' : 'copy';
-  const theme = resolveTheme(slide, safe);
-  const transition = useSlideTransition({ key: slideKey, special, kind, theme });
+  // A promo that ENDS on the lobby itself (src/lib/promos.js `exit:
+  // 'seamless'`, the Grand Prix video): the field behind it wears the theme it
+  // ends in, and leaving it is an ordinary change, not the stinger
+  // (lobbyMotion.js nextTransition). It brings the scene's ambient loops to
+  // rest and its chrome home under it (`promoScene`), and ends its own
+  // showing (`promoFinished`), the hold only a cap.
+  const seamless = kind === 'promo' && promo?.exit === 'seamless';
+  const theme = seamless && promo.theme ? promo.theme : resolveTheme(slide, safe);
+  const transition = useSlideTransition(seamless
+    ? { key: slideKey, special, kind, theme, exit: 'seamless' }
+    : { key: slideKey, special, kind, theme });
   const zero = useContext(ZeroAnimationContext);
 
   // Now and then the flagship carries on into the 3D intro video (src/lib/
@@ -203,11 +212,21 @@ export default function ManualSlideshow({ slides, slideshowDelaySec, clubTint = 
   }
   const [handOver, setHandOver] = useState({ key: '', away: false, rest: false });
   const handedOver = handOver.key === slideKey && handOver.away;
-  const ambientRest = handOver.key === slideKey && handOver.rest;
+  // The seamless promo's word on the scene behind it, for its own showing.
+  const [promoState, setPromoState] = useState({ key: '', rest: false, home: false });
+  const promoRest = seamless && promoState.key === slideKey && promoState.rest;
+  const promoHome = seamless && promoState.key === slideKey && promoState.home;
+  const ambientRest = (handOver.key === slideKey && handOver.rest) || promoRest;
 
+  // A seamless promo with motion on ends itself (its video's end); its own
+  // hold plus SEAMLESS_GRACE_SEC is only the cap that keeps a late or stalled
+  // video from holding the deck. With no motion it is a still: its plain hold.
+  const capped = seamless && !zero && !still;
   const holdMs = slides.length <= 1 || !slide || intro
     ? null
-    : isVideoSlide(slide) ? videoSlideTimerMs(slide) : slideDurationMs(held, slideshowDelaySec);
+    : isVideoSlide(slide) ? videoSlideTimerMs(slide)
+      : capped ? slideDurationMs(held, slideshowDelaySec) + SEAMLESS_GRACE_SEC * 1000
+        : slideDurationMs(held, slideshowDelaySec);
 
   // The hold timer, pausable: time already spent on this slide survives a
   // pause, so names on screen stop the clock instead of resetting it.
@@ -256,6 +275,13 @@ export default function ManualSlideshow({ slides, slideshowDelaySec, clubTint = 
   const introFinished = () => {
     if (keyNow.current === slideKey) finishVideo();
   };
+  // The seamless promo's two callbacks, guarded the same way.
+  const promoScene = (/** @type {{ rest: boolean, home: boolean }} */ state) => {
+    if (keyNow.current === slideKey) setPromoState({ key: slideKey, rest: state.rest, home: state.home });
+  };
+  const promoFinished = () => {
+    if (keyNow.current === slideKey) finishVideo();
+  };
 
   // Told before the frame is painted (a layout effect, not a passive one): App
   // turns what stands over the lobby (the first-run card) off the moment a
@@ -282,14 +308,17 @@ export default function ManualSlideshow({ slides, slideshowDelaySec, clubTint = 
         theme={transition.theme}
         wipe={transition.wipe}
         // The flagship keeps the scene's own chrome (the orange tab and house
-        // waves every other slide has); only a video or a poster covers it.
-        chromeAway={kind === 'video' || kind === 'promo'}
+        // waves every other slide has); only a video or a poster covers it,
+        // until a seamless promo, ending on the lobby, brings it home over
+        // itself, fading in over the identical picture.
+        chromeAway={(kind === 'video' || kind === 'promo') && !promoHome}
         // ...but its small logo steps aside while the flagship's big one is
         // up: the same mark twice on one screen reads as a doubling.
         logoAway={kind === 'flagship'}
         chromeHandedOver={handedOver}
         ambientRest={ambientRest}
-        chromeVia={transition.via}
+        fieldRest={promoRest}
+        chromeVia={promoHome ? 'reveal' : transition.via}
         swell={transition.swells}
         clubTint={clubTint}
         still={still}
@@ -331,7 +360,13 @@ export default function ManualSlideshow({ slides, slideshowDelaySec, clubTint = 
               animation plays from the top. */}
           {kind === 'promo' && (
             <Media key={slide.id} wipe={transition.wipe}>
-              <PromoSlide promo={promo} />
+              <PromoSlide
+                promo={promo}
+                still={still}
+                lead={transition.wipe ? SWAP_AT : 0}
+                onScene={seamless ? promoScene : undefined}
+                onFinished={seamless && slides.length > 1 ? promoFinished : undefined}
+              />
             </Media>
           )}
           {/* The permanent welcome slide: a full-bleed title sequence that

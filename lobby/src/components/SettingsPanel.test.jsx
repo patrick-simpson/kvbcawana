@@ -505,6 +505,19 @@ describe('Slides & look', () => {
     vi.useRealTimers();
   });
 
+  it('the promos toggle names the Grand Prix video through race day, and not after', () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2027-03-20T12:00:00'));
+    open();
+    expect(screen.getByText(/Awana Grand Prix video/)).toBeTruthy();
+    cleanup();
+    vi.setSystemTime(new Date('2027-03-21T12:00:00'));
+    open();
+    expect(screen.getByLabelText('Season promos')).toBeTruthy(); // the snow slide still rides it
+    expect(screen.queryByText(/Awana Grand Prix video/)).toBeNull();
+    vi.useRealTimers();
+  });
+
   it('after both seasons the promos toggle leaves the page', () => {
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date('2027-06-01T12:00:00'));
@@ -737,12 +750,17 @@ describe('Preview the promos', () => {
   it('lists every promo, and a click hands that one to the screen', () => {
     const props = { ...happyProps(), initialTab: 'slides', onPreviewPromo: vi.fn() };
     render(<SettingsPanel {...props} />);
-    const names = ['Poster contest', 'BARF Night', 'BARF Night: slime cut', 'Parents’ Night', 'Poster finalists: vote', 'Snow alerts', 'Snow alerts: snow week'];
+    const names = ['Poster contest', 'BARF Night', 'BARF Night: slime cut', 'Parents’ Night', 'Poster finalists: vote', 'Grand Prix (video)', 'Snow alerts', 'Snow alerts: snow week'];
     for (const n of names) expect(screen.getByRole('button', { name: n })).toBeTruthy();
     // It is the first card in Slides, the fall posters grouped apart from the snow slide.
     expect(document.querySelector('.panel-body .panel-card .section').textContent).toBe('Preview the promos');
     const fall = screen.getByRole('group', { name: 'Fall posters' });
     expect([...fall.querySelectorAll('button')].map((b) => b.textContent)).toEqual(names.slice(0, 5));
+    // The Grand Prix video (January to race day) in a group of its own.
+    const gp = screen.getByRole('group', { name: 'Awana Grand Prix (January to race day)' });
+    expect([...gp.querySelectorAll('button')].map((b) => b.textContent)).toEqual(['Grand Prix (video)']);
+    fireEvent.click(screen.getByRole('button', { name: 'Grand Prix (video)' }));
+    expect(props.onPreviewPromo).toHaveBeenLastCalledWith('grandPrix');
     fireEvent.click(screen.getByRole('button', { name: 'Snow alerts: snow week' }));
     expect(props.onPreviewPromo).toHaveBeenCalledWith('snowAlertsStorm');
     fireEvent.click(screen.getByRole('button', { name: 'Poster contest' }));

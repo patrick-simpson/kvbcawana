@@ -31,8 +31,10 @@ test('a streamed path comes from Journey\'s public files or the film\'s folder, 
   assert.equal(repoPathFor('/reel//x.mp4'), null);
   assert.equal(repoPathFor('/reel/'), null);
   assert.equal(repoPathFor('/lobby/intro/awana-intro.mp4'), 'lobby/public/intro/awana-intro.mp4');
+  assert.equal(repoPathFor('/lobby/promos/grand-prix.mp4'), 'lobby/public/promos/grand-prix.mp4');
+  assert.equal(repoPathFor('/lobby/promos/../intro/x.mp4'), null);
   assert.equal(repoPathFor('/lobby/assets/clip.mp4'), null);
-  assert.deepEqual(Object.keys(REPO_FOLDERS).sort(), ['/journey/', '/lobby/intro/', '/reel/']);
+  assert.deepEqual(Object.keys(REPO_FOLDERS).sort(), ['/journey/', '/lobby/intro/', '/lobby/promos/', '/reel/']);
 });
 
 test('the lobby\'s 3D intro is committed, a web copy, and streamed with Range like the film', () => {
@@ -47,6 +49,23 @@ test('the lobby\'s 3D intro is committed, a web copy, and streamed with Range li
   const moov = head.indexOf('moov');
   assert.ok(moov > 0 && (head.indexOf('mdat') === -1 || moov < head.indexOf('mdat')), 'moov before mdat');
   const fn = readFileSync(path.join(SITE, 'functions/lobby/intro/[[path]].js'), 'utf8');
+  assert.match(fn, /proxyLarge\(context\.request, LARGE_FILES, fetch\)\) \|\| context\.next\(\)/);
+});
+
+test('the lobby\'s Grand Prix promo is committed, a small web copy with its end card, and streamed with Range', () => {
+  const video = path.join(ROOT, 'lobby/public/promos/grand-prix.mp4');
+  assert.ok(existsSync(video), 'lobby/public/promos/grand-prix.mp4 is committed');
+  // The flat brand cut: 30 s at 1080p60, about 4 MB.
+  assert.ok(statSync(video).size <= 8 * 1000 * 1000);
+  const head = readFileSync(video).subarray(0, 64 * 1024);
+  const moov = head.indexOf('moov');
+  assert.ok(moov > 0 && (head.indexOf('mdat') === -1 || moov < head.indexOf('mdat')), 'moov before mdat');
+  // Its end card at rest (zero animation and the fallback) is a plain static file.
+  const still = path.join(ROOT, 'lobby/public/promos/grand-prix-end.jpg');
+  assert.ok(existsSync(still), 'lobby/public/promos/grand-prix-end.jpg is committed');
+  assert.equal(mustStream('/lobby/promos/grand-prix-end.jpg', statSync(still).size), false);
+  assert.equal(mustStream('/lobby/promos/grand-prix.mp4', statSync(video).size), true);
+  const fn = readFileSync(path.join(SITE, 'functions/lobby/promos/[[path]].js'), 'utf8');
   assert.match(fn, /proxyLarge\(context\.request, LARGE_FILES, fetch\)\) \|\| context\.next\(\)/);
 });
 

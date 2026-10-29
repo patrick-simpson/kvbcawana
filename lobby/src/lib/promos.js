@@ -36,10 +36,19 @@ import { dateKey } from './time.js';
 /**
  * @typedef {Object} SeasonPromo
  * @property {string} id
- * @property {string} kind 'contest' | 'friend' | 'parents' | 'barfEpic' | 'finalists'
+ * @property {string} kind 'contest' | 'friend' | 'parents' | 'barfEpic' | 'finalists' | 'grandPrix'
  * @property {string} eventDate Last day the promo shows, inclusive.
  * @property {string} showFrom First day the promo may show.
  * @property {number} durationSec How long the slideshow holds THIS poster.
+ * @property {'seamless'} [exit] The promo ENDS on the lobby itself: its last
+ *   frame is the lobby's normal screen at rest in `theme` (field, corner tab,
+ *   house waves; no slide words), so leaving it is an ordinary slide change,
+ *   never the stinger (lobbyMotion.js nextTransition). While it is up the
+ *   scene behind it wears `theme`, its ambient loops come to rest, the chrome
+ *   comes home under it before its end, and it ends its own showing, the
+ *   hold being only a cap (ManualSlideshow, SEAMLESS_GRACE_SEC).
+ * @property {string} [theme] The lobby theme its last frame is drawn in
+ *   (with `exit: 'seamless'`).
  */
 
 // Parents' Night, where the finalists are voted on (PARENTS_DATE below is the same day).
@@ -57,7 +66,24 @@ export const SEASON_PROMOS = [
   // from the day they were picked through the vote at Parents' Night. Its own
   // 21 s: six posters take their bow, each with its epic zoom, before the call (FinalistsPromo.jsx).
   { id: 'promo_finalists', kind: 'finalists', eventDate: PARENTS_NIGHT, showFrom: '2026-10-28', durationSec: 21 },
+  // The Awana Grand Prix, a 30 s video (owner 2026-10-29: "The flat brand one
+  // is the one that I wanted to keep. Get that one set to show up on the
+  // displays starting in January."): from New Year's Day through race day.
+  // Its last second is the lobby's own sky screen at rest, so it hands back to
+  // the lobby with no stinger (GrandPrixPromo.jsx; video/grand-prix/).
+  {
+    id: 'promo_grand_prix', kind: 'grandPrix', eventDate: '2027-03-20', showFrom: '2027-01-01', durationSec: 30,
+    exit: 'seamless', theme: 'sky',
+  },
 ];
+
+/**
+ * How far past its own durationSec a promo that ends itself (`exit:
+ * 'seamless'`, a video) may run before the slideshow moves on anyway: a video
+ * that started a little late still finishes; one that stalls cannot hold the
+ * deck.
+ */
+export const SEAMLESS_GRACE_SEC = 4;
 
 // The poster-contest deadline. Parents' Night says something different
 // about the voting once the posters are actually in.
@@ -150,6 +176,8 @@ export function countdownLabel(n, todayStr, eventDate) {
  * @property {string|null} countdown
  * @property {boolean} afterContest
  * @property {number} durationSec
+ * @property {'seamless'} [exit] see SeasonPromo
+ * @property {string} [theme] see SeasonPromo
  * @property {import('./snowAlerts.js').SnowOutlook|null} [snow] the snow-alerts slide only
  */
 
@@ -214,6 +242,7 @@ export function buildPromoSlot(events, todayStr, opts = {}) {
       countdown: countdownLabel(nightsUntil(events, today, p.eventDate, specialDates), today, p.eventDate),
       afterContest,
       durationSec: p.durationSec,
+      ...ending(p),
     }));
 
   const lapped = snowAlerts && inSnowSeason(today)
@@ -273,6 +302,7 @@ export const PREVIEW_PROMOS = Object.freeze([
   Object.freeze({ key: 'barfEpic', label: 'BARF Night: slime cut' }),
   Object.freeze({ key: 'parents', label: 'Parents’ Night' }),
   Object.freeze({ key: 'finalists', label: 'Poster finalists: vote' }),
+  Object.freeze({ key: 'grandPrix', label: 'Grand Prix (video)' }),
   Object.freeze({ key: 'snowAlerts', label: 'Snow alerts' }),
   Object.freeze({ key: 'snowAlertsStorm', label: 'Snow alerts: snow week' }),
 ]);
@@ -322,7 +352,17 @@ export function previewPromo(key, events, todayStr, specialDates = null) {
       : formatLongDate(p.eventDate) || null,
     afterContest,
     durationSec: p.durationSec,
+    ...ending(p),
   };
+}
+
+/**
+ * A promo's `exit` and `theme`, only when it has them (most do not, and their
+ * descriptors keep the shape they always had).
+ * @param {SeasonPromo} p
+ */
+function ending(p) {
+  return p.exit ? { exit: p.exit, theme: p.theme || 'sky' } : {};
 }
 
 /** @param {string} dateStr */

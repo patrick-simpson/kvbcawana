@@ -164,7 +164,13 @@ export function vanishAtSwap(rest, gone) {
  *   special: boolean,
  *   kind: SlideKind,
  *   theme: string,
+ *   exit?: 'seamless',
  * }} SlideShowing
+ *
+ * `exit: 'seamless'`: a held slide whose last frame IS the lobby at rest in
+ * `theme` (a promo video that ends on the lobby's own screen, src/lib/
+ * promos.js). Its theme is the field's while it is up, and leaving it is an
+ * ordinary change (no stinger); coming in still wipes.
  *
  * @typedef {SlideShowing & {
  *   wipe: boolean,
@@ -185,7 +191,9 @@ export function firstTransition(showing) {
 
 /**
  * How the lobby got from what it was showing to `next`, captured once per
- * real change. A held slide on either side wipes (the stinger); an ordinary
+ * real change. A held slide on either side wipes (the stinger), except on the
+ * way OUT of a seamless-exit slide, whose last frame is already the lobby (it
+ * reveals, like after a video); an ordinary
  * slide after an ordinary slide hands off (words lift, the house wave swells,
  * the next words land); anything after a video reveals. The field keeps its
  * theme under a video or poster, so there is nothing to crossfade when the
@@ -200,11 +208,11 @@ export function nextTransition(seen, next) {
   if (seen.key === next.key) {
     // The same showing, edited in place (an editor save that re-themes or
     // re-marks the slide on screen): take the new facts, play nothing.
-    const theme = next.kind === 'copy' ? next.theme : seen.theme;
-    if (seen.special === next.special && seen.kind === next.kind && seen.theme === theme) return seen;
-    return { ...seen, special: next.special, kind: next.kind, theme };
+    const theme = next.kind === 'copy' || next.exit === 'seamless' ? next.theme : seen.theme;
+    if (seen.special === next.special && seen.kind === next.kind && seen.theme === theme && seen.exit === next.exit) return seen;
+    return { ...seen, special: next.special, kind: next.kind, theme, exit: next.exit };
   }
-  const wipe = seen.special || next.special;
+  const wipe = (seen.special && seen.exit !== 'seamless') || next.special;
   /** @type {Via} */
   const via = wipe ? 'wipe' : seen.kind === 'copy' ? 'handoff' : seen.kind ? 'reveal' : 'boot';
   const swell = !wipe && seen.kind === 'copy' && next.kind === 'copy';
@@ -212,7 +220,9 @@ export function nextTransition(seen, next) {
     key: next.key,
     special: next.special,
     kind: next.kind,
-    theme: next.kind === 'copy' || !seen.theme ? next.theme : seen.theme,
+    // A seamless-exit slide brings its own theme: the field it ends on.
+    theme: next.kind === 'copy' || next.exit === 'seamless' || !seen.theme ? next.theme : seen.theme,
+    exit: next.exit,
     wipe,
     via,
     wipes: seen.wipes + (wipe ? 1 : 0),
