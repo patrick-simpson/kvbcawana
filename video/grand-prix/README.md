@@ -24,18 +24,40 @@ laid over the 3D frames.
 
 ## What the lobby plays
 
-The lobby screens play the **flat brand** concept, not the Blender film (owner
-2026-10-29: "The flat brand one is the one that I wanted to keep. Get that one
-set to show up on the displays starting in January."):
-`output/concepts/flat-brand-1080p60.mp4` (30 s, 1920x1080, 60 fps, silent, its
-last second the lobby's sky screen at rest, `concepts/lobby-plate-sky.png`) is
-committed as `lobby/public/promos/grand-prix.mp4`, with its end card at rest
-(the frame at 25.0 s) as `lobby/public/promos/grand-prix-end.jpg`. It is the
-season promo `promo_grand_prix` (2027-01-01 through race day 2027-03-20;
-`lobby/src/components/promos/GrandPrixPromo.jsx`, CLAUDE.md "Season promos,
-snow alerts, flagship"). A new cut must keep that last second exactly the
-lobby plate, or the hand-back to the lobby will show: copy both files again
+The lobby screens play the **gp-brand** cut (owner 2026-10-29: first "The flat
+brand one is the one that I wanted to keep. Get that one set to show up on the
+displays starting in January.", then, the same day, restyled in Awana's
+official Grand Prix sub-brand with permission to use its logos and graphics:
+"make it epic and extremely well produced").
+`output/gp-brand/grand-prix-1080p60.mp4` (30 s, 1920x1080, 60 fps, silent;
+its red end card at rest 22.3 to 28.45 s, then the lobby's own waves sweep it
+away and from 28.77 s to the end it is the lobby's sky screen at rest,
+`concepts/lobby-plate-sky.png`) is committed as
+`lobby/public/promos/grand-prix.mp4`, with its red end card at rest (the frame
+at 25.0 s) as `lobby/public/promos/grand-prix-end.jpg`. It is the season promo
+`promo_grand_prix` (2027-01-01 through race day 2027-03-20;
+`lobby/src/components/promos/GrandPrixPromo.jsx`, `GRAND_PRIX.homeAt` 28.87 s;
+CLAUDE.md "Season promos, snow alerts, flagship"). A new cut must keep its
+last second exactly the lobby plate (and `homeAt` just after the plate is
+fully drawn), or the hand-back to the lobby will show: copy both files again
 and re-measure the seam.
+
+Its source is `concepts/gp-brand/` (one canvas drawn from a time value,
+captured in Chrome; the official logo, torn brush edge, grain and starburst
+are vectors extracted from Awana's Grand Prix catalog PDF, used with the
+owner's permission; `assets/` is NOT committed, as Awana's artwork is not
+republished from this public repo: `extract_assets.py` rebuilds it from the
+catalog, which the owner has):
+
+    cd concepts/gp-brand
+    python extract_assets.py && python build_assets_js.py   # assets/ from the catalog PDF
+    node capture.mjs hd 6                                   # 1800 PNG frames (scratch-intro/gp/gp-brand/frames1080)
+    GP_CRF=MEDIUM blender --factory-startup -b -P encode.py -- _ ../../output/gp-brand/grand-prix-1080p60.mp4 hd
+    node measure.mjs ../../output/gp-brand/grand-prix-1080p60.mp4 28.8 29.98 0.0833   # vs the lobby plate
+
+(`node capture.mjs` without `hd` makes the 960x540 30 fps check.) The older
+flat-brand cut (`concepts/flat-brand/`) and the Blender film below are kept
+for reference.
 
 ## How to make the video
 

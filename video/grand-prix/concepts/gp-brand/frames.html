@@ -1,0 +1,129 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Awana Grand Prix sub-brand: style frames</title>
+<style>
+  @font-face { font-family: Figtree; src: url(../../../../shared/brand/fonts/Figtree-Variable.ttf); font-weight: 300 900; }
+  html, body { margin: 0; background: #000; }
+  #stage { position: relative; width: 1920px; height: 1080px; overflow: hidden; background: #F04A4B; }
+  #stage svg.art { position: absolute; inset: 0; }
+  .t { position: absolute; font-family: Figtree, sans-serif; color: #fff; font-kerning: normal;
+       font-feature-settings: "kern" 1; text-rendering: geometricPrecision; white-space: nowrap; margin: 0; }
+  .head { font-weight: 700; letter-spacing: -0.022em; line-height: 0.98; }
+  .read { font-weight: 600; letter-spacing: -0.008em; line-height: 1.22; }
+  .lab  { color: #232328; }
+  .caps { font-weight: 800; text-transform: none; letter-spacing: -0.01em; line-height: 1.0; text-align: center; }
+  img.church { position: absolute; display: block; }
+</style>
+<script src="assets/gp-assets.js"></script>
+<script src="cars.js"></script>
+</head>
+<body>
+<div id="stage"></div>
+<script>
+const W = 1920, H = 1080;
+const C = { red: '#F04A4B', black: '#232328', grain: '#1E1E22', ink: GP.logoSolid.dark, white: '#FFFFFF', blue: '#75A3D6' };
+const q = new URLSearchParams(location.search);
+const F = +(q.get('f') || 1);
+const stage = document.getElementById('stage');
+let defs = '', art = '', html = '';
+let nid = 0;
+
+// ---- the torn black field (catalog cover brush, vector) -------------------------------
+// The brush's rough lower edge runs through brush point (380,300) at slope -0.505 (rising right).
+// opts: ax, ay = where that point lands; s = scale; rot = degrees; fy/fx = -1 to flip.
+const FILL = '130,262 160,230 200,218 240,185 280,164 320,150 360,130 400,110 440,90 480,70 520,75 560,82 600,104 620,120 620,-3000 130,-3000';
+function tornField({ ax, ay, s = 4.4, rot = 0, fx = 1, fy = 1 }) {
+  const id = 'torn' + (nid++);
+  const tf = `translate(${ax} ${ay}) rotate(${rot}) scale(${s * fx} ${s * fy}) translate(-380 -300)`;
+  defs += `<clipPath id="${id}" clipPathUnits="userSpaceOnUse"><path transform="${tf}" d="${GP.brush.d}"/><polygon transform="${tf}" points="${FILL}"/></clipPath>`;
+  art += `<g clip-path="url(#${id})"><rect width="${W}" height="${H}" fill="${C.black}"/><rect width="${W}" height="${H}" fill="url(#grain)"/></g>`;
+}
+// grain on the black: the catalog's own grunge specks, tiled (assets/grain-tile.png)
+defs += `<pattern id="grain" patternUnits="userSpaceOnUse" width="2860" height="1540"><image href="assets/grain-tile.png" width="2860" height="1540"/></pattern>`;
+
+// ---- the official logo --------------------------------------------------------------
+function logoWhite(x, y, w, ext) {   // ext: {left: px, right: px} to run the checker bars out
+  const L = GP.logoWhite, k = w / L.w, per = 3 * (L.checkPeriod);
+  let reps = '';
+  if (ext) {
+    const nl = Math.ceil((ext.left / k) / per), nr = Math.ceil((ext.right / k) / per);
+    for (let i = 1; i <= nl; i++) reps += `<path transform="translate(${-i * per} 0)" d="${L.checkL}"/>`;
+    for (let i = 1; i <= nr; i++) reps += `<path transform="translate(${i * per} 0)" d="${L.checkR}"/>`;
+  }
+  art += `<g transform="translate(${x} ${y}) scale(${k})" fill="#fff">
+    <path d="${L.checkL}"/><path d="${L.awana}"/><path d="${L.checkR}"/><path d="${L.word}"/><path d="${L.tm}"/>${reps}</g>`;
+  return { h: L.h * k, k };
+}
+function logoSolid(x, y, w, extRight = 0) {
+  const L = GP.logoSolid, k = w / L.w, per = 33.9027;   // 3 checker squares in the back-cover lockup
+  let reps = '';
+  for (let i = 1; i <= Math.ceil(extRight / k / per); i++) reps += `<path transform="translate(${i * per} 0)" d="${L.checkR}"/>`;
+  art += `<g transform="translate(${x} ${y}) scale(${k})">
+    <path d="${L.sil}" fill="${L.dark}"/><path d="${L.checkL}${L.awana}${L.checkR}${L.tm}" fill="${L.dark}"/><g fill="${L.dark}">${reps}</g>
+    <path d="${L.letters}" fill="#fff"/></g>`;
+  return { h: L.h * k, k };
+}
+function starburst(cx, cy, d, fill, rot = 0) {
+  const S = GP.star, k = d / S.w;
+  art += `<g transform="translate(${cx} ${cy}) rotate(${rot}) scale(${k}) translate(${-S.w / 2} ${-S.h / 2})"><path d="${S.d}" fill="${fill}"/></g>`;
+}
+function text(cls, x, y, size, str, extra = '') {
+  html += `<p class="t ${cls}" style="left:${x}px;top:${y}px;font-size:${size}px;${extra}">${str}</p>`;
+}
+// place a car: origin = rear wheel ground point, angle in degrees, scale
+function placeCar(kind, paint, x, y, ang, s, streakSpec) {
+  art += `<g transform="translate(${x} ${y}) rotate(${ang}) scale(${s})">${streakSpec ? streaks(streakSpec) : ''}${car(kind, paint)}</g>`;
+}
+
+// =====================================================================================
+if (F === 1) {                       // OPENING: the logo as hero
+  tornField({ ax: 960, ay: 525 });   // black top-left, edge (0,1010) -> (1920,40)
+  logoWhite(120, 128, 860, { left: 140, right: 1000 });
+  text('head', 760, 772, 104, 'The Awana Grand Prix<br>is back.');
+}
+if (F === 2) {                       // RACE: down the ramp, along the torn edge
+  const deg = 14, m = Math.tan(deg * Math.PI / 180), y0 = 560;
+  tornField({ ax: 960, ay: y0 + m * 960, s: 5.2, fy: -1, rot: deg - 26.8 });   // black below, edge descending right
+  const u = [Math.cos(deg * Math.PI / 180), Math.sin(deg * Math.PI / 180)], n = [u[1], -u[0]];
+  const at = (t, d) => [t * u[0] + d * n[0], y0 + t * u[1] + d * n[1]];
+  const st = (c) => [[-52, 760, 6, c, 34], [-84, 420, 6, c, 70], [-20, 520, 4, c, 50]];
+  const cars = [
+    ['indy',  { body: C.black, stripes: [[-58, 8, C.white]], num: 4, glass: '#111114' }, 260, 460],
+    ['truck', { body: C.blue,  stripes: [[-50, 8, C.white]], num: 7, glass: C.black }, 540, 340],
+    ['stock', { body: C.white, stripes: [[-58, 12, C.red], [-40, 5, C.black]], num: 8, numBg: C.black, numFg: C.white }, 860, 190],
+    ['awana', { body: C.white, stripes: [[-60, 14, C.blue], [-40, 6, C.blue]], num: 1, numBg: C.blue, numFg: C.white }, 1180, 40],
+  ];
+  for (const [k, p, t, d] of cars) { const [x, y] = at(t, d); placeCar(k, p, x, y, deg, 1.05, st('#ffffff')); }
+  logoSolid(1290, 96, 510);
+}
+if (F === 3) {                       // THE NEWS
+  const deg = 14, m = Math.tan(deg * Math.PI / 180), y0 = 610;
+  tornField({ ax: 960, ay: y0 + m * 960, s: 5.2, fy: -1, rot: deg - 26.8 });
+  const u = [Math.cos(deg * Math.PI / 180), Math.sin(deg * Math.PI / 180)], n = [u[1], -u[0]];
+  const at = (t, d) => [t * u[0] + d * n[0], y0 + t * u[1] + d * n[1]];
+  starburst(450, 340, 540, C.black);
+  text('caps', 450 - 300, 340 - 86, 56, 'THIS YEAR,<br>GROWN-UPS<br>RACE TOO.', 'width:600px;');
+  text('read', 120, 846, 56, 'Kids race first. Then Trek, Journey<br>and adults race together.');
+  let [x, y] = at(1090, 230);
+  placeCar('truck', { body: C.blue, stripes: [[-50, 8, C.white]], num: 3, glass: C.black }, x, y, deg, 0.86,
+    [[-52, 380, 6, '#fff', 34], [-84, 220, 6, '#fff', 70], [-20, 300, 4, '#fff', 50]]);
+  [x, y] = at(1290, 50);
+  placeCar('sleek', { body: C.white, stripes: [[-56, 12, C.red], [-38, 5, C.red]], num: 1, numBg: C.red, numFg: C.white, glass: C.black },
+    x, y, deg, 1.18, [[-52, 620, 6, '#fff', 34], [-84, 360, 6, '#fff', 70], [-20, 460, 4, '#fff', 50]]);
+  logoSolid(1290, 96, 510);
+}
+if (F === 4) {                       // END CARD
+  tornField({ ax: 1560, ay: 1620 - 0.505 * 1560 - 90, rot: 180 });   // black bottom-right, edge rising right
+  const lg = logoSolid(120, 96, 560);
+  text('head', 120, 96 + lg.h + 92, 96, 'Kids, Trek, Journey &amp; Adults');
+  text('read', 120, 96 + lg.h + 92 + 96 + 84, 58, '<span class="lab">Register by</span> Sunday, Feb 28<br><span class="lab">Build day:</span> Saturday, March 6 · 2:00 pm<br><span class="lab">Race day:</span> Saturday, March 20 · 2:00 pm', 'line-height:1.4;');
+  html += `<img class="church" src="../../../../shared/brand/logos/kvbc-awana-two-line-white.svg" style="width:360px;right:120px;bottom:96px">`;
+}
+stage.innerHTML = `<svg class="art" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}"><defs>${defs}</defs>${art}</svg>${html}`;
+window.READY = false;
+Promise.all([document.fonts.ready, ...[...document.images].map(i => i.decode().catch(() => 0))]).then(() => { window.READY = true; });
+</script>
+</body>
+</html>

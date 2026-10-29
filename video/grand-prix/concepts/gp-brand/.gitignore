@@ -1,0 +1,5 @@
+# Awana Grand Prix brand art extracted from the catalog PDF (extract_assets.py
+# regenerates it). Awana's artwork: used with permission in the video, not
+# republished from this public repo.
+assets/
+__pycache__/
