@@ -3,6 +3,7 @@ import FriendPromo, { DETAILS as FRIEND_DETAILS } from './promos/FriendPromo.jsx
 import BarfEpicPromo, { DETAILS as BARF_EPIC_DETAILS } from './promos/BarfEpicPromo.jsx';
 import ParentsPromo, { DETAILS as PARENTS_DETAILS } from './promos/ParentsPromo.jsx';
 import SnowAlertsPromo, { DETAILS as SNOW_ALERTS_DETAILS } from './promos/SnowAlertsPromo.jsx';
+import FinalistsPromo, { DETAILS as FINALISTS_DETAILS } from './promos/FinalistsPromo.jsx';
 
 export { RotatingDetail, splatPath, landsAt, keyframes } from './promos/kit.jsx';
 
@@ -27,6 +28,7 @@ export const PROMO_DETAILS = Object.freeze({
   barfEpic: BARF_EPIC_DETAILS,
   parents: PARENTS_DETAILS,
   snowAlerts: SNOW_ALERTS_DETAILS,
+  finalists: FINALISTS_DETAILS,
 });
 
 const NO_DETAILS = Object.freeze([]);
@@ -53,6 +55,7 @@ const SCENES = {
   barfEpic: BarfEpicPromo,
   parents: ParentsPromo,
   snowAlerts: SnowAlertsPromo,
+  finalists: FinalistsPromo,
 };
 
 /**

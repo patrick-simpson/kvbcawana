@@ -737,12 +737,12 @@ describe('Preview the promos', () => {
   it('lists every promo, and a click hands that one to the screen', () => {
     const props = { ...happyProps(), initialTab: 'slides', onPreviewPromo: vi.fn() };
     render(<SettingsPanel {...props} />);
-    const names = ['Poster contest', 'BARF Night', 'BARF Night: slime cut', 'Parents’ Night', 'Snow alerts', 'Snow alerts: snow week'];
+    const names = ['Poster contest', 'BARF Night', 'BARF Night: slime cut', 'Parents’ Night', 'Poster finalists: vote', 'Snow alerts', 'Snow alerts: snow week'];
     for (const n of names) expect(screen.getByRole('button', { name: n })).toBeTruthy();
     // It is the first card in Slides, the fall posters grouped apart from the snow slide.
     expect(document.querySelector('.panel-body .panel-card .section').textContent).toBe('Preview the promos');
     const fall = screen.getByRole('group', { name: 'Fall posters' });
-    expect([...fall.querySelectorAll('button')].map((b) => b.textContent)).toEqual(names.slice(0, 4));
+    expect([...fall.querySelectorAll('button')].map((b) => b.textContent)).toEqual(names.slice(0, 5));
     fireEvent.click(screen.getByRole('button', { name: 'Snow alerts: snow week' }));
     expect(props.onPreviewPromo).toHaveBeenCalledWith('snowAlertsStorm');
     fireEvent.click(screen.getByRole('button', { name: 'Poster contest' }));

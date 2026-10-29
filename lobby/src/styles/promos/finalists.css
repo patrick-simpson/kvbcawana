@@ -1,0 +1,288 @@
+/* ── Promo: the DEFEND poster contest's finalists (showreel) ─────────
+   FinalistsPromo.jsx. The contest poster's navy and gold: a gallery wall of
+   the six framed finalists on the right, the call to vote on the left. Laid
+   out in a 16:9 frame in container units (1cqw = 1% of the frame's width),
+   so every screen size draws the same picture. Layering inside the slide,
+   lowest first: texture (0), vignette (1), the stage (2: dust, spotlight,
+   title card, gallery, call), wordmark and chip (4, the kit's). Poster faces
+   only (--font-poster, --promo-font-*): src/lib/promoFonts.test.js. */
+.promo-slide--finalists {
+  background-color: #1f2a5c;
+  background-image:
+    radial-gradient(ellipse 60% 70% at 66% 52%, #32427f 0%, rgba(50, 66, 127, 0) 70%),
+    radial-gradient(ellipse 50% 60% at 14% 55%, #2a3870 0%, rgba(42, 56, 112, 0) 70%);
+  container-type: size;
+  color: #ffffff;
+}
+.promo-slide--finalists .promo-chip {
+  background: #f8a91c;
+  color: #1f2a5c;
+  box-shadow: 0 10px 28px rgba(6, 10, 28, 0.45), 0 0 0 3px rgba(255, 217, 138, 0.55);
+}
+
+/* The 16:9 frame, centred in whatever the slide is. */
+.promo-fin-stage {
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  margin: auto;
+  width: min(100cqw, calc(100cqh * 16 / 9));
+  height: min(56.25cqw, 100cqh);
+  container-type: size;
+}
+
+/* ── Ambient ── */
+.promo-fin-dust { position: absolute; inset: 0; pointer-events: none; }
+.promo-fin-mote {
+  position: absolute;
+  display: block;
+  border-radius: 50%;
+  background: #ffd98a;
+  box-shadow: 0 0 0.6cqw rgba(255, 217, 138, 0.6);
+}
+.promo-fin-spot {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 92cqw;
+  height: 70cqw;
+  margin: -35cqw 0 0 -46cqw;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(255, 236, 190, 0.26), rgba(255, 236, 190, 0.08) 55%, rgba(255, 236, 190, 0) 100%);
+  pointer-events: none;
+}
+
+/* Each epic zoom's flare: a warm bloom from the centre as the poster fills the screen. */
+.promo-fin-flare {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  background: radial-gradient(ellipse 60% 60% at 50% 50%, rgba(255, 236, 190, 0) 35%, rgba(255, 236, 190, 0.45) 100%);
+  mix-blend-mode: screen;
+  pointer-events: none;
+}
+
+/* ── Act 1: the title card ── */
+.promo-fin-title {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.2cqw;
+  pointer-events: none;
+}
+.promo-fin-title-kicker {
+  margin: 0;
+  font-family: var(--promo-font-condensed);
+  font-weight: 600;
+  font-size: 2.1cqw;
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  color: #ffd98a;
+}
+.promo-fin-title-word {
+  margin: 0;
+  font-family: var(--font-poster);
+  font-weight: 400;
+  font-size: 9.6cqw;
+  line-height: 1;
+  text-transform: uppercase;
+  color: #ffffff;
+  text-shadow: 0 0.5cqw 0 #141c40;
+}
+.promo-fin-title-rule {
+  display: block;
+  width: 34cqw;
+  height: 0.55cqw;
+  border-radius: 1cqw;
+  background: #f8a91c;
+  transform-origin: 50% 50%;
+}
+
+/* ── Act 2: the gallery ── */
+.promo-fin-gallery { position: absolute; inset: 0; }
+.promo-fin-frame {
+  position: absolute;
+  margin: 0;
+  /* width, height and --fin-k: FinalistsPromo.jsx (frameBox(), RASTER): drawn
+     --fin-k times its gallery size, so every size inside is multiplied by it */
+  transform-origin: 50% 50%;
+  will-change: transform, opacity;
+}
+/* The mat: gallery cream inside a thin gold fillet, 0.75cqw each side (MAT in
+   FinalistsPromo.jsx); the frame already has the art's shape. */
+.promo-fin-mat {
+  position: absolute;
+  inset: 0;
+  padding: calc(var(--fin-k) * 0.75cqw);
+  border-radius: calc(var(--fin-k) * 0.35cqw);
+  background: #fbf7ee;
+  box-shadow:
+    inset 0 0 0 calc(var(--fin-k) * 0.16cqw) #d9a43a,
+    0 calc(var(--fin-k) * 1.2cqw) calc(var(--fin-k) * 2.6cqw) rgba(6, 10, 28, 0.55),
+    0 calc(var(--fin-k) * 0.2cqw) calc(var(--fin-k) * 0.5cqw) rgba(6, 10, 28, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+.promo-fin-art {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  box-shadow: 0 0 0 calc(var(--fin-k) * 0.08cqw) rgba(31, 42, 92, 0.25);
+}
+.promo-fin-badge {
+  position: absolute;
+  z-index: 1;
+  left: calc(var(--fin-k) * -1.1cqw);
+  top: calc(var(--fin-k) * -1.1cqw);
+  width: calc(var(--fin-k) * 3.2cqw);
+  height: calc(var(--fin-k) * 3.2cqw);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: #f8a91c;
+  color: #1f2a5c;
+  font-family: var(--font-poster);
+  font-weight: 400;
+  font-size: calc(var(--fin-k) * 2.1cqw);
+  line-height: 1;
+  box-shadow: 0 0 0 calc(var(--fin-k) * 0.25cqw) #1f2a5c, 0 calc(var(--fin-k) * 0.4cqw) calc(var(--fin-k) * 0.9cqw) rgba(6, 10, 28, 0.5);
+}
+
+/* Each row's division, centred over it between two gold rules. */
+.promo-fin-row {
+  position: absolute;
+  left: 33.4cqw;
+  width: 64cqw;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 1.2cqw;
+  font-family: var(--promo-font-condensed);
+  font-weight: 600;
+  font-size: 1.5cqw;
+  line-height: 1;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: #ffd98a;
+}
+.promo-fin-row::before,
+.promo-fin-row::after {
+  content: '';
+  flex: 1;
+  height: 0.16cqw;
+  background: rgba(248, 169, 28, 0.6);
+}
+/* The presented poster's caption, under it at the centre. */
+.promo-fin-captions { position: absolute; inset: 0; z-index: 25; pointer-events: none; }
+.promo-fin-caption {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 47.4cqw;
+  margin: 0;
+  text-align: center;
+  font-family: var(--promo-font-condensed);
+  font-weight: 600;
+  font-size: 2.2cqw;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: #ffd98a;
+}
+.promo-fin-caption b {
+  margin-left: 0.6em;
+  font-family: var(--font-poster);
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  color: #ffffff;
+}
+
+/* ── Act 3: the call ── */
+.promo-fin-call {
+  position: absolute;
+  left: 3.6cqw;
+  top: 12.6cqw;
+  width: 27.4cqw;
+  bottom: 4.2cqw;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  gap: 1.1cqw;
+}
+.promo-fin-kicker {
+  margin: 0;
+  font-family: var(--promo-font-condensed);
+  font-weight: 600;
+  font-size: 1.45cqw;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  color: #ffd98a;
+}
+.promo-fin-headline {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  font-family: var(--font-poster);
+  font-weight: 400;
+  font-size: 5.2cqw;
+  line-height: 0.98;
+  text-transform: uppercase;
+  color: #ffffff;
+}
+.promo-fin-word {
+  display: block;
+  text-shadow: 0 0.35cqw 0 #141c40;
+  transform-origin: 0% 100%;
+}
+.promo-fin-word:last-child { color: #f8a91c; }
+.promo-fin-sub {
+  margin: 0.4cqw 0 0;
+  font-family: var(--promo-font-body);
+  font-weight: 700;
+  font-size: 1.75cqw;
+  color: #d6e2ff;
+}
+.promo-fin-band {
+  margin-top: 0.8cqw;
+  padding: 1cqw 1.4cqw 1.1cqw;
+  border-radius: 0.6cqw;
+  background: #f8a91c;
+  color: #1f2a5c;
+  box-shadow: 0 0.6cqw 0 #c9810a, 0 1.2cqw 2.4cqw rgba(6, 10, 28, 0.4);
+  display: flex;
+  flex-direction: column;
+  gap: 0.2cqw;
+}
+.promo-fin-band-what {
+  font-family: var(--promo-font-condensed);
+  font-weight: 600;
+  font-size: 1.45cqw;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+.promo-fin-band-date {
+  font-family: var(--font-poster);
+  font-weight: 400;
+  font-size: 2.6cqw;
+  line-height: 1.05;
+}
+.promo-fin--tonight .promo-fin-band-date { font-size: 3.6cqw; }
+/* The kit's rotating line, at this poster's size. */
+.promo-fin-detail { margin-top: auto; }
+.promo-slide--finalists .promo-fin-detail .promo-detail-slot {
+  justify-content: flex-start;
+  min-height: 1.4em;
+  font-size: 1.5cqw;
+}
+.promo-slide--finalists .promo-fin-detail .promo-detail {
+  text-align: left;
+  color: #ffd98a;
+}

@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   promoForLap,
   CONTEST_DATE,
+  PARENTS_DATE,
   PROMO_DURATION_SEC,
   SEASON_PROMOS,
   buildPromoSlot,
@@ -113,7 +114,8 @@ describe('the promo holds', () => {
 
   // A promo still carries its OWN hold, which is what the slideshow reads.
   it('gives every descriptor in the table its own duration', () => {
-    expect(SEASON_PROMOS.map((p) => p.durationSec)).toEqual([15, 15, 15, 15]);
+    // The finalists' showreel is 21 s: six posters take their bow (each with its zoom) before the call.
+    expect(SEASON_PROMOS.map((p) => p.durationSec)).toEqual([15, 15, 15, 15, 21]);
   });
 });
 
@@ -143,8 +145,8 @@ describe('buildPromoSlot', () => {
     expect(kinds(slot('2026-10-15'))).toEqual(['parents']);
   });
 
-  it('shows Parents\' Night ON November 4 and nothing at all on the 5th', () => {
-    expect(kinds(slot('2026-11-04'))).toEqual(['parents']);
+  it('shows Parents\' Night (and the finalists to vote on) ON November 4 and nothing at all on the 5th', () => {
+    expect(kinds(slot('2026-11-04'))).toEqual(['parents', 'finalists']);
     expect(slot('2026-11-05')).toBeNull();
     expect(slot('2027-01-06')).toBeNull();
   });
@@ -197,9 +199,19 @@ describe('buildPromoSlot', () => {
     expect(buildPromoSlot(season, 'tomorrow')).toBeNull();
   });
 
-  it('every descriptor in the table is one of the four known kinds', () => {
+  it('every descriptor in the table is one of the five known kinds', () => {
     expect(SEASON_PROMOS.map((p) => p.kind).sort())
-      .toEqual(['barfEpic', 'contest', 'friend', 'parents']);
+      .toEqual(['barfEpic', 'contest', 'finalists', 'friend', 'parents']);
+  });
+
+  it('shows the finalists from the day they were picked through the vote at Parents’ Night, inclusive', () => {
+    const kinds = (day) => (slot(day)?.promos ?? []).filter(Boolean).map((p) => p.kind);
+    expect(kinds('2026-10-27')).not.toContain('finalists');
+    expect(kinds('2026-10-28')).toContain('finalists');
+    expect(kinds('2026-11-04')).toContain('finalists');
+    expect(kinds('2026-11-05')).not.toContain('finalists');
+    const f = slot('2026-11-04').promos.find((p) => p && p.kind === 'finalists');
+    expect(f).toMatchObject({ tonight: true, countdown: 'Tonight!', durationSec: 21, eventDate: PARENTS_DATE });
   });
 
   it('carries each promo\'s own hold onto the slot entry', () => {
@@ -245,15 +257,16 @@ describe('buildPromoSlot with the snow-alerts slide', () => {
   });
 
   it('shares its off laps with a fall poster that is still live', () => {
-    // Nov 1 to 4: Parents' Night is still up, so it fills the other laps.
-    expect(kinds(snowSlot('2026-11-02'))).toEqual(['snowAlerts', 'parents', 'parents', 'parents', 'parents', 'parents']);
+    // Nov 1 to 4: Parents' Night and the finalists are still up, so they take the other laps in turn.
+    expect(kinds(snowSlot('2026-11-02'))).toEqual(['snowAlerts', 'parents', 'finalists', 'parents', 'finalists', 'parents']);
   });
 
   it('alternates with a live poster in a snow week', () => {
-    // Snow forecast for Wed Nov 4, Parents' Night itself: every other lap each.
+    // Snow forecast for Wed Nov 4, Parents' Night itself: every other lap, the
+    // two live posters taking the laps between in turn.
     const nov = { time: ['2026-11-02', '2026-11-03', '2026-11-04'], inches: [0, 0, 2] };
     const s = buildPromoSlot(winter, '2026-11-02', { snowAlerts: true, snowForecast: nov });
-    expect(kinds(s)).toEqual(['snowAlerts', 'parents']);
+    expect(kinds(s)).toEqual(['snowAlerts', 'parents', 'snowAlerts', 'finalists']);
     expect(s.promos[0].snow?.when).toBe('later');
   });
 
@@ -263,7 +276,7 @@ describe('buildPromoSlot with the snow-alerts slide', () => {
   });
 
   it('is off unless asked for, and goes with the rest when promos are switched off', () => {
-    expect(kinds(buildPromoSlot(winter, '2026-11-02'))).toEqual(['parents']);
+    expect(kinds(buildPromoSlot(winter, '2026-11-02'))).toEqual(['parents', 'finalists']);
     expect(snowSlot('2026-12-10', null, { enabled: false })).toBeNull();
   });
 
@@ -283,7 +296,7 @@ describe('buildPromoSlot with the snow-alerts slide', () => {
 
 describe('previewPromo: Settings → Slides → Preview the promos', () => {
   it('offers every poster and both snow versions', () => {
-    expect(PREVIEW_PROMOS.map((p) => p.key)).toEqual(['contest', 'friend', 'barfEpic', 'parents', 'snowAlerts', 'snowAlertsStorm']);
+    expect(PREVIEW_PROMOS.map((p) => p.key)).toEqual(['contest', 'friend', 'barfEpic', 'parents', 'finalists', 'snowAlerts', 'snowAlertsStorm']);
     for (const p of PREVIEW_PROMOS) expect(previewPromo(p.key, season, '2026-10-01')).not.toBeNull();
     expect(previewPromo('nope', season, '2026-10-01')).toBeNull();
   });

@@ -36,11 +36,14 @@ import { dateKey } from './time.js';
 /**
  * @typedef {Object} SeasonPromo
  * @property {string} id
- * @property {string} kind 'contest' | 'friend' | 'parents' | 'barfEpic'
+ * @property {string} kind 'contest' | 'friend' | 'parents' | 'barfEpic' | 'finalists'
  * @property {string} eventDate Last day the promo shows, inclusive.
  * @property {string} showFrom First day the promo may show.
  * @property {number} durationSec How long the slideshow holds THIS poster.
  */
+
+// Parents' Night, where the finalists are voted on (PARENTS_DATE below is the same day).
+const PARENTS_NIGHT = '2026-11-04';
 
 /** @type {ReadonlyArray<SeasonPromo>} */
 export const SEASON_PROMOS = [
@@ -50,6 +53,10 @@ export const SEASON_PROMOS = [
   // The slime-soaked hype cut of BARF Night, the fourth poster the printer
   // never made.
   { id: 'promo_barf_epic', kind: 'barfEpic', eventDate: '2026-10-14', showFrom: '2026-09-01', durationSec: 15 },
+  // The contest's six finalists, "vote for your favorite" (owner 2026-10-28):
+  // from the day they were picked through the vote at Parents' Night. Its own
+  // 21 s: six posters take their bow, each with its epic zoom, before the call (FinalistsPromo.jsx).
+  { id: 'promo_finalists', kind: 'finalists', eventDate: PARENTS_NIGHT, showFrom: '2026-10-28', durationSec: 21 },
 ];
 
 // The poster-contest deadline. Parents' Night says something different
@@ -58,7 +65,7 @@ export const CONTEST_DATE = '2026-10-14';
 
 // Parents' Night, named once here so the contest promo can point at it
 // without a second copy of the date (the two events are chained).
-export const PARENTS_DATE = '2026-11-04';
+export const PARENTS_DATE = PARENTS_NIGHT;
 
 // Every poster is a 15 second showreel (owner's call, 2026-09-28): a full
 // motion-design sequence that lands on the finished printed poster. Each
@@ -265,6 +272,7 @@ export const PREVIEW_PROMOS = Object.freeze([
   Object.freeze({ key: 'friend', label: 'BARF Night' }),
   Object.freeze({ key: 'barfEpic', label: 'BARF Night: slime cut' }),
   Object.freeze({ key: 'parents', label: 'Parents’ Night' }),
+  Object.freeze({ key: 'finalists', label: 'Poster finalists: vote' }),
   Object.freeze({ key: 'snowAlerts', label: 'Snow alerts' }),
   Object.freeze({ key: 'snowAlertsStorm', label: 'Snow alerts: snow week' }),
 ]);
