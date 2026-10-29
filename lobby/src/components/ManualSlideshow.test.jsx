@@ -783,7 +783,7 @@ describe('ManualSlideshow: a promo that ends on the lobby (the Grand Prix video)
     expect(keys.at(-1)).toBe('2:s_b');
   });
 
-  it('under zero animation it is the end card for its own hold, with the chrome home over it', () => {
+  it('under zero animation it is the red end card for its own hold, the chrome away over it, then the ordinary change', () => {
     const keys = [];
     render(
       <ZeroAnimationContext.Provider value>
@@ -793,11 +793,14 @@ describe('ManualSlideshow: a promo that ends on the lobby (the Grand Prix video)
     at(5000);
     expect(document.querySelector('video')).toBeNull();
     expect(document.querySelector('img.grand-prix-promo__still')).not.toBeNull();
-    expect(chrome()).toContain('lobby-chrome--home');
+    // The still is the red end card, not the lobby: the tab and waves stay away.
+    expect(chrome()).toContain('lobby-chrome--away');
     at(gp.durationSec * 1000 - 100);
     expect(keys.at(-1)).toBe('1:season_promo');
     at(200);
     expect(keys.at(-1)).toBe('2:s_b');
+    // The next slide brings them home.
+    expect(chrome()).not.toContain('lobby-chrome--away');
   });
 
   it('an ordinary poster still wipes out, and keeps the field it came in on', () => {

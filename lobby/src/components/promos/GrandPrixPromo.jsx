@@ -4,40 +4,44 @@ import { ZeroAnimationContext } from '../../lib/motion.jsx';
 // ─────────────────────────────────────────────────────────────
 // The Awana Grand Prix (owner 2026-10-29: "The flat brand one is the one that
 // I wanted to keep. Get that one set to show up on the displays starting in
-// January."). Not a showreel drawn here but a 30 s silent video, the flat
-// brand cut made by video/grand-prix/ (1920x1080, 60 fps, H.264, moov first),
-// shown from 2027-01-01 through race day (src/lib/promos.js).
+// January."; then, the same day, restyled in Awana's official Grand Prix
+// sub-brand: "make it epic and extremely well produced"). Not a showreel
+// drawn here but a 30 s silent video made by video/grand-prix/concepts/gp-brand/
+// (1920x1080, 60 fps, H.264, moov first), shown from 2027-01-01 through race
+// day (src/lib/promos.js).
 //
 // Its story, in video time:
-//   0     colour lanes build; "The Awana Grand Prix is back."; a pinewood race;
-//         "This year, grown-ups race too." / "Kids race first. Then Trek,
-//         Journey and adults race together."
-//   ~20.5 the lobby's own orange waves sweep the race away, and from ~21.5 the
-//         picture IS the lobby's normal screen in the sky theme (field, clouds
-//         and doodles at rest, the corner tab with the two-line logo, the
-//         house waves at rest), with the end card's words on it:
-//         AWANA GRAND PRIX, Kids, Trek, Journey & Adults, register by Sunday,
-//         Feb 28, build day Saturday, March 6, race day Saturday, March 20,
-//         2:00 pm; readable and still ~22.4 to ~28.4.
-//   ~29   the words have gone: the last second is the bare lobby screen
-//         (video/grand-prix/concepts/lobby-plate-sky.png, mean difference ~0).
+//   0     the official logo builds on grainy black, the torn edge rips to the
+//         red: "The Awana Grand Prix is back."; the race (five shots, a
+//         slow-motion photo finish); "THIS YEAR, GROWN-UPS RACE TOO." / "Kids
+//         race first. Then Trek, Journey and adults race together."
+//   ~21   the RED end card: the logo, Kids, Trek, Journey & Adults, register by
+//         Sunday, Feb 28, build day Saturday, March 6, race day Saturday,
+//         March 20, 2:00 pm, the church's two-line logo; readable and still
+//         ~22.3 to 28.45.
+//   28.45 the lobby's own sun/orange waves rise and sweep the card away; from
+//         28.77 the picture IS the lobby's normal screen in the sky theme
+//         (video/grand-prix/concepts/lobby-plate-sky.png, identical in the
+//         render; ~0.3/255 after encoding), to the end.
 //
 // So it hands back to the lobby with nothing on screen changing (the
 // descriptor's `exit: 'seamless'`; ManualSlideshow and lobbyMotion.js do the
 // rest): once it is playing, the scene behind it comes to rest (`onScene({
 // rest })`: the sunflower wave's roll and the field's drift, all hidden under
-// it); at `homeAt`, inside the still end card, the scene's corner tab and
+// it); at `homeAt`, once the plate is fully drawn, the scene's corner tab and
 // house waves come home over it, exactly where the video draws them
 // (`onScene({ home })`); at its end it says so (`onFinished`), and the
 // slideshow moves on with an ordinary change: no stinger, the video fades
 // away over the identical lobby and the next slide's words land.
 //
 // Zero animation (?lowPower=1, reduced motion) and `still` play no video:
-// the end card at rest (`grand-prix-end.jpg`, the frame at 25.0 s) is the
-// finished poster, the M rule's last keyframe. A video that cannot play here,
-// errors, never starts or stalls falls back to that same picture for the
-// rest of the hold (never a black frame, never a wedge: the slideshow's cap,
-// durationSec + SEAMLESS_GRACE_SEC, ends the showing).
+// the red end card at rest (`grand-prix-end.jpg`, the frame at 25.0 s) is the
+// finished poster, the M rule's last keyframe. It is NOT the lobby, so the
+// chrome stays away over it (`home: false`); leaving it is the ordinary change
+// to the next slide. A video that cannot play here, errors, never starts or
+// stalls falls back to that same picture for the rest of the hold (never a
+// black frame, never a wedge: the slideshow's cap, durationSec +
+// SEAMLESS_GRACE_SEC, ends the showing).
 // ─────────────────────────────────────────────────────────────
 
 /** The video, beside the page (public/promos/; the site streams it with Range). */
@@ -46,11 +50,11 @@ export const GRAND_PRIX_SRC = './promos/grand-prix.mp4';
 export const GRAND_PRIX_STILL = './promos/grand-prix-end.jpg';
 
 /**
- * Seconds. `homeAt`: video time the chrome comes home over it (the lobby is
- * drawn, still, from ~21.5). `waitMax`: how long it may take to start once
+ * Seconds. `homeAt`: video time the chrome comes home over it (the lobby
+ * plate is fully drawn from 28.77; the red end card is up until 28.45). `waitMax`: how long it may take to start once
  * asked. `stall`: how long its clock may stand still while playing.
  */
-export const GRAND_PRIX = Object.freeze({ homeAt: 23, waitMax: 6, stall: 4 });
+export const GRAND_PRIX = Object.freeze({ homeAt: 28.87, waitMax: 6, stall: 4 });
 
 const TICK_MS = 50;
 
@@ -97,10 +101,11 @@ export default function GrandPrixPromo({
   // Decided at mount: a later change of `lead` (none is expected) never restarts it.
   const [leadSec] = useState(() => Math.max(0, Number(lead) || 0));
 
-  // The picture is the end card at rest, so the scene's chrome is home over it.
+  // The picture is the red end card at rest, not the lobby: the scene rests
+  // under it and its chrome stays away.
   const showStill = plain || failed;
   useEffect(() => {
-    if (showStill) live.current.onScene?.({ rest: true, home: true });
+    if (showStill) live.current.onScene?.({ rest: true, home: false });
   }, [showStill]);
 
   useEffect(() => {

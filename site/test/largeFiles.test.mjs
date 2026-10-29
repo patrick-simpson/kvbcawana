@@ -55,7 +55,7 @@ test('the lobby\'s 3D intro is committed, a web copy, and streamed with Range li
 test('the lobby\'s Grand Prix promo is committed, a small web copy with its end card, and streamed with Range', () => {
   const video = path.join(ROOT, 'lobby/public/promos/grand-prix.mp4');
   assert.ok(existsSync(video), 'lobby/public/promos/grand-prix.mp4 is committed');
-  // The flat brand cut: 30 s at 1080p60, about 4 MB.
+  // The gp-brand cut: 30 s at 1080p60, about 6.6 MB.
   assert.ok(statSync(video).size <= 8 * 1000 * 1000);
   const head = readFileSync(video).subarray(0, 64 * 1024);
   const moov = head.indexOf('moov');

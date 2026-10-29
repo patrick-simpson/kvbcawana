@@ -68,9 +68,10 @@ export const SEASON_PROMOS = [
   { id: 'promo_finalists', kind: 'finalists', eventDate: PARENTS_NIGHT, showFrom: '2026-10-28', durationSec: 21 },
   // The Awana Grand Prix, a 30 s video (owner 2026-10-29: "The flat brand one
   // is the one that I wanted to keep. Get that one set to show up on the
-  // displays starting in January."): from New Year's Day through race day.
-  // Its last second is the lobby's own sky screen at rest, so it hands back to
-  // the lobby with no stinger (GrandPrixPromo.jsx; video/grand-prix/).
+  // displays starting in January."; restyled the same day in Awana's official
+  // Grand Prix sub-brand): from New Year's Day through race day. Its last
+  // second is the lobby's own sky screen at rest, so it hands back to the
+  // lobby with no stinger (GrandPrixPromo.jsx; video/grand-prix/concepts/gp-brand/).
   {
     id: 'promo_grand_prix', kind: 'grandPrix', eventDate: '2027-03-20', showFrom: '2027-01-01', durationSec: 30,
     exit: 'seamless', theme: 'sky',

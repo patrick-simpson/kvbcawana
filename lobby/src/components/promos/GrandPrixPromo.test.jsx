@@ -72,7 +72,7 @@ describe('the Grand Prix promo (a video that ends on the lobby)', () => {
     expect(readFileSync(resolve(pub, 'promos/grand-prix-end.jpg')).subarray(0, 2)).toEqual(Buffer.from([0xff, 0xd8]));
   });
 
-  it('rests the scene once playing, brings the chrome home inside the still end card, and ends its own showing', () => {
+  it('rests the scene once playing, brings the chrome home once the lobby plate is drawn, and ends its own showing', () => {
     const calls = mount();
     expect(calls.scene).toEqual([]);
     at(0.1);
@@ -84,10 +84,11 @@ describe('the Grand Prix promo (a video that ends on the lobby)', () => {
     playTo(GRAND_PRIX.homeAt - 0.2);
     expect(calls.scene.at(-1)).toEqual({ rest: true, home: false });
     playTo(GRAND_PRIX.homeAt + 0.1);
-    // The lobby is drawn, still, from ~21.5 s: the chrome comes home over it.
+    // The lobby plate is fully drawn from 28.77 s (the red end card is up
+    // until 28.45): only then does the chrome come home over it.
     expect(calls.scene.at(-1)).toEqual({ rest: true, home: true });
-    expect(GRAND_PRIX.homeAt).toBeGreaterThan(21.5);
-    expect(GRAND_PRIX.homeAt).toBeLessThan(28);
+    expect(GRAND_PRIX.homeAt).toBeGreaterThan(28.77);
+    expect(GRAND_PRIX.homeAt).toBeLessThan(29);
     playTo(30);
     expect(calls.finished).toBe(0);
     media.ended = true;
@@ -106,12 +107,12 @@ describe('the Grand Prix promo (a video that ends on the lobby)', () => {
     expect(window.HTMLMediaElement.prototype.play).toHaveBeenCalledTimes(1);
   });
 
-  it('under zero animation shows the end card at rest, no video, with the chrome home over it', () => {
+  it('under zero animation shows the red end card at rest, no video, the chrome kept away (it is not the lobby)', () => {
     const calls = mount({}, true);
     expect(video()).toBeNull();
     expect(still().getAttribute('src')).toBe(GRAND_PRIX_STILL);
     expect(GRAND_PRIX_STILL).toBe('./promos/grand-prix-end.jpg');
-    expect(calls.scene).toEqual([{ rest: true, home: true }]);
+    expect(calls.scene).toEqual([{ rest: true, home: false }]);
     at(60);
     expect(calls.finished).toBe(0); // the slideshow's own hold ends it
   });
@@ -130,7 +131,7 @@ describe('the Grand Prix promo (a video that ends on the lobby)', () => {
     act(() => { video().dispatchEvent(new Event('error')); });
     expect(video()).toBeNull();
     expect(still()).not.toBeNull();
-    expect(calls.scene.at(-1)).toEqual({ rest: true, home: true });
+    expect(calls.scene.at(-1)).toEqual({ rest: true, home: false });
     expect(calls.finished).toBe(0);
   });
 

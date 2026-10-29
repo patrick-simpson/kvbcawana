@@ -4,7 +4,7 @@ import { liveChannel } from './liveChannel.js';
 // The Awana Grand Prix promo (src/components/promos/GrandPrixPromo.jsx), in a
 // real browser playing the committed video (public/promos/grand-prix.mp4) on
 // the real clock, through the deck: it comes in under the stinger on the sky
-// field, the scene's tab and waves come home under its end card, and it leaves
+// field, the scene's tab and waves come home under its last second (the lobby plate), and it leaves
 // for the next slide with NO stinger (its last second is the lobby itself).
 // The date is moved into its window (Tuesday 2027-01-05, flagship on air) for
 // this page only; the snow slide takes the slot's first lap, so the promo is
@@ -66,8 +66,8 @@ test('the Grand Prix plays on the sky, hands the tab and waves back under its en
   await expect(chrome(page)).toHaveClass(/lobby-chrome--away/);
   await page.evaluate(() => { window.__wave = document.querySelector('.slide-stinger'); });
   await expect.poll(() => video(page).evaluate((v) => !v.paused && v.currentTime > 0 && v.muted), { timeout: 10_000 }).toBe(true);
-  // Into its still end card (skipped ahead to save time): the tab and waves come home over it.
-  await video(page).evaluate((v) => { v.currentTime = 26; });
+  // Into its last second, the lobby plate (skipped ahead to save time): the tab and waves come home over it.
+  await video(page).evaluate((v) => { v.currentTime = 28.9; });
   await expect(chrome(page)).toHaveClass(/lobby-chrome--home/, { timeout: 5_000 });
   await expect(chrome(page)).not.toHaveClass(/lobby-chrome--away/);
   await expect(page.locator('.grand-prix-promo')).toBeVisible();
