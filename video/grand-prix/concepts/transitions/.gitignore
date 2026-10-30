@@ -1,0 +1,12 @@
+# Only the scripts are source: frames, masks, renders, blends and debug
+# images are rebuilt by them (torn-poster alone is ~2 GB of frames).
+*
+!*/
+!.gitignore
+!*.py
+!*.mjs
+!*.js
+!*.md
+!*.html
+!calib.json
+__pycache__/

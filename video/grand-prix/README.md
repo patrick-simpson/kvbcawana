@@ -29,18 +29,38 @@ brand one is the one that I wanted to keep. Get that one set to show up on the
 displays starting in January.", then, the same day, restyled in Awana's
 official Grand Prix sub-brand with permission to use its logos and graphics:
 "make it epic and extremely well produced").
-`output/gp-brand/grand-prix-1080p60.mp4` (30 s, 1920x1080, 60 fps, silent;
-its red end card at rest 22.3 to 28.45 s, then the lobby's own waves sweep it
-away and from 28.77 s to the end it is the lobby's sky screen at rest,
-`concepts/lobby-plate-sky.png`) is committed as
+`output/gp-brand/grand-prix-torn-1080p60.mp4` (the torn cut, 2026-10-29:
+33.68 s = 2021 frames, 1920x1080, 60 fps, silent, ~10.3 MB; it opens on the
+lobby's sky screen at rest, `concepts/lobby-plate-sky.png`, still until 1.0 s,
+then the plate tears like paper onto the film; its red end card is at rest
+~24 to 30.5 s; then the torn halves fly back, the tear heals, and from 32.75 s
+to the end it is the plate again) is committed as
 `lobby/public/promos/grand-prix.mp4`, with its red end card at rest (the frame
-at 25.0 s) as `lobby/public/promos/grand-prix-end.jpg`. It is the season promo
+at 27.5 s) as `lobby/public/promos/grand-prix-end.jpg`. It is the season promo
 `promo_grand_prix` (2027-01-01 through race day 2027-03-20;
-`lobby/src/components/promos/GrandPrixPromo.jsx`, `GRAND_PRIX.homeAt` 28.87 s;
-CLAUDE.md "Season promos, snow alerts, flagship"). A new cut must keep its
-last second exactly the lobby plate (and `homeAt` just after the plate is
-fully drawn), or the hand-back to the lobby will show: copy both files again
-and re-measure the seam.
+`lobby/src/components/promos/GrandPrixPromo.jsx`, `GRAND_PRIX.homeAt` 32.85 s,
+`openPlate` 1.0 s, `durationSec` 2021 / 60; CLAUDE.md "Season promos, snow
+alerts, flagship"). Measured in Chrome against the plate: 0.32/255 for its
+first second, 0.31/255 for its last. A new cut must keep its first and last
+second exactly the lobby plate (and `homeAt` just after the closing plate is
+fully drawn), or the hand-over will show: copy both files again, retime
+`GRAND_PRIX`, and re-measure both seams. The earlier gp-brand cut
+(`output/gp-brand/grand-prix-1080p60.mp4`, 30 s, which only ENDED on the
+plate) is kept for reference.
+
+The lobby also brings it IN with no stinger (`enter: 'seamless'` on the
+descriptor): the scene's drifting pieces come to rest during the last 3 s of
+the slide before it, that slide hands off as usual, and as soon as its words
+have gone (about 0.35 s) the video, paused on its first frame, fades in over
+it (0.15 s), takes the tab and waves over, then plays. So a cut
+must also OPEN on exactly the lobby plate, held still for at least
+`GRAND_PRIX.openPlate` (the hand-over is done about 0.3 s in). The torn cut
+(`output/gp-brand/grand-prix-torn-1080p60.mp4`, ~1.0 s of plate, the tear,
+the film, the tear closing, ~1.0 s of plate) is made for this. Both seams are
+measured in Chrome at 1920x1080 by `lobby/e2e/grand-prix-promo.events.spec.js`
+(it prints them; `GP_ENTRANCE_SEAM=1` asserts the entrance). Measured
+2026-10-29 with the torn cut: entrance 1.01/255, exit 0.51/255, the lobby on
+its empty plate 30 ms between the last words leaving and the video showing.
 
 Its source is `concepts/gp-brand/` (one canvas drawn from a time value,
 captured in Chrome; the official logo, torn brush edge, grain and starburst
@@ -53,7 +73,7 @@ catalog, which the owner has):
     python extract_assets.py && python build_assets_js.py   # assets/ from the catalog PDF
     node capture.mjs hd 6                                   # 1800 PNG frames (scratch-intro/gp/gp-brand/frames1080)
     GP_CRF=MEDIUM blender --factory-startup -b -P encode.py -- _ ../../output/gp-brand/grand-prix-1080p60.mp4 hd
-    node measure.mjs ../../output/gp-brand/grand-prix-1080p60.mp4 28.8 29.98 0.0833   # vs the lobby plate
+    node measure.mjs ../../output/gp-brand/grand-prix-torn-1080p60.mp4 32.75 33.68 0.0833   # vs the lobby plate (and 0 0.98 for the opening)
 
 (`node capture.mjs` without `hd` makes the 960x540 30 fps check.) The older
 flat-brand cut (`concepts/flat-brand/`) and the Blender film below are kept
