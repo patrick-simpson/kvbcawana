@@ -188,9 +188,34 @@ describe('nextTransition', () => {
     expect(edited).toMatchObject({ key: '0:a', theme: 'night', special: true, via: 'boot', wipes: 0, swells: 0 });
   });
 
-  // A promo whose last frame IS the lobby at rest (the Grand Prix video,
-  // src/lib/promos.js `exit: 'seamless'`): it still comes in under the
-  // stinger, but leaves like an ordinary slide, and the field wears its theme.
+  // A promo whose first AND last frames are the lobby at rest (the Grand Prix
+  // video, src/lib/promos.js `enter` + `exit: 'seamless'`): no stinger either
+  // way. In, the words lift away as on any change (no swell: it is not words
+  // to words) and the field turns to its theme; out, it reveals.
+  it('a seamless-enter, seamless-exit slide comes and goes with no stinger, the field in its theme', () => {
+    const a = firstTransition(showing('0:a', { theme: 'night' }));
+    const promo = nextTransition(a, showing('1:p', { kind: 'promo', special: true, theme: 'sky', exit: 'seamless', enter: 'seamless' }));
+    expect(promo).toMatchObject({ via: 'handoff', wipe: false, wipes: 0, swells: 0, theme: 'sky', exit: 'seamless', enter: 'seamless' });
+    const after = nextTransition(promo, showing('2:b', { theme: 'sky' }));
+    expect(after).toMatchObject({ via: 'reveal', wipe: false, wipes: 0, swells: 0, theme: 'sky' });
+    expect(after.enter).toBeUndefined();
+    expect(after.exit).toBeUndefined();
+    // After a video or the flagship (a picture, not words) it reveals in.
+    const fromPicture = nextTransition(firstTransition(showing('0:f', { kind: 'flagship' })), showing('1:p', { kind: 'promo', special: true, theme: 'sky', exit: 'seamless', enter: 'seamless' }));
+    expect(fromPicture).toMatchObject({ via: 'reveal', wipe: false, wipes: 0, theme: 'sky' });
+    // Out of a held slide it still wipes: that slide wants the stinger.
+    const held = nextTransition(a, showing('1:h', { special: true }));
+    expect(nextTransition(held, showing('2:p', { kind: 'promo', special: true, theme: 'sky', exit: 'seamless', enter: 'seamless' })))
+      .toMatchObject({ via: 'wipe', wipe: true, wipes: 2 });
+    // An edit in place that only adds or drops `enter` takes the fact, plays nothing.
+    const edited = nextTransition(promo, showing('1:p', { kind: 'promo', special: true, theme: 'sky', exit: 'seamless' }));
+    expect(edited).toMatchObject({ wipes: 0, swells: 0, via: 'handoff' });
+    expect(edited.enter).toBeUndefined();
+  });
+
+  // Without `enter` (and so under zero animation, where ManualSlideshow leaves
+  // it off): it still comes in under the stinger, but leaves like an ordinary
+  // slide, and the field wears its theme.
   it('a seamless-exit slide wipes in, wears its own theme, and leaves without the stinger', () => {
     const a = firstTransition(showing('0:a', { theme: 'night' }));
     const promo = nextTransition(a, showing('1:p', { kind: 'promo', special: true, theme: 'sky', exit: 'seamless' }));

@@ -6,7 +6,7 @@ import {
   HANDOFF, STINGER_SEC, SWAP_AT, firstTransition, holdThenLand, holdThenLeave, nextTransition,
 } from '../lib/lobbyMotion.js';
 import { slideFrame } from '../lib/lobbyFrame.js';
-import CatalogScene from './CatalogScene.jsx';
+import CatalogScene, { AMBIENT_REST_MS } from './CatalogScene.jsx';
 import SlideCopy from './SlideCopy.jsx';
 import Wave from './brand/Wave.jsx';
 import PromoSlide from './PromoSlide.jsx';
@@ -191,11 +191,17 @@ export default function ManualSlideshow({ slides, slideshowDelaySec, clubTint = 
   // rest and its chrome home under it (`promoScene`), and ends its own
   // showing (`promoFinished`), the hold only a cap.
   const seamless = kind === 'promo' && promo?.exit === 'seamless';
+  const zero = useContext(ZeroAnimationContext);
+  // ...and one that also STARTS on it (`enter: 'seamless'`): with motion on,
+  // coming in is an ordinary change too (the words lift away, the field turns
+  // to its theme, the scene comes to rest), and it appears over the identical
+  // picture, then takes the tab and waves over (`promoScene` `shown`). With no
+  // motion it is the end card still: in under the stinger (a cut, then).
+  const seamlessIn = seamless && promo?.enter === 'seamless' && !zero && !still;
   const theme = seamless && promo.theme ? promo.theme : resolveTheme(slide, safe);
   const transition = useSlideTransition(seamless
-    ? { key: slideKey, special, kind, theme, exit: 'seamless' }
+    ? { key: slideKey, special, kind, theme, exit: 'seamless', ...(seamlessIn ? { enter: 'seamless' } : null) }
     : { key: slideKey, special, kind, theme });
-  const zero = useContext(ZeroAnimationContext);
 
   // Now and then the flagship carries on into the 3D intro video (src/lib/
   // flagship.js, FlagshipIntro.jsx): on the passes flagshipIntroLap picks, with
@@ -213,10 +219,41 @@ export default function ManualSlideshow({ slides, slideshowDelaySec, clubTint = 
   const [handOver, setHandOver] = useState({ key: '', away: false, rest: false });
   const handedOver = handOver.key === slideKey && handOver.away;
   // The seamless promo's word on the scene behind it, for its own showing.
-  const [promoState, setPromoState] = useState({ key: '', rest: false, home: false });
+  const [promoState, setPromoState] = useState({ key: '', rest: false, home: false, shown: false });
   const promoRest = seamless && promoState.key === slideKey && promoState.rest;
   const promoHome = seamless && promoState.key === slideKey && promoState.home;
-  const ambientRest = (handOver.key === slideKey && handOver.rest) || promoRest;
+  const promoShown = seamless && promoState.key === slideKey && promoState.shown;
+
+  // The slide AFTER this one, as the deck will step to it (past an empty lap).
+  // When it is a promo that comes in over the lobby itself (`enter:
+  // 'seamless'`), the scene's ambient loops start coming to rest during this
+  // slide's last AMBIENT_REST_MS (`preRest`, under its words: a slowing drift
+  // is barely seen), so the promo finds the plate already at rest and appears
+  // as soon as these words have gone, rather than ~3 s later. Only on a timed
+  // showing that is not itself held (that one leaves under the stinger), never
+  // while names are up (the loops are let go meanwhile, and taken again when
+  // the slide's clock runs on), and only for that very next showing: an edited
+  // deck, or a lap the promo is skipped on, lets them go
+  // (CatalogScene: resumeFromRest).
+  const nextAt = slides.length > 1 ? nextStep(step, slides) : step;
+  const nextSlide = slides.length ? slides[nextAt % slides.length] : null;
+  const nextPromo = isPromoSlide(nextSlide) ? promoForLap(nextSlide, Math.floor(nextAt / slides.length), slides.length) : null;
+  const nextKey = `${nextAt}:${nextSlide?.id ?? ''}`;
+  const nextEntersSeamless = !zero && !still && !special && slides.length > 1
+    && nextPromo?.exit === 'seamless' && nextPromo?.enter === 'seamless';
+  const [preRest, setPreRest] = useState({ from: '', to: '' });
+  const preRestNow = nextEntersSeamless && !paused && preRest.from === slideKey && preRest.to === nextKey;
+  // ...carried on into the promo's own showing (its `rest` takes over).
+  const preRestCarried = seamlessIn && preRest.to === slideKey;
+  const ambientRest = (handOver.key === slideKey && handOver.rest) || promoRest || preRestNow || preRestCarried;
+  const fieldRest = promoRest || preRestNow || preRestCarried;
+  // A seamless-in promo that did come in on an ordinary change (after a held
+  // slide the stinger still brings it) never sends the chrome aside: it stays
+  // home until the picture is fully over it, then steps away under it by
+  // opacity (the same hand-over as the flagship intro's), and comes back at
+  // `home`.
+  const enteredSeamless = seamlessIn && !transition.wipe;
+  const promoHandedOver = enteredSeamless && promoShown && !promoHome;
 
   // A seamless promo with motion on ends itself (its video's end); its own
   // hold plus SEAMLESS_GRACE_SEC is only the cap that keeps a late or stalled
@@ -247,6 +284,19 @@ export default function ManualSlideshow({ slides, slideshowDelaySec, clubTint = 
     };
   }, [holdMs, slideKey, paused, advance]);
 
+  // The early rest before a seamless-in promo (`preRest` above): armed on the
+  // same pausable clock, AMBIENT_REST_MS before this slide's hold ends.
+  useEffect(() => {
+    if (!nextEntersSeamless || holdMs == null || paused) return undefined;
+    const t = timing.current;
+    const spent = t.key === slideKey ? t.spent + (performance.now() - t.startedAt) : 0;
+    const timer = setTimeout(
+      () => setPreRest({ from: slideKey, to: nextKey }),
+      Math.max(0, holdMs - AMBIENT_REST_MS - spent),
+    );
+    return () => clearTimeout(timer);
+  }, [nextEntersSeamless, holdMs, paused, slideKey, nextKey]);
+
   // A video that ends while names are up waits for them before advancing.
   const pending = useRef(false);
   const pausedNow = useRef(paused);
@@ -276,8 +326,10 @@ export default function ManualSlideshow({ slides, slideshowDelaySec, clubTint = 
     if (keyNow.current === slideKey) finishVideo();
   };
   // The seamless promo's two callbacks, guarded the same way.
-  const promoScene = (/** @type {{ rest: boolean, home: boolean }} */ state) => {
-    if (keyNow.current === slideKey) setPromoState({ key: slideKey, rest: state.rest, home: state.home });
+  const promoScene = (/** @type {{ rest: boolean, home: boolean, shown?: boolean }} */ state) => {
+    if (keyNow.current === slideKey) {
+      setPromoState({ key: slideKey, rest: state.rest, home: state.home, shown: state.shown !== false });
+    }
   };
   const promoFinished = () => {
     if (keyNow.current === slideKey) finishVideo();
@@ -311,13 +363,13 @@ export default function ManualSlideshow({ slides, slideshowDelaySec, clubTint = 
         // waves every other slide has); only a video or a poster covers it,
         // until a seamless promo, ending on the lobby, brings it home over
         // itself, fading in over the identical picture.
-        chromeAway={(kind === 'video' || kind === 'promo') && !promoHome}
+        chromeAway={(kind === 'video' || kind === 'promo') && !promoHome && !enteredSeamless}
         // ...but its small logo steps aside while the flagship's big one is
         // up: the same mark twice on one screen reads as a doubling.
         logoAway={kind === 'flagship'}
-        chromeHandedOver={handedOver}
+        chromeHandedOver={handedOver || promoHandedOver}
         ambientRest={ambientRest}
-        fieldRest={promoRest}
+        fieldRest={fieldRest}
         chromeVia={promoHome ? 'reveal' : transition.via}
         swell={transition.swells}
         clubTint={clubTint}
@@ -364,6 +416,8 @@ export default function ManualSlideshow({ slides, slideshowDelaySec, clubTint = 
                 promo={promo}
                 still={still}
                 lead={transition.wipe ? SWAP_AT : 0}
+                enter={enteredSeamless}
+                theme={theme}
                 onScene={seamless ? promoScene : undefined}
                 onFinished={seamless && slides.length > 1 ? promoFinished : undefined}
               />

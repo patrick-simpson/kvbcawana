@@ -7,14 +7,14 @@ import PromoSlide, { detailsFor } from '../PromoSlide.jsx';
 import { ZeroAnimationContext } from '../../lib/motion.jsx';
 import { previewPromo } from '../../lib/promos.js';
 
-// The Awana Grand Prix: a 30 s video that ends on the lobby's own screen at
+// The Awana Grand Prix: a 33.68 s video that starts and ends on the lobby's own screen at
 // rest. jsdom plays no media: the <video>'s state is this object, driven by hand.
 let media;
-const props = ['currentTime', 'paused', 'ended', 'duration'];
+const props = ['currentTime', 'paused', 'ended', 'duration', 'readyState'];
 
 beforeEach(() => {
   vi.useFakeTimers();
-  media = { currentTime: 0, paused: true, ended: false, duration: 30, canPlay: 'probably' };
+  media = { currentTime: 0, paused: true, ended: false, duration: 2021 / 60, readyState: 4, canPlay: 'probably' };
   const proto = window.HTMLMediaElement.prototype;
   for (const p of props) {
     Object.defineProperty(proto, p, { configurable: true, get: () => media[p], set: (v) => { media[p] = v; } });
@@ -80,16 +80,16 @@ describe('the Grand Prix promo (a video that ends on the lobby)', () => {
     media.currentTime = 0.05;
     at(0.1);
     // Playing: the scene behind it (hidden under it) comes to rest.
-    expect(calls.scene.at(-1)).toEqual({ rest: true, home: false });
+    expect(calls.scene.at(-1)).toEqual({ rest: true, home: false, shown: true });
     playTo(GRAND_PRIX.homeAt - 0.2);
-    expect(calls.scene.at(-1)).toEqual({ rest: true, home: false });
+    expect(calls.scene.at(-1)).toEqual({ rest: true, home: false, shown: true });
     playTo(GRAND_PRIX.homeAt + 0.1);
-    // The lobby plate is fully drawn from 28.77 s (the red end card is up
-    // until 28.45): only then does the chrome come home over it.
-    expect(calls.scene.at(-1)).toEqual({ rest: true, home: true });
-    expect(GRAND_PRIX.homeAt).toBeGreaterThan(28.77);
-    expect(GRAND_PRIX.homeAt).toBeLessThan(29);
-    playTo(30);
+    // The closing plate is fully drawn from 32.75 s (the tear heals at
+    // 32.3): only then does the chrome come home over it.
+    expect(calls.scene.at(-1)).toEqual({ rest: true, home: true, shown: true });
+    expect(GRAND_PRIX.homeAt).toBeGreaterThan(32.75);
+    expect(GRAND_PRIX.homeAt).toBeLessThan(33);
+    playTo(33.6);
     expect(calls.finished).toBe(0);
     media.ended = true;
     at(0.1);
@@ -112,7 +112,7 @@ describe('the Grand Prix promo (a video that ends on the lobby)', () => {
     expect(video()).toBeNull();
     expect(still().getAttribute('src')).toBe(GRAND_PRIX_STILL);
     expect(GRAND_PRIX_STILL).toBe('./promos/grand-prix-end.jpg');
-    expect(calls.scene).toEqual([{ rest: true, home: false }]);
+    expect(calls.scene).toEqual([{ rest: true, home: false, shown: true }]);
     at(60);
     expect(calls.finished).toBe(0); // the slideshow's own hold ends it
   });
@@ -131,7 +131,7 @@ describe('the Grand Prix promo (a video that ends on the lobby)', () => {
     act(() => { video().dispatchEvent(new Event('error')); });
     expect(video()).toBeNull();
     expect(still()).not.toBeNull();
-    expect(calls.scene.at(-1)).toEqual({ rest: true, home: false });
+    expect(calls.scene.at(-1)).toEqual({ rest: true, home: false, shown: true });
     expect(calls.finished).toBe(0);
   });
 
@@ -157,6 +157,84 @@ describe('the Grand Prix promo (a video that ends on the lobby)', () => {
     expect(video()).not.toBeNull();
     at(GRAND_PRIX.stall + 0.5); // a stalled download: its clock stands still
     expect(still()).not.toBeNull();
+  });
+
+  // Coming in over the lobby itself (`enter: 'seamless'`): its first second is
+  // the lobby plate, so it waits, paused and unseen, for the scene to be that
+  // plate at rest, then fades in, takes the tab and waves over, and plays.
+  describe('coming in over the lobby (`enter`)', () => {
+    const shownNow = () => video()?.classList.contains('is-shown') ?? false;
+
+    it('waits unseen for the scene to rest, fades in, hands the chrome over, then plays inside its opening plate', () => {
+      let ready = false;
+      const calls = mount({ enter: true, sceneReady: () => ready });
+      // The scene starts coming to rest at once; the video is not seen.
+      expect(calls.scene).toEqual([{ rest: true, home: false, shown: false }]);
+      expect(video().autoplay).toBe(false);
+      expect(document.querySelector('.grand-prix-promo--enter')).not.toBeNull();
+      at(2);
+      expect(shownNow()).toBe(false);
+      expect(window.HTMLMediaElement.prototype.play).not.toHaveBeenCalled();
+      ready = true;
+      at(0.05);
+      // Over the identical picture: shown, still paused on its first frame, the chrome still home.
+      expect(shownNow()).toBe(true);
+      expect(calls.scene.at(-1)).toEqual({ rest: true, home: false, shown: false });
+      expect(window.HTMLMediaElement.prototype.play).not.toHaveBeenCalled();
+      at(GRAND_PRIX.fade);
+      // Fully in: the scene's tab and waves step away under it.
+      expect(calls.scene.at(-1)).toEqual({ rest: true, home: false, shown: true });
+      expect(window.HTMLMediaElement.prototype.play).not.toHaveBeenCalled();
+      at(GRAND_PRIX.fade);
+      expect(window.HTMLMediaElement.prototype.play).toHaveBeenCalledTimes(1);
+      // All of it well inside the opening plate, before the tear.
+      expect(GRAND_PRIX.fade * 2 + 0.1).toBeLessThan(GRAND_PRIX.openPlate);
+      media.currentTime = 0.05;
+      at(0.1);
+      playTo(GRAND_PRIX.homeAt + 0.1);
+      expect(calls.scene.at(-1)).toEqual({ rest: true, home: true, shown: true });
+      media.ended = true;
+      at(0.1);
+      expect(calls.finished).toBe(1);
+    });
+
+    it('waits for the video to be able to play, too', () => {
+      media.readyState = 1;
+      mount({ enter: true, sceneReady: () => true });
+      at(1);
+      expect(shownNow()).toBe(false);
+      media.readyState = 4;
+      at(0.1);
+      expect(shownNow()).toBe(true);
+    });
+
+    it('not ready by waitMax: the lobby kept its own plate until then, and the end card comes up over it', () => {
+      const calls = mount({ enter: true, sceneReady: () => false });
+      at(GRAND_PRIX.waitMax - 0.2);
+      expect(still()).toBeNull();
+      expect(calls.scene).toEqual([{ rest: true, home: false, shown: false }]);
+      at(0.4);
+      expect(video()).toBeNull();
+      expect(still().classList.contains('grand-prix-promo__still--fade')).toBe(true);
+      expect(calls.scene.at(-1)).toEqual({ rest: true, home: false, shown: true });
+      expect(calls.finished).toBe(0);
+    });
+
+    it('an error once it was seen is a cut to the end card, as before', () => {
+      mount({ enter: true, sceneReady: () => true });
+      at(0.5);
+      media.currentTime = 0.2;
+      at(0.1);
+      act(() => { video().dispatchEvent(new Event('error')); });
+      expect(still().classList.contains('grand-prix-promo__still--fade')).toBe(false);
+    });
+
+    it('under zero animation `enter` changes nothing: the end card, the chrome away', () => {
+      const calls = mount({ enter: true, sceneReady: () => true }, true);
+      expect(video()).toBeNull();
+      expect(still().classList.contains('grand-prix-promo__still--fade')).toBe(false);
+      expect(calls.scene).toEqual([{ rest: true, home: false, shown: true }]);
+    });
   });
 
   it('says the end card\'s facts, no em dashes, and PromoSlide plays it for its kind', () => {

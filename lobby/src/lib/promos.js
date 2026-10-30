@@ -47,9 +47,18 @@ import { dateKey } from './time.js';
  *   scene behind it wears `theme`, its ambient loops come to rest, the chrome
  *   comes home under it before its end, and it ends its own showing, the
  *   hold being only a cap (ManualSlideshow, SEAMLESS_GRACE_SEC).
- * @property {string} [theme] The lobby theme its last frame is drawn in
- *   (with `exit: 'seamless'`).
+ * @property {'seamless'} [enter] The promo also STARTS on the lobby itself
+ *   (with `exit: 'seamless'`): its first frame is that same screen at rest,
+ *   so coming in is an ordinary change too, never the stinger: the words
+ *   lift away, the field turns to `theme`, the scene comes to rest, and only
+ *   then does it appear over the identical picture (GrandPrixPromo.jsx).
+ * @property {string} [theme] The lobby theme its last (and with `enter`,
+ *   first) frame is drawn in (with `exit: 'seamless'`).
  */
+
+// The Grand Prix video's length, to the frame: 2021 frames at 60 fps (the torn
+// cut, video/grand-prix/output/gp-brand/grand-prix-torn-1080p60.mp4).
+export const GRAND_PRIX_SEC = 2021 / 60;
 
 // Parents' Night, where the finalists are voted on (PARENTS_DATE below is the same day).
 const PARENTS_NIGHT = '2026-11-04';
@@ -66,15 +75,16 @@ export const SEASON_PROMOS = [
   // from the day they were picked through the vote at Parents' Night. Its own
   // 21 s: six posters take their bow, each with its epic zoom, before the call (FinalistsPromo.jsx).
   { id: 'promo_finalists', kind: 'finalists', eventDate: PARENTS_NIGHT, showFrom: '2026-10-28', durationSec: 21 },
-  // The Awana Grand Prix, a 30 s video (owner 2026-10-29: "The flat brand one
+  // The Awana Grand Prix, a 33.68 s video (owner 2026-10-29: "The flat brand one
   // is the one that I wanted to keep. Get that one set to show up on the
   // displays starting in January."; restyled the same day in Awana's official
-  // Grand Prix sub-brand): from New Year's Day through race day. Its last
-  // second is the lobby's own sky screen at rest, so it hands back to the
-  // lobby with no stinger (GrandPrixPromo.jsx; video/grand-prix/concepts/gp-brand/).
+  // Grand Prix sub-brand): from New Year's Day through race day. Its first
+  // and last second are the lobby's own sky screen at rest, so it takes over
+  // from the lobby and hands back to it with no stinger either way
+  // (GrandPrixPromo.jsx; video/grand-prix/concepts/gp-brand/).
   {
-    id: 'promo_grand_prix', kind: 'grandPrix', eventDate: '2027-03-20', showFrom: '2027-01-01', durationSec: 30,
-    exit: 'seamless', theme: 'sky',
+    id: 'promo_grand_prix', kind: 'grandPrix', eventDate: '2027-03-20', showFrom: '2027-01-01', durationSec: GRAND_PRIX_SEC,
+    exit: 'seamless', enter: 'seamless', theme: 'sky',
   },
 ];
 
@@ -178,6 +188,7 @@ export function countdownLabel(n, todayStr, eventDate) {
  * @property {boolean} afterContest
  * @property {number} durationSec
  * @property {'seamless'} [exit] see SeasonPromo
+ * @property {'seamless'} [enter] see SeasonPromo
  * @property {string} [theme] see SeasonPromo
  * @property {import('./snowAlerts.js').SnowOutlook|null} [snow] the snow-alerts slide only
  */
@@ -358,12 +369,13 @@ export function previewPromo(key, events, todayStr, specialDates = null) {
 }
 
 /**
- * A promo's `exit` and `theme`, only when it has them (most do not, and their
- * descriptors keep the shape they always had).
+ * A promo's `exit`, `enter` and `theme`, only when it has them (most do not,
+ * and their descriptors keep the shape they always had).
  * @param {SeasonPromo} p
  */
 function ending(p) {
-  return p.exit ? { exit: p.exit, theme: p.theme || 'sky' } : {};
+  if (!p.exit) return {};
+  return p.enter ? { exit: p.exit, enter: p.enter, theme: p.theme || 'sky' } : { exit: p.exit, theme: p.theme || 'sky' };
 }
 
 /** @param {string} dateStr */

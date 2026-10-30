@@ -14,3 +14,27 @@
   object-fit: cover;
   pointer-events: none;
 }
+
+/* Coming in over the lobby itself (`.grand-prix-promo--enter`, the descriptor's
+   `enter: 'seamless'`): the video stays unseen, paused on its first frame (the
+   lobby plate), until the scene under it is that plate at rest, then fades in
+   over it (`is-shown`, GRAND_PRIX.fade via --gp-fade) between identical
+   frames, under the scene's tab and waves, which then step away (app.css
+   .lobby-chrome--handed-over). Never under zero animation (no video then). */
+.grand-prix-promo--enter .grand-prix-promo__video {
+  opacity: 0;
+  transition: opacity var(--gp-fade, 0.15s) linear;
+}
+.grand-prix-promo--enter .grand-prix-promo__video.is-shown {
+  opacity: 1;
+}
+/* The fallback when it never got going: the end card comes up over the lobby
+   rather than cutting in. Its resting frame is the card fully drawn, which is
+   what the zero-animation rule shows. */
+.grand-prix-promo__still--fade {
+  animation: grand-prix-still-in 0.64s ease-in-out both;
+}
+@keyframes grand-prix-still-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}

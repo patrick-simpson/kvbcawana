@@ -55,8 +55,13 @@ test('the lobby\'s 3D intro is committed, a web copy, and streamed with Range li
 test('the lobby\'s Grand Prix promo is committed, a small web copy with its end card, and streamed with Range', () => {
   const video = path.join(ROOT, 'lobby/public/promos/grand-prix.mp4');
   assert.ok(existsSync(video), 'lobby/public/promos/grand-prix.mp4 is committed');
-  // The gp-brand cut: 30 s at 1080p60, about 6.6 MB.
-  assert.ok(statSync(video).size <= 8 * 1000 * 1000);
+  // The torn cut: 33.7 s at 1080p60, about 10.3 MB (the paper tear's grain and
+  // fine edges cost more bits than the flat cut's 6.6 MB). This cap is only a
+  // guard against committing a lossless render by mistake (hundreds of MB), as
+  // the intro's is: the file is never uploaded to Pages (no 25 MiB limit) but
+  // streamed by the Function from raw.githubusercontent.com, so the real
+  // ceiling is GitHub's 100 MB a file (50 MB warns). Raised 2026-10-29.
+  assert.ok(statSync(video).size <= 14 * 1000 * 1000);
   const head = readFileSync(video).subarray(0, 64 * 1024);
   const moov = head.indexOf('moov');
   assert.ok(moov > 0 && (head.indexOf('mdat') === -1 || moov < head.indexOf('mdat')), 'moov before mdat');

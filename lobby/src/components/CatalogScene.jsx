@@ -1,4 +1,4 @@
-import { useContext, useEffect, useRef, useState } from 'react';
+import { useContext, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { AnimatePresence, useIsPresent } from 'framer-motion';
 import { M, ZeroAnimationContext } from '../lib/motion.jsx';
 import { DOODLES, EASE, SHAPES } from '../lib/brand.js';
@@ -6,7 +6,7 @@ import {
   HANDOFF, SWAP_AT, chromeMove, chromeSpot, holdThenLand, holdThenLeave, swellKeyframes,
 } from '../lib/lobbyMotion.js';
 import { LOBBY_THEMES, lobbyTheme } from '../lib/lobbyFrame.js';
-import { ambientLoops, cssAnimation, resumeFromRest, settleToRest } from '../lib/ambientRest.js';
+import { ambientLoops, cssAnimation, holdAtRest, resumeFromRest, settleToRest } from '../lib/ambientRest.js';
 import CornerTab from './brand/CornerTab.jsx';
 import Wave from './brand/Wave.jsx';
 import ChurchLogo from './brand/ChurchLogo.jsx';
@@ -107,16 +107,24 @@ function Field({ theme, wipe, animated, rest = false }) {
   // The clouds' drift and the doodles' float and twinkle, brought to rest
   // while asked (a promo that ends on this field at rest is up over it,
   // GrandPrixPromo.jsx) and let go after, from where they rest.
+  // A field that APPEARS while asked to rest (the scene already resting for a
+  // promo that starts on the lobby, ManualSlideshow `preRest`) starts at rest
+  // (holdAtRest): it fades in over a field at rest, the same picture.
   const root = useRef(/** @type {HTMLDivElement | null} */ (null));
-  useEffect(() => {
+  const [bornResting] = useState(rest);
+  const firstRest = useRef(true);
+  useLayoutEffect(() => {
     if (!rest || !animated) return undefined;
     const loops = ambientLoops(root.current);
-    const cancels = loops.map((loop) => settleToRest(loop, AMBIENT_REST_MS));
+    const snap = bornResting && firstRest.current;
+    firstRest.current = false;
+    if (snap) loops.forEach(holdAtRest);
+    const cancels = snap ? [] : loops.map((loop) => settleToRest(loop, AMBIENT_REST_MS));
     return () => {
       cancels.forEach((cancel) => cancel());
       loops.forEach(resumeFromRest);
     };
-  }, [rest, animated]);
+  }, [rest, animated, bornResting]);
   // How long after page load this field appeared: its loops start that far
   // in, so they run in step with every other field's.
   const [phase] = useState(sinceEpoch);
@@ -273,7 +281,8 @@ export default function CatalogScene({
   logoAway = false,
   // The flagship's 3D intro: its video is drawing the tab and the waves, so
   // the scene's own step aside (app.css .lobby-chrome--handed-over), and the
-  // rolling wave comes to rest before it takes them (FlagshipIntro.jsx).
+  // rolling wave comes to rest before it takes them (FlagshipIntro.jsx). The
+  // Grand Prix coming in over the lobby does the same (GrandPrixPromo.jsx).
   chromeHandedOver = false, ambientRest = false,
   // A promo that ends on this scene at rest (GrandPrixPromo.jsx) is up over
   // it: the field's clouds and doodles come to rest too, so the picture

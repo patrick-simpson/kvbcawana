@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { ambientLoops, cssAnimation, restPlan, resumeFromRest, settleToRest } from './ambientRest.js';
+import { ambientLoops, cssAnimation, holdAtRest, restPlan, resumeFromRest, settleToRest } from './ambientRest.js';
 import { AMBIENT_REST_MS } from '../components/CatalogScene.jsx';
 import { FLAGSHIP_INTRO } from './flagship.js';
 
@@ -55,6 +55,20 @@ describe('bringing the rolling wave to rest', () => {
     resumeFromRest(/** @type {any} */ (anim));
     expect(anim.play).toHaveBeenCalled();
     expect(anim.playbackRate).toBe(1);
+  });
+
+  it('a field that appears while the scene rests starts AT rest: on the nearest loop end at once, then carries on', () => {
+    const anim = fakeLoop({ progress: 0.7 });
+    holdAtRest(anim);
+    expect(anim.pause).toHaveBeenCalledTimes(1);
+    expect(anim.playbackRate).toBe(1);
+    expect(anim.currentTime).toBe(-7000 + 4 * 18000); // the end of its fourth loop, nearer than the third's
+    resumeFromRest(anim);
+    expect(anim.play).toHaveBeenCalledTimes(1);
+    const idle = fakeLoop({ progress: 0.7, playState: 'paused' });
+    holdAtRest(idle);
+    expect(idle.pause).not.toHaveBeenCalled();
+    holdAtRest(null);
   });
 
   it('leaves alone what is not rolling (zero animation, reduced motion, no Web Animations)', () => {

@@ -115,8 +115,8 @@ describe('the promo holds', () => {
   // A promo still carries its OWN hold, which is what the slideshow reads.
   it('gives every descriptor in the table its own duration', () => {
     // The finalists' showreel is 21 s: six posters take their bow (each with its zoom) before the call.
-    // The Grand Prix is a 30 s video.
-    expect(SEASON_PROMOS.map((p) => p.durationSec)).toEqual([15, 15, 15, 15, 21, 30]);
+    // The Grand Prix is a 33.68 s video (the torn cut, 2021 frames at 60 fps).
+    expect(SEASON_PROMOS.map((p) => p.durationSec)).toEqual([15, 15, 15, 15, 21, 2021 / 60]);
   });
 });
 
@@ -218,7 +218,7 @@ describe('buildPromoSlot', () => {
     expect(kinds('2027-03-21')).toEqual([]);
     const gp = buildPromoSlot(spring, '2027-03-20').promos[0];
     expect(gp).toMatchObject({
-      id: 'promo_grand_prix', eventDate: '2027-03-20', tonight: true, durationSec: 30, exit: 'seamless', theme: 'sky',
+      id: 'promo_grand_prix', eventDate: '2027-03-20', tonight: true, durationSec: 2021 / 60, exit: 'seamless', enter: 'seamless', theme: 'sky',
     });
     // Like every promo, it needs the calendar feed.
     expect(buildPromoSlot([], '2027-02-10')).toBeNull();
@@ -229,8 +229,11 @@ describe('buildPromoSlot', () => {
     for (const p of s.promos) {
       expect(p).not.toHaveProperty('exit');
       expect(p).not.toHaveProperty('theme');
+      expect(p).not.toHaveProperty('enter');
     }
     expect(SEASON_PROMOS.filter((p) => p.exit).map((p) => [p.kind, p.exit, p.theme])).toEqual([['grandPrix', 'seamless', 'sky']]);
+    // ...and only such a promo can START on it too (an enter needs the exit's theme).
+    expect(SEASON_PROMOS.filter((p) => p.enter).map((p) => [p.kind, p.enter, p.exit])).toEqual([['grandPrix', 'seamless', 'seamless']]);
   });
 
   it('shares the snow season’s laps: the snow slide one lap in six, the Grand Prix the other five', () => {
@@ -346,7 +349,7 @@ describe('previewPromo: Settings → Slides → Preview the promos', () => {
   it('previews the Grand Prix video long before January, with its seamless ending', () => {
     expect(PREVIEW_PROMOS.find((p) => p.key === 'grandPrix')?.label).toBe('Grand Prix (video)');
     expect(previewPromo('grandPrix', season, '2026-10-29')).toMatchObject({
-      id: 'promo_grand_prix', kind: 'grandPrix', eventDate: '2027-03-20', tonight: false, durationSec: 30, exit: 'seamless', theme: 'sky',
+      id: 'promo_grand_prix', kind: 'grandPrix', eventDate: '2027-03-20', tonight: false, durationSec: 2021 / 60, exit: 'seamless', enter: 'seamless', theme: 'sky',
     });
   });
 

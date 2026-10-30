@@ -72,19 +72,23 @@ const SCENES = {
  * The rest is for a promo that ends on the lobby itself (`exit:
  * 'seamless'`, GrandPrixPromo) and is ignored by the showreels: `still` (no
  * motion: show the finished poster), `lead` (seconds before it starts: the
- * stinger's swap), `onScene` (the scene behind it to rest, its chrome home)
- * and `onFinished` (it has ended its showing).
+ * stinger's swap), `enter` (it came in on an ordinary change over the lobby
+ * itself, `enter: 'seamless'`: appear once the scene in `theme` is at rest),
+ * `onScene` (the scene behind it to rest, its chrome home or handed over to
+ * it) and `onFinished` (it has ended its showing).
  *
  * @param {{
  *   promo: any,
  *   still?: boolean,
  *   lead?: number,
- *   onScene?: (state: { rest: boolean, home: boolean }) => void,
+ *   enter?: boolean,
+ *   theme?: string,
+ *   onScene?: (state: { rest: boolean, home: boolean, shown: boolean }) => void,
  *   onFinished?: () => void,
  * }} props
  */
-export default function PromoSlide({ promo, still, lead, onScene, onFinished }) {
+export default function PromoSlide({ promo, still, lead, enter, theme, onScene, onFinished }) {
   const Scene = promo && SCENES[promo.kind];
   if (!Scene) return null;
-  return <Scene promo={promo} lines={detailsFor(promo)} still={still} lead={lead} onScene={onScene} onFinished={onFinished} />;
+  return <Scene promo={promo} lines={detailsFor(promo)} still={still} lead={lead} enter={enter} theme={theme} onScene={onScene} onFinished={onFinished} />;
 }
