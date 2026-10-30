@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo } from 'react';
 import { useLowPower } from '../hooks/useLowPower.js';
 import { CELEBRATION } from '../lib/kit.js';
 
@@ -15,7 +15,10 @@ const PARTICLES = Array.from({ length: 45 }, (_, i) => ({
   color: CELEBRATION[i % CELEBRATION.length],
 }));
 
-export const ParticleField = () => {
+// ⚡ Bolt: memoize to prevent unnecessary re-renders of the 45 particle
+// DOM nodes when the parent Slide/View component re-renders.
+// Component relies only on internal context (`useLowPower`), no props.
+export const ParticleField = memo(() => {
   const lowPower = useLowPower();
   if (lowPower) return null;
   return (
@@ -38,4 +41,4 @@ export const ParticleField = () => {
     ))}
   </div>
   );
-};
+});

@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { DOODLES } from '../lib/brand.js';
 
 // Ambient particle layer for the signage page (#26): a gentle full-screen
@@ -81,7 +82,10 @@ function Doodle({ kind }) {
   );
 }
 
-export default function ParticleLayer({ effect }) {
+// ⚡ Bolt: memoize to prevent unnecessary re-renders of the expensive
+// particle SVG elements when the parent App/Layout re-renders.
+// The `effect` prop only changes when settings are updated.
+export default memo(function ParticleLayer({ effect }) {
   const particles = PARTICLES[effect];
   if (!particles) return null;
   return (
@@ -93,4 +97,4 @@ export default function ParticleLayer({ effect }) {
       ))}
     </div>
   );
-}
+});
