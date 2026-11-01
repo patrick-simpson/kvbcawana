@@ -159,6 +159,17 @@ run(`node scripts/stamp-build.mjs ${hashTree(path.join(ROOT, 'classroom', 'publi
   for (const f of ['letterhead.js', 'sync-protocol.js', 'cloud-crypto.js']) cpSync(path.join(ROOT, 'shared', f), path.join(toolOut, 'shared', f));
 }
 
+// /presentation: the congregation deck (owner 2026-11-01; CLAUDE.md "Presentation",
+// worker/src/routes.md 10.14). The page opens the sealed deck with the passphrase, so it
+// carries the two sign-in modules beside it like the letterhead maker. Unlisted, noindex
+// like every path here.
+{
+  const out = path.join(OUT, 'presentation');
+  mkdirSync(path.join(out, 'shared'), { recursive: true });
+  for (const f of ['index.html', 'app.js', 'logic.js']) cpSync(path.join(ROOT, 'site', 'presentation', f), path.join(out, f));
+  for (const f of ['sync-protocol.js', 'cloud-crypto.js']) cpSync(path.join(ROOT, 'shared', f), path.join(out, 'shared', f));
+}
+
 // The showcase twins (owner, 2026-10-16: the home page plays a club night on the REAL
 // screens). Each is the built page itself with site/showcase/stub.js INLINE as the first
 // thing in its <head>, so it can never run without it: storage in memory, a club-night
@@ -336,7 +347,7 @@ writeFileSync(path.join(OUT, '_routes.json'), `${JSON.stringify({
 writeFileSync(path.join(ROOT, 'site', 'lib', 'large-files.generated.js'),
   `// Written by site/build.mjs for build ${BUILD_ID}; not committed.\nexport const LARGE_FILES = ${JSON.stringify(largeFiles, null, 2)};\nexport const LARGE_PREFIXES = ${JSON.stringify(VIDEO_PREFIXES, null, 2)};\n`);
 
-for (const must of ['index.html', 'lobby/index.html', 'lobby/countdown.html', 'lobby/settings.html', 'lobby/projector-remote.html', 'journey/index.html', 'journey/remote/index.html', 'classroom/index.html', 'classroom/version.json', 'classroom/src/logic.js', 'classroom/src/stage.js', 'classroom/src/shared/classroomRemote.js', 'classroom/remote/index.html', 'classroom/remote/remote.js', 'journey/remote/remote.js', 'journey/src/shared/journeyRemote.js', 'lobby/shared/sync.json', 'checkin/index.html', 'checkin/ym/index.html', 'checkin/desk-transport.js', 'checkin/cloud-crypto.js', 'checkin/clubs.js', 'checkin/brand/fonts.css', 'links/index.html', 'logo/index.html', 'tools/handbook-form/index.html', 'tools/letterhead/index.html', 'tools/letterhead/shared/letterhead.js', 'classic.html', 'robots.txt', 'lobby/showcase.html', 'lobby/countdown-showcase.html', 'lobby/settings-showcase.html', 'journey/showcase.html', 'journey/remote/showcase.html', 'checkin/showcase.html']) {
+for (const must of ['index.html', 'lobby/index.html', 'lobby/countdown.html', 'lobby/settings.html', 'lobby/projector-remote.html', 'journey/index.html', 'journey/remote/index.html', 'classroom/index.html', 'classroom/version.json', 'classroom/src/logic.js', 'classroom/src/stage.js', 'classroom/src/shared/classroomRemote.js', 'classroom/remote/index.html', 'classroom/remote/remote.js', 'journey/remote/remote.js', 'journey/src/shared/journeyRemote.js', 'lobby/shared/sync.json', 'checkin/index.html', 'checkin/ym/index.html', 'checkin/desk-transport.js', 'checkin/cloud-crypto.js', 'checkin/clubs.js', 'checkin/brand/fonts.css', 'links/index.html', 'logo/index.html', 'tools/handbook-form/index.html', 'tools/letterhead/index.html', 'tools/letterhead/shared/letterhead.js', 'presentation/index.html', 'presentation/app.js', 'presentation/shared/cloud-crypto.js', 'classic.html', 'robots.txt', 'lobby/showcase.html', 'lobby/countdown-showcase.html', 'lobby/settings-showcase.html', 'journey/showcase.html', 'journey/remote/showcase.html', 'checkin/showcase.html']) {
   if (!existsSync(path.join(OUT, must))) throw new Error(`site build is missing ${must}`);
 }
 console.log(`\n✓ site/dist built for ${ORIGIN} (build ${BUILD_ID.slice(0, 7)})`);
