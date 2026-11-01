@@ -7,7 +7,8 @@ that REPLACES the other screens' 5-second "Switching to opening ceremony" card
 lobby's welcome video (`video/awana-intro/`), on the Windows laptop (RTX 4050),
 not in the cloud (owner: "use the computer for that, not the cloud").
 
-Nothing is built yet. The next step is the stills, below.
+Nothing is built yet. The look is chosen (below, from the stills); the next
+step is building the film.
 
 ## Decided (the owner's answers)
 
@@ -38,15 +39,34 @@ The lead-in (lobby TV, Journey, the classroom):
   fills it (a video with transparency, e.g. VP9 WebM with alpha).
 - Says "Opening ceremony" as it lands.
 
-## Still open: decide from 3D stills (rough Blender renders on the laptop)
+## The look (owner 2026-11-01, chosen from the 3D stills)
 
-1. The feeling: stadium hype / wonder / fun and silly / warm and welcoming
-   (one still each).
-2. The story: (a) six club ribbons race in, weave into the logo, confetti,
-   then WELCOME and the logo land; (b) a camera flies down a stylized street
-   to the church's doors, which swing open onto WELCOME and the logo
-   (a few stills each; on a black stage).
-3. The material: glossy toy plastic / paper cut-out / light and neon.
+The stills: `stills.py` (double-click `Make Grand Welcome Stills.bat`, about
+a minute on the laptop) renders 15 rough 1280x720 EEVEE stills and a labelled
+`contact-sheet.png` into `output/stills/` (git ignores `output/`; never commit
+renders). The club marks are the kit's own `<club>-white.svg` files, drawn by
+the laptop's browser (Edge, else Chrome) into pictures, never redrawn:
+Blender's SVG reader pulls in bits of the catalog page they were cut from.
+
+Chosen:
+
+- Feeling: WONDER (still F2): still and hushed, starlight and sparkles
+  drifting, cool blue and purple edge light; not stadium hype, not silly.
+- Story: A, "six clubs converge" (stills A1-A3): the six club ribbons race
+  in, weave into one knot, it bursts, then WELCOME, the logo and the marks
+  land. Not the street-and-church-doors story.
+- Material: glossy toy plastic for WELCOME, the logo and the club plates;
+  the six club RIBBONS glow like light (plastic + glowing ribbons).
+- The opening: the countdown's "0:00" UNRAVELS into the six club ribbons (one
+  seamless move from the film's first frame, the 0:00 on black).
+- The burst: sparkles and starlight (a soft flash, then brand sparkles drift
+  out and twinkle), NOT confetti.
+- WELCOME: white letters with the cool blue and purple rim light (F2).
+- At the end the ribbons fade into starlight, leaving only WELCOME, the
+  church's full logo and the six club marks (on their club-colour plates)
+  before the hand-over to the US Pledge slide.
+- Easter egg: a SPARKLE CONSTELLATION: a few drifting sparkles briefly line
+  up to spell "2 Tim 2:15", then drift apart.
 
 ## When it is built (for whoever builds it)
 
