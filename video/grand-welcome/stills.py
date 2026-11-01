@@ -12,8 +12,12 @@ BRIEF.md, "Still open").
 
 You normally don't run this directly - double-click
     Make Grand Welcome Stills.bat
-It takes about 5 to 10 minutes on the RTX 4050 laptop and opens the folder
-when it is done.
+It takes about a minute on the RTX 4050 laptop and opens the folder when it
+is done. To WATCH it work, double-click
+    Watch Grand Welcome Stills.bat
+instead: Blender opens full-screen and builds each scene in front of you,
+shows it live through the camera, renders it, shows the finished picture,
+then moves on (2 to 3 minutes; see "watch mode" below).
 
 What it makes (all 1280 x 720, on pure black, no mascots), in
 output/stills/ (git ignores the output folder - never commit renders):
@@ -46,6 +50,8 @@ Options (after the -- on Blender's command line):
     --samples 64      EEVEE samples (Cycles fallback uses --cycles-samples 24)
     --engine cycles   skip EEVEE altogether
     --sheet           only remake the contact sheet
+    --watch           build them in Blender's open window (no -b), always fresh;
+                      --live 3 / --show 2.5 = seconds each scene / picture shows
 """
 
 import bpy, bmesh, json, math, os, random, re, shutil, subprocess, sys, time
@@ -175,8 +181,23 @@ def link(obj, coll=None):
 
 
 def reset_scene(name):
-    bpy.ops.wm.read_factory_settings(use_empty=True)
-    sc = bpy.context.scene
+    if WATCH:
+        # with Blender's window open, starting a new file would also throw
+        # away the window's layout: empty the scene by hand instead
+        sc = bpy.context.scene
+        for data in (bpy.data.objects, bpy.data.meshes, bpy.data.curves, bpy.data.lights,
+                     bpy.data.cameras, bpy.data.materials, bpy.data.worlds, bpy.data.node_groups,
+                     bpy.data.images, bpy.data.fonts):
+            try:
+                bpy.data.batch_remove(list(data))
+            except Exception:
+                pass
+        for c in list(sc.collection.children):
+            bpy.data.collections.remove(c)
+        sc.render.use_compositing = False
+    else:
+        bpy.ops.wm.read_factory_settings(use_empty=True)
+        sc = bpy.context.scene
     sc.name = name
     sc.unit_settings.system = "METRIC"
     MATS.clear(); FONTS.clear()
@@ -772,7 +793,15 @@ def world(sc, ambient=0.25, color="#9AA6C0"):
     out = nt.nodes.new("ShaderNodeOutputWorld")
     bg = nt.nodes.new("ShaderNodeBackground")
     bg.inputs["Color"].default_value = lin(color); bg.inputs["Strength"].default_value = ambient
-    nt.links.new(bg.outputs[0], out.inputs["Surface"])
+    # looked at straight by the camera the sky is black (the watch mode's
+    # live view shows this); everything is still lit by the dim dome
+    black = nt.nodes.new("ShaderNodeBackground")
+    black.inputs["Color"].default_value = (0, 0, 0, 1)
+    lp = nt.nodes.new("ShaderNodeLightPath")
+    mix = nt.nodes.new("ShaderNodeMixShader")
+    nt.links.new(lp.outputs["Is Camera Ray"], mix.inputs[0])
+    nt.links.new(bg.outputs[0], mix.inputs[1]); nt.links.new(black.outputs[0], mix.inputs[2])
+    nt.links.new(mix.outputs[0], out.inputs["Surface"])
     sc.render.film_transparent = True        # what the camera sees of the sky: nothing
 
 
@@ -1285,37 +1314,191 @@ def project(sc, p):
     return v.x, 1 - v.y
 
 
+ENGINES = ["CYCLES"] if str(arg("--engine", "")).lower() == "cycles" else ["EEVEE", "CYCLES"]
+
+
+def build_still(sid, fn, engine):
+    """Build one still's scene, ready to render."""
+    sc = reset_scene(f"Grand welcome {sid}")
+    fn(sc)
+    setup_render(sc, engine)
+    if float(arg("--bloom", 1)) > 0:
+        glow_compositor(sc, float(arg("--bloom", 1)) * (0.7 if sid in ("M3", "A2", "B2", "F2") else 0.4))
+    sc.render.filepath = os.path.join(STILLS, f"{sid}.png")
+    return sc
+
+
+def shoot(sc, sid, engine):
+    """Render the built scene to its picture (raises if the engine fails)."""
+    if engine == "EEVEE":
+        try:
+            import gpu
+            log(f"EEVEE on {gpu.platform.renderer_get()}")
+        except Exception:
+            pass
+    bpy.ops.render.render(write_still=True)
+    if "egg" in sc.keys() and sid == "E1":
+        x, y = project(sc, sc["egg"])
+        with open(os.path.join(STILLS, "egg.json"), "w") as fh:
+            json.dump({"x": x, "y": y}, fh)
+
+
 def render_one(sid, fn):
     path = os.path.join(STILLS, f"{sid}.png")
     if os.path.exists(path) and not arg("--redo"):
         log(f"{sid} already there (--redo to make it again)")
         return
-    engines = ["CYCLES"] if str(arg("--engine", "")).lower() == "cycles" else ["EEVEE", "CYCLES"]
-    for engine in engines:
+    for engine in ENGINES:
         t0 = time.time()
-        sc = reset_scene(f"Grand welcome {sid}")
-        fn(sc)
-        setup_render(sc, engine)
-        if float(arg("--bloom", 1)) > 0:
-            glow_compositor(sc, float(arg("--bloom", 1)) * (0.7 if sid in ("M3", "A2", "B2", "F2") else 0.4))
-        sc.render.filepath = path
+        sc = build_still(sid, fn, engine)
         try:
-            if engine == "EEVEE":
-                try:
-                    import gpu
-                    log(f"EEVEE on {gpu.platform.renderer_get()}")
-                except Exception:
-                    pass
-            bpy.ops.render.render(write_still=True)
-            if "egg" in sc.keys() and sid == "E1":
-                x, y = project(sc, sc["egg"])
-                with open(os.path.join(STILLS, "egg.json"), "w") as fh:
-                    json.dump({"x": x, "y": y}, fh)
+            shoot(sc, sid, engine)
             log(f"{sid} done with {engine} in {time.time() - t0:.0f}s")
             return
         except Exception as e:
             log(f"{sid}: {engine} failed ({e})" + ("; trying Cycles" if engine == "EEVEE" else ""))
     log(f"{sid}: could not render")
+
+
+# ============================================================ watch mode ===
+# --watch (Blender opened WITH its window, "Watch Grand Welcome Stills.bat"):
+# the same stills, built one at a time in front of you. Blender's window
+# freezes while a script runs, so the work is cut into small steps on a
+# timer, with a pause after each so the screen can catch up:
+#   build the scene -> show it live through the camera -> render it ->
+#   show the finished picture -> next one ... -> the contact sheet.
+WATCH = bool(arg("--watch")) and not bpy.app.background
+LIVE_SEC = float(arg("--live", 3.0))      # how long each scene shows live
+SHOW_SEC = float(arg("--show", 2.5))      # how long each finished picture shows
+
+
+def stage():
+    """The one big area the watch mode draws in: (window, area)."""
+    win = bpy.context.window_manager.windows[0]
+    areas = sorted(win.screen.areas, key=lambda a: -a.width * a.height)
+    return win, areas[0]
+
+
+def say(text):
+    """Write what's happening across the top of the stage (and the console)."""
+    log(text)
+    try:
+        stage()[1].header_text_set(text)
+    except Exception:
+        pass
+
+
+def show_scene():
+    """The stage as a 3D view through the still's camera, drawn live by EEVEE."""
+    win, area = stage()
+    area.type = "VIEW_3D"
+    sp = area.spaces.active
+    sp.shading.type = "RENDERED"
+    try:
+        sp.shading.use_compositor = "ALWAYS"       # the bloom, live
+    except Exception:
+        pass
+    sp.overlay.show_overlays = False
+    sp.show_gizmo = False
+    sp.show_region_header = True          # where the "what's happening" line shows
+    sp.show_region_tool_header = False
+    sp.region_3d.view_perspective = "CAMERA"
+    # the live view draws a see-through sky as a checkerboard: show the
+    # world instead, whose camera-facing side is black (see world())
+    bpy.context.scene.render.film_transparent = False
+
+
+def show_picture(path):
+    """The stage as a picture viewer, showing a finished still."""
+    win, area = stage()
+    area.type = "IMAGE_EDITOR"
+    img = bpy.data.images.load(path, check_existing=False)
+    area.spaces.active.image = img
+
+
+def fit_stage():
+    """Fit the camera frame / picture to the stage. Runs one step AFTER the
+    stage changes, once Blender has redrawn it (before that it has no size)."""
+    win, area = stage()
+    region = next((r for r in area.regions if r.type == "WINDOW"), None)
+    try:
+        with bpy.context.temp_override(window=win, screen=win.screen, area=area, region=region):
+            bpy.ops.wm.redraw_timer(type="DRAW_WIN_SWAP", iterations=1)   # lay it out first
+        # (the redraw forgets the context above: give the fit a fresh one)
+        with bpy.context.temp_override(window=win, screen=win.screen, area=area, region=region):
+            if area.type == "VIEW_3D":
+                bpy.ops.view3d.view_center_camera()
+            else:
+                bpy.ops.image.view_all(fit_view=True)
+    except Exception as e:
+        log(f"could not fit the view ({e})")
+
+
+def watch_steps(todo):
+    """The whole job as small steps; each yield = pause this many seconds."""
+    win, area = stage()
+    try:
+        region = next((r for r in area.regions if r.type == "WINDOW"), None)
+        with bpy.context.temp_override(window=win, screen=win.screen, area=area, region=region):
+            bpy.ops.screen.screen_full_area(use_hide_panels=True)     # one big stage
+    except Exception:
+        pass
+    # the stills render quietly in the background: Blender's own render
+    # display would cover the stage (the live view has already shown it)
+    bpy.context.preferences.view.render_display_type = "NONE"
+    say("Getting the club marks ready...")
+    yield 0.2
+    MARKS.update(draw_marks())
+    n = len(todo)
+    for k, (sid, lab, fn) in enumerate(todo):
+        for engine in ENGINES:
+            show_scene()
+            say(f"[{k + 1}/{n}] Building  {lab}")
+            yield 0.2
+            sc = build_still(sid, fn, engine)
+            show_scene()
+            say(f"[{k + 1}/{n}] {lab}   (live, through the camera)")
+            yield 0.1
+            fit_stage()
+            yield LIVE_SEC
+            say(f"[{k + 1}/{n}] {lab}   (rendering the still...)")
+            yield 0.2
+            sc.render.film_transparent = True        # the still itself: exactly as headless
+            try:
+                shoot(sc, sid, engine)
+            except Exception as e:
+                log(f"{sid}: {engine} failed ({e})" + ("; trying Cycles" if engine == "EEVEE" else ""))
+                continue
+            show_picture(sc.render.filepath)
+            say(f"[{k + 1}/{n}] {lab}   (done)")
+            yield 0.1
+            fit_stage()
+            yield SHOW_SEC
+            break
+    say("Making the contact sheet...")
+    show_scene()
+    yield 0.2
+    contact_sheet()
+    show_picture(os.path.join(STILLS, "contact-sheet.png"))
+    say(f"All done. Every still is in {STILLS}   (close Blender when you're finished)")
+    yield 0.1
+    fit_stage()
+
+
+def watch(todo):
+    steps = watch_steps(todo)
+
+    def tick():
+        try:
+            return next(steps)
+        except StopIteration:
+            return None
+        except Exception:
+            import traceback
+            traceback.print_exc()
+            say("Something went wrong - see the black console window")
+            return None
+    bpy.app.timers.register(tick, first_interval=1.0)
 
 
 # ========================================================= contact sheet ===
@@ -1394,6 +1577,7 @@ def contact_sheet():
     sc.render.resolution_x, sc.render.resolution_y = int(width * px), int(height * px)
     sc.render.resolution_percentage = 100
     sc.render.engine = "BLENDER_EEVEE"
+    sc.render.film_transparent = False
     sc.eevee.taa_render_samples = 8
     sc.view_settings.view_transform = "Standard"; sc.view_settings.look = "None"
     sc.render.image_settings.file_format = "PNG"; sc.render.image_settings.color_mode = "RGB"
@@ -1405,6 +1589,10 @@ def contact_sheet():
 # ================================================================== main ===
 def main():
     os.makedirs(STILLS, exist_ok=True)
+    if WATCH:
+        only = str(arg("--only", "")).split(",") if arg("--only") else None
+        watch([s for s in STORY if not only or s[0] in only])
+        return
     if not arg("--sheet"):
         MARKS.update(draw_marks())
         only = str(arg("--only", "")).split(",") if arg("--only") else None
