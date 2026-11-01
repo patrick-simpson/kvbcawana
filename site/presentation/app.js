@@ -6,9 +6,11 @@
 //
 //   ?screen=tv   the TV: the deck alone, full screen on the first click.
 //                KVBC Awana's "Presentation" display screen opens this.
-//   anything     the presenter view: the slide on the screen, the next one,
-//   else         speaker notes, Back / Next, every slide, a timer. KVBC Awana's
-//                Settings window (?configure=1), a laptop or a phone.
+//   anything     the controls: the slide on the screen, the next one, every
+//   else         slide, Back / Next. KVBC Awana's Settings window (?configure=1),
+//                a laptop or a phone; speaker notes on a PHONE only (owner
+//                2026-11-01: "On my phone I should be able to see notes but no
+//                where else"; logic.js notesHere).
 //
 // The deck is SEALED to the church's history key by the weekly job; this page
 // opens it with the passphrase (passphrase v2: the word never leaves the
@@ -18,7 +20,7 @@
 // enough for the TV window. Every screen follows ONE slide on the sync
 // Worker (POST /v1/presentation/go, polled), so a phone drives the TV too.
 
-import { builtWords, clampSlide, deckOutline, elapsed, frameHtml, keyStep, modeOf, tapStep } from './logic.js';
+import { builtWords, clampSlide, deckOutline, frameHtml, keyStep, modeOf, notesHere, tapStep } from './logic.js';
 
 const SYNC_INDEX = new URL('/lobby/shared/sync.json', location.href).href;
 const SESSION_KEY = 'awanaSyncSession.v1';
@@ -47,7 +49,13 @@ let seenRev = -1;
 let pollTimer = 0;
 let polling = false;
 let loading = false;
-let clockStart = 0;
+/** Speaker notes on this device? A phone only, never the lobby computer's Settings window. */
+const notesOn = notesHere({
+  configure: new URLSearchParams(location.search).get('configure') === '1',
+  coarse: matchMedia('(pointer: coarse)').matches,
+  screenW: screen.width,
+  screenH: screen.height,
+});
 let quietTimer = 0;
 /** @type {BroadcastChannel|null} */
 let bc = null;
@@ -118,9 +126,12 @@ function drawDesk() {
   $('next-frame').hidden = last;
   if (!last) framePoint($('next-frame'), deck.urls.still, index + 1);
   $('now-title').textContent = s[index]?.title || '';
-  const notes = s[index]?.notes || '';
-  $('notes').textContent = notes || 'No notes for this slide.';
-  $('notes').classList.toggle('empty', !notes);
+  $('notes-wrap').hidden = !notesOn;
+  if (notesOn) {
+    const notes = s[index]?.notes || '';
+    $('notes').textContent = notes || 'No notes for this slide.';
+    $('notes').classList.toggle('empty', !notes);
+  }
   $('count').firstChild.nodeValue = n ? `${index + 1} / ${n}` : `${index + 1}`;
   $('back').disabled = index <= 0;
   $('next').disabled = n > 0 && index >= n - 1;
@@ -183,7 +194,6 @@ function adopt(html, rev, builtAt, { tell = true } = {}) {
   deck = { html, rev, builtAt, outline: deckOutline(html), urls };
   index = clampSlide(index, count());
   if (old) setTimeout(() => { URL.revokeObjectURL(old.live); URL.revokeObjectURL(old.still); }, 5000);
-  if (!clockStart) clockStart = Date.now();
   if (tell) bc?.postMessage({ type: 'deck', html, rev, builtAt, index });
   render();
   schedulePoll(0);
@@ -337,7 +347,7 @@ async function poll() {
   }
 }
 
-// ── the TV's full screen and the presenter's clock ─────────────────────────
+// ── the TV's full screen ───────────────────────────────────────────────────
 
 function goFull() {
   const el = document.documentElement;
@@ -349,10 +359,6 @@ function quiet() {
   tv.classList.remove('quiet');
   clearTimeout(quietTimer);
   quietTimer = setTimeout(() => tv.classList.add('quiet'), tuning.quietMs);
-}
-
-function tick() {
-  if (mode === 'presenter' && deck) $('clock').textContent = elapsed(clockStart ? Date.now() - clockStart : 0);
 }
 
 function onKey(e) {
@@ -373,7 +379,8 @@ async function start() {
   $('lock').addEventListener('click', lock);
   $('back').addEventListener('click', () => stepBy(-1));
   $('next').addEventListener('click', () => stepBy(1));
-  $('clock-reset').addEventListener('click', () => { clockStart = Date.now(); tick(); });
+  // The lobby computer's Settings window is controls only: its TV is the other window.
+  if (new URLSearchParams(location.search).get('configure') === '1') $('present-here').hidden = true;
   $('present-here').addEventListener('click', () => { tvFromDesk = true; mode = 'tv'; render(); goFull(); quiet(); });
   $('wait-signin').addEventListener('click', () => { show('gate'); $('gate-tv').hidden = false; $('passphrase').focus(); });
   $('tv-tap').addEventListener('click', (e) => {
@@ -391,7 +398,6 @@ async function start() {
   addEventListener('resize', fitScreens);
   if (window.ResizeObserver) new ResizeObserver(fitScreens).observe($('now-screen'));
   document.addEventListener('visibilitychange', () => schedulePoll(document.hidden ? undefined : 0));
-  setInterval(tick, 1000);
 
   if ('BroadcastChannel' in window) {
     bc = new BroadcastChannel(CHANNEL);

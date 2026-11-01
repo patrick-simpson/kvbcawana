@@ -89,12 +89,17 @@ export function tapStep(x, width) {
   return 0;
 }
 
-/** Elapsed time as m:ss or h:mm:ss. @param {number} ms */
-export function elapsed(ms) {
-  const t = Math.max(0, Math.floor(ms / 1000));
-  const h = Math.floor(t / 3600), m = Math.floor((t % 3600) / 60), sec = t % 60;
-  const two = (n) => String(n).padStart(2, '0');
-  return h ? `${h}:${two(m)}:${two(sec)}` : `${m}:${two(sec)}`;
+/**
+ * Speaker notes on this device? A PHONE only (owner 2026-11-01: "On my phone I
+ * should be able to see notes but no where else"): a touch screen whose short
+ * side is phone-sized. Never the lobby computer's Settings window (`configure`),
+ * a laptop, a tablet or the TV.
+ * @param {{ configure: boolean, coarse: boolean, screenW: number, screenH: number }} d
+ */
+export function notesHere({ configure, coarse, screenW, screenH }) {
+  if (configure || !coarse) return false;
+  const short = Math.min(screenW, screenH);
+  return short > 0 && short <= 600;
 }
 
 /** "Updated Thursday, Nov 5" from the deck's builtAt, in Eastern time. @param {string|null} iso */

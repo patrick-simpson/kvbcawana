@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { FRAME_HELPER, builtWords, clampSlide, deckOutline, elapsed, frameHtml, keyStep, modeOf, tapStep } from '../presentation/logic.js';
+import { FRAME_HELPER, builtWords, clampSlide, deckOutline, frameHtml, keyStep, modeOf, notesHere, tapStep } from '../presentation/logic.js';
 
 const SITE = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const page = readFileSync(path.join(SITE, 'presentation', 'index.html'), 'utf8');
@@ -56,10 +56,18 @@ test('keys, taps and the slide range', () => {
   assert.equal(clampSlide(5, 3), 2);
   assert.equal(clampSlide(-1, 3), 0);
   assert.equal(clampSlide(7, 0), 7);
-  assert.equal(elapsed(65_000), '1:05');
-  assert.equal(elapsed(3_725_000), '1:02:05');
   assert.equal(builtWords('2026-11-05T08:30:00Z'), 'Numbers from Thursday, Nov 5');
   assert.equal(builtWords(null), '');
+});
+
+test('speaker notes on a phone only: never the lobby computer\'s Settings window, a laptop or a tablet', () => {
+  assert.equal(notesHere({ configure: false, coarse: true, screenW: 390, screenH: 844 }), true);
+  assert.equal(notesHere({ configure: false, coarse: true, screenW: 844, screenH: 390 }), true, 'a phone turned sideways');
+  assert.equal(notesHere({ configure: true, coarse: true, screenW: 390, screenH: 844 }), false, 'the app\'s Settings window');
+  assert.equal(notesHere({ configure: false, coarse: false, screenW: 1920, screenH: 1080 }), false, 'a laptop or the lobby PC');
+  assert.equal(notesHere({ configure: false, coarse: true, screenW: 1920, screenH: 1080 }), false, 'a touch-screen PC');
+  assert.equal(notesHere({ configure: false, coarse: true, screenW: 820, screenH: 1180 }), false, 'a tablet');
+  assert.equal(notesHere({ configure: false, coarse: false, screenW: 390, screenH: 844 }), false);
 });
 
 test('the TV is ?screen=tv; everything else is the presenter view', () => {
@@ -79,6 +87,9 @@ test('passphrase v2 only; the key stays in memory; the deck is opened here', () 
   assert.match(app, /unwrapPrivateKey\(key\.wrapped, typed, key\.pub\)/);
   assert.match(app, /openDocument\(ring, wire\)/);
   assert.match(app, /'awanaSyncSession\.v1'/);
+  // notes are written only where notesHere says so
+  assert.match(app, /\$\('notes-wrap'\)\.hidden = !notesOn;\n  if \(notesOn\) \{/);
+  assert.match(page, /id="notes-wrap" hidden/);
   // nothing but the session goes to storage: never the passphrase, the key or the deck
   for (const m of app.matchAll(/store\.set\(([^,]+),/g)) assert.equal(m[1], 'SESSION_KEY');
   assert.ok(!/sessionStorage|indexedDB/.test(app));
