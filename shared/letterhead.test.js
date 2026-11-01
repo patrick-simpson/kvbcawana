@@ -94,11 +94,11 @@ describe('letterHtml', () => {
   });
   it('the five words in order, this year\'s as the one hot pill, never called a plan', () => {
     expect(PLAN_WORDS).toEqual(['Belong', 'Believe', 'Become', 'Protect', 'Grow']);
-    expect(PLAN_NOW).toBe('Believe');
+    expect(PLAN_NOW).toBe('Protect');
     const row = html.match(/<div class="plan">([\s\S]*?)<\/div>/)[1];
     expect([...row.matchAll(/<b[^>]*>([^<]+)/g)].map((m) => m[1])).toEqual(PLAN_WORDS);
     expect(row.match(/class="now"/g)).toHaveLength(1);
-    expect(row).toContain('<b class="now">Believe<span class="swash">');
+    expect(row).toContain('<b class="now">Protect<span class="swash">');
     expect(html).not.toMatch(/ministry plan|5-year|five-year/i);
     expect(html).not.toMatch(/Wednesdays at|<div class="line">/);
     const next = letterHtml(parseLetter(SAMPLE), { kitUrl: '', svgs: SVGS, planNow: 'Become' });
