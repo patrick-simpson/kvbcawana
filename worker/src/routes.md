@@ -1572,3 +1572,34 @@ Back. /settings → Screens previews a look on the TV for a minute. Code:
   `CLASSROOM_WATCH_MS` (30 s): on a change, and every 10 s while a video plays.
 - Free plan: reads are memory; writes are one per edit or press; a part is one
   96 KiB put plus one small meta put.
+
+### 10.14 The presentation (BUILT, owner 2026-11-01)
+
+The congregation deck from AwanaReports (`deck/index.html`, rebuilt weekly) on a
+screen of its own: awana.kvbchurch.org/presentation/ (`site/presentation/`), and
+KVBC Awana's "Presentation" display screen (TV window = the deck, Settings window =
+the presenter view). Code `src/presentation.js`; tests `test/presentation.test.js`.
+
+- SEALED end to end (owner: "Sealed"): the weekly job (AwanaReports
+  `refresh-data.yml` -> this repo's `scripts/presentation/publish-deck.mjs`) seals
+  `{html, builtAt}` to `history:pub` with `shared/cloud-crypto.js` `sealDocument`
+  (ECIES, AAD prefix `doc1:`, HKDF info `kvbc-doc-v1`, padded to the next 64 KiB,
+  at most 4 MiB; a document never opens as a history row or the reverse). The
+  Worker stores and streams ciphertext only; the page opens it with the history
+  key the passphrase unwraps (memory only, non-extractable).
+- Machine token: Worker secret `PRESENTATION_TOKEN` (`Authorization: Bearer`;
+  ci.yml "Set the Worker's secrets" pushes it from the GitHub secret of the same
+  name; AwanaReports holds the same value). No secret = 503 `not-configured`.
+
+| Route | Auth | Body | Answer |
+|---|---|---|---|
+| `GET /v1/presentation/key` | token or session | | `{ok, pub, kid}` = `history:pub`; 404 `no-key` |
+| `POST /v1/presentation/deck` | token | `{v:1, id, night, kind:'deck', kid, epk, iv, chars, builtAt?}` | `{ok, rev, parts, partChars}`; 400 `bad-deck`; 409 `wrong-key` (kid is not the current history kid). Starting again drops an unfinished upload. |
+| `PUT /v1/presentation/deck/:rev/:n` | token | text: the next `partChars` (96 KiB) base64 characters of `ct` | `{ok, next}`; 409 `order`; 400 `size` |
+| `POST /v1/presentation/deck/:rev/done` | token | `{}` | `{ok, rev}`: it is now THE deck; the old one's parts are deleted. 400 `parts` |
+| `GET /v1/presentation/deck` | session | | the sealed deck as one JSON `{v, id, night, kind, kid, epk, iv, rev, builtAt, ct}`, streamed part by part; 404 `no-deck` |
+| `GET /v1/presentation/state` | session | | `{ok, deck: {rev, builtAt}\|null, slide: {index, rev, at}}` (memory after the first read) |
+| `POST /v1/presentation/go` | session | `{index}` (0..999) | the state; last press wins; the same index again changes nothing |
+
+Storage: `pres:deck`, `pres:up`, `pres:part:<rev>:<n>`, `pres:slide`. Screens poll
+the state (TV 0.8 s, presenter 1.5 s, only while the page is open); no doorbell.

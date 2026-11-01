@@ -89,6 +89,12 @@ export const ROW_PAD = 1024;
 /** Station bundles (rosters, books, print jobs) pad up to the next rung. */
 export const STATION_PAD_LADDER = [1024, 4096, 16384, 65536, 262144, 1048576];
 
+/** A sealed document (the presentation deck) pads up to the next step, at most DOC_PAD_MAX. */
+export const DOC_PAD_STEP = 65536;
+export const DOC_PAD_MAX = 4 * 1048576;
+export const INFO_DOC = 'kvbc-doc-v1';
+export const AAD_DOC = 'doc1:';
+
 /** Keys a history row may never carry (anywhere in it): medical notes are station-only. */
 export const MEDICAL_KEY = /allerg|medic|health|condition|notes?$/i;
 
@@ -253,6 +259,12 @@ export function rowPadSize(jsonLength) {
 export function stationPadSize(jsonLength) {
   for (const rung of STATION_PAD_LADDER) if (jsonLength + LEN_PREFIX <= rung) return rung;
   return null;
+}
+
+/** The next DOC_PAD_STEP that holds it, else null (over DOC_PAD_MAX). @param {number} jsonLength */
+export function docPadSize(jsonLength) {
+  const need = jsonLength + LEN_PREFIX;
+  return need <= DOC_PAD_MAX ? Math.ceil(need / DOC_PAD_STEP) * DOC_PAD_STEP : null;
 }
 
 /** u32be(length) || bytes || zero filler, `size` bytes in all. @param {Uint8Array} bytes @param {number} size */
@@ -528,7 +540,7 @@ async function eciesKey(shared, epk, fp, info, use) {
 
 /**
  * One ECIES seal. opts.ephemeralJwk / opts.iv only for test vectors.
- * @param {{ prefix: string, info: string, padTo: (n: number) => number|null, sizes: number[] }} suite
+ * @param {{ prefix: string, info: string, padTo: (n: number) => number|null, sizes: number[] | ((n: number) => boolean) }} suite
  * @param {Uint8Array|string} recipientPub @param {string} id @param {string} night @param {string} kind
  * @param {unknown} record @param {{ ephemeralJwk?: JsonWebKey, iv?: Uint8Array }} opts
  */
@@ -566,7 +578,7 @@ async function eciesSeal(suite, recipientPub, id, night, kind, record, opts) {
 /**
  * One ECIES open; null for anything that does not open (wrong key, a field
  * changed, damaged).
- * @param {{ prefix: string, info: string, padTo: (n: number) => number|null, sizes: number[] }} suite
+ * @param {{ prefix: string, info: string, padTo: (n: number) => number|null, sizes: number[] | ((n: number) => boolean) }} suite
  * @param {{ privateKey: CryptoKey, publicKey: string, kid: string }} ring
  * @param {string} id @param {string} night @param {string} kind @param {any} wire
  */
@@ -582,7 +594,7 @@ async function eciesOpen(suite, ring, id, night, kind, wire) {
     const shared = await crypto.subtle.deriveBits({ name: 'ECDH', public: await importPublic(epk) }, ring.privateKey, 256);
     const key = await eciesKey(shared, epk, await fingerprint(ring.publicKey), suite.info, 'decrypt');
     const padded = new Uint8Array(await crypto.subtle.decrypt({ name: 'AES-GCM', iv, additionalData: aad }, key, ct));
-    if (!suite.sizes.includes(padded.length)) return null;
+    if (!(typeof suite.sizes === 'function' ? suite.sizes(padded.length) : suite.sizes.includes(padded.length))) return null;
     const json = unpad(padded);
     return json ? JSON.parse(new TextDecoder().decode(json)) : null;
   } catch {
@@ -592,6 +604,36 @@ async function eciesOpen(suite, ring, id, night, kind, wire) {
 
 const ROW_SUITE = { prefix: AAD_HIST, info: INFO_HIST, padTo: rowPadSize, sizes: [ROW_PAD] };
 const STATION_SUITE = { prefix: AAD_STATION, info: INFO_STATION, padTo: stationPadSize, sizes: STATION_PAD_LADDER };
+const DOC_SUITE = {
+  prefix: AAD_DOC, info: INFO_DOC, padTo: docPadSize,
+  sizes: (/** @type {number} */ n) => n > 0 && n <= DOC_PAD_MAX && n % DOC_PAD_STEP === 0,
+};
+
+/**
+ * Seal one document (the presentation deck, owner 2026-11-01) to history:pub,
+ * so only someone who types the passphrase can open it. Its own suite (AAD
+ * prefix doc1:, HKDF info kvbc-doc-v1), so a document can never pass for a
+ * history row or a station bundle. null when it cannot be sealed (a bad id /
+ * night / kind, or over DOC_PAD_MAX).
+ * @param {Uint8Array|string} historyPub
+ * @param {{ id: string, night: string, kind: string, record: unknown }} doc
+ * @param {{ ephemeralJwk?: JsonWebKey, iv?: Uint8Array }} [opts]
+ * @returns {Promise<{ v: number, kid: string, epk: string, iv: string, ct: string }|null>}
+ */
+export async function sealDocument(historyPub, doc, opts = {}) {
+  if (!doc) return null;
+  return eciesSeal(DOC_SUITE, historyPub, doc.id, doc.night, doc.kind, doc.record, opts);
+}
+
+/**
+ * Open a sealed document ({id, night, kind, v, kid, epk, iv, ct}) with the
+ * unwrapped history key ring. null when it will not open.
+ * @param {{ privateKey: CryptoKey, publicKey: string, kid: string }} ring @param {any} wire
+ */
+export async function openDocument(ring, wire) {
+  if (!wire) return null;
+  return eciesOpen(DOC_SUITE, ring, wire.id, wire.night, wire.kind, wire);
+}
 
 /** Does this value carry a medical key anywhere? @param {unknown} value @returns {boolean} */
 export function hasMedicalKey(value) {

@@ -53,6 +53,7 @@ import { mountBarf } from './barf.js';
 import { Screens } from './screens.js';
 import { JourneyRemote, mountJourneyRemote } from './journeyRemote.js';
 import { Classroom, mountClassroom } from './classroom.js';
+import { Presentation, mountPresentation } from './presentation.js';
 import { parseSession, sessionBody } from './session.js';
 import { BadRequest, fail, json } from './http.js';
 import { Registry } from './registry.js';
@@ -255,6 +256,15 @@ export class SyncCore {
       ring: (payload) => { this.broadcast(frameText(DOORBELL_EVENT, payload)); },
     });
     mountClassroom(this.registry, this);   // /v1/classroom/* (routes.md 10.13)
+    // The presentation (presentation.js, routes.md 10.14): the sealed congregation deck the
+    // weekly AwanaReports job sends, and the slide every presentation screen shows.
+    this.presentation = new Presentation({
+      storage: this.storage,
+      now: this.now,
+      env: () => this.rawEnv || {},
+      historyKid: async () => (await this.storage.get('history:pub'))?.kid || null,
+    });
+    mountPresentation(this.registry, this);   // /v1/presentation/* (routes.md 10.14)
     // The change log (changes.js, routes.md 10.5): every write path below logs who
     // (device.js), when, which keys, before and after; a module that owns an
     // undoable kind adds its undoer to `undoers`.
