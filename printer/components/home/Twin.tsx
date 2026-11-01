@@ -41,9 +41,11 @@ interface Props {
   onEvent?: (what: string, data: Record<string, unknown>) => void;
   onReady?: () => void;
   className?: string;
+  /** The lobby twin plays the flagship's 3D intro every pass (the welcome scene; site/showcase/stub.js). */
+  intro?: boolean;
 }
 
-export const Twin = forwardRef<TwinHandle, Props>(({ kind, at, width, height, title, interactive, onEvent, onReady, className = '' }, ref) => {
+export const Twin = forwardRef<TwinHandle, Props>(({ kind, at, width, height, title, interactive, onEvent, onReady, className = '', intro = false }, ref) => {
   const box = useRef<HTMLDivElement>(null);
   const frame = useRef<HTMLIFrameElement>(null);
   const ready = useRef(false);
@@ -100,7 +102,7 @@ export const Twin = forwardRef<TwinHandle, Props>(({ kind, at, width, height, ti
         <iframe
           ref={frame}
           className="kv-twin__frame"
-          src={`${SRC[kind]}?at=${encodeURIComponent(at)}`}
+          src={`${SRC[kind]}?at=${encodeURIComponent(at)}${intro ? '&intro=1' : ''}`}
           title={title}
           width={width}
           height={height}

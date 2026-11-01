@@ -10,8 +10,9 @@ import { Reel } from './components/home/Reel';
  *
  *   #reel    the film, first (owner, 2026-10-16: "get the video to the top")
  *   #top     the opening: the time, and what this is
- *   #night   the night (components/home/Night.tsx): #doors (#phone, #labels,
- *            #lobby), #promos, #projector, #journey (#remote), #pickup (#app)
+ *   #night   the night (components/home/Night.tsx): #welcome, #doors (#phone,
+ *            #labels, #lobby), #promos, #opening, #projector, #journey
+ *            (#remote), #pickup (#app)
  *   #end     8:00: that's a club night, and the Lights out switch
  *   footer   the practical links, quietly
  *
@@ -42,8 +43,10 @@ const Clock: React.FC = () => {
 
 /** The evening's program, as the printed sheet on the welcome table has it. */
 const PROGRAM: [string, string, string][] = [
-  ['6:00', 'Doors open', '#doors'],
-  ['6:02', 'Coming up', '#promos'],
+  ['5:45', 'Welcome in', '#welcome'],
+  ['5:50', 'Doors open', '#doors'],
+  ['5:55', 'Coming up', '#promos'],
+  ['6:00', 'The opening', '#opening'],
   ['6:05', 'Game time', '#projector'],
   ['6:30', 'Journey', '#journey'],
   ['7:30', 'Pickup', '#pickup'],
@@ -60,9 +63,9 @@ const Opening: React.FC = () => {
         <h1 className="kv-open__title" id="open-title">One club night, on the real screens.</h1>
         <p className="kv-open__line">
           Every screen below is the software our Awana<sup>®</sup> club runs on, playing a made-up night. Scroll to
-          open the doors; tap a name when you get there.
+          start it; tap a name when the doors open.
         </p>
-        <a className="kv-open__go" href="#doors">Open the doors</a>
+        <a className="kv-open__go" href="#welcome">Start the night</a>
         <nav className="kv-program" aria-label="Tonight">
           <p className="kv-program__head">Tonight</p>
           <ol className="kv-program__list">

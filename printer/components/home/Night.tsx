@@ -6,9 +6,13 @@ import { Twin, TwinHandle } from './Twin';
  * Wednesday evening at Kennebec Valley Baptist Church, played on the REAL
  * screens (Twin.tsx), with the time of night as its spine:
  *
- *   #doors     6:00  the check-in page on a phone (the reader taps names, or it
+ *   #welcome   5:45  the lobby TV's welcome: the church's logo and the 3D intro
+ *                    video (owner 2026-11-01: "the new welcome graphics")
+ *   #doors     5:50  the check-in page on a phone (the reader taps names, or it
  *                    taps on its own), the label each tap prints, the lobby TV
- *   #promos    6:02  the lobby TV looping every season poster (the lobby's own list)
+ *   #promos    5:55  the lobby TV looping every season poster (the lobby's own
+ *                    list: the Grand Prix video too)
+ *   #opening   6:00  the projector wall: the countdown runs out, the grand welcome
  *   #projector 6:05  the projector wall: game time
  *   #journey   6:30  the Journey room's PC: the lesson starts, run from the
  *                    leader's phone remote (#remote; the reader may press too)
@@ -32,11 +36,11 @@ const reduced = () => typeof window.matchMedia === 'function' && window.matchMed
 // ── The clock on the page ────────────────────────────────────────────────────
 interface ClockState { at: string; since: number }
 const ClockCtx = createContext<{ clock: ClockState; enter: (at: string) => void }>({
-  clock: { at: '17:59:00', since: 0 }, enter: () => {},
+  clock: { at: '17:44:30', since: 0 }, enter: () => {},
 });
 
 export const NightClock: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [clock, setClock] = useState<ClockState>({ at: '17:59:00', since: Date.now() });
+  const [clock, setClock] = useState<ClockState>({ at: '17:44:30', since: Date.now() });
   const enter = useCallback((at: string) => setClock((c) => (c.at === at ? c : { at, since: Date.now() })), []);
   return <ClockCtx.Provider value={{ clock, enter }}>{children}</ClockCtx.Provider>;
 };
@@ -91,7 +95,35 @@ const Time: React.FC<{ hm: string; ampm?: string }> = ({ hm, ampm = 'PM' }) => (
 
 const Tag: React.FC<{ children: React.ReactNode }> = ({ children }) => <p className="kv-tag">{children}</p>;
 
-// ── 6:00 Doors open ──────────────────────────────────────────────────────────
+// ── 5:45 Welcome ─────────────────────────────────────────────────────────────
+// The lobby's welcome (owner, 2026-11-01: the home page shows the new welcome
+// graphics): the flagship slide, the church's logo landing big in the middle,
+// carrying on into the 3D intro video and back, on every pass of this twin
+// (`intro`; lobby/src/lib/flagship.js showcaseIntro). The real lobby plays the
+// video now and then; here it plays each time round.
+const Welcome: React.FC = () => {
+  const [ref] = useScene('17:45:00');
+  return (
+    <section ref={ref} id="welcome" className="kv-scene kv-scene--welcome" aria-labelledby="welcome-title">
+      <div className="kv-wrap kv-scene__grid">
+        <div className="kv-scene__copy">
+          <Time hm="5:45" />
+          <h2 className="kv-scene__title" id="welcome-title">Welcome in.</h2>
+          <p className="kv-scene__line">Before the first family walks in, the lobby is already saying hello: the church's logo lands, then the club's friends fly through.</p>
+        </div>
+        <div className="kv-scene__stage">
+          <figure className="kv-device kv-device--tv">
+            <Twin kind="lobby" at={wall('17:45:00')} width={1600} height={900} intro
+              title="The lobby TV's welcome: the church's logo, then the 3D intro video" />
+            <figcaption><Tag>Lobby TV · welcome</Tag></figcaption>
+          </figure>
+        </div>
+      </div>
+    </section>
+  );
+};
+
+// ── 5:50 Doors open ──────────────────────────────────────────────────────────
 // The showcase's club, in the order the check-in page taps them by itself.
 const ARRIVALS = [
   'Maya Brightwater', 'Noah Fairbanks', 'Ella Marchetti', 'Leo Castellan', 'Owen Pemberly', 'Lucy Ambrose',
@@ -119,7 +151,7 @@ const Printer: React.FC<{ printed: Printed[] }> = ({ printed }) => {
 };
 
 const Doors: React.FC = () => {
-  const [ref, active] = useScene('18:00:30');
+  const [ref, active] = useScene('17:50:30');
   const phone = useRef<TwinHandle>(null);
   const tv = useRef<TwinHandle>(null);
   const [printed, setPrinted] = useState<Printed[]>([]);
@@ -160,20 +192,20 @@ const Doors: React.FC = () => {
     <section ref={ref} id="doors" className="kv-scene kv-scene--doors" aria-labelledby="doors-title">
       <div className="kv-wrap kv-scene__grid">
         <div className="kv-scene__copy">
-          <Time hm="6:00" />
+          <Time hm="5:50" />
           <h2 className="kv-scene__title" id="doors-title">Doors open.</h2>
           <p className="kv-scene__line">Tap a name on the phone. A label prints and the lobby says hello.</p>
         </div>
         <div className="kv-scene__stage kv-doors">
           <figure id="phone" className="kv-device kv-device--phone">
-            <Twin ref={phone} kind="checkin" at={wall('18:00:30')} width={390} height={844} interactive
+            <Twin ref={phone} kind="checkin" at={wall('17:50:30')} width={390} height={844} interactive
               title="The check-in page, awana.kvbchurch.org/checkin, with a made-up roster: tap a name to check that child in"
               onEvent={(what, data) => { if (what === 'checkin') onCheckin(data); }} />
             <figcaption><Tag>Check-in · any phone</Tag></figcaption>
           </figure>
           <div id="labels" className="kv-doors__printer"><Printer printed={printed} /></div>
           <figure id="lobby" className="kv-device kv-device--tv">
-            <Twin ref={tv} kind="lobby" at={wall('18:00:30')} width={1600} height={900}
+            <Twin ref={tv} kind="lobby" at={wall('17:50:30')} width={1600} height={900}
               title="The lobby TV, welcoming each child by first name" />
             <figcaption><Tag>Lobby TV</Tag></figcaption>
           </figure>
@@ -183,7 +215,7 @@ const Doors: React.FC = () => {
   );
 };
 
-// ── 6:02 Coming up: the season's posters ─────────────────────────────────────
+// ── 5:55 Coming up: the season's posters ─────────────────────────────────────
 // Every poster the lobby has, on a loop, on its own TV (owner, 2026-10-16: "a
 // section for the promos that plays all of them on loop. Then any new ones can
 // get added"). The list is the lobby's own (PREVIEW_PROMOS, handed up by the
@@ -195,7 +227,7 @@ const PROMO_START_MS = 5000; // a poster that never comes up is skipped
 const PROMO_MAX_MS = 40000; // and one that never ends is moved on from
 
 const Promos: React.FC = () => {
-  const [ref, active] = useScene('18:02:00');
+  const [ref, active] = useScene('17:55:00');
   const tv = useRef<TwinHandle>(null);
   const [list, setList] = useState<PromoItem[]>([]);
   const [now, setNow] = useState<PromoItem | null>(null);
@@ -234,9 +266,9 @@ const Promos: React.FC = () => {
     <section ref={ref} id="promos" className="kv-scene kv-scene--promos" aria-labelledby="promos-title">
       <div className="kv-wrap kv-scene__grid">
         <div className="kv-scene__copy">
-          <Time hm="6:02" />
+          <Time hm="5:55" />
           <h2 className="kv-scene__title" id="promos-title">Coming up.</h2>
-          <p className="kv-scene__line">Between arrivals, the lobby tells families what's next: every poster of the season, one after another.</p>
+          <p className="kv-scene__line">Between arrivals, the lobby tells families what's next: every poster and promo video of the season, one after another.</p>
           {list.length > 0 && (
             <ol className="kv-promos__list" aria-label="The season's posters">
               {list.map((p) => <li key={p.key} className={now && now.key === p.key ? 'is-on' : undefined}>{p.label}</li>)}
@@ -245,9 +277,36 @@ const Promos: React.FC = () => {
         </div>
         <div className="kv-scene__stage">
           <figure className="kv-device kv-device--tv">
-            <Twin ref={tv} kind="lobby" at={wall('18:02:00')} width={1600} height={900} onEvent={onEvent}
+            <Twin ref={tv} kind="lobby" at={wall('17:55:00')} width={1600} height={900} onEvent={onEvent}
               title="The lobby TV playing the season's posters, one after another" />
             <figcaption><Tag>{now ? `Lobby TV · ${now.label}` : 'Lobby TV'}</Tag></figcaption>
+          </figure>
+        </div>
+      </div>
+    </section>
+  );
+};
+
+// ── 6:00 The opening ─────────────────────────────────────────────────────────
+// The projector's countdown reaches 0:00 and the grand welcome plays (owner,
+// 2026-10-19: "an epic welcome to Awana opening animation"): the six club bands,
+// WELCOME letter by letter, the church's logo, the club marks, confetti. Every
+// screen in the building shows it at that moment.
+const OpeningCeremony: React.FC = () => {
+  const [ref] = useScene('17:59:52');
+  return (
+    <section ref={ref} id="opening" className="kv-scene kv-scene--opening" aria-labelledby="opening-title">
+      <div className="kv-wrap kv-scene__grid">
+        <div className="kv-scene__copy">
+          <Time hm="6:00" />
+          <h2 className="kv-scene__title" id="opening-title">The opening.</h2>
+          <p className="kv-scene__line">The countdown hits zero and the whole gym gets its welcome. Every screen in the building plays it at once.</p>
+        </div>
+        <div className="kv-scene__stage">
+          <figure className="kv-device kv-device--wall">
+            <Twin kind="projector" at={wall('17:59:52')} width={1600} height={900}
+              title="The projector wall: the countdown reaches zero and the grand welcome plays" />
+            <figcaption><Tag>Projector wall · grand welcome</Tag></figcaption>
           </figure>
         </div>
       </div>
@@ -437,8 +496,10 @@ const Pickup: React.FC = () => {
 /** The night, scene by scene. */
 export const Night: React.FC = () => (
   <div id="night" className="kv-night">
+    <Welcome />
     <Doors />
     <Promos />
+    <OpeningCeremony />
     <Games />
     <Journey />
     <Pickup />
