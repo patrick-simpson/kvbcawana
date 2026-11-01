@@ -4,15 +4,22 @@
 // reel/README.md), about 1:01, every screen ONCE ("Should it be shortened in
 // order to just show once, and put more in time with the music?": yes). The
 // title (the clock ticking to 6:00, as on the home page) as the band comes in,
-// then the night's screens swept in two bars each over the verse; the first
-// chorus cuts hard (game time on its first hit, the season's posters a bar
-// each, Journey with the leader's remote, the milestone, pickup, Settings),
+// then the night's screens swept in two bars each over the verse (the
+// countdown hitting 0:00 into the projector's grand welcome); the first
+// chorus cuts hard (game time on its first hit, the lobby's welcome video, the
+// season's posters and the Grand Prix a bar each, Journey with the leader's
+// remote, the milestone, pickup, Settings),
 // then every screen at once across the splice (edit.mjs), and the end card
 // with the church's logo on the song's last hit. Inside each shot the moment
 // itself lands on a beat: a name, a tap, a label, the countdown's 0:00 (the
 // shots are filmed with their cues one bar apart; the offsets below seat them).
 // Words are corner labels only, plus the title and the end card's credit and
 // trademark line.
+//
+// Owner, 2026-11-01: add the new welcome graphics (the projector's grand
+// welcome, the lobby's 3D intro video) and the Grand Prix promo, keep
+// everything else, keep it a minute: Settings and the every-screen grid give
+// up a bar each.
 //
 // Real footage comes from record.mjs (/work/footage/<shot>/), the labels from
 // labels.cjs (/work/labels/); everything else is drawn from the brand kit.
@@ -261,7 +268,8 @@ function plate(parent, footage, { w, h, outline = '#fff', face = '#000' }) {
 
 const F = {};
 for (const name of ['lobby-open', 'lobby-run', 'lobby-milestone', 'lobby-pickup', 'projector-countdown',
-  'projector-game', 'journey-slides', 'remote', 'phone', 'settings', 'promo-barf', 'promo-snow', 'promo-contest', 'promo-parents']) F[name] = new Footage(name);
+  'projector-game', 'journey-slides', 'remote', 'phone', 'settings', 'promo-barf', 'promo-snow', 'promo-contest', 'promo-parents',
+  'flagship-intro', 'promo-grandprix']) F[name] = new Footage(name);
 
 /* ── The night, cut to the music (owner, 2026-10-16) ──────────────────
    A whole-system montage on "Happy Dance"'s beat: one title, then the real
@@ -393,7 +401,7 @@ function everything(root, tiles) {
   return (t) => {
     put(head, { o: prog(t, 0.1, 0.3) });
     items.forEach((it, i) => {
-      const t0 = b(i * 2);
+      const t0 = b(i * 1.5); // a tile every beat and a half (the grid has 12 beats since 2026-11-01)
       const s = t < t0 ? 0 : lerp(0.6, 1, spring(t, t0, 1.3));
       put(it.box, { x: it.x, y: it.y, s, o: t >= t0 ? 1 : 0 });
       put(it.tag, { x: it.x + 6, y: it.y + th + 22, o: prog(t, t0 + 0.2, 0.2) });
@@ -467,30 +475,39 @@ function build() {
   S('lobby-open', 24, 32, (r) => shot(r, { clip: 'lobby-open', at: (t) => 3.79 + t, label: 'Lobby TV', field: C.sun, accent: C.orange }));
   // A run, a name a bar (the lobby holds each 1.92 s): on beats 2 and 6.
   S('lobby-run', 32, 40, (r) => shot(r, { clip: 'lobby-run', at: (t) => 0.29 + t, label: 'Lobby TV', field: C.sparks, accent: C.sparksDeep, from: 'left' }));
-  // The countdown hits 0:00 (clip 8.75 s) on beat 4; the opening lands before the chorus.
-  S('countdown', 40, 48, (r) => shot(r, { clip: 'projector-countdown', at: (t) => 6.83 + t, label: 'Projector wall', field: '#000', accent: C.sun }), false);
+  // The countdown hits 0:00 (clip 8.7 s) on beat 1. The wall then holds black for
+  // its lead (to 11.2 s), so on beat 3 the shot cuts to the grand welcome's bands,
+  // WELCOME landing letter by letter and the church's logo, a little quick.
+  S('countdown', 40, 48, (r) => shot(r, {
+    clip: 'projector-countdown', at: (t) => (t < b(3) ? 8.22 + t : 11.2 + (t - b(3)) * 1.3),
+    label: 'Projector wall · grand welcome', field: '#000', accent: C.sun,
+  }), false);
   // The first chorus (song beats 96-151): hard cuts.
   const cut = (name, from, to, opts) => S(name, from, to, (r) => shot(r, { sweep: false, accent: opts.field, ...opts }), false);
   // Game time: WRAP IT UP (clip 5.0 s) on beat 4.
   cut('game', 48, 56, { clip: 'projector-game', at: (t) => 3.08 + t, label: 'Game time', field: '#000' });
+  // The lobby's welcome video: the club's friends fly through (video 2.4 s on).
+  cut('flagship-intro', 56, 60, { clip: 'flagship-intro', at: (t) => 2.4 + t * 1.3, label: 'Lobby TV · welcome', field: C.sky });
   // The season's posters, a bar each, a little quick, each on its big moment.
-  cut('promo-barf', 56, 60, { clip: 'promo-barf', at: (t) => 4.6 + t * 1.4, label: 'Lobby TV · BARF Night', field: '#5B2C83' });
-  cut('promo-contest', 60, 64, { clip: 'promo-contest', at: (t) => 6.85 + t * 1.2, label: 'Lobby TV · poster contest', field: C.blueDeep });
-  cut('promo-parents', 64, 68, { clip: 'promo-parents', at: (t) => 8.85 + t * 1.2, label: "Lobby TV · Parents' Night", field: C.orange });
-  cut('promo-snow', 68, 72, { clip: 'promo-snow', at: (t) => 5.6 + t, label: 'Lobby TV · snow alerts', field: '#1B2F66' });
+  cut('promo-barf', 60, 64, { clip: 'promo-barf', at: (t) => 4.6 + t * 1.4, label: 'Lobby TV · BARF Night', field: '#5B2C83' });
+  cut('promo-contest', 64, 68, { clip: 'promo-contest', at: (t) => 6.85 + t * 1.2, label: 'Lobby TV · poster contest', field: C.blueDeep });
+  cut('promo-parents', 68, 72, { clip: 'promo-parents', at: (t) => 8.85 + t * 1.2, label: "Lobby TV · Parents' Night", field: C.orange });
+  cut('promo-snow', 72, 76, { clip: 'promo-snow', at: (t) => 5.6 + t, label: 'Lobby TV · snow alerts', field: '#1B2F66' });
+  // The Grand Prix: the lobby strains and rips (video 1.8-2.4 s) on beat 1, its logo on beat 3.
+  cut('promo-grandprix', 76, 80, { clip: 'promo-grandprix', at: (t) => 1.2 + t * 1.4, label: 'Lobby TV · Grand Prix', field: '#17151c' });
   // Journey with the leader's remote: each Next (clip 1.0 s, 2.92 s) settles on beats 2 and 6.
-  S('journey', 72, 80, (r) => pair(r, { at: (t) => 0.54 + t, field: C.journeyInk }), false);
-  cut('milestone', 80, 84, { clip: 'lobby-milestone', at: (t) => t, label: 'Lobby TV', field: C.tnt });
+  S('journey', 80, 88, (r) => pair(r, { at: (t) => 0.54 + t, field: C.journeyInk }), false);
+  cut('milestone', 88, 92, { clip: 'lobby-milestone', at: (t) => t, label: 'Lobby TV', field: C.tnt });
   // Pickup: "Owen has checked out" (clip about 4.3 s) on beat 2.
-  cut('pickup', 84, 88, { clip: 'lobby-pickup', at: (t) => 3.34 + t, label: 'Pickup board', field: C.orange });
-  // Settings: the two taps (clip 2.0 s, 3.92 s) on beats 2 and 6.
-  cut('settings', 88, 96, { clip: 'settings', at: (t) => 1.04 + t, label: 'Settings · any device', field: C.cream, ratio: 1.6 });
+  cut('pickup', 92, 96, { clip: 'lobby-pickup', at: (t) => 3.34 + t, label: 'Pickup board', field: C.orange });
+  // Settings: the first tap (clip 2.0 s) on beat 2.
+  cut('settings', 96, 100, { clip: 'settings', at: (t) => 1.04 + t, label: 'Settings · any device', field: C.cream, ratio: 1.6 });
   // Every screen at once, across the splice (film 104 = song beat 376).
-  S('everything', 96, 112, (r) => everything(r, [
+  S('everything', 100, 112, (r) => everything(r, [
     { clip: 'lobby-run', at: (t) => 2.2 + t, label: 'Lobby TV' },
     { clip: 'projector-game', at: (t) => 1 + t, label: 'Projector' },
     { clip: 'journey-slides', at: (t) => 0.5 + t * 0.5, label: 'Journey room' },
-    { clip: 'promo-barf', at: (t) => 9 + t, label: 'Lobby TV' },
+    { clip: 'promo-grandprix', at: (t) => 3.6 + t * 0.6, label: 'Lobby TV' },
     { clip: 'lobby-pickup', at: (t) => 0.4 + t, label: 'Pickup board' },
     { clip: 'settings', at: (t) => 1.5 + t * 0.6, label: 'Settings' },
   ]), false);

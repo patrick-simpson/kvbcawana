@@ -5,7 +5,8 @@
 //   node reel/record.mjs                 every shot
 //   node reel/record.mjs lobby-run ...   just these
 //   node reel/record.mjs --fps 30 ...    a quicker, rougher pass
-import { existsSync, rmSync, writeFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { serve } from './lib/serve.mjs';
@@ -18,9 +19,30 @@ const WORK = path.join(HERE, '.work');
 const SITE = path.join(ROOT, 'site', 'dist');
 
 export async function record(names, { fps = 60 } = {}) {
+  names = [...names];
   if (!existsSync(path.join(SITE, 'lobby', 'index.html'))) {
     throw new Error('site/dist is not built: run `SITE_ORIGIN=https://awana.kvbchurch.org node site/build.mjs` at the repo root first');
   }
+  // The lobby's own video files (the flagship's 3D intro, the Grand Prix promo):
+  // the screen draws them full frame, the first and last frames ARE the lobby,
+  // so their frames are the footage, taken straight from the file the lobby
+  // plays (a <video> does not run on the virtual clock).
+  const fromVideo = names.filter((n) => SHOTS[n] && SHOTS[n].video);
+  for (const name of fromVideo) {
+    const spec = SHOTS[name];
+    const dir = path.join(WORK, 'footage', name);
+    rmSync(dir, { recursive: true, force: true });
+    mkdirSync(dir, { recursive: true });
+    execFileSync('ffmpeg', ['-v', 'error', '-y', '-ss', String(spec.from || 0), '-t', String(spec.seconds), '-i', path.join(ROOT, spec.video),
+      '-vf', `fps=${fps},scale=1920:1080`, '-q:v', '2', '-start_number', '0', path.join(dir, '%05d.jpg')]);
+    const frames = readdirSync(dir).filter((f) => f.endsWith('.jpg')).length;
+    writeFileSync(path.join(dir, 'meta.json'), `${JSON.stringify({
+      fps, seconds: spec.seconds, frames, viewport: { width: 1920, height: 1080 }, dpr: 1, taps: [], video: spec.video, from: spec.from || 0,
+    }, null, 2)}\n`);
+    console.log(`  ${name}: ${frames} frames from ${spec.video}`);
+  }
+  names = names.filter((n) => !fromVideo.includes(n));
+  if (!names.length) return;
   const srv = await serve({ site: SITE, film: path.join(HERE, 'film'), work: WORK });
   const browser = await launch();
   try {

@@ -20,7 +20,7 @@ which the page plays; everything in between goes to `reel/.work/` (ignored).
 | Step | File | What it does |
 | --- | --- | --- |
 | Labels | `labels.cjs` | Real 4x2 labels from the print server's own renderer (`generateLabel()` through `/preview`), for a made-up roster. |
-| Footage | `record.mjs`, `shots.mjs`, `lib/vclock.mjs` | The real screens from `site/dist` (the lobby, the projector, Journey, `/checkin`, `/settings`), driven the way their own e2e suites drive them (the stand-in live channel, `lib/live.mjs`; a stand-in check-in service behind the phone page, `lib/phone.mjs`), filmed frame by frame on a virtual clock at 60 fps. |
+| Footage | `record.mjs`, `shots.mjs`, `lib/vclock.mjs` | The real screens from `site/dist` (the lobby, the projector, Journey, `/checkin`, `/settings`), driven the way their own e2e suites drive them (the stand-in live channel, `lib/live.mjs`; a stand-in check-in service behind the phone page, `lib/phone.mjs`), filmed frame by frame on a virtual clock at 60 fps. The lobby's two videos (the flagship's 3D intro, the Grand Prix promo) are taken frame by frame from the very files the lobby plays (a shot with `video`): the screen draws them full frame, and a `<video>` does not run on the virtual clock. |
 | Film | `film/` (`film.js`, `kit.js`, `lib.js`, `film.css`), `render.mjs` | The motion graphics and the edit in one page: the opener, the section cards, the closer, the footage on the catalog's plates. Every frame is a pure function of time, rendered by seeking and screenshotting. |
 | Edit | `edit.mjs` | Cuts the soundtrack to the film (bars 2-31, then the final phrase), mixes it, and encodes the deliverables. |
 
@@ -66,3 +66,10 @@ screen once, in time with the music). Inside a shot the moment itself sits on
 a beat too: `shots.mjs` cues things one bar (1.92 s) apart (the lobby holds a
 name one bar), and `film.js` offsets each clip so the name, tap, label or
 0:00 lands on beat 2, 4 or 6 of its shot.
+
+Owner, 2026-11-01: the new welcome graphics and the Grand Prix join, nothing
+leaves, the film stays a minute. The countdown now hits 0:00 on beat 2 of its
+shot, so the projector's grand welcome fills the rest of it; the chorus gains
+the lobby's welcome video and the Grand Prix tearing open (a bar each), and
+Settings (one tap) and the every-screen grid (starting at film beat 100) each
+give up a bar.

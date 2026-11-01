@@ -120,9 +120,17 @@ export const SHOTS = {
   'promo-snow': promoShot('snowAlertsStorm', 20.5),
   'promo-contest': promoShot('contest', 15.5),
   'promo-parents': promoShot('parents', 15.5),
-  // The projector: the countdown runs out at 6:00 and the opening begins.
+  // The new welcome graphics and the Grand Prix (owner, 2026-11-01): the lobby's
+  // two videos, taken from the very files it plays (record.mjs; their first and
+  // last frames are the lobby itself). `from` and `seconds`: the part the film uses.
+  // The flagship's 3D intro: the club's friends fly through, the logo comes back.
+  'flagship-intro': { video: 'lobby/public/intro/awana-intro.mp4', from: 0, seconds: 9 },
+  // The Awana Grand Prix: the lobby strains and tears open on the race's logo.
+  'promo-grandprix': { video: 'lobby/public/promos/grand-prix.mp4', from: 0, seconds: 7 },
+  // The projector: the countdown runs out at 6:00 and the grand welcome plays
+  // (owner, 2026-10-19; the film shows its first seconds, 2026-11-01).
   'projector-countdown': {
-    url: '/lobby/countdown', time: at('17:59:49'), seconds: 15,
+    url: '/lobby/countdown', time: at('17:59:49'), seconds: 18,
     setup: projector,
     ready: 'body',
     warmup: async (shot) => { await shot.run(1.5); },
