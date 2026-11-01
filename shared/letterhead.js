@@ -41,11 +41,10 @@ export const MAX_TEXT = 20000;
 /**
  * The ministry's five words, one a year, in order (owner 2026-10-28; on the
  * page as the words alone, never named as a plan). PLAN_NOW is this year's,
- * drawn as the hot pill: move it on when the year turns. 2026-27 is Protect
- * (owner's five-year ministry focus: 2023-24 Belong ... 2027-28 Grow).
+ * drawn as the hot pill: move it on when the year turns.
  */
 export const PLAN_WORDS = Object.freeze(['Belong', 'Believe', 'Become', 'Protect', 'Grow']);
-export const PLAN_NOW = 'Protect';
+export const PLAN_NOW = 'Believe';
 
 const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
 const MONTH_WORD = /^(jan(uary)?|feb(ruary)?|mar(ch)?|apr(il)?|may|june?|july?|aug(ust)?|sept?(ember)?|oct(ober)?|nov(ember)?|dec(ember)?)\.?$/i;
