@@ -662,7 +662,18 @@ LAND = dict(welcome_w=8.4, welcome_z=2.35, logo_w=8.6, logo_z=-0.15,
             tile_w=1.62, tile_h=1.12, tile_z=-2.6, pitch=1.86)
 
 
-def build_landed(look="plastic", coll=None, welcome_colors=None, warm=False):
+# The words at the peak (owner 2026-11-01: "It should say welcome to Awana"):
+# each wording = its lines of shout (text, width, height of centre) and the
+# church's full logo (width, height of centre), in metres on the landed layout.
+WORDINGS = {
+    "welcome":  ([("WELCOME", 8.4, 2.35)], (8.6, -0.15)),
+    "to_logo":  ([("WELCOME TO", 7.6, 2.5)], (9.6, -0.1)),
+    "to_awana": ([("WELCOME TO", 5.2, 3.15), ("AWANA", 7.2, 1.45)], (5.4, -0.95)),
+    "one_line": ([("WELCOME TO AWANA", 11.4, 2.45)], (8.2, -0.15)),
+}
+
+
+def build_landed(look="plastic", coll=None, welcome_colors=None, warm=False, wording="welcome"):
     """WELCOME + the church's full logo + the six club marks, landed.
     look: plastic | paper | neon. Returns the pieces for later dressing."""
     L = LAND
@@ -670,9 +681,11 @@ def build_landed(look="plastic", coll=None, welcome_colors=None, warm=False):
     if look == "plastic":
         face = plastic(HOUSE["cream"] if warm else "#FFFFFF", rough=0.16)
         side = plastic(HOUSE["hot"] if not warm else HOUSE["orange"], rough=0.25)
-        w = text_mesh("WELCOME", L["welcome_w"], 0.55, face, coll, bevel=0.03, side_mat=side)
-        move_to([w], z=L["welcome_z"])
-        res["letters"] = split_loose(w)
+        lines, (logo_w, logo_z) = WORDINGS[wording]
+        for text, width, z in lines:
+            w = text_mesh(text, width, 0.55 * width / L["welcome_w"], face, coll, bevel=0.03, side_mat=side)
+            move_to([w], z=z)
+            res["letters"] += split_loose(w)
         if welcome_colors:
             for p, c in zip(res["letters"], welcome_colors):
                 p.data.materials[0] = plastic(c, rough=0.16)
@@ -680,8 +693,8 @@ def build_landed(look="plastic", coll=None, welcome_colors=None, warm=False):
                     p.data.materials[1] = plastic(c, rough=0.3)
         lf = plastic(HOUSE["cream"] if warm else "#FFFFFF", rough=0.2)
         ls = plastic("#C9CDD6", rough=0.35)
-        res["logo"] = logo_mesh(L["logo_w"], 0.16, lf, coll, side_mat=ls)
-        move_to(res["logo"], z=L["logo_z"])
+        res["logo"] = logo_mesh(logo_w, 0.16, lf, coll, side_mat=ls)
+        move_to(res["logo"], z=logo_z)
         for i, club in enumerate(CLUBS):
             x = (i - 2.5) * L["pitch"]
             t = plate(f"Tile {club}", L["tile_w"], L["tile_h"], 0.28, (x, 0, L["tile_z"]),
@@ -1110,10 +1123,11 @@ def still_F1(sc):
     sc.eevee.use_volumetric_shadows = True
 
 
-def still_F2(sc):
-    """Feeling: wonder - still and hushed, starlight drifting up."""
+def still_F2(sc, wording="welcome"):
+    """Feeling: wonder - still and hushed, starlight drifting up.
+    (Also the chosen look, for trying the wordings: W1-W3.)"""
     world(sc, 0.18, "#7080C0")
-    build_landed("plastic")
+    build_landed("plastic", wording=wording)
     area("Key", (-4, -12, 9), (0, 0, 0), 1500, "#E6EEFF", 8)
     area("Rim L", (-7, 6, 4), (0, 0, 1), 2600, CLUB["journey"]["primary"], 3)
     area("Rim R", (7, 6, 4), (0, 0, 1), 2600, CLUB["puggles"]["primary"], 3)
@@ -1242,6 +1256,9 @@ STORY = [
     ("M3", "M3  Material: light and neon", lambda sc: still_M(sc, "neon")),
     ("E1", "E1  Easter egg: the whole frame (circled)", lambda sc: still_E(sc)),
     ("E2", "E2  Easter egg: close-up of the same spot", lambda sc: still_E(sc, close=True)),
+    ("W1", "W1  \"WELCOME TO\" over the church's logo", lambda sc: still_F2(sc, "to_logo")),
+    ("W2", "W2  \"WELCOME TO AWANA\" big, the logo below", lambda sc: still_F2(sc, "to_awana")),
+    ("W3", "W3  \"WELCOME TO AWANA\" on one line", lambda sc: still_F2(sc, "one_line")),
 ]
 
 
@@ -1517,7 +1534,8 @@ def contact_sheet():
             ("Story B: fly to the church doors", ["B1", "B2", "B3"]),
             ("The landed frame in 4 feelings", ["F1", "F2", "F3", "F4"]),
             ("The landed frame in 3 materials", ["M1", "M2", "M3"]),
-            ("Where a tiny \"2 Tim 2:15\" could hide", ["E1", "E2"])]
+            ("Where a tiny \"2 Tim 2:15\" could hide", ["E1", "E2"]),
+            ("The words at the peak, in the chosen look (wonder)", ["W1", "W2", "W3"])]
     labels = {sid: lab for sid, lab, _ in STORY}
     width = COLS * TW + (COLS + 1) * GAP
     title_h = 1.3

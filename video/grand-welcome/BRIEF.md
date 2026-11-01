@@ -62,6 +62,12 @@ Chosen:
 - The burst: sparkles and starlight (a soft flash, then brand sparkles drift
   out and twinkle), NOT confetti.
 - WELCOME: white letters with the cool blue and purple rim light (F2).
+- The words at the peak (owner 2026-11-01: "It should say welcome to Awana";
+  plain WELCOME over the logo read oddly): "WELCOME TO" over the church's
+  full logo, so the logo finishes the sentence ("Welcome to Kennebec Valley
+  Baptist Church Awana Clubs"); nothing says Awana twice (still W1,
+  `WORDINGS["to_logo"]` in stills.py; W2 "WELCOME TO / AWANA" big and W3
+  "WELCOME TO AWANA" on one line were turned down).
 - At the end the ribbons fade into starlight, leaving only WELCOME, the
   church's full logo and the six club marks (on their club-colour plates)
   before the hand-over to the US Pledge slide.
