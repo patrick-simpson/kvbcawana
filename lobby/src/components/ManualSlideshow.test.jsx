@@ -616,6 +616,24 @@ describe('ManualSlideshow: the flagship\'s 3D intro', () => {
   const intro = () => document.querySelector('video.flagship-intro');
   const chrome = () => document.querySelector('.lobby-chrome');
 
+  it("the home page's welcome twin (showcaseIntro) plays it on the very first pass; the real lobby never does", () => {
+    screenOf(1920, 1080);
+    window.__SHOWCASE__ = { kind: 'lobby', intro: true };
+    try {
+      render(<ManualSlideshow slides={[flagship, next]} slideshowDelaySec={5} />);
+      expect(intro()).not.toBeNull();
+      cleanup();
+      // The twin's deck is the flagship alone: it still plays.
+      render(<ManualSlideshow slides={[flagship]} slideshowDelaySec={5} />);
+      expect(intro()).not.toBeNull();
+    } finally {
+      delete window.__SHOWCASE__;
+    }
+    cleanup();
+    render(<ManualSlideshow slides={[flagship, next]} slideshowDelaySec={5} />);
+    expect(intro()).toBeNull();
+  });
+
   it('plays on the second pass on a 16:9 screen, owns that showing\'s end, and hands the tab and waves over', () => {
     screenOf(1920, 1080);
     const keys = [];

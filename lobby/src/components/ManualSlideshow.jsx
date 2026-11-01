@@ -11,7 +11,7 @@ import SlideCopy from './SlideCopy.jsx';
 import Wave from './brand/Wave.jsx';
 import PromoSlide from './PromoSlide.jsx';
 import FlagshipSlide from './FlagshipSlide.jsx';
-import { flagshipIntroLap, introFits, isFlagshipSlide } from '../lib/flagship.js';
+import { flagshipIntroLap, introFits, isFlagshipSlide, showcaseIntro } from '../lib/flagship.js';
 import { SEAMLESS_GRACE_SEC, isPromoSlide, promoForLap } from '../lib/promos.js';
 import {
   holdsCheckIns,
@@ -208,8 +208,11 @@ export default function ManualSlideshow({ slides, slideshowDelaySec, clubTint = 
   // motion on, on a screen it fits. Decided once per showing (a resize
   // mid-showing changes nothing). The intro then owns the showing's end, the
   // way a video slide's `ended` does, and hands the scene's tab and waves
-  // over to the video and back.
-  const wantIntro = kind === 'flagship' && !zero && !still && slides.length > 1 && flagshipIntroLap(lap);
+  // over to the video and back. The home page's welcome twin plays it every
+  // pass (showcaseIntro), even with the flagship alone in its deck: its end
+  // then starts the next showing, intro and all.
+  const wantIntro = kind === 'flagship' && !zero && !still
+    && (showcaseIntro() || (slides.length > 1 && flagshipIntroLap(lap)));
   const [introFor, setIntroFor] = useState({ key: '', on: false });
   let intro = introFor.on;
   if (introFor.key !== slideKey) {

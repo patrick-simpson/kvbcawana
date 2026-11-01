@@ -20,6 +20,9 @@
 (function showcaseStandIn() {
   'use strict';
   var KIND = (window.__SHOWCASE__ && window.__SHOWCASE__.kind) || 'lobby';
+  // The home page's welcome scene asks its lobby twin to play the flagship's 3D
+  // intro on every pass (?intro=1; lobby/src/lib/flagship.js showcaseIntro).
+  if (window.__SHOWCASE__ && new URLSearchParams(location.search).get('intro') === '1') window.__SHOWCASE__.intro = true;
   var BASE = 'https://showcase.invalid/api';
   var SESSION = 'v1.1.1790839331729.oWr6n92IJW5ldPGmtiyjPHAZpca-QGToNlKGXlKI6vc';
   // A public key made once for the showcase (cloud-crypto generateKeyPair); rows the

@@ -3,7 +3,7 @@ import {
   FLAGSHIP_DURATION_SEC, flagshipOnAir, FLAGSHIP_ID, FLAGSHIP_SLIDE, isFlagshipSlide, withFlagship,
   FLAGSHIP_LINES, FLAGSHIP_STYLES, FLAGSHIP_TURN_KEY, FLAGSHIP_VERSIONS, flagshipLabel, flagshipPick,
   nextFlagshipPick, resetFlagshipTurn,
-  FLAGSHIP_INTRO, FLAGSHIP_INTRO_EVERY, FLAGSHIP_INTRO_PICK, FLAGSHIP_INTRO_SRC, flagshipIntroLap, introFits,
+  FLAGSHIP_INTRO, FLAGSHIP_INTRO_EVERY, FLAGSHIP_INTRO_PICK, FLAGSHIP_INTRO_SRC, flagshipIntroLap, introFits, showcaseIntro,
 } from './flagship.js';
 import { holdsCheckIns, slideDurationMs } from './slides.js';
 import { sanitizeSlides } from './slides.js';
@@ -108,6 +108,15 @@ describe('the 3D intro', () => {
     expect(flagshipIntroLap(-3)).toBe(false);
     expect(flagshipIntroLap(1.5)).toBe(false);
     expect(flagshipIntroLap(Number.NaN)).toBe(false);
+  });
+
+  it("asks for it on every pass only in the home page's welcome twin (__SHOWCASE__.intro)", () => {
+    expect(showcaseIntro()).toBe(false);
+    window.__SHOWCASE__ = { kind: 'lobby' };
+    expect(showcaseIntro()).toBe(false);
+    window.__SHOWCASE__.intro = true;
+    expect(showcaseIntro()).toBe(true);
+    delete window.__SHOWCASE__;
   });
 
   it('only plays on a 16:9 screen wide enough for the full logo (the frame the video IS)', () => {

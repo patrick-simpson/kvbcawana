@@ -186,6 +186,17 @@ export function flagshipIntroLap(lap) {
 }
 
 /**
+ * The home page's welcome scene (owner 2026-11-01: the home page shows the new
+ * welcome graphics) frames a showcase twin of the lobby with `?intro=1`; the
+ * stand-in (site/showcase/stub.js) sets `__SHOWCASE__.intro`, and that twin
+ * plays the intro on EVERY pass, so a reader sees it as soon as the scene
+ * comes up. Only a showcase twin: the real lobby never sets it.
+ */
+export function showcaseIntro() {
+  return typeof window !== 'undefined' && /** @type {any} */ (window).__SHOWCASE__?.intro === true;
+}
+
+/**
  * Can a screen this size show it? The video is 16:9 and is the slide as a
  * 16:9 screen draws it, with the FULL logo (a 16:9 screen under 722px wide
  * draws the two-line logo, flagship.css). Any other shape keeps the plain
