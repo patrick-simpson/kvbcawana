@@ -695,7 +695,7 @@ function startServer(config) {
       } catch (e) { console.warn('[alert] Notification failed:', e.message); }
     });
   } catch (e) {
-    serverState = { status: 'failed', error: `${e.message}\n${e.stack || ''}` };
+    serverState = { status: 'failed', error: e.message };
     console.error('[server] Print server failed to start:', e);
     // A missing module inside resources/ is the signature of an interrupted
     // or interleaved update (a half-copied node_modules) — not a bug the
