@@ -74,6 +74,26 @@ Chosen:
 - Easter egg: a SPARKLE CONSTELLATION: a few drifting sparkles briefly line
   up to spell "2 Tim 2:15", then drift apart.
 
+## The rough moving preview (2026-11-01)
+
+`grand_welcome.py` (double-click `Preview Grand Welcome Film.bat`) builds
+the 20-second film from the chosen look and renders it IN BLENDER'S OPEN
+WINDOW (owner 2026-11-01: everything runs with a window, never headless;
+about 2 minutes on the laptop), then makes `output/Grand Welcome -
+PREVIEW.mp4` (960 x 540, 30 fps). It reuses `stills.py`'s brand pieces.
+Its `BEATS` table holds the timing (30 frames = 1 s):
+
+- 0-0.7 s "0:00" alone on black; 0.7-1.7 s it unravels into the six
+  glowing club ribbons; 1.7-7.7 s they race round the room; 7.7-11 s they
+  weave into one turning knot; 11-11.5 s it tightens and bursts into
+  starlight; 11.7-14 s WELCOME TO lands letter by letter, the full logo
+  rises in, the six marks pop in youngest first (the camera has settled by
+  the burst); 14-19.3 s held, sparkles drifting, the 2 Tim 2:15
+  constellation at about 15-17 s top left; 19.3-20 s fade to black.
+- Still rough: the 0:00 (size, place, face) and the hand-over (a fade to
+  black) stand in for the real seams. Next: measure the projector's
+  countdown 0:00 and the US Pledge slide's first frame and fit both.
+
 ## When it is built (for whoever builds it)
 
 - The projector plays the film in place of GrandWelcome (the deck's `welcome`
