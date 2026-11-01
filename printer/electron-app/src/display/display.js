@@ -39,7 +39,7 @@ const SOURCES_EVERY_MS = 60 * 60 * 1000; // re-read the schedule and feed hourly
 const RETRY_LOAD_MS = 30 * 1000;
 const CURSOR_IDLE_MS = 3000;
 // What the volunteer calls the monitor it goes on, in titles and the tray.
-const WHERE = { lobby: 'the lobby TV', projector: 'the projector', journey: 'the Journey screen', classroom: 'the downstairs classroom screen' };
+const WHERE = { lobby: 'the lobby TV', projector: 'the projector', journey: 'the Journey screen', classroom: 'the downstairs classroom screen', presentation: 'the presentation screen' };
 const IPC_HANDLES = ['configure:get', 'configure:set'];
 const IPC_EVENTS = ['card:cancel', 'chooser:choose', 'chooser:cancel', 'configure:choose-monitor', 'configure:reload-screen',
   'configure:reload-settings', 'configure:open-log', 'configure:cancel-shutdown'];
@@ -491,6 +491,10 @@ function createDisplay(opts) {
     // by hand (or Hide in the tray) puts it away until the next scheduled window.
     if (win.inWindow) blackDismissed = false;
     if (!visible && reason === 'off' && urls().screen.id === 'classroom' && !blackDismissed && !SMOKE) { visible = true; reason = 'black'; }
+    // The presentation (owner 2026-11-01: "I'll only run this once on an off club
+    // night") is up whenever it is the chosen screen, whatever the hours say;
+    // closing it by hand or Hide in the tray puts it away (like the classroom's black).
+    if (!visible && reason === 'off' && urls().screen.always && !blackDismissed && !SMOKE) { visible = true; reason = 'presentation'; }
     if (reason !== lastReason) { log('state', reason, win.dateKey); lastReason = reason; }
     if (visible) openLobby(); else closeLobby();
     const clubNightAhead = nextClubNight(t, sources, 60, hours()) === win.dateKey && win.minutes < hours().closeMin;
@@ -670,6 +674,7 @@ function createDisplay(opts) {
     state.settings = next;
     saveState();
     log('screen chosen', next.screen);
+    blackDismissed = false; // a screen chosen by hand comes up (the presentation, the classroom's black)
     if (wasUp) closeLobby();
     evaluate();
     loadConfigScreen();
@@ -848,6 +853,7 @@ function createDisplay(opts) {
     const t = now();
     const win = displayWindow(t, sources, hours());
     const { reason } = decideVisibility(win, state.overrides, t.getTime());
+    if (reason === 'off' && urls().screen.always) return blackDismissed ? 'Presentation: put away until it is chosen again' : 'Presentation: on screen now';
     if (reason === 'schedule') return `On screen for club night, until ${clock(hours().closeMin)}`;
     if (reason === 'manual') return `Shown by hand, until ${fmtTime(state.overrides.manualUntil)}`;
     if (reason === 'hidden') return 'Hidden until the next club night';

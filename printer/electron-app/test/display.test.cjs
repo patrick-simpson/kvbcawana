@@ -217,7 +217,11 @@ describe('display/screens', () => {
       expect(screenUrls(SITE, 'journey').page).toBe('https://awana.kvbchurch.org/journey/');
       expect(screenUrls(SITE, 'classroom').page).toBe('https://awana.kvbchurch.org/classroom/');
       expect(screenUrls(SITE, 'classroom').configure).toBe('https://awana.kvbchurch.org/classroom/?configure=1');
-      expect(Object.keys(SCREENS)).toEqual(['lobby', 'projector', 'journey', 'classroom']);
+      expect(screenUrls(SITE, 'presentation').page).toBe('https://awana.kvbchurch.org/presentation/?screen=tv');
+      expect(screenUrls(SITE, 'presentation').configure).toBe('https://awana.kvbchurch.org/presentation/?configure=1');
+      expect(isScreenPage('https://awana.kvbchurch.org/presentation/?configure=1', screenUrls(SITE, 'presentation').base)).toBe(true);
+      expect(SCREENS.presentation.always).toBe(true);
+      expect(Object.keys(SCREENS)).toEqual(['lobby', 'projector', 'journey', 'classroom', 'presentation']);
     });
 
     it('gives each a configure-mode page', () => {

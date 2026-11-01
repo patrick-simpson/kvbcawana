@@ -10,10 +10,15 @@
 // `defaults` (optional): what choosing that screen sets on this computer
 // (settings.js settingsForScreen): the classroom's own hours (4:00 to 8:00 pm, black until its 6:30 card)
 // and its 8:00 pm shutdown, owner 2026-10-17. Changed afterwards, they stay.
+//
+// The presentation (owner 2026-11-01, CLAUDE.md "Presentation"): the congregation deck
+// on the TV (`query` screen=tv), the presenter view in the Settings window (its
+// configure page carries no `query`). Up whenever it is chosen (`always`): it is
+// for one night, not a club-night screen (display.js).
 'use strict';
 
-/** @typedef {'lobby' | 'projector' | 'journey' | 'classroom'} ScreenId */
-/** @typedef {{ id: ScreenId, name: string, short: string, dir: string, page: string, background: string, defaults?: { hours: { start: string, end: string }, shutdownAt: string } }} Screen */
+/** @typedef {'lobby' | 'projector' | 'journey' | 'classroom' | 'presentation'} ScreenId */
+/** @typedef {{ id: ScreenId, name: string, short: string, dir: string, page: string, background: string, query?: Record<string, string>, always?: boolean, defaults?: { hours: { start: string, end: string }, shutdownAt: string } }} Screen */
 
 /** @type {Record<ScreenId, Screen>} */
 const SCREENS = {
@@ -23,6 +28,10 @@ const SCREENS = {
   classroom: {
     id: 'classroom', name: 'Downstairs classroom', short: 'the downstairs classroom', dir: '../classroom/', page: '', background: '#000000',
     defaults: { hours: { start: '16:00', end: '20:00' }, shutdownAt: '20:00' },
+  },
+  presentation: {
+    id: 'presentation', name: 'Presentation', short: 'the presentation', dir: '../presentation/', page: '', background: '#000000',
+    query: { screen: 'tv' }, always: true,
   },
 };
 
@@ -47,6 +56,7 @@ function screenUrls(lobbySite, id) {
   const page = new URL(screen.page, base);
   const configure = new URL(page);
   configure.searchParams.set('configure', '1');
+  for (const [k, v] of Object.entries(screen.query || {})) page.searchParams.set(k, v);
   return { screen, page: page.href, base: base.href, configure: configure.href };
 }
 
