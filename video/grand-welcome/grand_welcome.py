@@ -40,6 +40,7 @@ The story (30 frames = 1 second; 600 frames = 20 s), the BEATS table below
 Options (after the -- on Blender's command line):
     --pct 75          size (75 = 960 x 540)        --samples 16   EEVEE samples
     --frames 1-600    just these frames            --no-render    build only
+    --fps 60          render at 60 fps (the real film; previews are 30)
 """
 
 import bpy, bmesh, math, os, random, sys, time
@@ -52,10 +53,16 @@ import stills as S                      # the brand pieces, shared with the stil
 
 S.WATCH = True                          # always in Blender's open window
 OUT = os.path.join(HERE, "output")
-FRAMES = os.path.join(OUT, "frames_preview")
-MP4 = os.path.join(OUT, "Grand Welcome - PREVIEW.mp4")
 arg, log, say = S.arg, S.log, S.say
 FPS, F_END = 30, 600
+# The frame rate the video is RENDERED at. The real film is 60 fps (owner
+# 2026-11-01: "the real one should be 60fps"); the rough previews stay 30.
+# The timeline below stays in 30 fps frames and Blender's time stretching
+# plays it RATE / 30 times as many frames (as in ../awana-intro).
+RATE = int(arg("--fps", FPS))
+assert RATE % FPS == 0, "--fps must be a multiple of 30"
+FRAMES = os.path.join(OUT, "frames_preview" + ("" if RATE == FPS else f"_{RATE}"))
+MP4 = os.path.join(OUT, "Grand Welcome - PREVIEW" + ("" if RATE == FPS else f" {RATE}fps") + ".mp4")
 CENTRE = Vector((0, 0, 0.3))            # where the knot turns and bursts
 ZERO_W = 5.2                            # how wide the 0:00 is (roughed in)
 TUBE = 0.085                            # the ribbons of light: tube radius
@@ -437,8 +444,9 @@ def build_camera(sc):
 
 def build(sc):
     S.reset_scene("Grand welcome")
-    sc.render.fps = FPS
-    sc.frame_start, sc.frame_end = 1, F_END
+    sc.render.fps = RATE
+    sc.render.frame_map_old, sc.render.frame_map_new = FPS, RATE
+    sc.frame_start, sc.frame_end = 1, F_END * RATE // FPS
     S.MARKS.update(S.draw_marks())
     S.world(sc, 0.18, "#7080C0")
     # the wonder lighting (stills F2), plus a soft front light so the words
@@ -485,7 +493,7 @@ def build(sc):
 
 
 # =============================================================== video ===
-def encode_mp4(frames_dir, out_path, fps=FPS):
+def encode_mp4(frames_dir, out_path, fps=RATE):
     """Glue the PNG frames into one H.264 .mp4 (Blender's own video editor)."""
     files = sorted(f for f in os.listdir(frames_dir) if f.endswith(".png") and
                    os.path.getsize(os.path.join(frames_dir, f)) > 0)

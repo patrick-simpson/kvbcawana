@@ -16,6 +16,11 @@ The film (projector, then every screen through the ceremony mirror):
 
 - Replaces today's grand welcome, bigger: a 3D Blender film, the same every night.
 - About 20 seconds (today: 15); the opening deck shifts 5 seconds.
+- 60 fps (owner 2026-11-01: "the real one should be 60fps"), like the
+  lobby's intro video; the rough previews stay 30 fps. `grand_welcome.py
+  --fps 60`: the timeline stays in 30 fps frames and Blender's time
+  stretching renders twice as many (60 fps frame 2N = 30 fps frame N,
+  checked to the pixel).
 - Silent.
 - Must show by its end: WELCOME, the church's full logo (with the tagline),
   the six club marks (official art, never redrawn).
