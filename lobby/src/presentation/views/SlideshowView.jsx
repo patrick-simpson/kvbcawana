@@ -10,6 +10,7 @@ import { useKeydown } from '../hooks/index.js';
 import { slideGesture, useTouch } from '../lib/touch.js';
 import { onRemoteGo, onRemoteStep } from '../lib/remoteSteps.js';
 import { ColorSweep } from '../components/ColorSweep.jsx';
+import { FILM } from '../lib/grandWelcomeFilm.js';
 import { StepChip } from '../components/StepChip.jsx';
 import { Slide } from './Slide.jsx';
 
@@ -92,6 +93,13 @@ export const SlideshowView = ({ deck, now, onExit, onFinish, onBareChange, onInd
   };
   const goNext = () => goTo(index + 1, 1);
   const goPrev = () => goTo(index - 1, -1);
+  // A slide that ends itself (the grand welcome film) moves the deck on only
+  // while it is still the slide on the wall: a film still leaving after a
+  // leader's Next must never skip the pledge.
+  const endRef = useRef(/** @type {(id: string) => void} */ (() => {}));
+  useEffect(() => {
+    endRef.current = (id) => { if (slide.id === id) goNext(); };
+  });
 
   // The closing blackout is a bare wall: tell App to take the mark away.
   // The grand welcome draws the church's full logo itself, so the corner's
@@ -102,10 +110,13 @@ export const SlideshowView = ({ deck, now, onExit, onFinish, onBareChange, onInd
   }, [bare, onBareChange]);
   useEffect(() => () => onBareChange?.(false), [onBareChange]);
 
-  // Auto-advance (leader can always advance manually first)
+  // Auto-advance (leader can always advance manually first). The grand
+  // welcome film ends its slide itself (GrandWelcome onEnd); its timer is only
+  // a cap, a little past the film's length.
+  const ownsEnd = slide.layout === 'grand-welcome';
   useEffect(() => {
     if (!slide.duration || index >= slides.length - 1) return;
-    const timer = setTimeout(goNext, slide.duration * 1000);
+    const timer = setTimeout(goNext, (slide.duration + (ownsEnd ? FILM.grace : 0)) * 1000);
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [index, slide.duration, slides.length]);
@@ -209,6 +220,7 @@ export const SlideshowView = ({ deck, now, onExit, onFinish, onBareChange, onInd
             events={events}
             hold={changes > 0 ? CHANGE_HOLD : FIRST_HOLD}
             onNext={!touch && (index < slides.length - 1 || onFinish) ? goNext : undefined}
+            onEnd={ownsEnd ? () => endRef.current(slide.id) : undefined}
           />
         </motion.div>
       </AnimatePresence>

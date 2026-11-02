@@ -166,9 +166,13 @@ export const App = () => {
   useBuildReload(buildReloadBusy);
 
   // A deliberately bare wall (the opening's closing blackout, the shutdown
-  // screen's idle blackout) takes the church's logo with it. The views
-  // report it; a view that goes away reports false on its way out.
+  // screen's idle blackout, the countdown's last ten seconds) takes the
+  // church's logo with it. The views report it; a view that goes away reports
+  // false on its way out, except the countdown, whose last seconds hand a bare
+  // wall straight to the grand welcome film (CountdownView FINAL_SEC): game
+  // time, which says nothing about it, gets the logo back here.
   const [bare, setBare] = useState(false);
+  if (bare && state.mode === AppMode.GAME_TIME) setBare(false);
 
   // The touch menu (TouchMenu): null while closed, 'menu' open, 'display'
   // open on Display Settings. A device that stops being touch-first (a mouse
@@ -300,16 +304,21 @@ export const App = () => {
   return (
     <MotionConfig reducedMotion={FLAGS.vr ? 'always' : 'user'}>
     <div className="w-full h-full relative" style={{ background: '#000000' }}>
-      {/* One view at a time; exits run faster than entrances (the kit's rule). */}
-      <AnimatePresence mode="wait">
+      {/* One view at a time; exits run faster than entrances (the kit's rule).
+          Except into the opening ceremony (cutsIn): its first slide, the grand
+          welcome film, starts on the countdown's own picture ("0:00" alone on
+          black), so it is a cut, not a fade through black: the film lands on
+          top at once and the countdown is let go under it. */}
+      <AnimatePresence mode={cutsIn(state) ? 'sync' : 'wait'} custom={cutsIn(state)}>
         <motion.div
           key={stateKey(state)}
           className="absolute inset-0"
           data-mode={slugFor(state)}
           data-deck={state.mode === AppMode.SLIDESHOW ? state.deck : undefined}
-          initial={{ opacity: 0, scale: 0.985 }}
+          initial={cutsIn(state) ? false : { opacity: 0, scale: 0.985 }}
           animate={{ opacity: 1, scale: 1, transition: { duration: DUR.mode, ease: EASE.settle } }}
-          exit={{ opacity: 0, scale: 1.01, transition: { duration: DUR.mode / 2, ease: EASE.exit } }}
+          variants={VIEW_VARIANTS}
+          exit="leave"
         >
           <ViewErrorBoundary label={labelFor(state)}>
             <ActiveView
@@ -356,6 +365,19 @@ export const App = () => {
   );
 };
 
+/** The opening ceremony cuts in (its film starts on the countdown's picture). */
+const cutsIn = (state) => state.mode === AppMode.SLIDESHOW && state.deck === 'opening';
+
+/**
+ * A view's way out. Into the opening ceremony (`cut`) the old view stays as
+ * it is, under the new one, until it is let go; otherwise it fades.
+ */
+const VIEW_VARIANTS = {
+  leave: (cut) => (cut
+    ? { opacity: 1, transition: { duration: DUR.mode / 2 } }
+    : { opacity: 0, scale: 1.01, transition: { duration: DUR.mode / 2, ease: EASE.exit } }),
+};
+
 const labelFor = (state) =>
   ({
     [AppMode.COUNTDOWN]: 'countdown',
@@ -383,6 +405,7 @@ const ActiveView = ({ state, now, tally, meetingTheme, onSelect, firstGameIndex,
           target={state.target}
           theme={meetingTheme}
           onSkip={() => onSelect({ type: 'window', index: OPENING_WINDOW_INDEX })}
+          onBareChange={onBareChange}
         />
       );
     case AppMode.GAME_TIME:

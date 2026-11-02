@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render } from '@testing-library/react';
-import { CountdownView } from './CountdownView.jsx';
+import { CountdownView, FINAL_SEC } from './CountdownView.jsx';
 
 // The operator asked for the milestone popup ("5 MINUTES!") to be gone
 // from the projector, but the optional chime is a separate opt-in
@@ -87,6 +87,39 @@ describe('CountdownView milestone popups', () => {
     );
     expect(playStinger).toHaveBeenCalledTimes(1);
     unmount();
+  });
+});
+
+// The last ten seconds (owner 2026-11-01): only the clock stays, on black,
+// so the grand welcome film can start from "0:00" alone on black.
+describe('CountdownView: the last seconds', () => {
+  afterEach(cleanup);
+
+  it('steps everything but the clock away, and the corner logo with it', () => {
+    const onBareChange = vi.fn();
+    const at = (s) => (
+      <CountdownView now={nowFor(s)} target={TARGET} theme="Superhero Night" onSkip={() => {}} onBareChange={onBareChange} />
+    );
+    const { container, rerender } = render(at(FINAL_SEC + 1));
+    expect(container.querySelector('[data-countdown-final]').dataset.countdownFinal).toBe('0');
+    expect(onBareChange).toHaveBeenLastCalledWith(false);
+    rerender(at(FINAL_SEC));
+    expect(container.querySelector('[data-countdown-final]').dataset.countdownFinal).toBe('1');
+    expect(onBareChange).toHaveBeenLastCalledWith(true);
+    // The clock is never inside what steps away; the kicker, theme and the
+    // weather layers are.
+    const away = [...container.querySelectorAll('[data-countdown-away]')];
+    expect(away.some((el) => el.contains(container.querySelector('[data-timer]')))).toBe(false);
+    expect(away.some((el) => /Awana begins in/.test(el.textContent))).toBe(true);
+    expect(away.some((el) => /Superhero Night/.test(el.textContent))).toBe(true);
+    // A countdown held at 0:00 (the remote's Back) stays stepped away.
+    rerender(at(0));
+    expect(onBareChange).toHaveBeenLastCalledWith(true);
+  });
+
+  it('is ten seconds: the moment the other screens turn over to copy it', () => {
+    // src/lib/ceremonyMirror.js MIRROR_EARLY_MS (the projector may not import it).
+    expect(FINAL_SEC).toBe(10);
   });
 });
 

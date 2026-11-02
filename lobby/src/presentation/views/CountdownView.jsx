@@ -11,6 +11,8 @@ import { StepChip } from '../components/StepChip.jsx';
 import { HOUSE } from '../lib/kit.js';
 import { fitChipU } from '../lib/chip.js';
 import { useFontsReady } from '../hooks/useFontsReady.js';
+import { useLowPower } from '../hooks/useLowPower.js';
+import { FILM, preloadFilm } from '../lib/grandWelcomeFilm.js';
 import { secondsUntil } from '../lib/schedule.js';
 import { playStinger } from '../lib/stingers.js';
 import { useKeydown } from '../hooks/index.js';
@@ -29,6 +31,18 @@ import { DUR, EASE } from '../lib/motion-tokens.js';
 const STINGER_TIMES = [3600, 1800, 600, 300, 60];
 
 /**
+ * The countdown's last seconds (owner 2026-11-01, video/grand-welcome/
+ * BRIEF.md): everything but the clock steps away (the kicker, the meeting
+ * line, the theme, the week's event lines, the weather and sparkles, and the
+ * church's corner logo through `onBareChange`), leaving only the figures on
+ * black, so the grand welcome film can start from "0:00" alone on black. The
+ * same ten seconds the other screens turn over to copy this one
+ * (src/lib/ceremonyMirror.js MIRROR_EARLY_MS). Opacity only: the clock never
+ * moves. A countdown held at 0:00 (the remote's Back) stays stepped away.
+ */
+export const FINAL_SEC = 10;
+
+/**
  * The week-long countdown to Wednesday 6:00 PM, flattened to type on the
  * bare black wall (the approved mockup): a Londrina kicker, Paytone One figures
  * with Awana-orange colons, and under them only what the week needs (the
@@ -41,10 +55,30 @@ const STINGER_TIMES = [3600, 1800, 600, 300, 60];
  * `schedule` broadcast (hooks/useRealtime.js, lib/scheduleAdvisory.js
  * `advisoryTitle`) — purely informational, shown only while present.
  */
-export const CountdownView = ({ now, target, theme, onSkip }) => {
+export const CountdownView = ({ now, target, theme, onSkip, onBareChange }) => {
   const seconds = secondsUntil(target, now);
   const weather = useWeatherReading();
   const events = useCalendarEvents();
+  const still = useLowPower();
+
+  // The last seconds: all but the clock steps away (FINAL_SEC). Not undone
+  // on leaving: the view after it says for itself whether the wall is bare
+  // (the grand welcome is; App.jsx brings the logo back for game time), so
+  // the corner logo never flashes up between the clock and the film.
+  const final = seconds <= FINAL_SEC;
+  useEffect(() => {
+    onBareChange?.(final);
+  }, [final, onBareChange]);
+  // The grand welcome film comes next: fetch it into memory in the last two
+  // minutes, so 6:00 is not a download (lib/grandWelcomeFilm.js).
+  const soon = seconds <= FILM.preloadSec;
+  useEffect(() => {
+    if (soon) preloadFilm();
+  }, [soon]);
+  const away = {
+    initial: false,
+    animate: { opacity: final ? 0 : 1, transition: { duration: still ? 0 : DUR.settle, ease: EASE.exit } },
+  };
 
   const soundedStingers = useRef(new Set());
 
@@ -92,35 +126,40 @@ export const CountdownView = ({ now, target, theme, onSkip }) => {
     <ScreenFrame
       shake={isShaking}
       layers={
-        <>
+        <motion.div className="absolute inset-0 pointer-events-none" data-countdown-away {...away}>
           <WeatherScene reading={weather} />
           <ParticleField />
           <SparkleDoodles seed={3} count={14} />
-        </>
+        </motion.div>
       }
     >
-      <div className="pj-frame pj-countdown">
-        <Kicker color="#FFFFFF" size="var(--pj-countdown-kicker, calc(3.2 * var(--u)))" style={{ letterSpacing: '0.12em', marginRight: '-0.12em' }}>
-          Awana begins in
-        </Kicker>
+      <div className="pj-frame pj-countdown" data-countdown-final={final ? '1' : '0'}>
+        {/* The wrappers centre their lines as .pj-countdown does: nothing moves. */}
+        <motion.div className="flex flex-col items-center" data-countdown-away {...away}>
+          <Kicker color="#FFFFFF" size="var(--pj-countdown-kicker, calc(3.2 * var(--u)))" style={{ letterSpacing: '0.12em', marginRight: '-0.12em' }}>
+            Awana begins in
+          </Kicker>
+        </motion.div>
 
         <div style={{ marginTop: 'var(--pj-countdown-gap, calc(0.6 * var(--u)))' }}>
           <BigTimer seconds={seconds} accent={HOUSE.orange} urgencyEnabled onClick={touch ? tapSkip : onSkip} touch={touch} />
         </div>
 
-        {seconds >= 24 * 3600 && (
-          <p className="pj-body" style={{ fontSize: 'var(--pj-countdown-next, calc(2.4 * var(--u)))', color: 'rgb(255 255 255 / 0.72)', fontWeight: 500 }}>
-            Next meeting · Wednesday · {targetTimeStr}
-          </p>
-        )}
+        <motion.div className="flex flex-col items-center" data-countdown-away {...away}>
+          {seconds >= 24 * 3600 && (
+            <p className="pj-body" style={{ fontSize: 'var(--pj-countdown-next, calc(2.4 * var(--u)))', color: 'rgb(255 255 255 / 0.72)', fontWeight: 500 }}>
+              Next meeting · Wednesday · {targetTimeStr}
+            </p>
+          )}
 
-        {theme && (
-          <div style={{ marginTop: 'calc(1.6 * var(--u))' }}>
-            <ThemeChip theme={theme} />
-          </div>
-        )}
+          {theme && (
+            <div style={{ marginTop: 'calc(1.6 * var(--u))' }}>
+              <ThemeChip theme={theme} />
+            </div>
+          )}
 
-        <EventChips events={events} thisWeekShown={!!theme} now={now} />
+          <EventChips events={events} thisWeekShown={!!theme} now={now} />
+        </motion.div>
       </div>
 
       {/* Touch: the skip's question. data-pj-bottom-overlay: it stands on the

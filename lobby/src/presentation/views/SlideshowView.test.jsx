@@ -6,6 +6,7 @@ vi.mock('../hooks/useCalendarEvents.js', () => ({ useCalendarEvents: () => [] })
 
 import { SlideshowView } from './SlideshowView.jsx';
 import { nightLabel, nightOf } from './Slide.jsx';
+import { FILM } from '../lib/grandWelcomeFilm.js';
 
 const NOW = new Date('2026-09-16T18:00:30');
 const press = (code) => act(() => { fireEvent.keyDown(window, { code }); });
@@ -32,16 +33,52 @@ const newestFrom = (container) => {
 describe('SlideshowView: the operator\'s keys still drive the deck', () => {
   afterEach(cleanup);
 
-  it('opens on the welcome, kicked by the night it is', () => {
+  it('opens on the welcome: the grand welcome film', () => {
     const { container } = render(deck());
     expect(current(container)).toBe(ORDER[0]);
-    expect(container.textContent).toMatch(/Wednesday night/);
-    // The grand welcome (owner 2026-10-19): WELCOME letter by letter, TO, the
-    // church's full logo (a drawing), one label for the whole sequence.
-    expect(container.querySelector('[role="img"][aria-label="Welcome to Awana"]')).not.toBeNull();
-    expect(container.querySelector('.pj-grand__word').textContent).toBe('WELCOME');
+    // The grand welcome film (owner 2026-11-01): one picture, one label for
+    // the whole film, which says what it ends on.
+    const film = container.querySelector('[role="img"][data-grand-welcome]');
+    expect(film.getAttribute('aria-label')).toBe('Welcome to Kennebec Valley Baptist Church Awana Clubs');
+    expect(film.querySelector('video')).not.toBeNull();
     // No change yet, so no sweep on the wall.
     expect(container.querySelector('[data-sweep]')).toBeNull();
+  });
+
+  it('the film moves the deck on when it ends; its timer is only a cap past the film', () => {
+    vi.useFakeTimers();
+    try {
+      const { container } = render(deck());
+      act(() => { fireEvent(container.querySelector('video'), new Event('playing')); });
+      // Not at 20 s: the film owns its end (a late start must not be cut short).
+      act(() => { vi.advanceTimersByTime(FILM.sec * 1000 + 500); });
+      expect(current(container)).toBe(ORDER[0]);
+      act(() => { fireEvent(container.querySelector('video'), new Event('ended')); });
+      expect(current(container)).toBe(ORDER[1]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('the film\'s timer moves the deck on if the film never says it ended', () => {
+    vi.useFakeTimers();
+    try {
+      const { container } = render(deck());
+      act(() => { vi.advanceTimersByTime((FILM.sec + FILM.grace) * 1000 + 50); });
+      expect(current(container)).toBe(ORDER[1]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('a film still leaving after a leader\'s Next never skips the pledge', () => {
+    const { container } = render(deck());
+    const video = container.querySelector('video');
+    press('Space');
+    expect(current(container)).toBe(ORDER[1]);
+    // The welcome is still leaving (AnimatePresence) and its film ends now.
+    act(() => { fireEvent(video, new Event('ended')); });
+    expect(current(container)).toBe(ORDER[1]);
   });
 
   for (const key of ['Space', 'ArrowRight', 'PageDown']) {
@@ -128,8 +165,8 @@ describe('SlideshowView: the operator\'s keys still drive the deck', () => {
   it('the blackout reports a bare wall (App takes the mark away) and back again', () => {
     const onBareChange = vi.fn();
     render(deck({ onBareChange }));
-    // The grand welcome draws the church's full logo itself, so the corner's
-    // steps aside for it too (never two church logos at once).
+    // The grand welcome film draws the church's full logo itself, so the
+    // corner's steps aside for it too (never two church logos at once).
     expect(onBareChange).toHaveBeenLastCalledWith(true);
     press('Space');
     expect(onBareChange).toHaveBeenLastCalledWith(false);

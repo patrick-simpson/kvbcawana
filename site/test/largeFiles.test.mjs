@@ -34,7 +34,38 @@ test('a streamed path comes from Journey\'s public files or the film\'s folder, 
   assert.equal(repoPathFor('/lobby/promos/grand-prix.mp4'), 'lobby/public/promos/grand-prix.mp4');
   assert.equal(repoPathFor('/lobby/promos/../intro/x.mp4'), null);
   assert.equal(repoPathFor('/lobby/assets/clip.mp4'), null);
-  assert.deepEqual(Object.keys(REPO_FOLDERS).sort(), ['/journey/', '/lobby/intro/', '/lobby/promos/', '/reel/']);
+  assert.equal(repoPathFor('/lobby/welcome/grand-welcome.mp4'), 'lobby/public/welcome/grand-welcome.mp4');
+  assert.equal(repoPathFor('/lobby/welcome/../promos/x.mp4'), null);
+  assert.deepEqual(Object.keys(REPO_FOLDERS).sort(), ['/journey/', '/lobby/intro/', '/lobby/promos/', '/lobby/welcome/', '/reel/']);
+});
+
+test('the opening ceremony\'s films are committed web copies with their stills, and streamed with Range', () => {
+  // The projector's grand welcome film (video/grand-welcome/grand_welcome.py
+  // --final): 20 s at 1080p60, 8 Mbps, about 20 MB. The cap only guards
+  // against committing a lossless render (hundreds of MB): the file is
+  // streamed from raw.githubusercontent.com, never uploaded to Pages.
+  const film = path.join(ROOT, 'lobby/public/welcome/grand-welcome.mp4');
+  assert.ok(existsSync(film), 'lobby/public/welcome/grand-welcome.mp4 is committed');
+  assert.ok(statSync(film).size <= 30 * 1000 * 1000);
+  const head = readFileSync(film).subarray(0, 64 * 1024);
+  const moov = head.indexOf('moov');
+  assert.ok(moov > 0 && (head.indexOf('mdat') === -1 || moov < head.indexOf('mdat')), 'moov before mdat');
+  assert.equal(mustStream('/lobby/welcome/grand-welcome.mp4', statSync(film).size), true);
+  // Its first frame (up the instant it lands) and its landed frame (low power,
+  // and if it can't play) are plain static files.
+  for (const still of ['grand-welcome-first.png', 'grand-welcome-still.jpg']) {
+    const p = path.join(ROOT, 'lobby/public/welcome', still);
+    assert.ok(existsSync(p), `lobby/public/welcome/${still} is committed`);
+    assert.equal(mustStream(`/lobby/welcome/${still}`, statSync(p).size), false);
+  }
+  // The other screens' see-through lead-in (VP9 with alpha), and its still.
+  const leadIn = path.join(ROOT, 'lobby/public/welcome/opening-lead-in.webm');
+  assert.ok(existsSync(leadIn), 'lobby/public/welcome/opening-lead-in.webm is committed');
+  assert.ok(statSync(leadIn).size <= 15 * 1000 * 1000);
+  assert.equal(mustStream('/lobby/welcome/opening-lead-in.webm', statSync(leadIn).size), true);
+  assert.ok(existsSync(path.join(ROOT, 'lobby/public/welcome/opening-lead-in-still.png')));
+  const fn = readFileSync(path.join(SITE, 'functions/lobby/welcome/[[path]].js'), 'utf8');
+  assert.match(fn, /proxyLarge\(context\.request, LARGE_FILES, fetch\)\) \|\| context\.next\(\)/);
 });
 
 test('the lobby\'s 3D intro is committed, a web copy, and streamed with Range like the film', () => {

@@ -12,7 +12,10 @@
 // the lobby's 3D intro (/lobby/intro/, functions/lobby/intro;
 // lobby/public/intro, made by video/awana-intro/) and the lobby's promo
 // videos (/lobby/promos/, functions/lobby/promos; lobby/public/promos, the
-// Grand Prix made by video/grand-prix/).
+// Grand Prix made by video/grand-prix/), and the opening ceremony's films
+// (/lobby/welcome/, functions/lobby/welcome; lobby/public/welcome, made by
+// video/grand-welcome/: the projector's grand welcome and the other screens'
+// see-through lead-in).
 // Anything else that big, or any other video, is a build output, and fails
 // the build rather than the deploy.
 //
@@ -25,6 +28,7 @@ export const REPO_FOLDERS = {
   '/reel/': 'printer/public/reel/',
   '/lobby/intro/': 'lobby/public/intro/',
   '/lobby/promos/': 'lobby/public/promos/',
+  '/lobby/welcome/': 'lobby/public/welcome/',
 };
 
 export const VIDEO_RELEASE_TAG = 'journey-videos-v2';

@@ -24,15 +24,16 @@ import { GrandWelcome } from './GrandWelcome.jsx';
  * from SlideshowView and lands (or leaves upward) on its own beat, in
  * reading order (lib/landing.js). `hold` is how long the slide waits before
  * its first part lands: long enough for the outgoing slide's words to leave.
+ * `onEnd`: a slide that ends itself (the grand welcome film) calls it.
  */
-export const Slide = ({ slide, now, events, hold = 0, onNext }) => {
+export const Slide = ({ slide, now, events, hold = 0, onNext, onEnd }) => {
   // The ceremony ends on a deliberate blackout: no logo (App hides the mark),
   // no clock, no ambient layers. Checked before anything below reads
   // slide.title (the doodle seed) so a black slide truly renders nothing else.
   if (slide.layout === 'black') return <div className="w-full h-full" style={{ background: '#000000' }} />;
-  // The grand welcome is a sequence of its own on the black wall (no doodles,
-  // no particles: the bands, the letters and the logo are the show).
-  if (slide.layout === 'grand-welcome') return <GrandWelcome now={now} hold={hold} />;
+  // The grand welcome is its own film on the black wall (no doodles, no
+  // particles); it ends its slide itself (onEnd).
+  if (slide.layout === 'grand-welcome') return <GrandWelcome onEnd={onEnd} />;
 
   return (
     <ScreenFrame
