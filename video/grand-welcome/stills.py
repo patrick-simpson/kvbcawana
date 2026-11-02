@@ -52,6 +52,9 @@ Options (after the -- on Blender's command line):
     --sheet           only remake the contact sheet
     --watch           build them in Blender's open window (no -b), always fresh;
                       --live 3 / --show 2.5 = seconds each scene / picture shows
+    --battery-low 20 --battery-resume 80
+                      the battery rule: at or under 20% every render here (and
+                      in grand_welcome.py) pauses until the laptop is back to 80%
 """
 
 import bpy, bmesh, json, math, os, random, re, shutil, subprocess, sys, time
@@ -1389,6 +1392,57 @@ LIVE_SEC = float(arg("--live", 3.0))      # how long each scene shows live
 SHOW_SEC = float(arg("--show", 2.5))      # how long each finished picture shows
 
 
+# The battery rule (owner 2026-11-01: "if the laptop drops to 20 percent
+# battery to pause until it hits 80"). The laptop is a Surface Laptop Studio 2
+# (RTX 4050, wants a 120 W charger); on a Surface Dock 1 (~60 W to the laptop)
+# a render drains the battery 37-54 W even while plugged in. Every render here
+# and in grand_welcome.py checks between stills / chunks of frames: at or
+# under BATTERY_LOW it pauses, saying so across the top of the window, until
+# the battery is back to BATTERY_RESUME, then carries on where it stopped.
+BATTERY_LOW, BATTERY_RESUME = int(arg("--battery-low", 20)), int(arg("--battery-resume", 80))
+BATTERY_POLL_SEC = 30
+
+
+def battery():
+    """(percent, plugged in) from Windows, or None (no battery, or not Windows)."""
+    if sys.platform != "win32":
+        return None
+    import ctypes
+
+    class Status(ctypes.Structure):
+        _fields_ = [("ACLineStatus", ctypes.c_ubyte), ("BatteryFlag", ctypes.c_ubyte),
+                    ("BatteryLifePercent", ctypes.c_ubyte), ("SystemStatusFlag", ctypes.c_ubyte),
+                    ("BatteryLifeTime", ctypes.c_ulong), ("BatteryFullLifeTime", ctypes.c_ulong)]
+    st = Status()
+    try:
+        if not ctypes.windll.kernel32.GetSystemPowerStatus(ctypes.byref(st)):
+            return None
+    except Exception:
+        return None
+    if st.BatteryFlag == 128 or st.BatteryLifePercent == 255:    # no battery / unknown
+        return None
+    return int(st.BatteryLifePercent), st.ACLineStatus == 1
+
+
+def battery_wait():
+    """Steps for the window's timer (yield = seconds to wait): nothing if the
+    battery is above BATTERY_LOW; otherwise pause until it reaches
+    BATTERY_RESUME."""
+    b = battery()
+    if not b or b[0] > BATTERY_LOW:
+        return
+    log(f"battery at {b[0]}%: pausing until {BATTERY_RESUME}%")
+    while True:
+        b = battery()
+        if not b or b[0] >= BATTERY_RESUME:
+            say(f"Battery back to {b[0] if b else '?'}%: carrying on")
+            yield 1.0
+            return
+        plug = "charging" if b[1] else "NOT PLUGGED IN - plug the laptop in"
+        say(f"Paused to save the battery: {b[0]}% ({plug}). Carries on by itself at {BATTERY_RESUME}%.")
+        yield BATTERY_POLL_SEC
+
+
 def stage():
     """The one big area the watch mode draws in: (window, area)."""
     win = bpy.context.window_manager.windows[0]
@@ -1468,6 +1522,7 @@ def watch_steps(todo):
     MARKS.update(draw_marks())
     n = len(todo)
     for k, (sid, lab, fn) in enumerate(todo):
+        yield from battery_wait()          # at 20% pause until 80% (BATTERY_LOW)
         for engine in ENGINES:
             show_scene()
             say(f"[{k + 1}/{n}] Building  {lab}")

@@ -137,6 +137,19 @@ Its `BEATS` table holds the timing (30 frames = 1 s):
   fully covered from 1.3 s. (A seek-and-copy check reads VP9 alpha video as
   blank in Edge: test it playing, or decode with FFmpeg's libvpx-vp9.)
 
+## The battery rule (owner 2026-11-01)
+
+"If the laptop drops to 20 percent battery, pause until it hits 80": every
+render in stills.py and grand_welcome.py checks the battery (Windows
+GetSystemPowerStatus) before each still and between chunks of frames (2 s
+of film each, `--chunk`); at or under 20% it pauses with a message across the
+top of Blender's window ("Paused to save the battery: N% (charging) ..."),
+checks every 30 s, and carries on where it stopped at 80%
+(`--battery-low` / `--battery-resume` change them). Why: the laptop is a
+Surface Laptop Studio 2 (RTX 4050, wants a 120 W charger); on a Surface
+Dock 1 (~60 W to the laptop) a render drains the battery 37-54 W while
+plugged in (measured 2026-11-01).
+
 ## When it is built (for whoever builds it)
 
 - The projector plays the film in place of GrandWelcome (the deck's `welcome`

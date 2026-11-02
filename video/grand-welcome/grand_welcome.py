@@ -803,48 +803,56 @@ def steps():
         if f.endswith(".png"):
             os.remove(os.path.join(FRAMES, f))
     started = time.time()
-
-    def finished(scene, *_):
-        if finished in bpy.app.handlers.render_complete:
-            bpy.app.handlers.render_complete.remove(finished)
-        def make_video():
-            if LEAD_IN:
-                say("All frames done. Making the see-through WebM...")
-                encode_webm(FRAMES, os.path.join(WEB, "opening-lead-in.webm"))
-                # zero animation shows the card at rest: the frame at 3.5 s
-                files = sorted(f for f in os.listdir(FRAMES) if f.endswith(".png"))
-                shutil.copyfile(os.path.join(FRAMES, files[min(len(files) - 1, int(3.5 * RATE))]),
-                                os.path.join(WEB, "opening-lead-in-still.png"))
-                say(f"Finished. The lead-in: {WEB}   (close Blender when you're done)")
-                return None
-            say("All frames done. Making the video...")
-            # Until the ribbons start, the film IS the countdown's 0:00:
-            # those frames become the projector's own picture, pixel for
-            # pixel (the render matches it to under 1/255 on average, but
-            # the cut at 6:00 lands on frame 1, so make it exact).
-            if os.path.exists(PLATE) and scene.render.resolution_percentage == 100 \
-                    and (scene.render.resolution_x, scene.render.resolution_y) == (1920, 1080):
-                last = (BEATS["trace"][0] - 1) * RATE // FPS
-                for f in range(1, last + 1):
-                    p = os.path.join(FRAMES, f"frame_{f:04d}.png")
-                    if os.path.exists(p):
-                        shutil.copyfile(PLATE, p)
-                log(f"frames 1-{last}: the projector's own 0:00")
-            encode_mp4(FRAMES, MP4)
-            if FINAL:
-                say("Making the projector's copy and its stills...")
-                encode_mp4(FRAMES, os.path.join(WEB, "grand-welcome.mp4"), web=True)
-                save_stills(FRAMES)
-            mins = (time.time() - started) / 60
-            say(f"Finished in {mins:.0f} min. The video: {MP4}   (close Blender when you're done)")
-            return None
-        bpy.app.timers.register(make_video, first_interval=1.0)
-    bpy.app.handlers.render_complete.append(finished)
+    # In chunks, so the battery rule (stills.battery_wait: at 20% pause until
+    # 80%) is checked between them; each chunk renders in Blender's own render
+    # view, so every frame still shows in the window as it is made.
+    first, last = sc.frame_start, sc.frame_end
+    chunk = int(arg("--chunk", 2 * RATE))
     win, area = S.stage()
-    region = next((r for r in area.regions if r.type == "WINDOW"), None)
-    with bpy.context.temp_override(window=win, screen=win.screen, area=area, region=region):
-        bpy.ops.render.render("INVOKE_DEFAULT", animation=True)
-    log("rendering every frame in the window")
+    for c0 in range(first, last + 1, chunk):
+        yield from S.battery_wait()
+        sc.frame_start, sc.frame_end = c0, min(last, c0 + chunk - 1)
+        win, area = S.stage()
+        region = next((r for r in area.regions if r.type == "WINDOW"), None)
+        with bpy.context.temp_override(window=win, screen=win.screen, area=area, region=region):
+            bpy.ops.render.render("INVOKE_DEFAULT", animation=True)
+        log(f"rendering frames {sc.frame_start}-{sc.frame_end} of {last} in the window")
+        yield 0.5
+        while bpy.app.is_job_running("RENDER"):
+            yield 0.5
+    sc.frame_start, sc.frame_end = first, last
+    scene = sc
+    if LEAD_IN:
+        say("All frames done. Making the see-through WebM...")
+        yield 0.2
+        encode_webm(FRAMES, os.path.join(WEB, "opening-lead-in.webm"))
+        # zero animation shows the card at rest: the frame at 3.5 s
+        files = sorted(f for f in os.listdir(FRAMES) if f.endswith(".png"))
+        shutil.copyfile(os.path.join(FRAMES, files[min(len(files) - 1, int(3.5 * RATE))]),
+                        os.path.join(WEB, "opening-lead-in-still.png"))
+        say(f"Finished. The lead-in: {WEB}   (close Blender when you're done)")
+        return
+    say("All frames done. Making the video...")
+    yield 0.2
+    # Until the ribbons start, the film IS the countdown's 0:00: those frames
+    # become the projector's own picture, pixel for pixel (the render matches
+    # it to under 1/255 on average, but the cut at 6:00 lands on frame 1, so
+    # make it exact).
+    if os.path.exists(PLATE) and scene.render.resolution_percentage == 100             and (scene.render.resolution_x, scene.render.resolution_y) == (1920, 1080):
+        lastp = (BEATS["trace"][0] - 1) * RATE // FPS
+        for f in range(1, lastp + 1):
+            p = os.path.join(FRAMES, f"frame_{f:04d}.png")
+            if os.path.exists(p):
+                shutil.copyfile(PLATE, p)
+        log(f"frames 1-{lastp}: the projector's own 0:00")
+    encode_mp4(FRAMES, MP4)
+    if FINAL:
+        say("Making the projector's copy and its stills...")
+        yield 0.2
+        encode_mp4(FRAMES, os.path.join(WEB, "grand-welcome.mp4"), web=True)
+        save_stills(FRAMES)
+    mins = (time.time() - started) / 60
+    say(f"Finished in {mins:.0f} min. The video: {MP4}   (close Blender when you're done)")
 
 
 def main():
