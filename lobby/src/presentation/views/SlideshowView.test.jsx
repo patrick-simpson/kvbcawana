@@ -7,8 +7,11 @@ vi.mock('../hooks/useCalendarEvents.js', () => ({ useCalendarEvents: () => [] })
 import { SlideshowView } from './SlideshowView.jsx';
 import { nightLabel, nightOf } from './Slide.jsx';
 import { FILM } from '../lib/grandWelcomeFilm.js';
+import { welcomeStyle } from '../../../../shared/grandWelcomeWeek.js';
+import { GRAND_WELCOME_CLASSIC_SEC } from './GrandWelcomeClassic.jsx';
 
-const NOW = new Date('2026-09-16T18:00:30');
+const NOW = new Date('2026-09-16T18:00:30');   // a classic week (shared/grandWelcomeWeek.js)
+const FILM_NOW = new Date('2026-11-04T18:00:30');   // a film week
 const press = (code) => act(() => { fireEvent.keyDown(window, { code }); });
 
 const deck = (props = {}) => (
@@ -33,8 +36,35 @@ const newestFrom = (container) => {
 describe('SlideshowView: the operator\'s keys still drive the deck', () => {
   afterEach(cleanup);
 
-  it('opens on the welcome: the grand welcome film', () => {
+  it('on a classic week opens on the animated welcome, kicked by the night it is', () => {
+    expect(welcomeStyle(NOW)).toBe('classic');
     const { container } = render(deck());
+    expect(current(container)).toBe(ORDER[0]);
+    expect(container.textContent).toMatch(/Wednesday night/);
+    // The classic grand welcome (owner 2026-10-19): WELCOME letter by letter,
+    // TO, the church's full logo (a drawing), one label for the whole sequence.
+    expect(container.querySelector('[role="img"][aria-label="Welcome to Awana"]')).not.toBeNull();
+    expect(container.querySelector('.pj-grand__word').textContent).toBe('WELCOME');
+    expect(container.querySelector('video')).toBeNull();
+    expect(container.querySelector('[data-sweep]')).toBeNull();
+  });
+
+  it('on a classic week the welcome moves on by its own 15 s, as it always did', () => {
+    vi.useFakeTimers();
+    try {
+      const { container } = render(deck());
+      act(() => { vi.advanceTimersByTime(GRAND_WELCOME_CLASSIC_SEC * 1000 - 50); });
+      expect(current(container)).toBe(ORDER[0]);
+      act(() => { vi.advanceTimersByTime(100); });
+      expect(current(container)).toBe(ORDER[1]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('on a film week opens on the welcome: the grand welcome film', () => {
+    expect(welcomeStyle(FILM_NOW)).toBe('film');
+    const { container } = render(deck({ now: FILM_NOW }));
     expect(current(container)).toBe(ORDER[0]);
     // The grand welcome film (owner 2026-11-01): one picture, one label for
     // the whole film, which says what it ends on.
@@ -48,7 +78,7 @@ describe('SlideshowView: the operator\'s keys still drive the deck', () => {
   it('the film moves the deck on when it ends; its timer is only a cap past the film', () => {
     vi.useFakeTimers();
     try {
-      const { container } = render(deck());
+      const { container } = render(deck({ now: FILM_NOW }));
       act(() => { fireEvent(container.querySelector('video'), new Event('playing')); });
       // Not at 20 s: the film owns its end (a late start must not be cut short).
       act(() => { vi.advanceTimersByTime(FILM.sec * 1000 + 500); });
@@ -63,7 +93,7 @@ describe('SlideshowView: the operator\'s keys still drive the deck', () => {
   it('the film\'s timer moves the deck on if the film never says it ended', () => {
     vi.useFakeTimers();
     try {
-      const { container } = render(deck());
+      const { container } = render(deck({ now: FILM_NOW }));
       act(() => { vi.advanceTimersByTime((FILM.sec + FILM.grace) * 1000 + 50); });
       expect(current(container)).toBe(ORDER[1]);
     } finally {
@@ -72,7 +102,7 @@ describe('SlideshowView: the operator\'s keys still drive the deck', () => {
   });
 
   it('a film still leaving after a leader\'s Next never skips the pledge', () => {
-    const { container } = render(deck());
+    const { container } = render(deck({ now: FILM_NOW }));
     const video = container.querySelector('video');
     press('Space');
     expect(current(container)).toBe(ORDER[1]);

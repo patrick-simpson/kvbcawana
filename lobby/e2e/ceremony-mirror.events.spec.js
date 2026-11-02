@@ -82,17 +82,38 @@ test("the remote's Back to the countdown takes the copy down; the ceremony start
   await expect(mirror).toHaveAttribute('data-up', '1');
 });
 
-// Owner 2026-10-22: five seconds before the turn-over; since 2026-11-01 the
-// see-through lead-in film (components/CeremonyLeadIn.jsx) in place of the
-// "switching to opening ceremony" card. The seam's `switching` stands for those
-// five seconds (the real rule is lib/ceremonyMirror.js mirrorSwitching,
-// unit-tested). Under ?lowPower=1 (zero animation) it is its card at rest.
-test('the five seconds before the turn-over show the lead-in, with the lobby held', async ({ page }) => {
+// Owner 2026-10-22: five seconds before the turn-over. Since 2026-11-01, week
+// by week (shared/grandWelcomeWeek.js): on a film week the see-through lead-in
+// film (components/CeremonyLeadIn.jsx), on a classic week the "switching to
+// opening ceremony" card. The seam's `switching` stands for those five seconds
+// (the real rule is lib/ceremonyMirror.js mirrorSwitching, unit-tested), its
+// `style` for the week. Under ?lowPower=1 (zero animation) the lead-in is its
+// card at rest.
+test('on a classic week the five seconds before the turn-over show the switching card, with the lobby held', async ({ page }) => {
   await liveChannel(page);
   await page.route(/open-meteo|twotimtwo/, (route) => route.abort());
   await page.addInitScript(() => {
     localStorage.setItem('awanaSetupCardDismissed.v1', '1');
-    window.awanaMirrorTuning = { wanted: true, switching: true, query: `&now=${encodeURIComponent('2026-09-16T17:59:30-04:00')}` };
+    window.awanaMirrorTuning = { wanted: true, switching: true, style: 'classic', query: `&now=${encodeURIComponent('2026-09-16T17:59:30-04:00')}` };
+  });
+  await page.goto('/index.html?lowPower=1');
+  const mirror = page.locator('[data-testid="ceremony-mirror"]');
+  await expect(mirror).toHaveAttribute('data-up', '1');
+  await expect(mirror).not.toHaveClass(/lobby-mirror--lead-in/);
+  const card = page.locator('[data-testid="mirror-switching"]');
+  await expect(card).toBeVisible();
+  await expect(card).toContainText('Switching to');
+  await expect(card).toContainText('Opening ceremony');
+  await expect(page.locator('[data-testid="ceremony-lead-in"]')).toHaveCount(0);
+  await expect(page.locator('[data-testid="ceremony-label"]')).toHaveCount(0);   // not copying yet
+});
+
+test('on a film week the five seconds before the turn-over show the lead-in, with the lobby held', async ({ page }) => {
+  await liveChannel(page);
+  await page.route(/open-meteo|twotimtwo/, (route) => route.abort());
+  await page.addInitScript(() => {
+    localStorage.setItem('awanaSetupCardDismissed.v1', '1');
+    window.awanaMirrorTuning = { wanted: true, switching: true, style: 'film', query: `&now=${encodeURIComponent('2026-11-04T17:59:30-05:00')}` };
   });
   await page.goto('/index.html?lowPower=1');
   const mirror = page.locator('[data-testid="ceremony-mirror"]');

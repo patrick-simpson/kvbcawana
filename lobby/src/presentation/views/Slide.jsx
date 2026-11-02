@@ -15,6 +15,8 @@ import { ambientVariants, partVariants } from '../lib/landing.js';
 import { PLEDGE_FIT, PLEDGE_FIT_PORTRAIT, fitPledge } from '../lib/pledgeFit.js';
 import { usePortrait } from '../lib/touch.js';
 import { GrandWelcome } from './GrandWelcome.jsx';
+import { GrandWelcomeClassic } from './GrandWelcomeClassic.jsx';
+import { welcomeStyle } from '../../../../shared/grandWelcomeWeek.js';
 
 /**
  * One slide, laid out by its explicit `layout` field, in the kit's three
@@ -31,9 +33,14 @@ export const Slide = ({ slide, now, events, hold = 0, onNext, onEnd }) => {
   // no clock, no ambient layers. Checked before anything below reads
   // slide.title (the doodle seed) so a black slide truly renders nothing else.
   if (slide.layout === 'black') return <div className="w-full h-full" style={{ background: '#000000' }} />;
-  // The grand welcome is its own film on the black wall (no doodles, no
-  // particles); it ends its slide itself (onEnd).
-  if (slide.layout === 'grand-welcome') return <GrandWelcome onEnd={onEnd} />;
+  // The grand welcome, week by week (shared/grandWelcomeWeek.js): the 3D film
+  // (it ends its slide itself, onEnd) or the classic animated sequence. Either
+  // is its own show on the black wall: no doodles, no particles.
+  if (slide.layout === 'grand-welcome') {
+    return welcomeStyle(now ?? new Date()) === 'film'
+      ? <GrandWelcome onEnd={onEnd} />
+      : <GrandWelcomeClassic now={now} hold={hold} />;
+  }
 
   return (
     <ScreenFrame

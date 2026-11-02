@@ -11,6 +11,8 @@ import { slideGesture, useTouch } from '../lib/touch.js';
 import { onRemoteGo, onRemoteStep } from '../lib/remoteSteps.js';
 import { ColorSweep } from '../components/ColorSweep.jsx';
 import { FILM } from '../lib/grandWelcomeFilm.js';
+import { welcomeStyle } from '../../../../shared/grandWelcomeWeek.js';
+import { GRAND_WELCOME_CLASSIC_SEC } from './GrandWelcomeClassic.jsx';
 import { StepChip } from '../components/StepChip.jsx';
 import { Slide } from './Slide.jsx';
 
@@ -113,13 +115,18 @@ export const SlideshowView = ({ deck, now, onExit, onFinish, onBareChange, onInd
   // Auto-advance (leader can always advance manually first). The grand
   // welcome film ends its slide itself (GrandWelcome onEnd); its timer is only
   // a cap, a little past the film's length.
-  const ownsEnd = slide.layout === 'grand-welcome';
+  // On a classic week (shared/grandWelcomeWeek.js) the welcome is the
+  // animated sequence, its own 15 s, ended by the timer as before.
+  const welcome = slide.layout === 'grand-welcome';
+  const filmWeek = welcomeStyle(now ?? new Date()) === 'film';
+  const ownsEnd = welcome && filmWeek;
+  const duration = welcome && !filmWeek ? GRAND_WELCOME_CLASSIC_SEC : slide.duration;
   useEffect(() => {
-    if (!slide.duration || index >= slides.length - 1) return;
-    const timer = setTimeout(goNext, (slide.duration + (ownsEnd ? FILM.grace : 0)) * 1000);
+    if (!duration || index >= slides.length - 1) return;
+    const timer = setTimeout(goNext, (duration + (ownsEnd ? FILM.grace : 0)) * 1000);
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [index, slide.duration, slides.length]);
+  }, [index, duration, ownsEnd, slides.length]);
 
   // Escape is press-twice (replaces the old window.confirm dialog)
   useEffect(() => {

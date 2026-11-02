@@ -12,6 +12,12 @@ BUILT and on the screens (2026-11-01, owner: "Make the whole thing in 1080p
 both). See "The real film and the lead-in" below and CLAUDE.md "Projector"
 (Grand welcome, Ceremony mirror).
 
+It ALTERNATES WEEK BY WEEK with the old style (owner 2026-11-01: "I want this
+to alternate with the old style each week"): the film and the lead-in on
+film weeks, the classic animated welcome and the switching card on classic
+weeks. One rule, `shared/grandWelcomeWeek.js`; Wednesday 2026-11-04 is the
+film's first night (a film week), 2026-11-11 classic, and so on.
+
 ## Decided (the owner's answers)
 
 The film (projector, then every screen through the ceremony mirror):

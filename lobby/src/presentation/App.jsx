@@ -32,6 +32,7 @@ import { listenToProjectors, sendScreenAction, thisScreenId, useScreenSync } fro
 import { lowPowerPreference, setLowPowerPreference, subscribeLowPower } from './hooks/useLowPower.js';
 import { setStingersEnabled, silenceStingers, stingersEnabled, subscribeStingers, unlockStingers } from './lib/stingers.js';
 import { isTouch, usePortrait, useTouch } from './lib/touch.js';
+import { welcomeStyle } from '../../../shared/grandWelcomeWeek.js';
 
 const OPENING_WINDOW_INDEX = 0;
 /** The remote's Back to the countdown: held until a Next (hooks/useSchedule.js). */
@@ -309,13 +310,13 @@ export const App = () => {
           welcome film, starts on the countdown's own picture ("0:00" alone on
           black), so it is a cut, not a fade through black: the film lands on
           top at once and the countdown is let go under it. */}
-      <AnimatePresence mode={cutsIn(state) ? 'sync' : 'wait'} custom={cutsIn(state)}>
+      <AnimatePresence mode={cutsIn(state, now) ? 'sync' : 'wait'} custom={cutsIn(state, now)}>
         <motion.div
           key={stateKey(state)}
           className="absolute inset-0"
           data-mode={slugFor(state)}
           data-deck={state.mode === AppMode.SLIDESHOW ? state.deck : undefined}
-          initial={cutsIn(state) ? false : { opacity: 0, scale: 0.985 }}
+          initial={cutsIn(state, now) ? false : { opacity: 0, scale: 0.985 }}
           animate={{ opacity: 1, scale: 1, transition: { duration: DUR.mode, ease: EASE.settle } }}
           variants={VIEW_VARIANTS}
           exit="leave"
@@ -365,8 +366,13 @@ export const App = () => {
   );
 };
 
-/** The opening ceremony cuts in (its film starts on the countdown's picture). */
-const cutsIn = (state) => state.mode === AppMode.SLIDESHOW && state.deck === 'opening';
+/**
+ * The opening ceremony cuts in on a film week (its film starts on the
+ * countdown's picture; shared/grandWelcomeWeek.js); the classic week's
+ * animated welcome fades in from black as it always did.
+ */
+const cutsIn = (state, now) => state.mode === AppMode.SLIDESHOW && state.deck === 'opening'
+  && welcomeStyle(now ?? new Date()) === 'film';
 
 /**
  * A view's way out. Into the opening ceremony (`cut`) the old view stays as

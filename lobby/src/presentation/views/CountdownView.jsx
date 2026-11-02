@@ -13,6 +13,7 @@ import { fitChipU } from '../lib/chip.js';
 import { useFontsReady } from '../hooks/useFontsReady.js';
 import { useLowPower } from '../hooks/useLowPower.js';
 import { FILM, preloadFilm } from '../lib/grandWelcomeFilm.js';
+import { welcomeStyle } from '../../../../shared/grandWelcomeWeek.js';
 import { secondsUntil } from '../lib/schedule.js';
 import { playStinger } from '../lib/stingers.js';
 import { useKeydown } from '../hooks/index.js';
@@ -69,9 +70,10 @@ export const CountdownView = ({ now, target, theme, onSkip, onBareChange }) => {
   useEffect(() => {
     onBareChange?.(final);
   }, [final, onBareChange]);
-  // The grand welcome film comes next: fetch it into memory in the last two
-  // minutes, so 6:00 is not a download (lib/grandWelcomeFilm.js).
-  const soon = seconds <= FILM.preloadSec;
+  // On a film week (shared/grandWelcomeWeek.js) the grand welcome film comes
+  // next: fetch it into memory in the last two minutes, so 6:00 is not a
+  // download (lib/grandWelcomeFilm.js).
+  const soon = seconds <= FILM.preloadSec && welcomeStyle(target) === 'film';
   useEffect(() => {
     if (soon) preloadFilm();
   }, [soon]);

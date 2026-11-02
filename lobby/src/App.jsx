@@ -95,6 +95,7 @@ import { useTallerThan } from './hooks/useTallerThan.js';
 import { hostCheckin, hostDoorbell, hostMirror, isEmbedded } from './lib/embed.js';
 import { useCeremonyMirror } from './hooks/useCeremonyMirror.js';
 import { CeremonyLeadIn } from './components/CeremonyLeadIn.jsx';
+import { MirrorSwitching } from './components/MirrorSwitching.jsx';
 import { isConfigureMode, isSettingsPage, listenForRelay, relayToScreen } from './lib/configureRelay.js';
 import { BACKGROUND_VIDEO_CHANGED_EVENT } from './components/VideoBackground.jsx';
 import { BOARD_DEMO_MS, BUILD_QUIET_MS, SHARE_DEBOUNCE_MS, COUNTS_WITHOUT_NAMES_MS, TONIGHT_STALE_MS, DROPPED_GRACE_MS, EMBED_FULLSCREEN_MESSAGE, LAYER_FAULT_SHOW_MS, MILESTONE_TOAST_MS, OPS_FAILURES_MAX, SETUP_CARD_QUIET_MS } from './lib/constants.js';
@@ -230,11 +231,13 @@ export default function App() {
   // page, mirrored from 6:00 until T&T game time (lib/ceremonyMirror.js). It
   // covers the wall like a promo poster does and holds check-ins the same way
   // (WAITING chip; the names play as one run when the lobby comes back).
-  const { mounted: mirrorMounted, up: mirrorCopying, switching: mirrorSwitchingNow, frameRef: mirrorFrameRef, query: mirrorQuery } = useCeremonyMirror({
+  const { mounted: mirrorMounted, up: mirrorCopying, switching: mirrorSwitchingNow, leadIn: mirrorLeadInWeek, frameRef: mirrorFrameRef, query: mirrorQuery } = useCeremonyMirror({
     schedule: sharedSchedule, showcase: SHOWCASE, configure: CONFIGURE, settingsPage: SETTINGS_PAGE, overlay: FLAGS.overlay,
   });
-  // The lead-in (five seconds, components/CeremonyLeadIn.jsx) then the gym's
-  // own picture: one cover.
+  // The five seconds before the turn-over (week by week: the see-through
+  // lead-in, components/CeremonyLeadIn.jsx, or the switching card,
+  // components/MirrorSwitching.jsx) then the gym's own picture: one cover.
+  const mirrorLeadIn = mirrorSwitchingNow && mirrorLeadInWeek;
   const mirrorUp = mirrorCopying || mirrorSwitchingNow;
   const coverUp = previewUp || mirrorUp;
   // Framed (the classroom, the Journey kiosk), the host is told when the
@@ -1543,12 +1546,12 @@ export default function App() {
       {mirrorMounted && (
         <ErrorBoundary key="ceremony-mirror" label="ceremony-mirror" onError={() => recordLayerFault('ceremony-mirror')}>
           <M.div
-            className={`lobby-mirror${mirrorSwitchingNow ? ' lobby-mirror--lead-in' : ''}`}
+            className={`lobby-mirror${mirrorLeadIn ? ' lobby-mirror--lead-in' : ''}`}
             data-testid="ceremony-mirror"
             data-up={mirrorUp ? '1' : '0'}
             aria-hidden={!mirrorUp}
             initial={false}
-            animate={mirrorSwitchingNow ? MIRROR_LEAD_IN : mirrorUp ? MIRROR_SHOW : MIRROR_HIDE}
+            animate={mirrorLeadIn ? MIRROR_LEAD_IN : mirrorUp ? MIRROR_SHOW : MIRROR_HIDE}
             exit={MIRROR_HIDE}
           >
             <iframe
@@ -1560,7 +1563,9 @@ export default function App() {
             />
             {/* Mounted with the mirror (loaded two minutes early), shown and
                 played only the five seconds before the turn-over. */}
-            <CeremonyLeadIn playing={mirrorSwitchingNow} />
+            {mirrorLeadInWeek
+              ? <CeremonyLeadIn playing={mirrorSwitchingNow} />
+              : mirrorSwitchingNow && <MirrorSwitching />}
             {/* The copy says what it is (owner 2026-10-22), so nobody mistakes it for a stuck screen. */}
             {mirrorCopying && <p className="lobby-mirror__label" data-testid="ceremony-label">Opening ceremony in progress</p>}
           </M.div>
