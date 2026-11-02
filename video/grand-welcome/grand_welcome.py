@@ -43,7 +43,7 @@ Options (after the -- on Blender's command line):
     --fps 60          render at 60 fps (the real film; previews are 30)
 """
 
-import bpy, bmesh, math, os, random, sys, time
+import bpy, bmesh, math, os, random, shutil, sys, time
 from mathutils import Vector, Matrix, geometry
 from bpy_extras import anim_utils
 
@@ -59,10 +59,23 @@ FPS, F_END = 30, 600
 # 2026-11-01: "the real one should be 60fps"); the rough previews stay 30.
 # The timeline below stays in 30 fps frames and Blender's time stretching
 # plays it RATE / 30 times as many frames (as in ../awana-intro).
-RATE = int(arg("--fps", FPS))
+# --final: the real film, 1920 x 1080 at 60 fps with motion blur (owner
+# 2026-11-01: "Make the whole thing in 1080p 60fps"), plus the projector's
+# copies in lobby/public/welcome/ (the web video and its two stills).
+FINAL = bool(arg("--final"))
+RATE = int(arg("--fps", 60 if FINAL else FPS))
 assert RATE % FPS == 0, "--fps must be a multiple of 30"
-FRAMES = os.path.join(OUT, "frames_preview" + ("" if RATE == FPS else f"_{RATE}"))
-MP4 = os.path.join(OUT, "Grand Welcome - PREVIEW" + ("" if RATE == FPS else f" {RATE}fps") + ".mp4")
+# --lead-in: the other screens' five-second see-through lead-in instead
+# (build_lead_in), always at full size; with --final, at 60 fps.
+LEAD_IN = bool(arg("--lead-in"))
+LEAD_END = 150                          # 5 s, in 30 fps frames
+FRAMES = os.path.join(OUT, ("frames_lead_in" if LEAD_IN else "frames_final" if FINAL else "frames_preview")
+                      + ("" if RATE == FPS else f"_{RATE}"))
+MP4 = os.path.join(OUT, "Grand Welcome.mp4" if FINAL else
+                   "Grand Welcome - PREVIEW" + ("" if RATE == FPS else f" {RATE}fps") + ".mp4")
+REPO = os.path.abspath(os.path.join(HERE, "..", ".."))
+WEB = os.path.join(REPO, "lobby", "public", "welcome")        # the projector's copies
+WEB_KBPS = 8000                        # ~20 MB for 20 s at 1080p60
 CENTRE = Vector((0, 0, 0.3))            # where the knot turns and bursts
 ZERO_W = 5.2                            # how wide the 0:00 is (roughed in)
 TUBE = 0.085                            # the ribbons of light: tube radius
@@ -198,13 +211,62 @@ def zero_outlines():
     ordered = []
     for j in range(0, 6, 2):                   # each zero: outer edge, then inner
         ordered += sorted(zeros[j:j + 2], key=area, reverse=True)
+    boxes = plate_zero_boxes()
     out = []
-    for lp in ordered:
-        w = [Vector(((p.x - c.x) * k, -0.08, (p.y - c.y) * k)) for p in lp]
+    for j, lp in enumerate(ordered):
+        if boxes:
+            # Fit this zero (its outer edge's box) onto where the projector
+            # draws it (the plate), the inner edge moving with it.
+            outer = ordered[j - j % 2]
+            ox0, ox1 = min(p.x for p in outer), max(p.x for p in outer)
+            oy0, oy1 = min(p.y for p in outer), max(p.y for p in outer)
+            bx0, bz0, bx1, bz1 = boxes[j // 2]
+            sx, sz = (bx1 - bx0) / (ox1 - ox0), (bz1 - bz0) / (oy1 - oy0)
+            w = [Vector((bx0 + (p.x - ox0) * sx, 0.0, bz0 + (p.y - oy0) * sz)) for p in lp]
+        else:
+            w = [Vector(((p.x - c.x) * k, -0.08, (p.y - c.y) * k)) for p in lp]
         top = max(range(len(w)), key=lambda i: w[i].z)       # start at the top
         w = w[top:] + w[:top + 1]
         out.append(w)
     return out
+
+
+# The countdown's own "0:00" alone on black, as the gym's wall draws it at
+# 1920x1080 (tools/measure-projector.mjs): the film's first frames ARE it,
+# so the projector's cut from its countdown to the film is invisible.
+PLATE = os.path.join(HERE, "projector-zero.png")
+# At frame 1 the camera sits at (0, -CAM_D, 0) with a 50 mm lens on a 36 mm
+# sensor: the plane y = 0 shows 14.4 x 8.1 m. The plate stands just behind it
+# (PLATE_Y), scaled to fill exactly the same frame.
+PLATE_Y = 0.12
+VIEW_W, VIEW_H = 36.0 / 50.0 * S.CAM_D, 36.0 / 50.0 * S.CAM_D * 9 / 16
+
+
+def plate_zero_boxes():
+    """The three zeros' ink boxes on the plate, in metres on the plane y = 0:
+    [(x0, z0, x1, z1)] left to right, or None without a plate."""
+    if not os.path.exists(PLATE):
+        log("no projector-zero.png: run tools/measure-projector.mjs (the 0:00 is roughed in)")
+        return None
+    import numpy as np
+    img = bpy.data.images.load(PLATE, check_existing=True)
+    w, h = img.size
+    px = np.array(img.pixels[:], dtype=np.float32).reshape(h, w, 4)[::-1]   # top row first
+    white = (px[..., 0] > 0.5) & (px[..., 1] > 0.5) & (px[..., 2] > 0.5)    # the orange colon isn't
+    cols = np.where(white.any(axis=0))[0]
+    groups, start = [], cols[0]
+    for a, b in zip(cols, cols[1:]):
+        if b - a > 3:
+            groups.append((start, a)); start = b
+    groups.append((start, cols[-1]))
+    boxes = []
+    for x0, x1 in groups[:3]:
+        rows = np.where(white[:, x0:x1 + 1].any(axis=1))[0]
+        y0, y1 = rows[0], rows[-1] + 1
+        boxes.append(((x0 / w - 0.5) * VIEW_W, (0.5 - y1 / h) * VIEW_H,
+                      ((x1 + 1) / w - 0.5) * VIEW_W, (0.5 - y0 / h) * VIEW_H))
+    log(f"0:00 fitted to the projector's zeros at {[(int(a), int(b)) for a, b in groups[:3]]} px")
+    return boxes
 
 
 def build_ribbons(knot):
@@ -247,11 +309,24 @@ def build_ribbons(knot):
 
 
 def build_zero():
-    """The countdown's last frame: 0:00 alone on black (roughed in). It goes
-    once the ribbons have traced it."""
-    z = S.text_mesh("0:00", ZERO_W, 0.12, S.neon("#FFFFFF", 1.0))
-    S.origin_to_centre(z)
+    """The countdown's last frame: 0:00 alone on black, the projector's own
+    picture (PLATE). It goes once the ribbons have traced it."""
     off = BEATS["digits_off"]
+    if not os.path.exists(PLATE):
+        z = S.text_mesh("0:00", ZERO_W, 0.12, S.neon("#FFFFFF", 1.0))   # roughed in
+        S.origin_to_centre(z)
+        key(z, "scale", 1, (1, 1, 1), "CONSTANT")
+        key(z, "scale", off, (0, 0, 0), "CONSTANT")
+        return z
+    m, N, L = S._mat("Projector 0:00")
+    out = N.new("ShaderNodeOutputMaterial")
+    img = N.new("ShaderNodeTexImage")
+    img.image = bpy.data.images.load(PLATE, check_existing=True)
+    img.interpolation = "Closest"; img.extension = "CLIP"      # its pixels, as they are
+    em = N.new("ShaderNodeEmission")
+    L.new(img.outputs["Color"], em.inputs["Color"]); L.new(em.outputs[0], out.inputs["Surface"])
+    k = (S.CAM_D + PLATE_Y) / S.CAM_D
+    z = S.image_card("Projector 0:00", VIEW_W * k, VIEW_H * k, (0, PLATE_Y, 0), m)
     key(z, "scale", 1, (1, 1, 1), "CONSTANT")
     key(z, "scale", off, (0, 0, 0), "CONSTANT")
     return z
@@ -474,8 +549,11 @@ def build(sc):
     build_delivery(plates)
     build_camera(sc)
     S.setup_render(sc, "EEVEE")
-    sc.render.resolution_percentage = int(arg("--pct", 75))
-    sc.eevee.taa_render_samples = int(arg("--samples", 16))
+    sc.render.resolution_x, sc.render.resolution_y = 1920, 1080
+    sc.render.resolution_percentage = int(arg("--pct", 100 if FINAL else 50))
+    sc.eevee.taa_render_samples = int(arg("--samples", 64 if FINAL else 16))
+    sc.render.use_motion_blur = FINAL
+    sc.render.motion_blur_shutter = 0.5
     sc.render.film_transparent = False     # the world shows black to the camera
     S.glow_compositor(sc, 0.6)
     # the hand-over, roughed in: a fade to black
@@ -493,8 +571,11 @@ def build(sc):
 
 
 # =============================================================== video ===
-def encode_mp4(frames_dir, out_path, fps=RATE):
-    """Glue the PNG frames into one H.264 .mp4 (Blender's own video editor)."""
+def encode_mp4(frames_dir, out_path, fps=RATE, web=False):
+    """Glue the PNG frames into one H.264 .mp4 (Blender's own video editor).
+    `web`: the projector's copy instead: a steady bitrate, a keyframe every
+    second, and its index moved to the front so the wall can start it from
+    the first request (as ../awana-intro does for the lobby)."""
     files = sorted(f for f in os.listdir(frames_dir) if f.endswith(".png") and
                    os.path.getsize(os.path.join(frames_dir, f)) > 0)
     if not files:
@@ -516,16 +597,178 @@ def encode_mp4(frames_dir, out_path, fps=RATE):
     enc.render.image_settings.file_format = "FFMPEG"
     ff = enc.render.ffmpeg
     ff.format = "MPEG4"; ff.codec = "H264"; ff.audio_codec = "NONE"
-    ff.constant_rate_factor = "HIGH"; ff.ffmpeg_preset = "GOOD"
+    if web:
+        ff.constant_rate_factor = "NONE"; ff.ffmpeg_preset = "BEST"
+        ff.video_bitrate = WEB_KBPS; ff.minrate = 0; ff.maxrate = int(WEB_KBPS * 1.5)
+        ff.gopsize = fps
+    elif FINAL:
+        ff.constant_rate_factor = "PERC_LOSSLESS"; ff.ffmpeg_preset = "BEST"
+    else:
+        ff.constant_rate_factor = "HIGH"; ff.ffmpeg_preset = "GOOD"
+    os.makedirs(os.path.dirname(out_path), exist_ok=True)
     enc.render.filepath = out_path
     enc.render.use_overwrite = True
     with bpy.context.temp_override(scene=enc):
         bpy.ops.render.render(animation=True, scene=enc.name)
     bpy.data.scenes.remove(enc)
+    if web:
+        sys.path.insert(0, os.path.join(HERE, "..", "awana-intro", "tools"))
+        from faststart import faststart
+        faststart(out_path)
     log(f"video saved: {out_path}")
 
 
+def save_stills(frames_dir):
+    """The projector's two stills, from the finished frames: the first frame
+    (shown the instant the film's slide lands, before the video plays: the
+    countdown's own 0:00) and the landed frame (the low-power switch's
+    finished frame, and the stand-in if the video can't play)."""
+    files = sorted(f for f in os.listdir(frames_dir) if f.endswith(".png"))
+    if not files:
+        return
+    first = os.path.join(frames_dir, files[0])
+    shutil.copyfile(first, os.path.join(WEB, "grand-welcome-first.png"))
+    landed = os.path.join(frames_dir, files[min(len(files) - 1, 16 * RATE)])     # 16 s in
+    img = bpy.data.images.load(landed)
+    img.file_format = "JPEG"
+    out = os.path.join(WEB, "grand-welcome-still.jpg")
+    try:
+        img.save(filepath=out, quality=88)
+    except TypeError:                     # older save() without quality
+        img.filepath_raw = out
+        img.save()
+    bpy.data.images.remove(img)
+    log(f"stills saved in {WEB}")
+
+
 # ======================================================= in the window ===
+# ===================================================== the lead-in film ===
+# The other screens' lead-in (owner 2026-11-01, BRIEF.md "The lead-in"): one
+# shared five-second film for the lobby TV, Journey and the classroom, in the
+# slot of the old "Switching to opening ceremony" card. It is SEE-THROUGH: it
+# plays over whatever the screen shows (lobby/src/components/CeremonyLeadIn.jsx)
+# and fills it, then the screen's copy of the gym projector (its countdown,
+# on black) takes over from its last frame, pure black. By the second:
+#   0.0-1.2  six club-colour edges race across, top to bottom, youngest club
+#            first, each pulling the projector's black in behind it
+#   1.4-2.4  OPENING CEREMONY lands letter by letter (the film's white
+#            plastic, its wonder light), sparkles come out
+#   2.4-4.0  held
+#   4.0-4.7  the words and sparkles step away
+#   4.7-5.0  pure black (the mirror's own black)
+LEAD = dict(bands=(1, 4), band_dur=26, letters=(42, 2), out=(120, 141))
+
+
+def build_lead_in(sc):
+    S.reset_scene("Opening ceremony lead-in")
+    sc.render.fps = RATE
+    sc.render.frame_map_old, sc.render.frame_map_new = FPS, RATE
+    sc.frame_start, sc.frame_end = 1, LEAD_END * RATE // FPS
+    S.world(sc, 0.18, "#7080C0")           # film_transparent: the screen shows through
+    S.area("Key", (-4, -12, 9), (0, 0, 0), 1500, "#E6EEFF", 8)
+    S.area("Word light", (0, -14, 4), (0, 0, 0.5), 1400, "#FFFFFF", 6)
+    S.area("Rim L", (-7, 6, 4), (0, 0, 1), 2600, S.CLUB["journey"]["primary"], 3)
+    S.area("Rim R", (7, 6, 4), (0, 0, 1), 2600, S.CLUB["puggles"]["primary"], 3)
+    S.camera(sc, (0, -S.CAM_D, 0), (0, 0, 0), lens=50)
+    # The bands: black, each led by a glowing club-colour edge, sweeping in
+    # from the left at y = 1.5 (behind the words), together covering the frame.
+    y = 1.5
+    k = (S.CAM_D + y) / S.CAM_D
+    W, H = VIEW_W * k + 0.6, VIEW_H * k + 0.6
+    h = H / 6
+    b0, step = LEAD["bands"]
+    black = S.neon("#000000", 1.0, name="Lead-in black")    # pure #000, no shine
+    for i, club in enumerate(S.CLUBS):
+        z = H / 2 - h * (i + 0.5)
+        band = S.box(f"Band {club}", (W, 0.02, h + 0.02), (0, 0, 0), black)
+        edge = S.box(f"Edge {club}", (0.28, 0.02, h + 0.02), (0, 0, 0), S.neon(S.CLUB[club]["primary"], 2.0))
+        grp = empty(f"Sweep {club}", (-W, y, z))
+        band.location = (0, 0, 0); edge.location = (W / 2 + 0.14, -0.01, 0)
+        band.parent = grp; edge.parent = grp
+        f0 = b0 + step * i
+        key(grp, "location", 1, (-W - 0.5, y, z), "CONSTANT")
+        key(grp, "location", f0, (-W - 0.5, y, z), "EXPO", "EASE_OUT")
+        key(grp, "location", f0 + LEAD["band_dur"], (0, y, z))
+    # OPENING CEREMONY, letter by letter
+    face = S.plastic("#FFFFFF", rough=0.16)
+    side = S.plastic(S.HOUSE["hot"], rough=0.25)
+    # 9.6 m of the 14.4 m frame: the screens fill with it edge to edge
+    # (object-fit: cover), and a 4:3 screen keeps 75% of the width.
+    w = S.text_mesh("OPENING CEREMONY", 9.6, 0.55 * 9.6 / S.LAND["welcome_w"], face, bevel=0.03, side_mat=side)
+    S.move_to([w], z=0.0)
+    letters = S.split_loose(w)
+    l0, lstep = LEAD["letters"]
+    o0, o1 = LEAD["out"]
+    for i, p in enumerate(letters):
+        S.origin_to_centre(p)
+        rest = p.location.copy()
+        f = l0 + i * lstep
+        key(p, "location", 1, rest + Vector((0, 4, 1.0)), "CONSTANT")
+        key(p, "location", f, rest + Vector((0, 4, 1.0)), "BACK", "EASE_OUT")
+        key(p, "location", f + 14, rest)
+        pop_in(p, f, 14)
+        g = o0 + i
+        key(p, "scale", g, (1, 1, 1), "SINE", "EASE_IN")
+        key(p, "scale", g + 8, (0, 0, 0), "CONSTANT")
+    rnd = random.Random(77)
+    for i in range(28):
+        s = S.doodle("sparkle", rnd.uniform(0.06, 0.24), S.neon("#EAF2FF" if i % 2 else S.CLUB[S.CLUBS[i % 6]]["primary"], 5))
+        s.location = (rnd.uniform(-7, 7), rnd.uniform(0.2, 1.2), rnd.choice([-1, 1]) * rnd.uniform(1.0, 3.6))
+        pop_in(s, l0 + 6 + rnd.randint(0, 20), 12)
+        key(s, "scale", o0 + rnd.randint(0, 10), (1, 1, 1), "SINE", "EASE_IN")
+        key(s, "scale", o1, (0, 0, 0), "CONSTANT")
+    S.setup_render(sc, "EEVEE")
+    sc.render.resolution_x, sc.render.resolution_y = 1920, 1080
+    sc.render.resolution_percentage = int(arg("--pct", 100))
+    sc.eevee.taa_render_samples = int(arg("--samples", 64 if FINAL else 16))
+    sc.render.use_motion_blur = FINAL
+    sc.render.motion_blur_shutter = 0.5
+    sc.render.film_transparent = True        # see-through until the bands cover it
+    sc.render.image_settings.color_mode = "RGBA"
+    # No bloom here: the compositor's glare throws the see-through alpha away
+    # (every frame came out opaque black).
+    sc.render.use_compositing = False
+    os.makedirs(FRAMES, exist_ok=True)
+    sc.render.filepath = os.path.join(FRAMES, "frame_####")
+    sc.frame_set(1)
+    return sc
+
+
+def encode_webm(frames_dir, out_path, fps=RATE):
+    """The lead-in's frames (RGBA) as one VP9 WebM WITH its see-through alpha,
+    which Chromium plays over the page (the lobby, Journey, the classroom)."""
+    files = sorted(f for f in os.listdir(frames_dir) if f.endswith(".png") and
+                   os.path.getsize(os.path.join(frames_dir, f)) > 0)
+    if not files:
+        log("no frames to encode"); return
+    enc = bpy.data.scenes.new("Encode")
+    enc.render.fps = fps
+    enc.sequence_editor_create()
+    st = enc.sequence_editor.strips.new_image(
+        name="frames", filepath=os.path.join(frames_dir, files[0]), channel=1, frame_start=1)
+    for f in files[1:]:
+        st.elements.append(f)
+    enc.frame_start, enc.frame_end = 1, len(files)
+    enc.render.resolution_x, enc.render.resolution_y = 1920, 1080
+    enc.render.resolution_percentage = 100
+    enc.view_settings.view_transform = "Standard"
+    enc.render.film_transparent = True
+    enc.render.image_settings.media_type = "VIDEO"
+    enc.render.image_settings.file_format = "FFMPEG"
+    ff = enc.render.ffmpeg
+    ff.format = "WEBM"; ff.codec = "WEBM"; ff.audio_codec = "NONE"
+    enc.render.image_settings.color_mode = "RGBA"
+    ff.constant_rate_factor = "HIGH"; ff.ffmpeg_preset = "GOOD"
+    ff.gopsize = fps
+    os.makedirs(os.path.dirname(out_path), exist_ok=True)
+    enc.render.filepath = out_path
+    enc.render.use_overwrite = True
+    with bpy.context.temp_override(scene=enc):
+        bpy.ops.render.render(animation=True, scene=enc.name)
+    bpy.data.scenes.remove(enc)
+    log(f"lead-in saved: {out_path}")
+
+
 def steps():
     """The whole job as small steps on a timer, so the window keeps drawing."""
     win, area = S.stage()
@@ -535,10 +778,10 @@ def steps():
             bpy.ops.screen.screen_full_area(use_hide_panels=True)
     except Exception:
         pass
-    say("Building the grand welcome...")
+    say("Building the opening ceremony lead-in..." if LEAD_IN else "Building the grand welcome...")
     yield 0.2
     t0 = time.time()
-    sc = build(bpy.context.scene)
+    sc = build_lead_in(bpy.context.scene) if LEAD_IN else build(bpy.context.scene)
     log(f"built in {time.time() - t0:.0f}s")
     S.show_scene()
     say("The grand welcome: built. A look through the camera, then rendering every frame...")
@@ -551,6 +794,11 @@ def steps():
     # Render the frames with Blender's own render view, so each frame shows
     # in the window as it is made; when the last one is done, make the video.
     bpy.context.preferences.view.render_display_type = "AREA"
+    if LEAD_IN:
+        # The live look above turns the see-through sky off (stills.show_scene);
+        # the lead-in's frames must keep it.
+        sc.render.film_transparent = True
+        sc.render.image_settings.color_mode = "RGBA"
     for f in os.listdir(FRAMES):
         if f.endswith(".png"):
             os.remove(os.path.join(FRAMES, f))
@@ -560,8 +808,33 @@ def steps():
         if finished in bpy.app.handlers.render_complete:
             bpy.app.handlers.render_complete.remove(finished)
         def make_video():
+            if LEAD_IN:
+                say("All frames done. Making the see-through WebM...")
+                encode_webm(FRAMES, os.path.join(WEB, "opening-lead-in.webm"))
+                # zero animation shows the card at rest: the frame at 3.5 s
+                files = sorted(f for f in os.listdir(FRAMES) if f.endswith(".png"))
+                shutil.copyfile(os.path.join(FRAMES, files[min(len(files) - 1, int(3.5 * RATE))]),
+                                os.path.join(WEB, "opening-lead-in-still.png"))
+                say(f"Finished. The lead-in: {WEB}   (close Blender when you're done)")
+                return None
             say("All frames done. Making the video...")
+            # Until the ribbons start, the film IS the countdown's 0:00:
+            # those frames become the projector's own picture, pixel for
+            # pixel (the render matches it to under 1/255 on average, but
+            # the cut at 6:00 lands on frame 1, so make it exact).
+            if os.path.exists(PLATE) and scene.render.resolution_percentage == 100 \
+                    and (scene.render.resolution_x, scene.render.resolution_y) == (1920, 1080):
+                last = (BEATS["trace"][0] - 1) * RATE // FPS
+                for f in range(1, last + 1):
+                    p = os.path.join(FRAMES, f"frame_{f:04d}.png")
+                    if os.path.exists(p):
+                        shutil.copyfile(PLATE, p)
+                log(f"frames 1-{last}: the projector's own 0:00")
             encode_mp4(FRAMES, MP4)
+            if FINAL:
+                say("Making the projector's copy and its stills...")
+                encode_mp4(FRAMES, os.path.join(WEB, "grand-welcome.mp4"), web=True)
+                save_stills(FRAMES)
             mins = (time.time() - started) / 60
             say(f"Finished in {mins:.0f} min. The video: {MP4}   (close Blender when you're done)")
             return None

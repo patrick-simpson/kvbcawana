@@ -7,8 +7,10 @@ that REPLACES the other screens' 5-second "Switching to opening ceremony" card
 lobby's welcome video (`video/awana-intro/`), on the Windows laptop (RTX 4050),
 not in the cloud (owner: "use the computer for that, not the cloud").
 
-Nothing is built yet. The look is chosen (below, from the stills); the next
-step is building the film.
+BUILT and on the screens (2026-11-01, owner: "Make the whole thing in 1080p
+60fps then adapt everything to fit it nicely", the projector and the lead-in
+both). See "The real film and the lead-in" below and CLAUDE.md "Projector"
+(Grand welcome, Ceremony mirror).
 
 ## Decided (the owner's answers)
 
@@ -104,6 +106,30 @@ Its `BEATS` table holds the timing (30 frames = 1 s):
 - Still rough: the 0:00 (size, place, face) and the hand-over (a fade to
   black) stand in for the real seams. Next: measure the projector's
   countdown 0:00 and the US Pledge slide's first frame and fit both.
+
+## The real film and the lead-in (2026-11-01)
+
+- The film: `grand_welcome.py --final` (in Blender's window, ~18 min on the
+  laptop): 1920x1080, 60 fps, motion blur, 64 EEVEE samples; writes
+  `output/Grand Welcome.mp4` (near-lossless master) and the projector's
+  copies in `lobby/public/welcome/`: `grand-welcome.mp4` (8 Mbps, ~21 MB,
+  index first), `grand-welcome-first.png` (its first frame) and
+  `grand-welcome-still.jpg` (its landed frame at 16 s).
+- The start seam: `tools/measure-projector.mjs` captures the built
+  countdown's "0:00" alone on black at 1920x1080 (`projector-zero.png`,
+  `projector-layout.json`); the film's ribbons trace the zeros at their
+  measured places, and its frames before the ribbons start are copied from
+  that picture, so frame 1 is byte for byte the countdown's. Checked in Edge
+  through 6:00: the countdown's last instant reads 0:00 and the film lands
+  on it with no visible cut. The end seam: the last frame is black (the
+  pledge slide starts on black: its words, clock and the corner logo fade in).
+- The lead-in: `grand_welcome.py --lead-in --final` (~4 min): 5 s, 1080p60,
+  RGBA frames (no bloom: the compositor drops alpha) encoded by Blender to
+  VP9 WebM with alpha, `lobby/public/welcome/opening-lead-in.webm` (~0.4 MB)
+  and `opening-lead-in-still.png` (its card at 3.5 s, for zero animation).
+  Measured playing in Edge: see-through 100% at the start, ~50% at 0.45 s,
+  fully covered from 1.3 s. (A seek-and-copy check reads VP9 alpha video as
+  blank in Edge: test it playing, or decode with FFmpeg's libvpx-vp9.)
 
 ## When it is built (for whoever builds it)
 
