@@ -83,13 +83,19 @@ about 2 minutes on the laptop), then makes `output/Grand Welcome -
 PREVIEW.mp4` (960 x 540, 30 fps). It reuses `stills.py`'s brand pieces.
 Its `BEATS` table holds the timing (30 frames = 1 s):
 
-- 0-0.7 s "0:00" alone on black; 0.7-1.7 s it unravels into the six
-  glowing club ribbons; 1.7-7.7 s they race round the room; 7.7-11 s they
-  weave into one turning knot; 11-11.5 s it tightens and bursts into
-  starlight; 11.7-14 s WELCOME TO lands letter by letter, the full logo
-  rises in, the six marks pop in youngest first (the camera has settled by
-  the burst); 14-19.3 s held, sparkles drifting, the 2 Tim 2:15
-  constellation at about 15-17 s top left; 19.3-20 s fade to black.
+- Preview 2 (owner chose all four improvements, 2026-11-01): 0-0.7 s
+  "0:00" alone on black; 0.7-1.3 s the six club ribbons (round tubes of
+  light, so they can follow tight curves) trace the three zeros' outer and
+  inner edges in club colours, youngest first left to right, and the white
+  digits go; 1.3-5.7 s they peel off and race round the room, past the
+  lens; 5.7-7.8 s all six slot into one knot together, which turns and
+  tightens; 10.5 s it bursts: a four-point brand starburst, a ring, starlight
+  half white and half in the club colours; 10.8-12.3 s WELCOME TO lands
+  letter by letter and the full logo rises in; 11.8-13.3 s each club's light
+  streaks (behind the logo) to its own plate and delivers its mark, youngest
+  first; 13.3-19.3 s held with a slow push-in, the 2 Tim 2:15 constellation
+  at about 15-17 s top left, fading out; 19.3-20 s fade to black. The words
+  have their own soft front light so they read white.
 - Still rough: the 0:00 (size, place, face) and the hand-over (a fade to
   black) stand in for the real seams. Next: measure the projector's
   countdown 0:00 and the US Pledge slide's first frame and fit both.
