@@ -82,10 +82,12 @@ test("the remote's Back to the countdown takes the copy down; the ceremony start
   await expect(mirror).toHaveAttribute('data-up', '1');
 });
 
-// Owner 2026-10-22: a five-second "switching to opening ceremony" card before
-// the turn-over. The seam's `switching` stands for those five seconds (the
-// real rule is lib/ceremonyMirror.js mirrorSwitching, unit-tested).
-test('the five seconds before the turn-over show the switching card, with the lobby held', async ({ page }) => {
+// Owner 2026-10-22: five seconds before the turn-over; since 2026-11-01 the
+// see-through lead-in film (components/CeremonyLeadIn.jsx) in place of the
+// "switching to opening ceremony" card. The seam's `switching` stands for those
+// five seconds (the real rule is lib/ceremonyMirror.js mirrorSwitching,
+// unit-tested). Under ?lowPower=1 (zero animation) it is its card at rest.
+test('the five seconds before the turn-over show the lead-in, with the lobby held', async ({ page }) => {
   await liveChannel(page);
   await page.route(/open-meteo|twotimtwo/, (route) => route.abort());
   await page.addInitScript(() => {
@@ -95,12 +97,14 @@ test('the five seconds before the turn-over show the switching card, with the lo
   await page.goto('/index.html?lowPower=1');
   const mirror = page.locator('[data-testid="ceremony-mirror"]');
   await expect(mirror).toHaveAttribute('data-up', '1');
-  const card = page.locator('[data-testid="mirror-switching"]');
-  await expect(card).toBeVisible();
-  await expect(card).toContainText('Switching to');
-  await expect(card).toContainText('Opening ceremony');
+  // See-through: the layer has no black of its own and the projector's frame isn't drawn yet.
+  await expect(mirror).toHaveClass(/lobby-mirror--lead-in/);
+  const leadIn = page.locator('[data-testid="ceremony-lead-in"]');
+  await expect(leadIn).toHaveAttribute('data-playing', '1');
+  await expect(leadIn).toHaveAttribute('aria-label', 'Opening ceremony');
+  await expect(leadIn.locator('img')).toHaveAttribute('src', './welcome/opening-lead-in-still.png');
   await expect(page.locator('[data-testid="ceremony-label"]')).toHaveCount(0);   // not copying yet
-  await page.screenshot({ path: test.info().outputPath('switching.png') });
+  await page.screenshot({ path: test.info().outputPath('lead-in.png') });
 });
 
 // Owner 2026-10-19: "ALL screens should show the games projector display.
