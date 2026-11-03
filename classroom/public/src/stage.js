@@ -26,7 +26,11 @@ const SESSION_RE = /^v1\.\d+\.\d+\.[A-Za-z0-9_-]{20,}$/;
 export const DOORBELL_MESSAGE = 'awana-display:sync-doorbell';
 const PDFJS = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/';
 const YT_API = 'https://www.youtube.com/iframe_api';
-const TUNING = { pollMs: 5000, reportVideoMs: 10000, swoopMs: 1100, swapAtMs: 500, timeoutMs: 8000 };
+// pollMs: the doorbell (passed up by the embedded lobby) brings a press at once;
+// the poll is only its safety net, and keeps the remote's "the TV is on" (the
+// Worker's CLASSROOM_ONLINE_MS, 45 s) true. Every 5 s around the clock was most of
+// the account's free daily requests (2026-11-03), so 30 s.
+const TUNING = { pollMs: 30000, reportVideoMs: 10000, swoopMs: 1100, swapAtMs: 500, timeoutMs: 8000 };
 const tuning = () => Object.assign({}, TUNING, window.classroomStageTuning || {});
 
 /**
