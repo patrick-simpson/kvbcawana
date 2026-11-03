@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { FRAME_HELPER, builtWords, clampSlide, deckOutline, frameHtml, keyStep, modeOf, notesHere, tapStep } from '../presentation/logic.js';
+import { FRAME_HELPER, builtWords, clampSlide, deckOutline, followingNow, frameHtml, keyStep, modeOf, msToNextEdge, notesHere, tapStep } from '../presentation/logic.js';
 
 const SITE = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const page = readFileSync(path.join(SITE, 'presentation', 'index.html'), 'utf8');
@@ -108,4 +108,19 @@ test('the slide is pushed: the page listens for the doorbell and only polls slow
   const t = /livePollMs: (\d[\d *]*)/.exec(app);
   assert.ok(t && eval(t[1]) >= 60 * 1000, 'the safety-net poll is a minute or more');
   assert.match(app, /liveOpen \? tuning\.livePollMs : document\.hidden \? tuning\.hiddenPollMs/, 'a hidden TV slows down too');
+});
+
+test('it follows other devices Sunday 5-9 PM Eastern only, and makes no calls outside it (owner 2026-11-03)', () => {
+  const et = (iso) => new Date(iso);   // UTC instants; EST is UTC-5 in November, EDT UTC-4 in October
+  assert.equal(followingNow(et('2026-11-08T22:00:00Z')), true, 'Sunday 5:00 PM EST');
+  assert.equal(followingNow(et('2026-11-09T01:59:00Z')), true, 'Sunday 8:59 PM EST');
+  assert.equal(followingNow(et('2026-11-09T02:00:00Z')), false, 'Sunday 9:00 PM EST');
+  assert.equal(followingNow(et('2026-11-08T21:59:00Z')), false, 'Sunday 4:59 PM EST');
+  assert.equal(followingNow(et('2026-11-04T23:00:00Z')), false, 'Wednesday 6 PM');
+  assert.equal(followingNow(et('2026-10-25T21:30:00Z')), true, 'Sunday 5:30 PM EDT');
+  assert.equal(msToNextEdge(et('2026-11-08T21:30:00Z')), 30 * 60 * 1000, 'opens in half an hour');
+  assert.equal(msToNextEdge(et('2026-11-08T23:00:00Z')), 60 * 60 * 1000, 'never sleeps more than an hour');
+  assert.match(app, /if \(!followingNow\(\)\) \{ closeLive\(\);/, 'the poll stops and the socket closes outside it');
+  assert.match(app, /!session\(\) \|\| !followingNow\(\)\) return;/, 'a press outside it is not sent');
+  assert.match(app, /liveSock \|\| !session\(\) \|\| !followingNow\(\)/, 'no socket outside it');
 });

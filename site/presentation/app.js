@@ -20,7 +20,7 @@
 // enough for the TV window. Every screen follows ONE slide on the sync
 // Worker (POST /v1/presentation/go, polled), so a phone drives the TV too.
 
-import { builtWords, clampSlide, deckOutline, frameHtml, keyStep, modeOf, notesHere, tapStep } from './logic.js';
+import { builtWords, clampSlide, deckOutline, followingNow, frameHtml, keyStep, modeOf, msToNextEdge, notesHere, tapStep } from './logic.js';
 
 const SYNC_INDEX = new URL('/lobby/shared/sync.json', location.href).href;
 const SESSION_KEY = 'awanaSyncSession.v1';
@@ -308,7 +308,7 @@ async function move(target) {
   index = want;
   render();
   bc?.postMessage({ type: 'go', index });
-  if (!session()) return;
+  if (!session() || !followingNow()) return;   // off the air: this browser's windows only
   const res = await request('/v1/presentation/go', { method: 'POST', body: { index } });
   if (res.status === 401) { signedOut('The passphrase changed: other screens no longer follow this one.'); return; }
   if (res.ok) take(res.body);
@@ -366,7 +366,7 @@ function closeLive() {
 function openLive() {
   clearTimeout(liveRetryTimer);
   liveRetryTimer = 0;
-  if (liveSock || !session() || !/^https:\/\//.test(base) || typeof WebSocket !== 'function') return;
+  if (liveSock || !session() || !followingNow() || !/^https:\/\//.test(base) || typeof WebSocket !== 'function') return;
   let sock;
   try { sock = new WebSocket(`${base.replace(/^https:/, 'wss:')}/v1/live?session=${encodeURIComponent(session())}`); } catch { return; }
   liveSock = sock;
@@ -401,6 +401,9 @@ function dropLive() {
 async function poll() {
   if (polling) return;
   if (!session() || !base) { closeLive(); setLive(null, deck ? 'This screen only' : 'Not signed in'); schedulePoll(); return; }
+  // Off the air (outside Sunday 5-9 PM Eastern, logic.js followingNow): no calls at
+  // all; the next look is at the window's edge (or within the hour).
+  if (!followingNow()) { closeLive(); setLive(null, 'Follows other devices Sunday 5–9 PM'); schedulePoll(msToNextEdge()); return; }
   if (!liveSock && !liveRetryTimer) openLive();
   polling = true;
   try {

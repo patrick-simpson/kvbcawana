@@ -118,3 +118,32 @@ export function modeOf(search) {
   const q = new URLSearchParams(search || '');
   return q.get('screen') === 'tv' ? 'tv' : 'presenter';
 }
+
+// When the presentation follows the other devices (owner 2026-11-03: "Presentation
+// should only check for things on Sunday nights"; 5-9 PM Eastern). Outside it the
+// page makes no calls at all: no socket, no poll, a press is not sent. Windows of one
+// browser still follow each other (BroadcastChannel), so the lobby computer's
+// Settings window still drives its TV.
+export const FOLLOW_WINDOW = Object.freeze({ day: 0, from: 17 * 60, until: 21 * 60, zone: 'America/New_York' });
+
+/** Eastern weekday (0 = Sunday) and minutes past midnight. @param {Date} d */
+function easternClock(d) {
+  const parts = Object.fromEntries(new Intl.DateTimeFormat('en-US', { timeZone: FOLLOW_WINDOW.zone, weekday: 'short', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
+    .formatToParts(d).map((p) => [p.type, p.value]));
+  const day = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(parts.weekday);
+  return { day, mins: Number(parts.hour) * 60 + Number(parts.minute) };
+}
+
+/** Is the presentation following other devices now? @param {Date} [d] */
+export function followingNow(d = new Date()) {
+  const { day, mins } = easternClock(d);
+  return day === FOLLOW_WINDOW.day && mins >= FOLLOW_WINDOW.from && mins < FOLLOW_WINDOW.until;
+}
+
+/** Milliseconds until the window's next edge (open or close), at most an hour. @param {Date} [d] */
+export function msToNextEdge(d = new Date()) {
+  const { mins } = easternClock(d);
+  const secs = d.getUTCSeconds() * 1000 + d.getUTCMilliseconds();
+  const edges = [FOLLOW_WINDOW.from, FOLLOW_WINDOW.until].map((e) => ((e - mins + 1440) % 1440 || 1440) * 60000 - secs);
+  return Math.max(1000, Math.min(60 * 60 * 1000, ...edges));
+}
