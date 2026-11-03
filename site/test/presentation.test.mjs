@@ -100,3 +100,12 @@ test('the build ships the page with its two sign-in modules', () => {
   assert.match(build, /for \(const f of \['index\.html', 'app\.js', 'logic\.js'\]\) cpSync\(path\.join\(ROOT, 'site', 'presentation', f\)/);
   assert.match(build, /for \(const f of \['sync-protocol\.js', 'cloud-crypto\.js'\]\) cpSync\(path\.join\(ROOT, 'shared', f\), path\.join\(out, 'shared', f\)\)/);
 });
+
+test('the slide is pushed: the page listens for the doorbell and only polls slowly while it can hear it (2026-11-03)', () => {
+  // Polling every 0.8 s around the clock used up the account's free daily requests.
+  assert.match(app, /\/v1\/live\?session=/);
+  assert.match(app, /f\?\.d\?\.what === 'presentation'/);
+  const t = /livePollMs: (\d[\d *]*)/.exec(app);
+  assert.ok(t && eval(t[1]) >= 60 * 1000, 'the safety-net poll is a minute or more');
+  assert.match(app, /liveOpen \? tuning\.livePollMs : document\.hidden \? tuning\.hiddenPollMs/, 'a hidden TV slows down too');
+});

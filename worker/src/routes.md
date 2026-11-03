@@ -1567,7 +1567,7 @@ Back. /settings → Screens previews a look on the TV for a minute. Code:
   TV's embedded lobby passes it up (`lobby/src/lib/embed.js hostDoorbell`,
   the word and a whole-number rev only) and the TV reads the stage at once.
   The first remote read after a quiet spell rings it too (`watch: true`), so
-  the TV reports straight away. Without the doorbell the TV reads every 5 s.
+  the TV reports straight away. Without the doorbell the TV reads every 30 s (5 s until 2026-11-03; under the 45 s online window).
 - Watching: the TV posts `now` only while a remote read the state within
   `CLASSROOM_WATCH_MS` (30 s): on a change, and every 10 s while a video plays.
 - Free plan: reads are memory; writes are one per edit or press; a part is one
@@ -1601,5 +1601,7 @@ the presenter view). Code `src/presentation.js`; tests `test/presentation.test.j
 | `GET /v1/presentation/state` | session | | `{ok, deck: {rev, builtAt}\|null, slide: {index, rev, at}}` (memory after the first read) |
 | `POST /v1/presentation/go` | session | `{index}` (0..999) | the state; last press wins; the same index again changes nothing |
 
-Storage: `pres:deck`, `pres:up`, `pres:part:<rev>:<n>`, `pres:slide`. Screens poll
-the state (TV 0.8 s, presenter 1.5 s, only while the page is open); no doorbell.
+Doorbell (2026-11-03): a slide change (`go` that moved the slide) rings `changed {what: 'presentation', slide: <rev>}` and a finished deck upload `changed {what: 'presentation', deck: <rev>}` on the live channel; the pages read the state then, polling only every 2 minutes while their socket is open. Other screens ignore the word.
+
+Storage: `pres:deck`, `pres:up`, `pres:part:<rev>:<n>`, `pres:slide`. Screens read
+the state on the doorbell above (polling 0.8 s / 1.5 s only while their socket is down).

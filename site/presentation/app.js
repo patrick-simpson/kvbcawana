@@ -27,7 +27,12 @@ const SESSION_KEY = 'awanaSyncSession.v1';
 const SESSION_RE = /^v1\.\d+\.\d+\.[A-Za-z0-9_-]{20,}$/;
 const CHANNEL = 'awana-presentation';
 const STAGE_W = 1600;
-const tuning = Object.assign({ tvPollMs: 800, deskPollMs: 1500, hiddenPollMs: 5000, helloWaitMs: 700, quietMs: 2500, timeoutMs: 15000, deckTimeoutMs: 90000 }, window.presentationTuning || {});
+// The slide is PUSHED (2026-11-03): the Worker rings the live channel's doorbell,
+// `changed {what: 'presentation'}`, on every slide change and new deck, and the
+// page reads the state then. While that socket is open the poll is only a
+// safety net (livePollMs); the fast polls are for a page whose socket is down.
+// Polling every 0.8 s around the clock used up the account's free daily requests.
+const tuning = Object.assign({ tvPollMs: 800, deskPollMs: 1500, hiddenPollMs: 5000, livePollMs: 2 * 60 * 1000, pingMs: 25 * 1000, silentMs: 70 * 1000, retryMinMs: 2000, retryMaxMs: 60 * 1000, helloWaitMs: 700, quietMs: 2500, timeoutMs: 15000, deckTimeoutMs: 90000 }, window.presentationTuning || {});
 
 const $ = (id) => /** @type {any} */ (document.getElementById(id));
 const store = {
@@ -231,6 +236,7 @@ function gateNote(words) {
 }
 
 function signedOut(words) {
+  closeLive();
   store.set(SESSION_KEY, null);
   memorySession = '';
   if (deck) { setLive(false, 'Signed out'); status(words); return; }
@@ -328,12 +334,74 @@ function take(body) {
 
 function schedulePoll(ms) {
   clearTimeout(pollTimer);
-  pollTimer = setTimeout(poll, ms ?? (mode === 'tv' ? tuning.tvPollMs : document.hidden ? tuning.hiddenPollMs : tuning.deskPollMs));
+  pollTimer = setTimeout(poll, ms ?? (liveOpen ? tuning.livePollMs : document.hidden ? tuning.hiddenPollMs : mode === 'tv' ? tuning.tvPollMs : tuning.deskPollMs));
+}
+
+// ── the doorbell (the live channel) ────────────────────────────────────────
+
+/** @type {WebSocket|null} */
+let liveSock = null;
+let liveOpen = false;
+let liveRetryMs = 0;
+let liveRetryTimer = 0;
+let livePingTimer = 0;
+let liveHeardAt = 0;
+
+/** Is this socket message the presentation's ring? @param {unknown} data */
+const isRing = (data) => {
+  if (typeof data !== 'string' || data === 'pong') return false;
+  try { const f = JSON.parse(data); return f?.e === 'changed' && f?.d?.what === 'presentation'; } catch { return false; }
+};
+
+function closeLive() {
+  clearTimeout(liveRetryTimer);
+  liveRetryTimer = 0;
+  clearInterval(livePingTimer);
+  const sock = liveSock;
+  liveSock = null;
+  liveOpen = false;
+  if (sock) { sock.onopen = sock.onmessage = sock.onclose = sock.onerror = null; try { sock.close(); } catch { /* already closed */ } }
+}
+
+function openLive() {
+  clearTimeout(liveRetryTimer);
+  liveRetryTimer = 0;
+  if (liveSock || !session() || !/^https:\/\//.test(base) || typeof WebSocket !== 'function') return;
+  let sock;
+  try { sock = new WebSocket(`${base.replace(/^https:/, 'wss:')}/v1/live?session=${encodeURIComponent(session())}`); } catch { return; }
+  liveSock = sock;
+  sock.onopen = () => {
+    liveOpen = true;
+    liveRetryMs = 0;
+    liveHeardAt = Date.now();
+    clearInterval(livePingTimer);
+    livePingTimer = setInterval(() => {
+      if (Date.now() - liveHeardAt > tuning.silentMs) { dropLive(); return; }
+      try { sock.send('ping'); } catch { dropLive(); }
+    }, tuning.pingMs);
+    schedulePoll(0);   // whatever moved while it was down
+  };
+  sock.onmessage = (e) => {
+    liveHeardAt = Date.now();
+    if (isRing(e.data)) schedulePoll(0);
+  };
+  sock.onclose = sock.onerror = () => dropLive();
+}
+
+/** The socket went away: poll fast again, and open it again after a back-off. */
+function dropLive() {
+  const was = liveOpen;
+  closeLive();
+  if (was) schedulePoll(0);
+  if (!session()) return;
+  liveRetryMs = Math.min(tuning.retryMaxMs, liveRetryMs ? liveRetryMs * 2 : tuning.retryMinMs);
+  liveRetryTimer = setTimeout(openLive, liveRetryMs);
 }
 
 async function poll() {
   if (polling) return;
-  if (!session() || !base) { setLive(null, deck ? 'This screen only' : 'Not signed in'); schedulePoll(); return; }
+  if (!session() || !base) { closeLive(); setLive(null, deck ? 'This screen only' : 'Not signed in'); schedulePoll(); return; }
+  if (!liveSock && !liveRetryTimer) openLive();
   polling = true;
   try {
     const res = await request('/v1/presentation/state');

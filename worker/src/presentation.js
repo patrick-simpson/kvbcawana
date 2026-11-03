@@ -57,9 +57,13 @@ export function cleanDeckHeader(b) {
 }
 
 export class Presentation {
-  /** @param {{ storage: any, now: () => number, env: () => Record<string, any>, historyKid: () => Promise<string|null> }} deps */
-  constructor({ storage, now, env, historyKid }) {
+  /** @param {{ storage: any, now: () => number, env: () => Record<string, any>, historyKid: () => Promise<string|null>, ring?: (payload: Record<string, unknown>) => void }} deps */
+  constructor({ storage, now, env, historyKid, ring }) {
     this.storage = storage;
+    // The live channel's doorbell, `changed {what: 'presentation'}` (2026-11-03: the
+    // pages listen for it instead of asking every second, which used up the free
+    // plan's daily requests). Never awaited, never fails a route.
+    this.ring = (/** @type {Record<string, unknown>} */ payload) => { try { ring?.(payload); } catch { /* the poll catches up */ } };
     this.now = now;
     this.env = env;
     this.historyKid = historyKid;
@@ -123,6 +127,7 @@ export class Presentation {
     await this.storage.delete(UP_KEY);
     if (old && old.rev !== deck.rev) await this.dropParts(old.rev, old.parts);
     this.deckCache = { rev: deck.rev, builtAt: deck.builtAt };
+    this.ring({ what: 'presentation', deck: deck.rev });
     return json({ ok: true, rev: deck.rev });
   }
 
@@ -182,6 +187,7 @@ export class Presentation {
     if (s.index !== index) {
       this.slideCache = { index, rev: s.rev + 1, at: this.now() };
       await this.storage.put(SLIDE_KEY, this.slideCache);
+      this.ring({ what: 'presentation', slide: this.slideCache.rev });
     }
     return this.state();
   }

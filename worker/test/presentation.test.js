@@ -18,11 +18,12 @@ beforeAll(async () => { key = await createHistoryKey(PASS); }, 60000);
 async function setup({ token = TOKEN, withKey = true } = {}) {
   let t = Date.parse('2026-11-04T23:10:00Z');
   const storage = memoryStore();
+  const frames = [];
   const core = new SyncCore({
     storage,
     env: { INITIAL_PASSPHRASE: PASS, ...(token ? { PRESENTATION_TOKEN: token } : {}) },
     now: () => t,
-    broadcast: () => 1,
+    broadcast: (text) => { frames.push(JSON.parse(text)); return 1; },
     liveScreens: () => new Set(),
   });
   const session = (await signInV2(core)).body.session;
@@ -35,7 +36,7 @@ async function setup({ token = TOKEN, withKey = true } = {}) {
   if (withKey) expect((await call('PUT', '/v1/history/key', { pub: key.pub, kid: key.kid, wrapped: key.wrapped })).status).toBe(201);
   /** fetch for the job's script, routed into the core */
   const fetchFn = async (url, init) => core.handle(new Request(url, init), '10.0.0.2');
-  return { core, storage, session, raw, call, fetchFn, tick: (ms) => { t += ms; } };
+  return { core, storage, frames, session, raw, call, fetchFn, tick: (ms) => { t += ms; } };
 }
 
 const DECK = `<!doctype html><html><head><title>Eleven Seasons</title></head><body>${'<section class="slide">Growth</section>'.repeat(9000)}</body></html>`;
@@ -138,4 +139,23 @@ describe('the shared slide', () => {
     expect((await s.call('POST', '/v1/presentation/go', { index: 1.5 })).status).toBe(400);
     expect((await s.call('GET', '/v1/presentation/state')).body.deck).toBeNull();
   });
+
+  it('a slide change rings the doorbell once; a repeat press does not', async () => {
+    const s = await setup({ withKey: false });
+    const rings = () => s.frames.filter((f) => f.e === 'changed' && f.d.what === 'presentation');
+    await s.call('POST', '/v1/presentation/go', { index: 3 });
+    await s.call('POST', '/v1/presentation/go', { index: 3 });
+    expect(rings()).toEqual([{ e: 'changed', d: { what: 'presentation', slide: 1 } }]);
+    await s.call('POST', '/v1/presentation/go', { index: 4 });
+    expect(rings().length).toBe(2);
+    // the state read alone never rings
+    await s.call('GET', '/v1/presentation/state');
+    expect(rings().length).toBe(2);
+  });
+
+  it('a new deck rings the doorbell with its rev', async () => {
+    const s = await setup();
+    const out = await publishDeck({ html: DECK, base: 'https://sync.test', token: TOKEN, fetchFn: s.fetchFn });
+    expect(s.frames.filter((f) => f.e === 'changed' && f.d.what === 'presentation')).toEqual([{ e: 'changed', d: { what: 'presentation', deck: out.rev } }]);
+  }, 60000);
 });

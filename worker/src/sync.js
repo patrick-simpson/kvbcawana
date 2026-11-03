@@ -263,6 +263,7 @@ export class SyncCore {
       now: this.now,
       env: () => this.rawEnv || {},
       historyKid: async () => (await this.storage.get('history:pub'))?.kid || null,
+      ring: (payload) => { this.broadcast(frameText(DOORBELL_EVENT, payload)); },
     });
     mountPresentation(this.registry, this);   // /v1/presentation/* (routes.md 10.14)
     // The change log (changes.js, routes.md 10.5): every write path below logs who
