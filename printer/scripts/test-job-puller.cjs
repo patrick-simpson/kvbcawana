@@ -403,7 +403,7 @@ exit 0
     check('quiet hours: an idle round waits the quiet time', waits.includes(jp.QUIET_IDLE_MS));
     check('quiet hours: a busy round (labels printed) still comes back at once', waits.includes(jp.BUSY_MS));
     check('quiet hours: the roster and books are read less often', waits.includes(jp.QUIET_BUNDLE_MS) && !waits.includes(60 * 1000));
-    check('quiet hours ask 9x less often, but inside /checkin\'s 2-minute line', jp.QUIET_IDLE_MS >= 9 * jp.IDLE_MS && jp.QUIET_IDLE_MS + 60 * 1000 < 2 * 60 * 1000);
+    check('quiet hours ask every 5 minutes (owner 2026-11-03)', jp.QUIET_IDLE_MS === 5 * 60 * 1000);
     // ...and only with the wake-up socket open, outside the club-night window.
     const open = { status: () => ({ open: true }) };
     const shut = { status: () => ({ open: false }) };

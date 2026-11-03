@@ -1435,6 +1435,8 @@ app.whenReady().then(async () => {
     apply: applyDeviceSettings,
     busy: serverBusy,
     report: () => appReport.read(app.getVersion(), updateState),
+    // Every 2 minutes on the club evening, every 15 the rest of the week (owner 2026-11-03).
+    clubEvening: () => require('./src/display/clubNight').clubEveningNow(new Date()),
     // The display log's tail for /settings (worker/src/routes.md 10.7a): display.js writes it here.
     logTail: () => readLogTail(path.join(userData, 'display', 'display.log')),
     onStatus: (st) => { console.log('[device]', st.state, st.pending ? `(held: ${JSON.stringify(st.pending)})` : ''); refreshTray(); },

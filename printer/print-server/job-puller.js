@@ -97,9 +97,10 @@ const BUNDLE_MS = 60 * 1000;
 // Quiet hours (2026-11-03): outside the club-night window, while the wake-up
 // socket is open (station-wake.js), the station asks far less often. Every 5 s
 // around the clock was most of the Cloudflare account's free daily requests.
-// A label still comes at once (the ring); 45 s keeps the Worker's lastSeenAt
-// (written at most once a minute) inside /checkin's 2-minute "station quiet" line.
-const QUIET_IDLE_MS = 45 * 1000;
+// A label still comes at once (the ring). Every 5 minutes (owner 2026-11-03: "Print
+// laptop: every 5 min"): on a test day outside the club evening /checkin may say the
+// station has not been seen (its 2-minute line); labels still print (accepted).
+const QUIET_IDLE_MS = 5 * 60 * 1000;
 const QUIET_HELLO_MS = 5 * 60 * 1000;
 const QUIET_BUNDLE_MS = 10 * 60 * 1000;
 /** Jobs of one lease running at once with the print turn: one printing, the next one drawing. */

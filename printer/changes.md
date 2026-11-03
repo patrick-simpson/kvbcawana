@@ -1,4 +1,9 @@
-﻿## [10.7.1] - 2026-11-03
+﻿## [10.7.2] - 2026-11-03
+Between club nights the app checks in far less often.
+
+**Club evening only.** Outside the club evening (Wednesday 3:30 to 10:00 pm Eastern) a print station now asks for labels every 5 minutes (was 45 seconds), and every computer reports to awana.kvbchurch.org/settings every 15 minutes (was 2). Labels still print at once at any hour: the check-in service rings the station the moment one is ready. On the club evening nothing changes. What you may notice outside it: /settings can show a computer as Off or a little out of date, a change made there can take up to 15 minutes to reach a computer, and on a test day /checkin may say the printer has not been seen (it still prints). Why: the owner asked that these checks "really happen Wednesday evenings when it would matter"; the church's free Cloudflare plan is shared with the camp's phone alerts.
+
+## [10.7.1] - 2026-11-03
 The print station asks the check-in service far less often overnight.
 
 **Quieter between club nights.** A print station used to ask the check-in service "any labels for me?" every 5 seconds, all day and all night, and also sent its heartbeat every 30 seconds, re-read the roster and books every minute and re-sent its settings every minute. Outside the club-night window (Wednesday 3:30 to 10:00 pm, two hours either side of club) and only while its wake-up connection to the service is open, it now asks every 45 seconds, sends its heartbeat every 5 minutes and reads the roster and books every 10 minutes; its settings go again every 4 minutes when unchanged (a change still goes within a minute). A label still prints at once at any hour: the service rings the station the moment one is ready. On club night, or whenever the wake-up connection is down, nothing changes. Why: these calls, around the clock, were using up the church's free Cloudflare plan (100,000 requests a day, shared with the camp's phone alerts); if it runs out, every Cloudflare service on the account stops until 7 pm.

@@ -69,7 +69,7 @@ function fakeTimers() {
 }
 
 /** A computer: roles, hours, a print server that can be busy, main.js's apply. */
-async function computer({ worker = fakeWorker(), print = true, display = false, name = 'Check-in laptop', signedIn = true, report, logTail } = {}) {
+async function computer({ worker = fakeWorker(), print = true, display = false, name = 'Check-in laptop', signedIn = true, report, logTail, clubEvening } = {}) {
   const dir = tmp();
   const pc = {
     dir, worker, timers: fakeTimers(), busy: false, applied: [], statuses: [], signedOutWith: [],
@@ -105,6 +105,7 @@ async function computer({ worker = fakeWorker(), print = true, display = false, 
     timers: pc.timers,
     report,
     logTail,
+    clubEvening,
     now: () => pc.clock,
   });
   pc.clock = Date.parse('2026-10-12T15:00:00Z');
@@ -159,6 +160,19 @@ describe('the rounds', () => {
     await new Promise((r) => setImmediate(r));
     await new Promise((r) => setImmediate(r));
     assert.deepEqual(paths(pc.worker), ['POST /v1/screens/hello', 'GET /v1/screens/<id>/settings']);
+    assert.ok(pc.timers.has(ds.HELLO_MS));
+  });
+
+  it('outside the club evening the hello waits 15 minutes; on it, two (owner 2026-11-03)', async () => {
+    let evening = false;
+    const pc = await computer({ clubEvening: () => evening });
+    await pc.sync.start();
+    assert.ok(pc.timers.has(ds.QUIET_HELLO_MS) && !pc.timers.has(ds.HELLO_MS));
+    assert.equal(ds.QUIET_HELLO_MS, 15 * 60 * 1000);
+    evening = true;
+    pc.timers.run(ds.QUIET_HELLO_MS);
+    await new Promise((r) => setImmediate(r));
+    await new Promise((r) => setImmediate(r));
     assert.ok(pc.timers.has(ds.HELLO_MS));
   });
 

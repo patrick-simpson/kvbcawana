@@ -50,6 +50,12 @@ const KIND = 'computer';
 const FILE = 'device-sync.json';
 /** A hello this often (the Worker calls a screen online for 3 minutes after one). */
 const HELLO_MS = 2 * 60 * 1000;
+// Outside the club evening (owner 2026-11-03: Wednesday 3:30-10 pm Eastern,
+// shared/clubNight.js clubEveningNow, handed in as deps.clubEvening) the hello
+// goes every 15 minutes: the free Cloudflare plan's daily requests are shared.
+// /settings may then show this computer Off, and a change made there reaches it
+// within 15 minutes (accepted by the owner). A change made HERE still goes at once.
+const QUIET_HELLO_MS = 15 * 60 * 1000;
 /** A change made on this computer goes up this long after the last one. */
 const PUSH_DEBOUNCE_MS = 1500;
 /** While a print-off is held, how often the print server is asked whether it is idle. */
@@ -204,7 +210,9 @@ async function createDeviceSync(deps) {
   function schedule() {
     if (!running) return;
     if (loop) timers.clearTimeout(loop);
-    loop = unref(timers.setTimeout(() => { loop = null; tick(); }, HELLO_MS));
+    let every = HELLO_MS;
+    if (typeof deps.clubEvening === 'function') { try { if (!deps.clubEvening()) every = QUIET_HELLO_MS; } catch { /* the usual pace */ } }
+    loop = unref(timers.setTimeout(() => { loop = null; tick(); }, every));
   }
 
   function watchIdle() {
@@ -435,6 +443,6 @@ async function createDeviceSync(deps) {
 }
 
 module.exports = {
-  KIND, FILE, HELLO_MS, PUSH_DEBOUNCE_MS, IDLE_CHECK_MS, REPORT_GAP_MS, SPEC,
+  KIND, FILE, HELLO_MS, QUIET_HELLO_MS, PUSH_DEBOUNCE_MS, IDLE_CHECK_MS, REPORT_GAP_MS, SPEC,
   cleanSettings, reconcileComputer, screenName, createDeviceSync,
 };
