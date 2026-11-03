@@ -1,8 +1,8 @@
-version: 10.7.0
+version: 10.7.1
 files:
-  - url: https://github.com/patrick-simpson/kvbcawana/releases/download/printer-v10.7.0/KVBC-Awana-Setup.exe
-    sha512: Z6B9isBTjcw4UH/qExGhh9br1xQJiq2Tvx2qWwj53UjXg44WJV/+CXrhSCAIKqa7RpFhBIlU6eRMbH56WSQQBg==
-    size: 244692769
-path: https://github.com/patrick-simpson/kvbcawana/releases/download/printer-v10.7.0/KVBC-Awana-Setup.exe
-sha512: Z6B9isBTjcw4UH/qExGhh9br1xQJiq2Tvx2qWwj53UjXg44WJV/+CXrhSCAIKqa7RpFhBIlU6eRMbH56WSQQBg==
-releaseDate: '2026-11-01T12:51:36.662Z'
+  - url: https://github.com/patrick-simpson/kvbcawana/releases/download/printer-v10.7.1/KVBC-Awana-Setup.exe
+    sha512: 8ZMXdonPAMKKLWj4aXGJMNnPyaZIAjj3NdvQAl7VC3BT5sbcUAlLxV0P95S1zxSU0N6S2qXDn4dI1BoJl6FmGg==
+    size: 244693687
+path: https://github.com/patrick-simpson/kvbcawana/releases/download/printer-v10.7.1/KVBC-Awana-Setup.exe
+sha512: 8ZMXdonPAMKKLWj4aXGJMNnPyaZIAjj3NdvQAl7VC3BT5sbcUAlLxV0P95S1zxSU0N6S2qXDn4dI1BoJl6FmGg==
+releaseDate: '2026-11-03T11:25:54.902Z'
