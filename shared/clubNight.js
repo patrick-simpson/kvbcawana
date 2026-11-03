@@ -186,3 +186,21 @@ export function clubNightToday(now, { schedule = null, feed = null } = {}) {
   return isClubNight(dateKey, weekday, { schedule, feed, timeZone });
 }
 
+
+/**
+ * The club EVENING (owner 2026-11-03, "time box some of these checks so that they
+ * really happen Wednesday evenings when it would matter"): Wednesday 3:30-10:00 pm
+ * Eastern, every Wednesday (a cancelled night included: the clock alone, no data
+ * to load). Inside it every screen's BACKUP checks run at their usual speed;
+ * outside it they slow right down, and only the live channel's rings (free) bring
+ * changes at once. The free Cloudflare plan's 100,000 requests a day are shared
+ * with the camp's alerts. The print server's own copy of this window is
+ * printer/print-server/server/station.js (STATION_WINDOW_*: 17:30-20:00 club +-2 h).
+ */
+export const CLUB_EVENING = Object.freeze({ weekday: DEFAULT_MEETING_DAY, fromMin: 15 * 60 + 30, untilMin: 22 * 60 });
+
+/** Is it the club evening now? @param {Date} [now] @param {string} [timeZone] */
+export function clubEveningNow(now = new Date(), timeZone = DEFAULT_TIMEZONE) {
+  const p = zonedParts(now, timeZone);
+  return p.weekday === CLUB_EVENING.weekday && p.minutes >= CLUB_EVENING.fromMin && p.minutes < CLUB_EVENING.untilMin;
+}

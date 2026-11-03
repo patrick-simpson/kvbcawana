@@ -547,6 +547,8 @@ async function startStage() {
     stageApi = await mod.createStage({
       rules, root, frame, motionOk,
       screen: () => ({ phase, board: Boolean(board) }),
+      // Backup reads on the club evening only (shared/clubNight.js); rule not loaded yet = read.
+      backupNow: () => (night.rule && typeof night.rule.clubEveningNow === 'function' ? night.rule.clubEveningNow(now()) : true),
       onChange: () => tick(),
       // Something new went up: the black board steps aside for it.
       onShow: () => { if (board) endBoard(); drawWelcomes(); },

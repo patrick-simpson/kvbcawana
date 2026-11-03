@@ -168,3 +168,15 @@ describe('clubNightToday', () => {
     expect(clubNightToday(et('2026-10-08T20:15:00'), { schedule: SCHEDULE, feed: FEED })).toBe(false);
   });
 });
+
+describe('the club evening (backup checks at full speed; owner 2026-11-03)', async () => {
+  const { clubEveningNow } = await import('./clubNight.js');
+  it('is Wednesday 3:30-10:00 pm Eastern only', () => {
+    expect(clubEveningNow(new Date('2026-11-04T20:30:00Z'))).toBe(true);   // Wed 3:30 pm EST
+    expect(clubEveningNow(new Date('2026-11-05T02:59:00Z'))).toBe(true);   // Wed 9:59 pm EST
+    expect(clubEveningNow(new Date('2026-11-05T03:00:00Z'))).toBe(false);  // Wed 10:00 pm EST
+    expect(clubEveningNow(new Date('2026-11-04T20:29:00Z'))).toBe(false);  // Wed 3:29 pm EST
+    expect(clubEveningNow(new Date('2026-11-03T23:00:00Z'))).toBe(false);  // Tuesday 6 pm
+    expect(clubEveningNow(new Date('2026-10-28T22:00:00Z'))).toBe(true);   // Wed 6 pm EDT
+  });
+});

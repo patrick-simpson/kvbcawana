@@ -184,7 +184,15 @@ describe('the Sparks remote on the classroom screen', { skip: SKIP }, () => {
   it('a /settings preview shows its look for its minute on a night with no club', async () => {
     const page = await open('?now=2026-10-13T16:00:00Z'); // a Tuesday noon
     await page.waitForFunction(() => document.documentElement.dataset.phase === 'off');
+    // Off the club evening the page reads nothing by itself (owner 2026-11-03)...
+    await page.waitForTimeout(400);
+    const reads = worker.reads;
+    await page.waitForTimeout(600);
+    assert.equal(worker.reads, reads, 'no backup reads on a Tuesday');
+    // ...the Worker's doorbell for the preview (classroom.js press rings) brings it.
     worker.stage = { ...worker.stage, rev: 1, preview: { look: 'cubbies', until: Date.now() + 1500 } };
+    const frame = page.frame({ url: /\/lobby\/\?club=sparks/ });
+    await frame.evaluate(() => window.postMessage({ post: { type: 'awana-display:sync-doorbell', what: 'classroom', rev: 1 } }, location.origin));
     await page.waitForFunction(() => document.documentElement.dataset.phase === 'cubbies');
     assert.equal(await page.isVisible('#cubbies'), true);
     await page.waitForFunction(() => document.documentElement.dataset.phase === 'off', null, { timeout: 4000 });

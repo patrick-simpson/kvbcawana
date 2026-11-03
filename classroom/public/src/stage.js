@@ -425,7 +425,11 @@ export async function createStage(deps) {
     if (d && typeof d === 'object' && d.type === DOORBELL_MESSAGE && d.what === 'classroom') read();
   });
   window.addEventListener('storage', (e) => { if (e.key === SESSION_KEY) read(); });
-  setInterval(read, tuning().pollMs);
+  // The backup read runs on the club evening only (owner 2026-11-03: Wednesday
+  // 3:30-10 pm Eastern, shared/clubNight.js clubEveningNow, handed in by app.js);
+  // any other time the doorbell alone brings a press (the remote may then say the
+  // TV is off: accepted by the owner).
+  setInterval(() => { if (typeof deps.backupNow !== 'function' || deps.backupNow()) read(); }, tuning().pollMs);
   reportTimer = window.setInterval(() => { if (stage.show && stage.show.button.kind === 'video') report(true); }, tuning().reportVideoMs);
   void reportTimer;
   read();
