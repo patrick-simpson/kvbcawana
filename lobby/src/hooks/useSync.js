@@ -21,6 +21,7 @@ import {
   wirePayloads,
 } from '../lib/syncService.js';
 import { normalizeSyncPassphrase, sanitizeTemplate, PASSPHRASE_MIN } from '../lib/syncSpecs.js';
+import { backupEveryMs } from '../lib/screenSync.js';
 import { saveDisplayKey } from '../lib/displayKey.js';
 import { AUTH_PARAMS_PATH, parseAuthParams } from '../../../shared/sync-protocol.js';
 import { PBKDF2_ITER, authVerifier, bytesToBase64, deriveAuthKey, randomBytes } from '../../../shared/cloud-crypto.js';
@@ -168,7 +169,11 @@ export function useSyncDriver({ handlers, dispatch, store }) {
   useEffect(() => {
     let cancelled = false;
     ensureUrl().then(() => { if (!cancelled) syncNow(); });
-    const timer = setInterval(() => syncNow(), SYNC_POLL_MS);
+    // Every SYNC_POLL_MS on the club evening, every 15 minutes otherwise (screenSync.js backupEveryMs).
+    /** @type {ReturnType<typeof setTimeout>|undefined} */
+    let timer;
+    const again = () => { timer = setTimeout(() => { syncNow(); again(); }, backupEveryMs(SYNC_POLL_MS)); };
+    again();
     const online = () => syncNow();
     const onChange = () => update({ signedIn: Boolean(loadSyncSession()) });
     window.addEventListener('online', online);
@@ -176,7 +181,7 @@ export function useSyncDriver({ handlers, dispatch, store }) {
     window.addEventListener('storage', onChange);
     return () => {
       cancelled = true;
-      clearInterval(timer);
+      clearTimeout(timer);
       window.removeEventListener('online', online);
       window.removeEventListener(SYNC_CHANGE_EVENT, onChange);
       window.removeEventListener('storage', onChange);

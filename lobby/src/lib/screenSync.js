@@ -21,6 +21,21 @@
 // Export, ?config= and Reset this screen never see it.
 
 import { SCREEN_SPECS, isScreenId, sanitizeScreenSettings } from './syncSpecs.js';
+import { clubEveningNow } from '../../../shared/clubNight.js';
+
+/**
+ * A screen's BACKUP checks (the hello, the state pull) at their usual pace on the
+ * club evening only (owner 2026-11-03: Wednesday 3:30-10 pm Eastern,
+ * shared/clubNight.js clubEveningNow), every 15 minutes the rest of the week: the
+ * live channel's rings (free) still bring every change at once, and the free
+ * Cloudflare plan's daily requests are shared. /settings may then show a screen's
+ * status a little late (accepted by the owner).
+ */
+export const QUIET_BACKUP_MS = 15 * 60 * 1000;
+/** @param {number} baseMs the club evening's pace @param {Date} [now] */
+export function backupEveryMs(baseMs, now = new Date()) {
+  return clubEveningNow(now) ? baseMs : Math.max(baseMs, QUIET_BACKUP_MS);
+}
 
 export const SCREENS_STORAGE = 'awanaScreens.v1';
 /** A hello this often (the Worker calls a screen online for 3 minutes after one). */

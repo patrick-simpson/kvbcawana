@@ -562,3 +562,14 @@ test('signing out while a phone watches leaves no remote timer running', async (
     k.close();
   }
 });
+
+test('the backup checks keep their pace only on the club evening (owner 2026-11-03), same window as shared/clubNight.js', async () => {
+  const { CLUB_EVENING } = await import('../../shared/clubNight.js');
+  const src = readFileSync(new URL('../public/src/sync.js', import.meta.url), 'utf8');
+  const m = /var CLUB_EVENING = \{ weekday: (\d+), fromMin: ([\d *+]+), untilMin: ([\d *+]+) \};/.exec(src);
+  assert.ok(m, 'sync.js names the window');
+  assert.deepEqual([Number(m[1]), eval(m[2]), eval(m[3])], [CLUB_EVENING.weekday, CLUB_EVENING.fromMin, CLUB_EVENING.untilMin]);
+  assert.match(src, /setTimeout\(hello, backupMs\('helloMs'\)\)/);
+  assert.match(src, /: backupMs\('minGapMs'\)/);
+  assert.match(src, /clubEveningNow\(\) \? POLL_MS : Math\.max\(POLL_MS, QUIET_BACKUP_MS\)/);
+});

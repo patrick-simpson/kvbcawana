@@ -14,6 +14,7 @@ import { useEffect, useRef, useSyncExternalStore } from 'react';
 import {
   SCREEN_HELLO_MS,
   SCREEN_PUSH_DEBOUNCE_MS,
+  backupEveryMs,
   loadScreenSlot,
   reconcileScreen,
   saveScreenSlot,
@@ -249,7 +250,11 @@ export function useScreenSync({ kind, enabled, overrides, replaceConfig, onActio
     };
 
     hello();
-    const timer = setInterval(hello, SCREEN_HELLO_MS);
+    /** @type {ReturnType<typeof setTimeout>|undefined} */
+    let timer;
+    // Every SCREEN_HELLO_MS on the club evening, every 15 minutes otherwise (backupEveryMs).
+    const again = () => { timer = setTimeout(() => { hello(); again(); }, backupEveryMs(SCREEN_HELLO_MS)); };
+    again();
     const online = () => { hello(); };
     window.addEventListener('online', online);
     const off = onSyncDoorbell((what, payload) => {
@@ -263,7 +268,7 @@ export function useScreenSync({ kind, enabled, overrides, replaceConfig, onActio
     return () => {
       stopped = true;
       readyRef.current = false;
-      clearInterval(timer);
+      clearTimeout(timer);
       window.removeEventListener('online', online);
       off();
       setLiveScreenId(null);

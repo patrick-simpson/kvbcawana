@@ -314,6 +314,30 @@
   /* ── This kiosk on the settings page ── */
 
   // A test may shorten the waits (read at each use).
+  // The club evening (owner 2026-11-03, "time box some of these checks so that they
+  // really happen Wednesday evenings"): shared/clubNight.js CLUB_EVENING written again
+  // here (this classic script cannot import it; test/sync.test.mjs pins the two
+  // equal). On it the backup checks keep their pace; the rest of the week the
+  // hello, the status hello and the room pull go every 15 minutes (rings, the
+  // phone remote and a /settings command still answer at once).
+  var CLUB_EVENING = { weekday: 3, fromMin: 15 * 60 + 30, untilMin: 22 * 60 };
+  var QUIET_BACKUP_MS = 15 * 60 * 1000;
+  function clubEveningNow(d) {
+    var parts = {};
+    new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', weekday: 'short', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
+      .formatToParts(d || new Date()).forEach(function (p) { parts[p.type] = p.value; });
+    var day = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(parts.weekday);
+    var mins = (Number(parts.hour) % 24) * 60 + Number(parts.minute);
+    return day === CLUB_EVENING.weekday && mins >= CLUB_EVENING.fromMin && mins < CLUB_EVENING.untilMin;
+  }
+  window.journeyClubEveningNow = clubEveningNow;
+  /** A backup pace: as tuned on the club evening (or by a test's seam), else 15 minutes. */
+  function backupMs(key) {
+    var t = window.journeyScreenTuning || {};
+    if (typeof t[key] === 'number') return t[key];
+    return clubEveningNow() ? SCREEN_TUNING[key] : Math.max(SCREEN_TUNING[key], QUIET_BACKUP_MS);
+  }
+
   function screenTuning() {
     var t = window.journeyScreenTuning || {};
     var out = {};
@@ -386,7 +410,7 @@
 
   function scheduleHello() {
     clearTimeout(helloTimer);
-    helloTimer = setTimeout(hello, screenTuning().helloMs);
+    helloTimer = setTimeout(hello, backupMs('helloMs'));
   }
 
   /* One hello: who this kiosk is, and how its saved lessons are going.
@@ -732,7 +756,7 @@
     if (CONFIGURE || !base || screenGone || !session() || statusTimer) return;
     var status = lessonsStatus();
     if (!status || JSON.stringify(status) === lastStatusSent) return;
-    var gap = Date.now() < ackUntil ? screenTuning().ackMs : screenTuning().minGapMs;
+    var gap = Date.now() < ackUntil ? screenTuning().ackMs : backupMs('minGapMs');
     var wait = Math.max(0, lastHelloAt + gap - Date.now());
     statusTimer = setTimeout(function () {
       statusTimer = null;
@@ -831,7 +855,7 @@
           lastPushed = JSON.stringify(readRoom());
           render();
           pull();
-          setInterval(pull, POLL_MS);
+          (function again() { setTimeout(function () { pull(); again(); }, clubEveningNow() ? POLL_MS : Math.max(POLL_MS, QUIET_BACKUP_MS)); })();
           window.addEventListener('online', pull);
           hello();
           window.addEventListener('online', function () {
