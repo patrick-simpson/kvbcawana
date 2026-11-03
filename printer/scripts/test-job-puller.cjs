@@ -390,6 +390,29 @@ exit 0
     const seen = timers.length;
     await sleep(30);
     check('the loop runs and stops', seen >= 2 && timers.length === seen);
+
+    // Quiet hours (2026-11-03): an idle round waits idleMs(); a busy one never does.
+    const waits = [];
+    let answer = { wait: jp.IDLE_MS };
+    const stop2 = jp.startJobPuller({ puller: { tick: async () => answer }, idleMs: () => jp.QUIET_IDLE_MS, bundles: { syncOnce: async () => ({}) }, bundleMs: () => jp.QUIET_BUNDLE_MS,
+      setTimeoutFn: (fn, ms) => { waits.push(ms); return setTimeout(fn, 1); } });
+    await sleep(30);
+    answer = { wait: jp.BUSY_MS };
+    await sleep(30);
+    stop2();
+    check('quiet hours: an idle round waits the quiet time', waits.includes(jp.QUIET_IDLE_MS));
+    check('quiet hours: a busy round (labels printed) still comes back at once', waits.includes(jp.BUSY_MS));
+    check('quiet hours: the roster and books are read less often', waits.includes(jp.QUIET_BUNDLE_MS) && !waits.includes(60 * 1000));
+    check('quiet hours ask 9x less often, but inside /checkin\'s 2-minute line', jp.QUIET_IDLE_MS >= 9 * jp.IDLE_MS && jp.QUIET_IDLE_MS + 60 * 1000 < 2 * 60 * 1000);
+    // ...and only with the wake-up socket open, outside the club-night window.
+    const open = { status: () => ({ open: true }) };
+    const shut = { status: () => ({ open: false }) };
+    const at = (iso) => new Date(iso);   // the suite's clock is local; the club night is Wednesday 17:30-20:00
+    const tue3am = at('2026-11-03T03:00:00'), wed6pm = at('2026-11-04T18:00:00'), wed4pm = at('2026-11-04T16:00:00'), wed2pm = at('2026-11-04T14:00:00'), wed2330 = at('2026-11-04T23:30:00');
+    check('quiet overnight with the socket open', server.stationQuiet(open, tue3am) === true);
+    check('never quiet with the socket down (the 5 s poll is the fallback)', server.stationQuiet(shut, tue3am) === false && server.stationQuiet(null, tue3am) === false);
+    check('never quiet on club night, two hours either side', server.stationQuiet(open, wed6pm) === false && server.stationQuiet(open, wed4pm) === false);
+    check('quiet again well before and after it', server.stationQuiet(open, wed2pm) === true && server.stationQuiet(open, wed2330) === true);
   }
 
   console.log('\njob puller: the lease\'s church field and what every heartbeat carries (routes.md 10.3)');

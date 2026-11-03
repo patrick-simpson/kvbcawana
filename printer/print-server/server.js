@@ -52,7 +52,7 @@ const $lifecycle = require('./server/lifecycle');
 const app = $http.app;
 
 module.exports = {
-  configureCloud: $station.configureCloud, stopCloud: $station.stopCloud,
+  configureCloud: $station.configureCloud, stopCloud: $station.stopCloud, stationQuiet: $station.stationQuiet,
   // The church settings from the Worker (church-sync.js) and the switch-aware gates.
   get churchSync() { return $station.churchSync; }, startChurchSync: $station.startChurchSync, stopChurchSync: $station.stopChurchSync,
   singlePublisherSilent: $station.singlePublisherSilent, cloudStatus: $station.cloudStatus, clearCheckThePrinter: $station.clearCheckThePrinter, importLaptopHistory: $station.importLaptopHistory, mergeAttendance: $station.mergeAttendance,

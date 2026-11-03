@@ -10,6 +10,7 @@ const stationWake = require('../station-wake');
 const historySync = require('../history-sync');
 const churchSyncModule = require('../church-sync');
 const pickup = require('../pickup');
+const events = require('../events');
 const fs    = require('fs');
 const path  = require('path');
 const $config = lazy('./config');
@@ -41,6 +42,7 @@ Object.defineProperties(exports, {
   startClubNightTimers: { enumerable: true, get: () => startClubNightTimers },
   stopChurchSync: { enumerable: true, get: () => stopChurchSync },
   stopCloud: { enumerable: true, get: () => stopCloud },
+  stationQuiet: { enumerable: true, get: () => stationQuiet },
 });
 
 // ── Online check-in, P2: this computer as a print STATION ───────────────────
@@ -92,6 +94,26 @@ function mergeAttendance(entries) {
 // the Screen season and rehearsal flag that ride the tally, and the clubs on the pickup list.
 // Plaintext, non-personal; sent when one changes and at least once a minute.
 const STATION_EXTRAS_EVERY_MS = 60 * 1000;
+// Unchanged settings are sent again this often (the Worker counts a rehearsal flag
+// heard within 5 minutes); a change goes at the next minute's check, or at once.
+// Once a minute around the clock was needless requests on the free plan (2026-11-03).
+const STATION_EXTRAS_REFRESH_MS = 4 * 60 * 1000;
+
+// The club-night window for a station's polling (2026-11-03): two hours either
+// side of the church's club night (Wednesday 17:30-20:00 = 15:30-22:00, about the
+// Worker's own watch window). Inside it, or whenever the wake-up socket is down,
+// a station polls as before; outside it, with the socket open, it asks far less
+// (job-puller.js QUIET_*). A label still comes at once: the socket rings for it.
+const STATION_WINDOW_LEAD_MIN = 120;
+const STATION_WINDOW_GRACE_MIN = 120;
+/** @param {Date} [date] */
+function inStationWindow(date) {
+  return events.isClubNightNow($config.churchConfig.clubNights, date, STATION_WINDOW_GRACE_MIN, STATION_WINDOW_LEAD_MIN);
+}
+/** @param {{ status: () => { open?: boolean } } | null} wake @param {Date} [date] */
+function stationQuiet(wake, date) {
+  try { return !!(wake && wake.status().open) && !inStationWindow(date); } catch { return false; }
+}
 let stationExtrasSig = null;
 let stationExtrasAt = 0;
 let stationExtrasBusy = false;
@@ -107,7 +129,7 @@ async function sendStationExtras(force = false) {
   const body = stationExtrasBody();
   const sig = JSON.stringify(body);
   const now = Date.now();
-  if (!force && sig === stationExtrasSig && now - stationExtrasAt < STATION_EXTRAS_EVERY_MS) return true;
+  if (!force && sig === stationExtrasSig && now - stationExtrasAt < STATION_EXTRAS_REFRESH_MS) return true;
   const where = $config.cloudStation.signedIn();
   if (!where) return false;
   stationExtrasBusy = true;
@@ -175,8 +197,12 @@ function configureCloud(opts) {
   const localBase = opts.localBase || `http://127.0.0.1:${$config.PORT}`;
   const journal = jobPuller.createJournal(opts.journalFile === undefined ? path.join($config.DATA_DIR, 'print-journal.json') : opts.journalFile, opts.now);
   const writer = historySync.createHistoryWriter({ pub: opts.historyPub || (() => null), signedIn, request, stationId, log, now: opts.now });
+  /** The wake-up socket, once started: quiet hours need it open. */
+  let wake = null;
+  const quiet = () => stationQuiet(wake);
   const puller = jobPuller.createJobPuller({
     signedIn, stationId, ring: opts.ring, localBase, request, journal, fetchFn: opts.fetchFn, now: opts.now, log, heartbeatMs: opts.heartbeatMs,
+    helloMs: () => (quiet() ? jobPuller.QUIET_HELLO_MS : jobPuller.HELLO_MS),
     // Draw the next label while this one prints, in lease order (print-turn.js).
     turns: $printing.printTurns,
     // The lease says when the church settings or the switches moved (routes.md 10.3).
@@ -198,9 +224,13 @@ function configureCloud(opts) {
   churchSyncInstance().stationActive();
   if (opts.start !== false) {
     const unref = (fn, ms) => { const t = setTimeout(fn, ms); if (t.unref) t.unref(); return t; };
-    const stopPull = jobPuller.startJobPuller({ puller, bundles, log, setTimeoutFn: unref });
+    const stopPull = jobPuller.startJobPuller({
+      puller, bundles, log, setTimeoutFn: unref,
+      idleMs: () => (quiet() ? jobPuller.QUIET_IDLE_MS : jobPuller.IDLE_MS),
+      bundleMs: () => (quiet() ? jobPuller.QUIET_BUNDLE_MS : jobPuller.BUNDLE_MS),
+    });
     // The wake-up call: the service rings this station's socket when a label is ready.
-    const wake = stationWake.startStationWake({ signedIn, stationId, onWake: () => stopPull.kick(), log });
+    wake = stationWake.startStationWake({ signedIn, stationId, onWake: () => stopPull.kick(), log });
     const readAttendance = () => attendance.syncOnce().catch(() => {});
     const first = setTimeout(readAttendance, 20 * 1000);
     const every = setInterval(() => { readAttendance(); writer.flush().catch(() => {}); }, CLOUD_ATTENDANCE_MS);

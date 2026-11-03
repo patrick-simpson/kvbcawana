@@ -94,6 +94,14 @@ const LOCAL_TIMEOUT_MS = 60 * 1000;
 const JOURNAL_KEEP_MS = 4 * 24 * 60 * 60 * 1000;
 const ACK_TRIES_MAX = 30;
 const BUNDLE_MS = 60 * 1000;
+// Quiet hours (2026-11-03): outside the club-night window, while the wake-up
+// socket is open (station-wake.js), the station asks far less often. Every 5 s
+// around the clock was most of the Cloudflare account's free daily requests.
+// A label still comes at once (the ring); 45 s keeps the Worker's lastSeenAt
+// (written at most once a minute) inside /checkin's 2-minute "station quiet" line.
+const QUIET_IDLE_MS = 45 * 1000;
+const QUIET_HELLO_MS = 5 * 60 * 1000;
+const QUIET_BUNDLE_MS = 10 * 60 * 1000;
 /** Jobs of one lease running at once with the print turn: one printing, the next one drawing. */
 const DRAW_AHEAD = 2;
 /** How long a check-in route that waits for its turn may take: its own time plus the wait. */
@@ -416,7 +424,8 @@ function createJobPuller(o) {
   }
 
   async function hello(force) {
-    if (!force && now() - lastHelloAt < HELLO_MS) return;
+    const every = typeof o.helloMs === 'function' ? o.helloMs() : HELLO_MS;
+    if (!force && now() - lastHelloAt < every) return;
     lastHelloAt = now();
     const check = journal.unchecked().length > 0;
     await call('/v1/print/heartbeat', { method: 'POST', body: { printer: check ? { state: 'error', detail: 'A label may not have come out' } : { state: 'ok' }, ...extras() } });
@@ -544,7 +553,7 @@ function createBundleSync(o) {
  * Both loops, like startPhoneRelay. Returns a stop function.
  * @param {{ puller: ReturnType<typeof createJobPuller>, bundles?: ReturnType<typeof createBundleSync>, log?: Function, setTimeoutFn?: typeof setTimeout, clearTimeoutFn?: typeof clearTimeout }} o
  */
-function startJobPuller({ puller, bundles, log, setTimeoutFn = setTimeout, clearTimeoutFn = clearTimeout }) {
+function startJobPuller({ puller, bundles, log, setTimeoutFn = setTimeout, clearTimeoutFn = clearTimeout, idleMs, bundleMs }) {
   let stopped = false;
   let timer = null;
   let bundleTimer = null;
@@ -557,6 +566,8 @@ function startJobPuller({ puller, bundles, log, setTimeoutFn = setTimeout, clear
     let wait = IDLE_MS;
     try { wait = (await puller.tick()).wait; } catch (e) { if (log) log(`[jobs] ${e && e.message}`); }
     running = false;
+    // Nothing to do: in quiet hours (idleMs, from station.js) the next ask waits longer.
+    if (wait === IDLE_MS && typeof idleMs === 'function') { try { wait = idleMs(); } catch { wait = IDLE_MS; } }
     // A wake-up call that came while this round ran: ask again at once.
     if (again) { again = false; wait = 0; }
     if (!stopped) timer = setTimeoutFn(tick, wait);
@@ -564,7 +575,9 @@ function startJobPuller({ puller, bundles, log, setTimeoutFn = setTimeout, clear
   const bundleTick = async () => {
     if (stopped) return;
     try { await bundles.syncOnce(); } catch (e) { if (log) log(`[station] ${e && e.message}`); }
-    if (!stopped) bundleTimer = setTimeoutFn(bundleTick, BUNDLE_MS);
+    let next = BUNDLE_MS;
+    if (typeof bundleMs === 'function') { try { next = bundleMs(); } catch { next = BUNDLE_MS; } }
+    if (!stopped) bundleTimer = setTimeoutFn(bundleTick, next);
   };
   timer = setTimeoutFn(tick, 3000);
   if (bundles) bundleTimer = setTimeoutFn(bundleTick, 5000);
@@ -583,4 +596,5 @@ module.exports = {
   JOB_PULL_ROUTES, jobPullAllowed, JOB_ID_RE,
   createJournal, createJobPuller, createBundleSync, startJobPuller,
   IDLE_MS, BUSY_MS, HELLO_MS, HEARTBEAT_MS, FAIL_PAUSE_MS, MALFORMED, LEASE_BATCH, DRAW_AHEAD,
+  BUNDLE_MS, QUIET_IDLE_MS, QUIET_HELLO_MS, QUIET_BUNDLE_MS,
 };
