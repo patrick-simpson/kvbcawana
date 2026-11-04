@@ -10,10 +10,13 @@
 // that turns a MailChimp newsletter into this text.
 //
 // Or a ready-made PDF instead of a letter (owner 2026-11-04: "50 sheets of the
-// ballots ... to the downstairs printer"): PDF_URL, a file on THIS repo's GitHub
-// releases only (`releasePdfUrl`), repeated the same way.
+// ballots ... to the downstairs printer"; the Parents' Night half sheet): PDF_URL,
+// a file on THIS repo's GitHub releases only (`releasePdfUrl`), or PDF_FILE, a
+// .pdf the repo holds under prints/ (`printsPath`; the repo is public, so
+// nothing private goes there), repeated the same way. One job for all three
+// (owner 2026-11-04: "merge the two print jobs into one").
 //
-// Env: LETTER_TEXT (the text) or PDF_URL, COPIES (default 50, 1..MAX_COPIES), TO (default
+// Env: LETTER_TEXT (the text), PDF_URL or PDF_FILE, COPIES (default 50, 1..MAX_COPIES), TO (default
 // the downstairs Epson), DRY_RUN ('true' = one copy mailed to GMAIL_USER
 // instead), GMAIL_USER, GMAIL_APP_PASSWORD. The log shows sizes and page
 // counts only.
@@ -119,6 +122,29 @@ export async function fetchPdf(url, get = fetch) {
   return bytes;
 }
 
+/** The repo's root, and the one folder a committed PDF may be printed from. */
+export const ROOT = path.resolve(HERE, '../..');
+export const PRINTS = 'prints/';
+
+/** A .pdf under prints/, never climbing out. @param {string} rel */
+export function printsPath(rel) {
+  const clean = String(rel || '').trim().replace(/^\.?\//, '');
+  if (!clean.startsWith(PRINTS) || !/\.pdf$/i.test(clean) || clean.split('/').some((p) => p === '..' || p === '')) {
+    throw new Fatal(`PDF_FILE must be a .pdf under ${PRINTS} (got "${clean}").`);
+  }
+  return clean;
+}
+
+/** A committed PDF's bytes. @param {string} rel @param {string} [root] */
+export function readPrintsPdf(rel, root = ROOT) {
+  const file = path.join(root, rel);
+  if (!fs.existsSync(file)) throw new Fatal(`${rel} is not in the repo.`);
+  const bytes = new Uint8Array(fs.readFileSync(file));
+  if (bytes.length > PDF_MAX) throw new Fatal(`The PDF is ${bytes.length} bytes; at most ${PDF_MAX} go in one email.`);
+  if (String.fromCharCode(...bytes.slice(0, 5)) !== '%PDF-') throw new Fatal(`${rel} is not a PDF.`);
+  return bytes;
+}
+
 /** @param {string} title */
 export function fileNameFor(title) {
   return `${title.replace(/[^\w &'-]+/g, '').trim().replace(/\s+/g, '-').slice(0, 60) || 'Awana-letter'}.pdf`;
@@ -128,7 +154,9 @@ export function fileNameFor(title) {
 export async function run(env, deps = {}) {
   const text = String(env.LETTER_TEXT || '');
   const pdfUrl = String(env.PDF_URL || '').trim();
-  if (pdfUrl) return runPdf(env, pdfUrl, deps);
+  const pdfFile = String(env.PDF_FILE || '').trim();
+  if (pdfUrl && pdfFile) throw new Fatal('Give PDF_URL or PDF_FILE, not both.');
+  if (pdfUrl || pdfFile) return runPdf(env, pdfUrl ? { url: pdfUrl } : { file: pdfFile }, deps);
   if (!text.trim()) throw new Fatal('LETTER_TEXT is empty.');
   const dry = env.DRY_RUN === 'true';
   const copies = dry ? 1 : copiesFrom(env.COPIES);
@@ -174,16 +202,16 @@ function mailSetup(env) {
 }
 
 /**
- * A ready-made PDF from this repo's releases, COPIES times in one PDF, mailed
- * like a letter (never retried).
- * @param {NodeJS.ProcessEnv} env @param {string} url
- * @param {{send?: typeof sendMail, get?: typeof fetch}} [deps]
+ * A ready-made PDF (this repo's releases, or a file under prints/), COPIES
+ * times in one PDF, mailed like a letter (never retried).
+ * @param {NodeJS.ProcessEnv} env @param {{url?: string, file?: string}} source
+ * @param {{send?: typeof sendMail, get?: typeof fetch, root?: string}} [deps]
  */
-export async function runPdf(env, url, deps = {}) {
-  const src = releasePdfUrl(url);
+export async function runPdf(env, source, deps = {}) {
+  const src = source.url ? releasePdfUrl(source.url) : printsPath(source.file || '');
   const { dry, user, pass, to } = mailSetup(env);
   const copies = dry ? 1 : copiesFrom(env.COPIES);
-  const one = await fetchPdf(src, deps.get);
+  const one = source.url ? await fetchPdf(src, deps.get) : readPrintsPdf(src, deps.root);
   const { pdf, pages } = await repeatPdf(one, copies);
   log(`${copies} ${copies === 1 ? 'copy' : 'copies'} of ${pages} ${pages === 1 ? 'page' : 'pages'}: ${pdf.length} bytes.`);
   const name = decodeURIComponent(src.split('/').pop() || 'document.pdf');

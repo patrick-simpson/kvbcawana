@@ -4,7 +4,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { PDFDocument } from 'pdf-lib';
-import { run, copiesFrom, repeatPdf, fileNameFor, releasePdfUrl, EPSON, MAX_COPIES } from '../letterhead-print.mjs';
+import os from 'node:os';
+import { run, copiesFrom, repeatPdf, fileNameFor, releasePdfUrl, printsPath, ROOT, EPSON, MAX_COPIES } from '../letterhead-print.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const SAMPLE = fs.readFileSync(path.join(HERE, 'november.txt'), 'utf8');
@@ -116,4 +117,54 @@ test('a PDF url refuses a file that is not a PDF and a failed download', async (
   await assert.rejects(run(env, { send, get: async () => new Response('<html>') }), /not a PDF/);
   await assert.rejects(run(env, { send, get: async () => new Response('', { status: 404 }) }), /HTTP 404/);
   assert.equal(sent, false);
+});
+
+// A PDF the repo holds under prints/ (owner 2026-11-04: the Parents' Night half
+// sheet; one print job for all three sources).
+async function standInRepo() {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'prints-'));
+  fs.mkdirSync(path.join(root, 'prints'));
+  fs.writeFileSync(path.join(root, 'prints', 'sample-sheet.pdf'), await onePagePdf());
+  fs.writeFileSync(path.join(root, 'prints', 'fake.pdf'), 'not a pdf');
+  return root;
+}
+
+test('a PDF file must be a .pdf under prints/, never climbing out', () => {
+  assert.equal(printsPath('prints/a.pdf'), 'prints/a.pdf');
+  assert.equal(printsPath('./prints/a.pdf'), 'prints/a.pdf');
+  for (const bad of ['', 'a.pdf', 'prints/a.txt', 'prints/../secret.pdf', '/etc/a.pdf', 'printsx/a.pdf']) assert.throws(() => printsPath(bad), /PDF_FILE/, bad);
+});
+
+test('a PDF file prints that PDF, copies as pages, to the Epson with no text body; a dry run mails one copy to GMAIL_USER', async () => {
+  const root = await standInRepo();
+  let sent;
+  const send = async (m) => { sent = m; };
+  const env = { GMAIL_USER: 'owner@example.org', GMAIL_APP_PASSWORD: 'x', PDF_FILE: 'prints/sample-sheet.pdf', COPIES: '10' };
+  const out = await run(env, { root, send });
+  assert.deepEqual([out.copies, out.pages], [10, 1]);
+  assert.equal(sent.to, EPSON);
+  assert.match(sent.message, /^Subject: sample-sheet$/m);
+  assert.ok(!/text\/plain/.test(sent.message), 'no text body');
+  assert.equal((await PDFDocument.load(pdfOf(sent.message))).getPageCount(), 10);
+  const dry = await run({ ...env, DRY_RUN: 'true' }, { root, send });
+  assert.equal(dry.copies, 1);
+  assert.equal(sent.to, 'owner@example.org');
+});
+
+test('a PDF file refuses a missing file, a non-PDF, and both sources at once', async () => {
+  const root = await standInRepo();
+  let sent = false;
+  const send = async () => { sent = true; };
+  const env = { GMAIL_USER: 'owner@example.org', GMAIL_APP_PASSWORD: 'x' };
+  await assert.rejects(run({ ...env, PDF_FILE: 'prints/none.pdf' }, { root, send }), /not in the repo/);
+  await assert.rejects(run({ ...env, PDF_FILE: 'prints/fake.pdf' }, { root, send }), /not a PDF/);
+  await assert.rejects(run({ ...env, PDF_FILE: 'prints/sample-sheet.pdf', PDF_URL: BALLOTS }, { root, send }), /not both/);
+  assert.equal(sent, false);
+});
+
+test('the Parents\' Night half sheet in the repo is one Letter page', async () => {
+  const doc = await PDFDocument.load(fs.readFileSync(path.join(ROOT, 'prints/2026-11-04-parents-night-half-sheet.pdf')));
+  assert.equal(doc.getPageCount(), 1);
+  const { width, height } = doc.getPage(0).getSize();
+  assert.deepEqual([Math.round(width), Math.round(height)], [612, 792]);
 });
