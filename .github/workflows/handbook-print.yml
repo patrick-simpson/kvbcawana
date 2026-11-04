@@ -17,6 +17,11 @@ name: Print the handbook sheets
 # and the run whose hour is not 4 pm in New York this season skips itself
 # (as checkin-health.yml does).
 #
+# A scheduled run that starts at or after 5:00 pm Eastern skips itself too
+# (2026-11-04: GitHub started both of 2026-11-03's scheduled runs after 7 pm):
+# the sheets are for before club, and a late run after a hand-started one would
+# print a second set.
+#
 # PRIVACY: the log shows only sizes, content types and status codes; the PDFs
 # stay in the runner's memory and are never uploaded as artifacts.
 
@@ -63,8 +68,12 @@ jobs:
             '0 21 * * *') season=-0500 ;;
             *) season="$offset" ;;   # a manual run
           esac
+          now_hm="$(TZ=America/New_York date +%H%M)"
           if [ "$EVENT" = "schedule" ] && [ "$season" != "$offset" ]; then
             echo "This is the other season's run (Eastern is UTC$offset now): nothing to do."
+            echo "go=false" >> "$GITHUB_OUTPUT"
+          elif [ "$EVENT" = "schedule" ] && [ "$((10#$now_hm))" -ge 1700 ]; then
+            echo "GitHub started this scheduled run late ($now_hm Eastern): too late for tonight's sheets, so nothing is printed (start it by hand if it is still wanted)."
             echo "go=false" >> "$GITHUB_OUTPUT"
           else
             echo "go=true" >> "$GITHUB_OUTPUT"
