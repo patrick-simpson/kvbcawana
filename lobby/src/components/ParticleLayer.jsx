@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { DOODLES } from '../lib/brand.js';
 
 // Ambient particle layer for the signage page (#26): a gentle full-screen
@@ -81,7 +82,9 @@ function Doodle({ kind }) {
   );
 }
 
-export default function ParticleLayer({ effect }) {
+// Memoized to prevent unnecessary re-evaluations on every App state change
+// (like check-ins or clock updates) since this is a pure decoration.
+const ParticleLayer = memo(function ParticleLayer({ effect }) {
   const particles = PARTICLES[effect];
   if (!particles) return null;
   return (
@@ -93,4 +96,6 @@ export default function ParticleLayer({ effect }) {
       ))}
     </div>
   );
-}
+});
+
+export default ParticleLayer;
