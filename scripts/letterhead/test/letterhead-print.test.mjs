@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { PDFDocument } from 'pdf-lib';
-import { run, copiesFrom, repeatPdf, fileNameFor, EPSON, MAX_COPIES } from '../letterhead-print.mjs';
+import { run, copiesFrom, repeatPdf, fileNameFor, releasePdfUrl, EPSON, MAX_COPIES } from '../letterhead-print.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const SAMPLE = fs.readFileSync(path.join(HERE, 'november.txt'), 'utf8');
@@ -77,4 +77,43 @@ test('refuses: no text, no Gmail secrets, a bad address, and a send that fails i
   let tries = 0;
   await assert.rejects(run(ENV, { launch, send: async () => { tries++; throw new Error('smtp data 451'); } }), /did not take/);
   assert.equal(tries, 1);
+});
+
+// A ready-made PDF (owner 2026-11-04: the poster contest ballots).
+const BALLOTS = 'https://github.com/patrick-simpson/kvbcawana/releases/download/media-poster-contest-2026/Poster-Contest-Ballots.pdf';
+async function onePagePdf() {
+  const d = await PDFDocument.create();
+  d.addPage([612, 792]).drawRectangle({ x: 72, y: 72, width: 100, height: 20 });
+  return d.save();
+}
+
+test('a PDF url must be a .pdf on this repo\'s releases', () => {
+  assert.equal(releasePdfUrl(BALLOTS), BALLOTS);
+  for (const bad of ['https://example.org/x.pdf', 'http://github.com/patrick-simpson/kvbcawana/releases/download/t/x.pdf',
+    'https://github.com/someone/else/releases/download/t/x.pdf', BALLOTS.replace('.pdf', '.exe'), BALLOTS + '?x=1']) {
+    assert.throws(() => releasePdfUrl(bad), /PDF_URL/);
+  }
+});
+
+test('a PDF url prints that PDF, copies as pages, no letter text needed', async () => {
+  const one = await onePagePdf();
+  let asked = '', sent;
+  const get = async (url) => { asked = url; return new Response(one); };
+  const send = async (m) => { sent = m; };
+  const out = await run({ GMAIL_USER: 'owner@example.org', GMAIL_APP_PASSWORD: 'x', PDF_URL: BALLOTS, COPIES: '50' }, { get, send });
+  assert.equal(asked, BALLOTS);
+  assert.deepEqual([out.copies, out.pages], [50, 1]);
+  assert.equal(sent.to, EPSON);
+  assert.match(sent.message, /Poster-Contest-Ballots\.pdf/);
+  assert.ok(!/text\/plain/.test(sent.message), 'no text body');
+  assert.equal((await PDFDocument.load(pdfOf(sent.message))).getPageCount(), 50);
+});
+
+test('a PDF url refuses a file that is not a PDF and a failed download', async () => {
+  const env = { GMAIL_USER: 'owner@example.org', GMAIL_APP_PASSWORD: 'x', PDF_URL: BALLOTS };
+  let sent = false;
+  const send = async () => { sent = true; };
+  await assert.rejects(run(env, { send, get: async () => new Response('<html>') }), /not a PDF/);
+  await assert.rejects(run(env, { send, get: async () => new Response('', { status: 404 }) }), /HTTP 404/);
+  assert.equal(sent, false);
 });

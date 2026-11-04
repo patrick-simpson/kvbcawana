@@ -9,7 +9,11 @@
 // Started by hand (Actions → "Print a letterhead") or by the Claude routine
 // that turns a MailChimp newsletter into this text.
 //
-// Env: LETTER_TEXT (the text), COPIES (default 50, 1..MAX_COPIES), TO (default
+// Or a ready-made PDF instead of a letter (owner 2026-11-04: "50 sheets of the
+// ballots ... to the downstairs printer"): PDF_URL, a file on THIS repo's GitHub
+// releases only (`releasePdfUrl`), repeated the same way.
+//
+// Env: LETTER_TEXT (the text) or PDF_URL, COPIES (default 50, 1..MAX_COPIES), TO (default
 // the downstairs Epson), DRY_RUN ('true' = one copy mailed to GMAIL_USER
 // instead), GMAIL_USER, GMAIL_APP_PASSWORD. The log shows sizes and page
 // counts only.
@@ -93,6 +97,28 @@ export async function repeatPdf(one, copies) {
   return { pdf: await out.save(), pages: n };
 }
 
+/** Where a ready-made PDF may come from: this repo's own release files. */
+export const RELEASE_PDF_RE = /^https:\/\/github\.com\/patrick-simpson\/kvbcawana\/releases\/download\/[\w.-]+\/[\w.()-]+\.pdf$/;
+/** The largest ready-made PDF taken (bytes; the mail must stay under Gmail's 25 MB). */
+export const PDF_MAX = 15 * 1024 * 1024;
+
+/** @param {string} url */
+export function releasePdfUrl(url) {
+  const u = String(url || '').trim();
+  if (!RELEASE_PDF_RE.test(u)) throw new Fatal('PDF_URL must be a .pdf on this repo\'s GitHub releases (https://github.com/patrick-simpson/kvbcawana/releases/download/<tag>/<file>.pdf).');
+  return u;
+}
+
+/** @param {string} url @param {typeof fetch} [get] */
+export async function fetchPdf(url, get = fetch) {
+  const res = await get(url, { redirect: 'follow' });
+  if (!res.ok) throw new Fatal(`Could not download the PDF (HTTP ${res.status}).`);
+  const bytes = new Uint8Array(await res.arrayBuffer());
+  if (bytes.length > PDF_MAX) throw new Fatal(`The PDF is ${bytes.length} bytes; at most ${PDF_MAX} go in one email.`);
+  if (String.fromCharCode(...bytes.slice(0, 5)) !== '%PDF-') throw new Fatal('That file is not a PDF.');
+  return bytes;
+}
+
 /** @param {string} title */
 export function fileNameFor(title) {
   return `${title.replace(/[^\w &'-]+/g, '').trim().replace(/\s+/g, '-').slice(0, 60) || 'Awana-letter'}.pdf`;
@@ -101,6 +127,8 @@ export function fileNameFor(title) {
 /** @param {NodeJS.ProcessEnv} env @param {{send?: typeof sendMail, launch?: () => Promise<any>}} [deps] */
 export async function run(env, deps = {}) {
   const text = String(env.LETTER_TEXT || '');
+  const pdfUrl = String(env.PDF_URL || '').trim();
+  if (pdfUrl) return runPdf(env, pdfUrl, deps);
   if (!text.trim()) throw new Fatal('LETTER_TEXT is empty.');
   const dry = env.DRY_RUN === 'true';
   const copies = dry ? 1 : copiesFrom(env.COPIES);
@@ -132,6 +160,43 @@ export async function run(env, deps = {}) {
   }
   log(dry ? 'Dry run: one copy was emailed to GMAIL_USER.' : `Sent to the printer (${copies} copies).`);
   return { copies, pages, bytes: pdf.length, fit: one.fit };
+}
+
+/** The secrets and address checks both kinds of job share. @param {NodeJS.ProcessEnv} env */
+function mailSetup(env) {
+  const dry = env.DRY_RUN === 'true';
+  const user = String(env.GMAIL_USER || '');
+  const pass = String(env.GMAIL_APP_PASSWORD || '');
+  if (!ADDRESS_RE.test(user) || !pass) throw new Fatal('GMAIL_USER and GMAIL_APP_PASSWORD are needed (the handbook job\'s secrets).');
+  const to = dry ? user : String(env.TO || EPSON);
+  if (!ADDRESS_RE.test(to)) throw new Fatal('The "to" address is not a plain email address.');
+  return { dry, user, pass, to };
+}
+
+/**
+ * A ready-made PDF from this repo's releases, COPIES times in one PDF, mailed
+ * like a letter (never retried).
+ * @param {NodeJS.ProcessEnv} env @param {string} url
+ * @param {{send?: typeof sendMail, get?: typeof fetch}} [deps]
+ */
+export async function runPdf(env, url, deps = {}) {
+  const src = releasePdfUrl(url);
+  const { dry, user, pass, to } = mailSetup(env);
+  const copies = dry ? 1 : copiesFrom(env.COPIES);
+  const one = await fetchPdf(src, deps.get);
+  const { pdf, pages } = await repeatPdf(one, copies);
+  log(`${copies} ${copies === 1 ? 'copy' : 'copies'} of ${pages} ${pages === 1 ? 'page' : 'pages'}: ${pdf.length} bytes.`);
+  const name = decodeURIComponent(src.split('/').pop() || 'document.pdf');
+  const message = buildMessage({ from: user, to, subject: `${dry ? '[Dry run] ' : ''}${name.replace(/\.pdf$/i, '')}`, attachments: [{ name, bytes: pdf }] });
+  try {
+    await (deps.send || sendMail)({ user, pass, from: user, to, message });
+  } catch (e) {
+    const why = String(/** @type {any} */ (e).message || 'smtp');
+    if (/smtp auth 5\d\d/.test(why)) throw new Fatal(`Gmail refused the sign-in (${why}). Check GMAIL_USER and GMAIL_APP_PASSWORD.`);
+    throw new Error(`Gmail did not take the message (${why}).`);
+  }
+  log(dry ? 'Dry run: one copy was emailed to GMAIL_USER.' : `Sent to the printer (${copies} copies).`);
+  return { copies, pages, bytes: pdf.length };
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

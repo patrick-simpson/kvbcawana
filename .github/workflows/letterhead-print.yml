@@ -4,6 +4,8 @@ name: Print a letterhead
 # the same drawing as awana.kvbchurch.org/tools/letterhead/) out, COPIES times in
 # ONE PDF, emailed from the owner's Gmail to the downstairs Epson (Epson Connect
 # email print takes no copy count from the mail, so the copies are pages).
+# Or a ready-made PDF from this repo's releases (pdf_url; owner 2026-11-04:
+# the poster contest ballots), repeated the same way.
 # Started by hand, or by the Claude routine that turns a MailChimp newsletter
 # (Gmail label "Letterhead") into this text. It prints at once, by the owner's
 # choice; a dry run mails one copy to GMAIL_USER instead.
@@ -16,9 +18,13 @@ on:
   workflow_dispatch:
     inputs:
       text:
-        description: 'The letter: first line is the title (see /tools/letterhead/ for the format)'
+        description: 'The letter: first line is the title (see /tools/letterhead/ for the format). Leave empty with a PDF below.'
         type: string
-        required: true
+        required: false
+      pdf_url:
+        description: 'Or a ready-made PDF on this repo''s GitHub releases (https://github.com/patrick-simpson/kvbcawana/releases/download/...pdf)'
+        type: string
+        required: false
       copies:
         description: 'Copies (1 to 100)'
         type: string
@@ -61,6 +67,7 @@ jobs:
         working-directory: scripts/letterhead
         env:
           LETTER_TEXT: ${{ inputs.text }}
+          PDF_URL: ${{ inputs.pdf_url }}
           COPIES: ${{ inputs.copies }}
           TO: ${{ inputs.to || 'kvbcdownstairs@print.epsonconnect.com' }}
           DRY_RUN: ${{ inputs.dry_run == true && 'true' || 'false' }}
