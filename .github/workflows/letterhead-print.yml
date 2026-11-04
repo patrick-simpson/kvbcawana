@@ -66,9 +66,13 @@ jobs:
           cache-dependency-path: scripts/letterhead/package-lock.json
       - name: Install
         working-directory: scripts/letterhead
-        run: |
-          npm ci
-          npx playwright install --with-deps --only-shell chromium
+        run: npm ci
+      # Chromium draws a LETTER only; a ready-made PDF needs none of it (2026-11-04:
+      # the browser install hung for over 10 minutes on the ballots run).
+      - name: Install Chromium (letters only)
+        if: inputs.text != ''
+        working-directory: scripts/letterhead
+        run: npx playwright install --with-deps --only-shell chromium
       - name: Make and send the letter
         working-directory: scripts/letterhead
         env:
