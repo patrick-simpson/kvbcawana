@@ -29,6 +29,7 @@ import { fromBase64, toBase64 } from './crypto.js';
 import { INTERACTIVE_WAIT_MS, READ_INTERVAL_MS, ReadBudget } from './readbudget.js';
 import { massUndoRefused, reportIsPartial } from '../../shared/tonight.js';
 import { SCHEDULE, clubDay } from './clubday.js';
+import { zonedParts } from '../../shared/clubNight.js';
 
 export { READ_INTERVAL_MS };
 /**
@@ -44,6 +45,23 @@ export { READ_INTERVAL_MS };
  * it (desk.js), so a poll is answered from a page at most 30 s old.
  */
 export const WATCH_INTERVAL_MS = 30 * 1000;
+/**
+ * The arrival rush (owner 2026-11-04: "Can we make it check every 10 seconds
+ * during this hour each week", 5:00 to 6:00 pm, for check-ins made on
+ * TwoTimTwo's own page): the report every WATCH_FAST_MS, every other slot of
+ * the 5 s read clock, so the slot between still goes to everyone else's reads.
+ * Only inside the watch window, which opens on club nights only. Local
+ * (America/New_York) minutes, start inclusive, end exclusive.
+ */
+export const WATCH_FAST_MS = 10 * 1000;
+export const WATCH_FAST_FROM_MIN = 17 * 60;
+export const WATCH_FAST_UNTIL_MIN = 18 * 60;
+
+/** How often the report is read at this moment. @param {number} now */
+export function watchIntervalAt(now) {
+  const m = zonedParts(new Date(now), TIME_ZONE).minutes;
+  return m >= WATCH_FAST_FROM_MIN && m < WATCH_FAST_UNTIL_MIN ? WATCH_FAST_MS : WATCH_INTERVAL_MS;
+}
 /**
  * Work per alarm invocation. Sealing a print job to the stations is ECDH per
  * station (measured ~4.2 ms for 3 stations under Node), and the free plan
@@ -337,7 +355,7 @@ export class Watcher {
       windowOpen: w.open,
       nextWindowInMin: w.open ? 0 : Math.round(w.untilMs / 60000),
       readIntervalSec: READ_INTERVAL_MS / 1000,
-      watchIntervalSec: WATCH_INTERVAL_MS / 1000,
+      watchIntervalSec: watchIntervalAt(this.now()) / 1000,
       budget: this.budget.stats(),
       ...(this.desk ? { deskPage: { held: this.desk.hasNightPage(), readAt: this.desk.cache ? new Date(this.desk.cache.at).toISOString() : null, restored: !!this.desk.cache?.restored }, families: this.desk.familiesSource.stats() } : {}),
       signedIn: !!(this.client && this.client.cookies.size),
@@ -443,7 +461,7 @@ export class Watcher {
       const feeds = this.feeds;
       if (feeds) await feeds.load().catch((err) => console.error('[feeds] load failed', err));
       const before = await this.loadStatus();
-      const reportAt = this.lastWatcherRead(before) + WATCH_INTERVAL_MS;
+      const reportAt = this.lastWatcherRead(before) + watchIntervalAt(this.now());
       // The next report's slot is the watcher's: other reads keep clear of it.
       this.budget.reserve(reportAt);
       const due = reportAt <= this.now();
@@ -483,7 +501,7 @@ export class Watcher {
         await this.publisher.tick();
       }
       const s = await this.loadStatus();
-      this.budget.reserve(this.lastWatcherRead(s) + WATCH_INTERVAL_MS);
+      this.budget.reserve(this.lastWatcherRead(s) + watchIntervalAt(this.now()));
       const reportIn = Math.max((this.budget.reserved ? this.budget.reserved.at : 0) - this.now(), this.budget.peek(), 1000);
       next = reportIn;
       // The free slot between reports, for the watcher's other reads.

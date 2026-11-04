@@ -711,7 +711,7 @@ undo): the station ends it quietly.
   will queue (`waitMs`): 0 for the watcher's own reads (it skips its turn),
   `INTERACTIVE_WAIT_MS` (20 s, more than one slot) for a desk or phone request,
   and a refusal is `{error: 'read-busy', retryAfterMs}`. **How the 12 slots are
-  shared:** the watcher's report every 30 s (`WATCH_INTERVAL_MS`); the watcher
+  shared:** the watcher's report every 30 s (`WATCH_INTERVAL_MS`; every 10 s from 5:00 to 6:00 pm Eastern, `WATCH_FAST_MS`, owner 2026-11-04); the watcher
   RESERVES its next report's moment, so every other read keeps a slot clear of
   it and between two reports (30 s) the slots go report, other x5 (5, 10, 15, 20,
   25 s), report. A waiting request that could

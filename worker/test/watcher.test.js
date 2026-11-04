@@ -8,7 +8,9 @@ import {
   READ_INTERVAL_MS,
   SEAL_PER_TICK,
   WATCH_INTERVAL_MS,
+  WATCH_FAST_MS,
   Watcher,
+  watchIntervalAt,
   compareReport,
   lastClubNight,
   localTime,
@@ -166,6 +168,29 @@ describe('the watcher', () => {
     s.tick(WATCH_INTERVAL_MS - READ_INTERVAL_MS);
     await s.w.tick();
     expect(reportReads(s)).toBe(2);
+  });
+
+  it('reads the report every 10 s from 5:00 to 6:00 pm (the arrival rush), the slot between still free', async () => {
+    expect(WATCH_FAST_MS).toBe(10000);
+    expect(watchIntervalAt(Date.parse('2026-10-14T20:59:59Z'))).toBe(WATCH_INTERVAL_MS);   // 4:59:59 pm EDT
+    expect(watchIntervalAt(Date.parse('2026-10-14T21:00:00Z'))).toBe(WATCH_FAST_MS);       // 5:00 pm
+    expect(watchIntervalAt(Date.parse('2026-10-14T21:59:59Z'))).toBe(WATCH_FAST_MS);       // 5:59:59 pm
+    expect(watchIntervalAt(Date.parse('2026-10-14T22:00:00Z'))).toBe(WATCH_INTERVAL_MS);   // 6:00 pm
+    expect(watchIntervalAt(Date.parse('2026-12-02T22:30:00Z'))).toBe(WATCH_FAST_MS);       // 5:30 pm EST, winter
+    const s = setup({ start: Date.parse('2026-10-14T21:15:00Z'), kids: [kid(1)] });
+    await s.w.tick();
+    expect(reportReads(s)).toBe(1);
+    expect(s.alarm.at - s.now()).toBe(READ_INTERVAL_MS);   // the free slot: the night's check-in page
+    s.tick(READ_INTERVAL_MS);
+    await s.w.tick();
+    expect(reportReads(s)).toBe(1);
+    expect(s.alarm.at - s.now()).toBe(WATCH_FAST_MS - READ_INTERVAL_MS);
+    s.tick(WATCH_FAST_MS - READ_INTERVAL_MS);
+    await s.w.tick();
+    expect(reportReads(s)).toBe(2);
+    // a minute of the rush: six reports, never two reads closer than the 5 s clock
+    for (let i = 0; i < 12; i++) { s.tick(READ_INTERVAL_MS); await s.w.tick(); }
+    expect(reportReads(s)).toBe(8);
   });
 
   it('any other read on the session (a phone\'s roster) takes its slot: the watcher waits its turn, never doubles up', async () => {
