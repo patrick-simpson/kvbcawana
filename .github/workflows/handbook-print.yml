@@ -1,4 +1,5 @@
 name: Print the handbook sheets
+run-name: Print the handbook sheets${{ inputs.dry_run && ' (dry run)' || '' }}${{ inputs.test && ' (test)' || '' }}
 
 # Owner 2026-10-18: every club night at 4:00 pm Eastern, print TwoTimTwo's
 # handbook check-off report for Cubbies, Sparks and T&T on the downstairs
@@ -13,22 +14,28 @@ name: Print the handbook sheets
 # TwoTimTwo read. A failure is tried again 15 and 30 minutes later; the third
 # failure fails the job, and GitHub emails the owner.
 #
-# Cron is UTC and Eastern moves an hour twice a year: both times are scheduled
-# and the run whose hour is not 4 pm in New York this season skips itself
-# (as checkin-health.yml does).
-#
-# A scheduled run that starts at or after 5:00 pm Eastern skips itself too
-# (2026-11-04: GitHub started both of 2026-11-03's scheduled runs after 7 pm):
-# the sheets are for before club, and a late run after a hand-started one would
-# print a second set.
-#
+# BEFORE 4 PM (owner 2026-11-04: "make sure that it runs before 4:00 p.m. going
+# forward"; "from noon"): GitHub's scheduled starts can slip by hours (both of
+# 2026-11-03's ran after 7 pm), so it is scheduled every half hour, :07 and :37
+# past, and a scheduled run prints only when ALL of these hold:
+#   - it is 12:00 to 4:59 pm in New York (cron is UTC and Eastern moves an hour
+#     twice a year: the hours cover both; one outside the window skips itself,
+#     so nothing scheduled prints after 5 pm, during or after club);
+#   - no earlier run TODAY (New York date) already got through "Make and send
+#     the sheets" (a hand-started run counts; a dry run or test, named so by
+#     run-name, does not). So the first try of the day prints, every later one
+#     skips. A run that FAILED did not send, and the next try runs again.
+# On a non-club day the first try finds no club (no TwoTimTwo read) and the
+# rest skip. Hand-started runs always run.
+
 # PRIVACY: the log shows only sizes, content types and status codes; the PDFs
 # stay in the runner's memory and are never uploaded as artifacts.
 
 on:
   schedule:
-    - cron: '0 20 * * *'   # 4:00 pm EDT
-    - cron: '0 21 * * *'   # 4:00 pm EST
+    # Every half hour, 16:07 to 20:37 UTC = 12:07 to 4:37 pm EDT / 11:07 am to
+    # 3:37 pm EST; the step below keeps only noon to 4:59 pm New York time.
+    - cron: '7,37 16-20 * * *'
   workflow_dispatch:
     inputs:
       to:
@@ -44,7 +51,8 @@ on:
         type: boolean
         default: false
 
-permissions: {}
+permissions:
+  actions: read   # only to see whether an earlier run today already sent the sheets
 
 concurrency:
   group: handbook-print
@@ -56,28 +64,39 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 50
     steps:
-      - name: Is it 4 pm in New York?
+      - name: Is it time, and not printed yet today?
         id: when
         env:
-          SCHEDULE: ${{ github.event.schedule }}
           EVENT: ${{ github.event_name }}
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
         run: |
-          offset="$(TZ=America/New_York date +%z)"   # -0400 in summer time, -0500 in winter
-          case "$SCHEDULE" in
-            '0 20 * * *') season=-0400 ;;
-            '0 21 * * *') season=-0500 ;;
-            *) season="$offset" ;;   # a manual run
-          esac
-          now_hm="$(TZ=America/New_York date +%H%M)"
-          if [ "$EVENT" = "schedule" ] && [ "$season" != "$offset" ]; then
-            echo "This is the other season's run (Eastern is UTC$offset now): nothing to do."
-            echo "go=false" >> "$GITHUB_OUTPUT"
-          elif [ "$EVENT" = "schedule" ] && [ "$((10#$now_hm))" -ge 1700 ]; then
-            echo "GitHub started this scheduled run late ($now_hm Eastern): too late for tonight's sheets, so nothing is printed (start it by hand if it is still wanted)."
-            echo "go=false" >> "$GITHUB_OUTPUT"
-          else
+          if [ "$EVENT" != "schedule" ]; then
+            echo "Started by hand: printing."
             echo "go=true" >> "$GITHUB_OUTPUT"
+            exit 0
           fi
+          now_hm="$(TZ=America/New_York date +%H%M)"
+          if [ "$((10#$now_hm))" -lt 1200 ] || [ "$((10#$now_hm))" -ge 1700 ]; then
+            echo "It is $now_hm in New York: outside noon to 5 pm, nothing to do."
+            echo "go=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # Midnight in New York today, in UTC, for the runs list.
+          since="$(date -u -d "$(TZ=America/New_York date +%Y-%m-%d) 00:00 $(TZ=America/New_York date +%z)" +%Y-%m-%dT%H:%M:%SZ)"
+          api() { curl -fsS -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" "https://api.github.com/repos/$REPO/actions/$1"; }
+          runs="$(api "workflows/handbook-print.yml/runs?status=success&created=%3E%3D$since&per_page=50")" || { echo "Could not read today's runs: printing to be safe."; echo "go=true" >> "$GITHUB_OUTPUT"; exit 0; }
+          for id in $(echo "$runs" | jq -r --argjson me "$RUN_ID" '.workflow_runs[] | select(.id != $me) | select((.display_title | test("dry run|test")) | not) | .id'); do
+            sent="$(api "runs/$id/jobs" | jq -r '[.jobs[].steps[] | select(.name == "Make and send the sheets" and .conclusion == "success")] | length')" || sent=0
+            if [ "${sent:-0}" -gt 0 ]; then
+              echo "Run $id already sent today's sheets: nothing to do."
+              echo "go=false" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+          done
+          echo "Not sent yet today ($now_hm in New York): printing."
+          echo "go=true" >> "$GITHUB_OUTPUT"
       - uses: actions/checkout@v4
         if: steps.when.outputs.go == 'true'
         with:
