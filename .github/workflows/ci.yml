@@ -543,11 +543,14 @@ jobs:
           # The presentation deck upload's machine token (routes.md 10.14, AwanaReports'
           # refresh-data.yml holds the same value). Optional, like the handbook's.
           PRESENTATION_TOKEN: ${{ secrets.PRESENTATION_TOKEN }}
+          # The letterhead page's print buttons (routes.md 10.16): a fine-grained GitHub
+          # token that can only run this repo's Actions. Optional, like the others.
+          PRINT_DISPATCH_TOKEN: ${{ secrets.PRINT_DISPATCH_TOKEN }}
         run: |
           node -e '
             const names = ["INITIAL_PASSPHRASE",
               "TWOTIMTWO_USERNAME", "TWOTIMTWO_PASSWORD", "TWOTIMTWO_HOST"];
-            const optional = ["HANDBOOK_TOKEN", "PRESENTATION_TOKEN"];
+            const optional = ["HANDBOOK_TOKEN", "PRESENTATION_TOKEN", "PRINT_DISPATCH_TOKEN"];
             const out = {};
             for (const n of [...names, ...optional]) if (process.env[n]) out[n] = process.env[n];
             const missing = names.filter((n) => !out[n]);

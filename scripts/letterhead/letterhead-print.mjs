@@ -16,7 +16,14 @@
 // nothing private goes there), repeated the same way. One job for all three
 // (owner 2026-11-04: "merge the two print jobs into one").
 //
-// Env: LETTER_TEXT (the text), PDF_URL or PDF_FILE, COPIES (default 50, 1..MAX_COPIES), TO (default
+// Or an UPLOADED PDF (owner 2026-11-04: "a page where I can upload a PDF and it
+// will send whatever quantity I specify"): PDF_JOB = `<id>.<key>` from the sync
+// Worker (worker/src/prints.js, routes.md 10.16), which holds the PDF scrambled in
+// the browser (AES-256-GCM: IV + ciphertext, base64). The job reads it with the
+// machine token PRINT_FETCH_TOKEN (the handbook's HANDBOOK_TOKEN) from SITE_ORIGIN,
+// opens it with the key, and deletes it from the Worker whatever happens.
+//
+// Env: LETTER_TEXT (the text), PDF_URL or PDF_FILE or PDF_JOB, COPIES (default 50, 1..MAX_COPIES), TO (default
 // the downstairs Epson), DRY_RUN ('true' = one copy mailed to GMAIL_USER
 // instead), GMAIL_USER, GMAIL_APP_PASSWORD. The log shows sizes and page
 // counts only.
@@ -89,15 +96,24 @@ export async function repeatPdf(one, copies) {
   const src = await PDFDocument.load(one);
   const n = src.getPageCount();
   if (n * copies > MAX_PAGES) throw new Fatal(`${copies} copies of a ${n}-page letter is ${n * copies} pages; at most ${MAX_PAGES} go in one email.`);
-  const out = await PDFDocument.create();
-  out.setTitle(src.getTitle() || 'Awana letter');
   // Each page is drawn ONCE (one embedded page, its fonts once) and every copy
-  // points at it, so 50 copies weigh about what one does.
-  const drawn = await out.embedPages(src.getPages());
-  for (let c = 0; c < copies; c++) {
-    for (const d of drawn) out.addPage([d.width, d.height]).drawPage(d);
+  // points at it, so 50 copies weigh about what one does. A page pdf-lib cannot
+  // embed (an uploaded PDF's odd page) is copied whole each time instead.
+  try {
+    const out = await PDFDocument.create();
+    out.setTitle(src.getTitle() || 'Awana letter');
+    const drawn = await out.embedPages(src.getPages());
+    for (let c = 0; c < copies; c++) {
+      for (const d of drawn) out.addPage([d.width, d.height]).drawPage(d);
+    }
+    return { pdf: await out.save(), pages: n };
+  } catch {
+    const out = await PDFDocument.create();
+    out.setTitle(src.getTitle() || 'Awana letter');
+    const idx = src.getPageIndices();
+    for (let c = 0; c < copies; c++) for (const pg of await out.copyPages(src, idx)) out.addPage(pg);
+    return { pdf: await out.save(), pages: n };
   }
-  return { pdf: await out.save(), pages: n };
 }
 
 /** Where a ready-made PDF may come from: this repo's own release files. */
@@ -155,7 +171,10 @@ export async function run(env, deps = {}) {
   const text = String(env.LETTER_TEXT || '');
   const pdfUrl = String(env.PDF_URL || '').trim();
   const pdfFile = String(env.PDF_FILE || '').trim();
+  const pdfJob = String(env.PDF_JOB || '').trim();
   if (pdfUrl && pdfFile) throw new Fatal('Give PDF_URL or PDF_FILE, not both.');
+  if (pdfJob && (pdfUrl || pdfFile)) throw new Fatal('Give one of PDF_URL, PDF_FILE or PDF_JOB.');
+  if (pdfJob) return runPdf(env, { job: pdfJob }, deps);
   if (pdfUrl || pdfFile) return runPdf(env, pdfUrl ? { url: pdfUrl } : { file: pdfFile }, deps);
   if (!text.trim()) throw new Fatal('LETTER_TEXT is empty.');
   const dry = env.DRY_RUN === 'true';
@@ -201,20 +220,92 @@ function mailSetup(env) {
   return { dry, user, pass, to };
 }
 
+/** `<id>.<key>`: the Worker's upload id and the browser's key. @param {string} v */
+export function parseJob(v) {
+  const m = /^([a-f0-9]{16})\.([A-Za-z0-9_-]{43})$/.exec(String(v || '').trim());
+  if (!m) throw new Fatal('PDF_JOB is not an upload id and key.');
+  return { id: m[1], key: m[2] };
+}
+
+/** Open the browser's scrambling: base64 of 12-byte IV + AES-GCM ciphertext. @param {string} ct @param {string} key */
+export async function openUpload(ct, key) {
+  const raw = Buffer.from(ct, 'base64');
+  if (raw.length < 29) throw new Fatal('The uploaded PDF is empty.');
+  const k = await crypto.subtle.importKey('raw', Buffer.from(key, 'base64url'), 'AES-GCM', false, ['decrypt']);
+  let plain;
+  try {
+    plain = new Uint8Array(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: raw.subarray(0, 12) }, k, raw.subarray(12)));
+  } catch {
+    throw new Fatal('The uploaded PDF could not be opened with its key.');
+  }
+  if (plain.length > PDF_MAX) throw new Fatal(`The PDF is ${plain.length} bytes; at most ${PDF_MAX} go in one email.`);
+  if (String.fromCharCode(...plain.slice(0, 5)) !== '%PDF-') throw new Fatal('That file is not a PDF.');
+  return plain;
+}
+
+/** The upload's base: SITE_ORIGIN's /api. @param {NodeJS.ProcessEnv} env */
+function jobBase(env) {
+  const origin = String(env.SITE_ORIGIN || 'https://awana.kvbchurch.org').replace(/\/+$/, '');
+  if (!/^https:\/\/[^\s/?#]+$/.test(origin)) throw new Fatal('SITE_ORIGIN is not an https origin.');
+  return `${origin}/api/v1/prints/pdf`;
+}
+
 /**
- * A ready-made PDF (this repo's releases, or a file under prints/), COPIES
- * times in one PDF, mailed like a letter (never retried).
- * @param {NodeJS.ProcessEnv} env @param {{url?: string, file?: string}} source
+ * Fetch an uploaded PDF from the Worker and open it.
+ * @param {NodeJS.ProcessEnv} env @param {{id: string, key: string}} job @param {typeof fetch} [get]
+ */
+export async function fetchUpload(env, job, get = fetch) {
+  const token = String(env.PRINT_FETCH_TOKEN || '');
+  if (!token) throw new Fatal('PRINT_FETCH_TOKEN is needed (the HANDBOOK_TOKEN secret).');
+  const res = await get(`${jobBase(env)}/${job.id}`, { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' });
+  if (res.status === 404) throw new Fatal('The upload is gone (it was printed already, or waited over an hour). Upload it again.');
+  if (!res.ok) throw new Fatal(`Could not read the upload (HTTP ${res.status}).`);
+  const body = await res.json();
+  const bytes = await openUpload(String(body?.ct || ''), job.key);
+  return { bytes, name: `${String(body?.name || 'document').replace(/[^\w &'()-]+/g, ' ').trim() || 'document'}.pdf` };
+}
+
+/** Delete the upload from the Worker (never fails the job). @param {NodeJS.ProcessEnv} env @param {{id: string}} job @param {typeof fetch} [get] */
+export async function forgetUpload(env, job, get = fetch) {
+  try {
+    const res = await get(`${jobBase(env)}/${job.id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${String(env.PRINT_FETCH_TOKEN || '')}` } });
+    log(`Deleted the upload from the sync service (HTTP ${res.status}).`);
+  } catch {
+    log('Could not delete the upload now; the sync service deletes it within the hour.');
+  }
+}
+
+/**
+ * A ready-made PDF (this repo's releases, a file under prints/, or an upload
+ * from the letterhead page), COPIES times in one PDF, mailed like a letter
+ * (never retried).
+ * @param {NodeJS.ProcessEnv} env @param {{url?: string, file?: string, job?: string}} source
  * @param {{send?: typeof sendMail, get?: typeof fetch, root?: string}} [deps]
  */
 export async function runPdf(env, source, deps = {}) {
-  const src = source.url ? releasePdfUrl(source.url) : printsPath(source.file || '');
+  const job = source.job ? parseJob(source.job) : null;
+  try {
+    return await runPdfFrom(env, source, job, deps);
+  } finally {
+    if (job) await forgetUpload(env, job, deps.get);
+  }
+}
+
+/** @param {NodeJS.ProcessEnv} env @param {{url?: string, file?: string}} source @param {{id: string, key: string}|null} job @param {{send?: typeof sendMail, get?: typeof fetch, root?: string}} deps */
+async function runPdfFrom(env, source, job, deps) {
   const { dry, user, pass, to } = mailSetup(env);
   const copies = dry ? 1 : copiesFrom(env.COPIES);
-  const one = source.url ? await fetchPdf(src, deps.get) : readPrintsPdf(src, deps.root);
+  let one;
+  let name;
+  if (job) {
+    ({ bytes: one, name } = await fetchUpload(env, job, deps.get));
+  } else {
+    const src = source.url ? releasePdfUrl(source.url) : printsPath(source.file || '');
+    one = source.url ? await fetchPdf(src, deps.get) : readPrintsPdf(src, deps.root);
+    name = decodeURIComponent(src.split('/').pop() || 'document.pdf');
+  }
   const { pdf, pages } = await repeatPdf(one, copies);
   log(`${copies} ${copies === 1 ? 'copy' : 'copies'} of ${pages} ${pages === 1 ? 'page' : 'pages'}: ${pdf.length} bytes.`);
-  const name = decodeURIComponent(src.split('/').pop() || 'document.pdf');
   const message = buildMessage({ from: user, to, subject: `${dry ? '[Dry run] ' : ''}${name.replace(/\.pdf$/i, '')}`, attachments: [{ name, bytes: pdf }] });
   try {
     await (deps.send || sendMail)({ user, pass, from: user, to, message });

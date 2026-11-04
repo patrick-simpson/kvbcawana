@@ -1622,3 +1622,30 @@ step, written through; a count never goes below 0. A change rings
 | `GET /v1/tally` | session | | `{ok, counts, rev, at}` |
 | `POST /v1/tally` | session | `{division: 'older'\|'younger', poster: 1..3, delta: 1\|-1}` | the state; 400 `bad-press` |
 | `POST /v1/tally/reset` | session | `{}` | the state, every count 0 |
+
+### 10.16 Print from the letterhead page (BUILT, owner 2026-11-04)
+
+awana.kvbchurch.org/tools/letterhead/ uploads a PDF and a number of copies, or asks for
+today's handbook sheets; the Worker starts the GitHub Actions print job
+(`letterhead-print.yml` / `handbook-print.yml`) with the secret `PRINT_DISPATCH_TOKEN`
+(a fine-grained GitHub token, this repo only, Actions: read and write; setup in
+`worker/README.md`). Without it the page's routes answer 503 `not-configured`.
+Code `src/prints.js`; tests `test/prints.test.js`.
+
+The PDF is scrambled IN THE BROWSER (AES-256-GCM, a fresh key; base64 of IV + ciphertext)
+and stored as `prints:part:<id>:<n>` pieces of 96 KiB (`prints:up` the record, ONE upload
+at a time, deleted after an hour unprinted). "Send" passes `pdf_job: <id>.<key>` and
+`copies` to the job; the key is never stored here. The job reads the ciphertext with the
+machine token `HANDBOOK_TOKEN`, opens it, mails it (copies as pages of ONE PDF) and deletes
+it. A send is marked BEFORE the dispatch, so a second tap never prints twice; a refused
+dispatch can be tried again. The handbook button: one print per 2 minutes.
+
+| Route | Auth | Body | Answer |
+|---|---|---|---|
+| `GET /v1/prints` | session | | `{ok, ready}` (`ready` = the token is set) |
+| `POST /v1/prints/pdf` | session | `{chars, name, copies: 1..100}` | `{id, parts, partChars}`; 400 `size` (over 15 MB) / `copies` |
+| `PUT /v1/prints/pdf/:id/:n` | session | one piece (text) | `{next}`; 409 `order`, 400 `size` |
+| `POST /v1/prints/pdf/:id/send` | session | `{key}` (43 base64url) | `{copies, name}`; 409 `sent`, 400 `parts`/`bad-key`, 502 `dispatch` |
+| `GET /v1/prints/pdf/:id` | machine token | | `{name, ct}` streamed |
+| `DELETE /v1/prints/pdf/:id` | machine token | | `{ok}` |
+| `POST /v1/prints/handbook` | session | `{}` | `{ok}`; 429 `just-sent`, 502 `dispatch` |

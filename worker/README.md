@@ -156,6 +156,25 @@ a child gone between two genuinely read pages leaves tonight's count.
 `GET /v1/cloud/status` shows all of it as counts and times (`stationFeeds`,
 `ymCheckout.leftPage`).
 
+## The letterhead page's print buttons (`src/prints.js`, `src/routes.md` 10.16)
+
+awana.kvbchurch.org/tools/letterhead/ can send a PDF (any number of copies) or
+today's handbook sheets to the downstairs Epson. Printing is a GitHub Actions job,
+so the Worker needs a GitHub token that may start this repo's jobs and nothing else:
+
+1. GitHub → your picture → Settings → Developer settings → Personal access tokens →
+   **Fine-grained tokens** → Generate new token.
+2. Name it "KVBC Awana print buttons". Expiration: up to a year (put a reminder on
+   the calendar to replace it).
+3. Repository access: **Only select repositories** → `patrick-simpson/kvbcawana`.
+4. Permissions → Repository permissions → **Actions: Read and write**. Nothing else.
+5. Generate, copy it, then in this repo: Settings → Secrets and variables → Actions →
+   New repository secret, name `PRINT_DISPATCH_TOKEN`, paste it, save.
+6. The next Worker deploy sends it to the Worker (ci.yml "Set the Worker's secrets").
+   Until then the page says printing is not set up yet.
+
+When it expires, the page says GitHub refused the token: make a new one the same way.
+
 ## Developing
 
 ```sh

@@ -47,6 +47,36 @@
     textarea { height: 40vh; }
     header.bar { padding: 12px 16px; flex-wrap: wrap; } header.bar h1 { font-size: 20px; }
   }
+  /* The two tabs (owner 2026-11-04: the print page beside the letter maker). */
+  nav.tabs { display: flex; gap: 6px; padding: 16px 24px 0; max-width: 1500px; margin: 0 auto; }
+  nav.tabs button { box-shadow: none; border: 2px solid var(--ink); border-bottom: 0; border-radius: 10px 10px 0 0; background: transparent; padding: 10px 16px; }
+  nav.tabs button[aria-selected=true] { background: var(--ink); color: #fff; }
+  nav.tabs button:active { translate: none; }
+  #printer { max-width: 1100px; margin: 0 auto; padding: 24px; display: grid; grid-template-columns: 1.4fr 1fr; gap: 24px; align-items: start; }
+  .card { background: #fff; border-radius: 16px; box-shadow: 4px 4px 0 var(--ink); padding: 22px 24px 24px; }
+  .card h2 { margin: 0 0 4px; font: 400 26px/1.1 var(--brand-font-display); text-transform: uppercase; color: var(--brand-blue); }
+  .card p.lede { margin: 0 0 16px; color: #4a4a4a; }
+  .drop { display: grid; place-items: center; gap: 6px; text-align: center; min-height: 150px; padding: 18px; border: 2px dashed var(--ink); border-radius: 12px; background: var(--paper); cursor: pointer; }
+  .drop.over { background: var(--brand-cream); border-style: solid; }
+  .drop b { font: 400 20px/1.1 var(--brand-font-label); letter-spacing: .04em; text-transform: uppercase; }
+  .drop small { color: #555; }
+  .file { display: none; align-items: center; gap: 12px; margin-top: 14px; padding: 12px 14px; border-radius: 10px; background: var(--brand-cream); font-weight: 600; }
+  .file.on { display: flex; }
+  .file span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .file button { padding: 6px 10px; font-size: 13px; box-shadow: none; border: 2px solid var(--ink); }
+  .row { display: flex; flex-wrap: wrap; align-items: end; gap: 16px; margin-top: 18px; }
+  .row label { display: grid; gap: 6px; font: 400 15px/1 var(--brand-font-label); letter-spacing: .08em; text-transform: uppercase; }
+  .row input[type=number] { width: 110px; font: 400 26px/1 var(--brand-font-display); padding: 8px 12px; border: 2px solid var(--ink); border-radius: 10px; }
+  .row .total { padding-bottom: 12px; color: #4a4a4a; font-weight: 600; }
+  .status { min-height: 1.5em; margin: 14px 0 0; font-weight: 600; }
+  .status.bad { color: var(--brand-sparks-deep); }
+  .status.good { color: var(--brand-tnt-deep); }
+  progress { width: 100%; height: 10px; margin-top: 10px; accent-color: var(--brand-blue); }
+  .card.hb h2 { color: var(--brand-hot-deep, #b8380f); }
+  .card.hb ul { margin: 0 0 18px; padding-left: 20px; color: #4a4a4a; }
+  button.armed { background: var(--ink); color: #fff; }
+  .setup { grid-column: 1 / -1; padding: 14px 18px; border-radius: 12px; background: var(--brand-cream); font-weight: 600; }
+  @media (max-width: 860px) { #printer { grid-template-columns: 1fr; padding: 16px; } nav.tabs { padding: 12px 16px 0; } }
   [hidden] { display: none !important; }
 </style>
 </head>
@@ -65,6 +95,11 @@
   <button class="hot" id="signin-btn" type="submit">Sign in</button>
   <p class="note" id="signin-note" role="status"></p>
 </form>
+
+<nav class="tabs" id="tabs" role="tablist" hidden>
+  <button type="button" role="tab" id="tab-letter" aria-selected="true" aria-controls="maker">Letter</button>
+  <button type="button" role="tab" id="tab-print" aria-selected="false" aria-controls="printer">Print to downstairs</button>
+</nav>
 
 <main id="maker" hidden>
   <section class="col">
@@ -101,6 +136,34 @@ awana@kvbchurch.org | 290-0341"></textarea>
       <span id="fit" role="status"></span>
     </div>
     <div class="sheet" id="sheet"><iframe id="preview" title="Letter preview"></iframe></div>
+  </section>
+</main>
+
+<main id="printer" hidden>
+  <p class="setup" id="print-setup" hidden>Printing from this page is not set up yet: the sync service needs its GitHub print token (worker/README.md, "The letterhead page's print buttons").</p>
+  <section class="card">
+    <h2>Print a PDF</h2>
+    <p class="lede">Sends straight to the downstairs Epson. More than one copy goes out as one long PDF, so it all prints in one go.</p>
+    <label class="drop" id="drop" for="pdf">
+      <b>Choose a PDF</b>
+      <small>or drop it here · up to 15 MB</small>
+    </label>
+    <input type="file" id="pdf" accept="application/pdf,.pdf" hidden>
+    <div class="file" id="file"><span id="file-name"></span><button type="button" id="file-clear">Change</button></div>
+    <div class="row">
+      <label for="copies">Copies<input type="number" id="copies" min="1" max="100" step="1" value="1" inputmode="numeric"></label>
+      <span class="total" id="total"></span>
+    </div>
+    <div class="row"><button class="hot" type="button" id="send" disabled>Send to the printer</button></div>
+    <progress id="progress" max="1" value="0" hidden></progress>
+    <p class="status" id="send-status" role="status"></p>
+  </section>
+  <section class="card hb">
+    <h2>Handbook sheets</h2>
+    <p class="lede">Tonight's TwoTimTwo handbook check-off sheets, printed now.</p>
+    <ul><li>Cubbies, Sparks and T&amp;T, one email</li><li>Prints even if today's already printed</li><li>Only on a club night</li></ul>
+    <button class="hot" type="button" id="handbook">Print handbook sheets</button>
+    <p class="status" id="hb-status" role="status"></p>
   </section>
 </main>
 <script type="module" src="./app.js"></script>

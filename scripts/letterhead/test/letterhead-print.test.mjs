@@ -168,3 +168,71 @@ test('the Parents\' Night half sheet in the repo is one Letter page', async () =
   const { width, height } = doc.getPage(0).getSize();
   assert.deepEqual([Math.round(width), Math.round(height)], [612, 792]);
 });
+
+// An uploaded PDF from the letterhead page (worker/src/prints.js): scrambled in the
+// browser, read with the machine token, opened with the key, deleted after.
+async function scramble(bytes) {
+  const raw = crypto.getRandomValues(new Uint8Array(32));
+  const key = await crypto.subtle.importKey('raw', raw, 'AES-GCM', false, ['encrypt']);
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ct = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, bytes));
+  return { ct: Buffer.concat([iv, ct]).toString('base64'), key: Buffer.from(raw).toString('base64url') };
+}
+
+async function twoPagePdf() {
+  const doc = await PDFDocument.create();
+  doc.addPage([612, 792]).drawText('Page one', { x: 72, y: 700 });
+  doc.addPage([612, 792]).drawText('Page two', { x: 72, y: 700 });
+  return doc.save();
+}
+
+test('an uploaded PDF: opened with its key, copies as pages of one PDF, deleted from the Worker', async () => {
+  const { ct, key } = await scramble(await twoPagePdf());
+  const id = '0123456789abcdef';
+  const calls = [];
+  const get = async (url, init = {}) => {
+    calls.push({ url, method: init.method || 'GET', auth: init.headers?.Authorization });
+    if ((init.method || 'GET') === 'DELETE') return new Response('{"ok":true}', { status: 200 });
+    return new Response(JSON.stringify({ name: 'Sign up sheet', ct }), { status: 200 });
+  };
+  /** @type {any} */
+  let sent = null;
+  const out = await run({ GMAIL_USER: 'owner@example.org', GMAIL_APP_PASSWORD: 'x', PDF_JOB: `${id}.${key}`, COPIES: '3', PRINT_FETCH_TOKEN: 'machine', SITE_ORIGIN: 'https://awana.example.org' },
+    { get, send: async (m) => { sent = m; } });
+  assert.deepEqual([out.copies, out.pages], [3, 2]);
+  assert.equal(sent.to, EPSON);
+  assert.match(sent.message, /^Subject: Sign up sheet$/m);
+  assert.equal((await PDFDocument.load(pdfOf(sent.message))).getPageCount(), 6);
+  assert.deepEqual(calls.map((c) => `${c.method} ${c.url} ${c.auth}`), [
+    `GET https://awana.example.org/api/v1/prints/pdf/${id} Bearer machine`,
+    `DELETE https://awana.example.org/api/v1/prints/pdf/${id} Bearer machine`,
+  ]);
+});
+
+test('an upload with the wrong key prints nothing and is still deleted', async () => {
+  const { ct } = await scramble(await twoPagePdf());
+  const methods = [];
+  const get = async (_url, init = {}) => {
+    methods.push(init.method || 'GET');
+    return new Response(JSON.stringify({ name: 'x', ct }), { status: 200 });
+  };
+  let sent = false;
+  await assert.rejects(run({ GMAIL_USER: 'owner@example.org', GMAIL_APP_PASSWORD: 'x', PDF_JOB: `0123456789abcdef.${'B'.repeat(43)}`, PRINT_FETCH_TOKEN: 'machine' },
+    { get, send: async () => { sent = true; } }), /could not be opened/);
+  assert.equal(sent, false);
+  assert.deepEqual(methods, ['GET', 'DELETE']);
+});
+
+test('PDF_JOB must be an id and a key, and only one source at a time', async () => {
+  const env = { GMAIL_USER: 'owner@example.org', GMAIL_APP_PASSWORD: 'x', PRINT_FETCH_TOKEN: 'm' };
+  await assert.rejects(run({ ...env, PDF_JOB: 'nope' }, { send: async () => {} }), /PDF_JOB/);
+  await assert.rejects(run({ ...env, PDF_JOB: `0123456789abcdef.${'B'.repeat(43)}`, PDF_FILE: 'prints/x.pdf' }, { send: async () => {} }), /one of/);
+});
+
+test('a PDF whose page cannot be embedded is copied whole instead', async () => {
+  const doc = await PDFDocument.create();
+  doc.addPage([612, 792]);   // no contents at all
+  const { pdf, pages } = await repeatPdf(await doc.save(), 4);
+  assert.equal(pages, 1);
+  assert.equal((await PDFDocument.load(pdf)).getPageCount(), 4);
+});
