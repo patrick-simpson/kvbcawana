@@ -5,14 +5,21 @@
 // 10.15), so every signed-in phone or laptop adds into the same totals.
 // Signed in with the church passphrase like the letterhead tool (passphrase v2:
 // the word never leaves this browser). Undo takes back THIS device's last taps.
-// The page reads the totals every READ_MS while it is visible (and after each
-// tap); nothing at all while hidden.
+// Live (owner 2026-11-04: "it would be really cool if the vote counts synced"):
+// while visible the page holds the live channel (/v1/live) and reads the totals
+// the moment the Worker rings `changed {what: 'tally'}`, so another phone's tap
+// shows within a second; a read every LIVE_READ_MS is the safety net (READ_MS
+// while the socket is down). Nothing at all while hidden or idle.
 
 const SYNC_INDEX = new URL('/lobby/shared/sync.json', location.href).href;
 const SESSION_KEY = 'awanaSyncSession.v1';
 const SESSION_RE = /^v1\.\d+\.\d+\.[A-Za-z0-9_-]{20,}$/;
 const TIMEOUT_MS = 10000;
 const READ_MS = 4000;
+/** With the live channel open the ring brings changes; this read is only a safety net. */
+const LIVE_READ_MS = 60000;
+const PING_MS = 25000;
+const SILENT_MS = 70000;
 /** Nobody has touched this page for this long: stop reading until the next touch (the free plan's daily requests). */
 const IDLE_STOP_MS = 15 * 60 * 1000;
 const MAX_UNDO = 50;
@@ -38,6 +45,13 @@ let armed = false;
 let resetTimer = 0;
 let lastActive = Date.now();
 let paused = false;
+/** @type {WebSocket|null} */
+let sock = null;
+let sockOpen = false;
+let sockRetryMs = 0;
+let sockRetry = 0;
+let pingTimer = 0;
+let heardAt = 0;
 
 const cards = { o: [], y: [] };
 document.querySelectorAll('.poster').forEach((el) => { cards[el.dataset.div][Number(el.dataset.i)] = el; });
@@ -124,7 +138,7 @@ async function change(d, i, s, fromUndo = false) {
     status(res.status === 0 ? 'Not counted: no internet. Tap again.' : 'Not counted. Tap again.');
     return;
   }
-  status('Live · counts shared on every device');
+  status(liveWords());
   if (pending === 0) take(res.body, true);
 }
 
@@ -157,15 +171,67 @@ async function onReset() {
   take(res.body, true);
 }
 
+const liveWords = () => (sockOpen ? 'Live · every device in sync' : 'Counts shared on every device');
+
+function closeLive() {
+  clearTimeout(sockRetry);
+  sockRetry = 0;
+  clearInterval(pingTimer);
+  const s = sock;
+  sock = null;
+  sockOpen = false;
+  if (s) { s.onopen = s.onmessage = s.onclose = s.onerror = null; try { s.close(); } catch { /* already closed */ } }
+}
+
+/** The doorbell: another device's tap rings, this page reads at once. */
+function openLive() {
+  clearTimeout(sockRetry);
+  sockRetry = 0;
+  if (sock || paused || document.hidden || !session() || !/^https:\/\//.test(base) || typeof WebSocket !== 'function') return;
+  let s;
+  try { s = new WebSocket(`${base.replace(/^https:/, 'wss:')}/v1/live?session=${encodeURIComponent(session())}`); } catch { return; }
+  sock = s;
+  s.onopen = () => {
+    sockOpen = true;
+    sockRetryMs = 0;
+    heardAt = Date.now();
+    clearInterval(pingTimer);
+    pingTimer = setInterval(() => {
+      if (Date.now() - heardAt > SILENT_MS) { dropLive(); return; }
+      try { s.send('ping'); } catch { dropLive(); }
+    }, PING_MS);
+    read();   // whatever moved while it was down
+  };
+  s.onmessage = (e) => {
+    heardAt = Date.now();
+    if (typeof e.data !== 'string' || e.data === 'pong') return;
+    try {
+      const f = JSON.parse(e.data);
+      if (f?.e === 'changed' && f?.d?.what === 'tally' && !(Number.isInteger(f.d.rev) && f.d.rev <= rev)) read();
+    } catch { /* not ours */ }
+  };
+  s.onclose = s.onerror = () => dropLive();
+}
+
+function dropLive() {
+  const was = sockOpen;
+  closeLive();
+  if (was) read();
+  if (!session() || paused || document.hidden) return;
+  sockRetryMs = Math.min(60000, sockRetryMs ? sockRetryMs * 2 : 2000);
+  sockRetry = setTimeout(openLive, sockRetryMs);
+}
+
 async function read() {
   clearTimeout(readTimer);
   if (!session() || document.hidden) return;
   const res = await request('/v1/tally');
   if (res.status === 401) { signedOut('The passphrase changed. Sign in again.'); return; }
-  if (res.ok) { status('Live · counts shared on every device'); take(res.body, false); }
+  if (res.ok) { status(liveWords()); take(res.body, false); }
   else status(res.status === 0 ? 'Offline: showing the last totals' : 'Reconnecting…');
-  if (Date.now() - lastActive > IDLE_STOP_MS) { paused = true; status('Paused · tap anywhere to update'); return; }
-  readTimer = setTimeout(read, READ_MS);
+  if (Date.now() - lastActive > IDLE_STOP_MS) { paused = true; closeLive(); status('Paused · tap anywhere to update'); return; }
+  if (!sock && !sockRetry) openLive();
+  readTimer = setTimeout(read, sockOpen ? LIVE_READ_MS : READ_MS);
 }
 
 /** Any touch or key: this device is in use again. */
@@ -183,6 +249,7 @@ function showSignedIn() {
 
 function signedOut(note) {
   clearTimeout(readTimer);
+  closeLive();
   store.set(SESSION_KEY, null);
   memorySession = '';
   $('tally').hidden = true;
@@ -242,7 +309,10 @@ async function start() {
     const m = KEYS[String(e.key).toLowerCase()];
     if (m) change(m[0], m[1], 1);
   });
-  document.addEventListener('visibilitychange', () => { if (!document.hidden) { lastActive = Date.now(); paused = false; read(); } });
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) { closeLive(); clearTimeout(readTimer); return; }
+    lastActive = Date.now(); paused = false; read();
+  });
   document.addEventListener('pointerdown', active, true);
   document.addEventListener('keydown', active, true);
   addEventListener('storage', (e) => { if ((e.key === SESSION_KEY || e.key === null) && !session()) signedOut('Signed out on this device.'); });
