@@ -16,6 +16,7 @@ const ALLOWED = [
   '/lobby/projector-remote.html', // the opening ceremony remote (phone: Next and Back for the projector's slides)
   '/settings', '/logo/',
   '/tools/letterhead/', // owner 2026-10-28: the letterhead maker is on the links page
+  '/tools/tally/', // owner 2026-11-04: the poster contest vote tally, shared on every device
   '/download/kvbc-awana', '/help', '/capabilities.html', '/release-notes/printer.md',
   '/',
 ];
@@ -37,7 +38,7 @@ test('every link is one of the listed pages: no extra links, no passphrase, quer
   }
 });
 
-test('each of the 17 listed pages is linked exactly once', () => {
+test('each of the 18 listed pages is linked exactly once', () => {
   assert.equal(hrefs.length, ALLOWED.length);
   assert.deepEqual([...hrefs].sort(), [...ALLOWED].sort());
 });

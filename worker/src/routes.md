@@ -1605,3 +1605,18 @@ Doorbell (2026-11-03): a slide change (`go` that moved the slide) rings `changed
 
 Storage: `pres:deck`, `pres:up`, `pres:part:<rev>:<n>`, `pres:slide`. Screens read
 the state on the doorbell above (polling 0.8 s / 1.5 s only while their socket is down).
+
+### 10.15 The poster contest vote tally (BUILT, owner 2026-11-04)
+
+Six shared counts for awana.kvbchurch.org/tools/tally/ (`site/tools/tally/`): the paper
+ballot's two divisions, posters 1 to 3 each, by number only (never a child's name).
+Code `src/tally.js`; tests `test/tally.test.js`. Storage `tally:poster`
+`{counts: {older: [n,n,n], younger: [n,n,n]}, rev, at}`. Each press is one synchronous
+step, written through; a count never goes below 0. A change rings
+`changed {what: 'tally', rev}` (other screens ignore the word).
+
+| Route | Auth | Body | Answer |
+|---|---|---|---|
+| `GET /v1/tally` | session | | `{ok, counts, rev, at}` |
+| `POST /v1/tally` | session | `{division: 'older'\|'younger', poster: 1..3, delta: 1\|-1}` | the state; 400 `bad-press` |
+| `POST /v1/tally/reset` | session | `{}` | the state, every count 0 |

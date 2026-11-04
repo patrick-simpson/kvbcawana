@@ -54,6 +54,7 @@ import { Screens } from './screens.js';
 import { JourneyRemote, mountJourneyRemote } from './journeyRemote.js';
 import { Classroom, mountClassroom } from './classroom.js';
 import { Presentation, mountPresentation } from './presentation.js';
+import { Tally, mountTally } from './tally.js';
 import { parseSession, sessionBody } from './session.js';
 import { BadRequest, fail, json } from './http.js';
 import { Registry } from './registry.js';
@@ -266,6 +267,9 @@ export class SyncCore {
       ring: (payload) => { this.broadcast(frameText(DOORBELL_EVENT, payload)); },
     });
     mountPresentation(this.registry, this);   // /v1/presentation/* (routes.md 10.14)
+    // The poster contest vote tally (tally.js, routes.md 10.15): six shared counts.
+    this.tally = new Tally({ storage: this.storage, now: this.now, ring: (payload) => { this.broadcast(frameText(DOORBELL_EVENT, payload)); } });
+    mountTally(this.registry, this);   // /v1/tally (routes.md 10.15)
     // The change log (changes.js, routes.md 10.5): every write path below logs who
     // (device.js), when, which keys, before and after; a module that owns an
     // undoable kind adds its undoer to `undoers`.
