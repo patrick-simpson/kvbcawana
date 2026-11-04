@@ -28,6 +28,7 @@ import {
   CLASSROOM_FILE_PART_BYTES,
   CLASSROOM_FILE_TYPES,
   CLASSROOM_PREVIEW_MS,
+  CLASSROOM_HOLD_MS,
   CLASSROOM_WATCH_MS,
   fileLinkFrom,
   filesOf,
@@ -272,10 +273,12 @@ export class Classroom {
         const video = buttons.videos.find((v) => v.id === p.data?.button);
         const item = buttons.items.find((v) => v.id === p.data?.button);
         if (!video && !item) return fail('That button is gone. The list has been reloaded.', 404, { reason: 'no-button' });
-        next = { ...stage, show: { button: video ? { ...video, kind: 'video' } : item, at: t, page: 1 }, cmds };
+        // One thing up at a time: a button takes a held look (the Sparks screen) down.
+        next = { ...stage, show: { button: video ? { ...video, kind: 'video' } : item, at: t, page: 1 }, preview: stage.preview?.held ? null : stage.preview, cmds };
         break;
       }
-      case 'back': next = { ...stage, show: null, cmds }; break;
+      // Back to the schedule: whatever the remote put up goes, a held look too.
+      case 'back': next = { ...stage, show: null, preview: stage.preview?.held ? null : stage.preview, cmds }; break;
       case 'video':
         if (stage.show?.button?.kind !== 'video') return fail('No video is on the screen.', 409, { reason: 'no-video' });
         next = { ...stage, cmds: cmd('video', p.data) };
@@ -288,7 +291,12 @@ export class Classroom {
         next = { ...stage, show: { ...stage.show, page }, cmds };
         break;
       }
-      case 'preview': next = { ...stage, preview: { look: p.data?.look, until: t + CLASSROOM_PREVIEW_MS }, cmds }; this.watchAt = t; break;
+      // A /settings preview (one minute), or the remote's held look (until Back): it
+      // replaces whatever button was up.
+      case 'preview': next = p.data?.hold
+        ? { ...stage, show: null, preview: { look: p.data.look, until: t + CLASSROOM_HOLD_MS, held: true }, cmds }
+        : { ...stage, preview: { look: p.data?.look, until: t + CLASSROOM_PREVIEW_MS }, cmds };
+        this.watchAt = t; break;
       case 'preview-end': next = { ...stage, preview: null, cmds }; break;
       case 'sparky': next = { ...stage, cmds: cmd('sparky') }; break;
       default: return fail('That is not something the Sparks remote can ask.', 400);

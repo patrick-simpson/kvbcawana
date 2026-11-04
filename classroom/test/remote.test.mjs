@@ -119,7 +119,8 @@ async function open(size = { width: 390, height: 844 }) {
 describe('the Sparks remote page', { skip: SKIP }, () => {
   it('shows the shared buttons; a tap puts one up; the right controls appear; Back takes it down', async () => {
     const page = await open();
-    assert.deepEqual(await page.$$eval('.tile', (ts) => ts.map((t) => [t.dataset.kind, t.firstChild.textContent])), [['video', 'Sparky Song'], ['text', 'Verse'], ['pdf', 'Handbook']]);
+    // The fixed Sparks screen tile (owner 2026-11-04) first, then the shared buttons.
+    assert.deepEqual(await page.$$eval('.tile', (ts) => ts.map((t) => [t.dataset.kind, t.firstChild.textContent])), [['look', 'Sparks screen'], ['video', 'Sparky Song'], ['text', 'Verse'], ['pdf', 'Handbook']]);
     assert.equal(await page.isHidden('#btn-back'), true);
     await page.click('.tile[data-button="bvideo01"]');
     await page.waitForSelector('#video:not([hidden])');
@@ -138,6 +139,10 @@ describe('the Sparks remote page', { skip: SKIP }, () => {
     await page.click('#btn-back');
     await page.waitForSelector('#btn-back', { state: 'hidden' });
     assert.deepEqual(W.presses.at(-1), { action: 'back' });
+    // The Sparks screen: a held look, until Back.
+    await page.click('#tile-sparks');
+    await page.waitForFunction(() => document.getElementById('press-note').textContent.startsWith('The Sparks screen is going up'));
+    assert.deepEqual(W.presses.at(-1), { action: 'preview', data: { look: 'sparks', hold: true } });
     // Nothing on a phone runs off its right edge.
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
     await page.close();

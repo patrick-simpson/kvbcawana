@@ -226,6 +226,28 @@ describe('the stage (POST /v1/classroom/remote, GET /v1/classroom/stage)', () =>
     expect((await s.call('GET', '/v1/classroom/remote/state')).body.screenOnline).toBe(true);
   });
 
+  it('the remote\'s Sparks screen stays until Back, and a button takes it down (owner 2026-11-04)', async () => {
+    const s = await setup();
+    expect(sanitizeClassroomPress('preview', { look: 'sparks', hold: true })).toEqual({ action: 'preview', data: { look: 'sparks', hold: true } });
+    expect(sanitizeClassroomPress('preview', { look: 'sparks', hold: 'yes' })).toEqual({ action: 'preview', data: { look: 'sparks' } });
+    await s.call('POST', '/v1/classroom/remote', { action: 'preview', data: { look: 'sparks', hold: true } });
+    s.tick(CLASSROOM_PREVIEW_MS * 30);   // far past a /settings preview's minute
+    expect((await s.call('GET', '/v1/classroom/stage')).body.stage.preview).toMatchObject({ look: 'sparks', held: true });
+    await s.call('POST', '/v1/classroom/remote', { action: 'back' });
+    expect((await s.call('GET', '/v1/classroom/stage')).body.stage.preview).toBe(null);
+    // up again, then a button replaces it: one thing at a time
+    await s.call('PUT', '/v1/classroom/buttons', { baseRev: 0, buttons: { videos: [], items: [TEXT] } });
+    await s.call('POST', '/v1/classroom/remote', { action: 'preview', data: { look: 'sparks', hold: true } });
+    await s.call('POST', '/v1/classroom/remote', { action: 'show', data: { button: TEXT.id } });
+    const st = (await s.call('GET', '/v1/classroom/stage')).body.stage;
+    expect(st.preview).toBe(null);
+    expect(st.show.button.id).toBe(TEXT.id);
+    // a /settings minute-long preview is NOT taken down by Back (it is not the remote's)
+    await s.call('POST', '/v1/classroom/remote', { action: 'preview', data: { look: 'cubbies' } });
+    await s.call('POST', '/v1/classroom/remote', { action: 'back' });
+    expect((await s.call('GET', '/v1/classroom/stage')).body.stage.preview).toMatchObject({ look: 'cubbies' });
+  });
+
   it('the screen reports only while a remote watches; the first look rings it', async () => {
     const s = await setup();
     expect((await s.call('GET', '/v1/classroom/stage')).body.watch).toBe(false);

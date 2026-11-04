@@ -1573,6 +1573,8 @@ Back. /settings → Screens previews a look on the TV for a minute. Code:
 - Free plan: reads are memory; writes are one per edit or press; a part is one
   96 KiB put plus one small meta put.
 
+Held look (2026-11-04): `preview {look, hold: true}` (the remote's Sparks screen tile) stores `preview {look, until: now + CLASSROOM_HOLD_MS (6 h), held: true}` and takes any shown button down; `back` and `show` take a HELD look down (a /settings one-minute preview is left alone).
+
 ### 10.14 The presentation (BUILT, owner 2026-11-01)
 
 The congregation deck from AwanaReports (`deck/index.html`, rebuilt weekly) on a

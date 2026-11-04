@@ -165,7 +165,9 @@ function render() {
   setText($('now-sub'), w.sub);
   $('now').dataset.live = String(w.live);
   const shown = state.stage.show ? state.stage.show.button : null;
-  $('btn-back').hidden = !shown;
+  const held = Boolean(state.stage.preview && state.stage.preview.held);
+  $('btn-back').hidden = !shown && !held;
+  $('tile-sparks').setAttribute('aria-pressed', String(held && state.stage.preview.look === 'sparks'));
   $('video').hidden = !shown || shown.kind !== 'video';
   $('pdf').hidden = !shown || shown.kind !== 'pdf';
   const video = state.now && shown && state.now.button === shown.id ? state.now.video : null;
@@ -412,6 +414,7 @@ async function start() {
   $('video-tiles').addEventListener('click', onTile);
   $('item-tiles').addEventListener('click', onTile);
   $('btn-back').addEventListener('click', () => press('back', null, 'Back to the schedule'));
+  $('tile-sparks').addEventListener('click', () => press('preview', { look: 'sparks', hold: true }, 'The Sparks screen is going up'));
   $('video').addEventListener('click', (e) => {
     const b = e.target.closest('[data-op]');
     if (!b) return;

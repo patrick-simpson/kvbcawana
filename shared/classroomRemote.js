@@ -31,6 +31,13 @@ export const CLASSROOM_FILE_TYPES = Object.freeze(['image/jpeg', 'image/png', 'i
 /** The looks /settings can preview on the TV, and for how long (owner: one minute). */
 export const CLASSROOM_LOOKS = Object.freeze(['cubbies', 'sparks', 'lobby']);
 export const CLASSROOM_PREVIEW_MS = 60 * 1000;
+/**
+ * A HELD look (owner 2026-11-04: "an option in the Sparks remote that allows anyone
+ * to push the Sparks screen up on the TV ... at any time"): the remote's Sparks
+ * screen tile sends `preview {look, hold: true}`; it stays until Back (or another
+ * button), at most this long.
+ */
+export const CLASSROOM_HOLD_MS = 6 * 60 * 60 * 1000;
 /** Momentary commands older than this are not run (a pause 30 s late is worse than none). */
 export const CLASSROOM_CMD_TTL_MS = 20 * 1000;
 export const CLASSROOM_CMDS_MAX = 8;
@@ -195,7 +202,7 @@ export function sanitizeShown(v) {
 
 /**
  * One press, or null. data: show {button}, video {op, by?|step?}, page {step},
- * preview {look}; the others none. Never free text.
+ * preview {look, hold?}; the others none. Never free text.
  * @param {unknown} action @param {unknown} data
  * @returns {{ action: string, data?: Record<string, any> } | null}
  */
@@ -211,7 +218,7 @@ export function sanitizeClassroomPress(action, data) {
       return { action, data: { op: d.op } };
     }
     case 'page': return d.step === 1 || d.step === -1 ? { action, data: { step: d.step } } : null;
-    case 'preview': return CLASSROOM_LOOKS.includes(d.look) ? { action, data: { look: d.look } } : null;
+    case 'preview': return CLASSROOM_LOOKS.includes(d.look) ? { action, data: { look: d.look, ...(d.hold === true ? { hold: true } : {}) } } : null;
     default: return { action };
   }
 }
@@ -234,7 +241,7 @@ export function sanitizeStage(v) {
   const s = isObj(v) ? v : {};
   const shown = sanitizeShown(s.show?.button);
   const show = shown && typeof s.show.at === 'number' ? { button: shown, at: s.show.at, page: Number.isInteger(s.show.page) && s.show.page >= 1 ? Math.min(s.show.page, 9999) : 1 } : null;
-  const preview = isObj(s.preview) && CLASSROOM_LOOKS.includes(s.preview.look) && typeof s.preview.until === 'number' ? { look: s.preview.look, until: s.preview.until } : null;
+  const preview = isObj(s.preview) && CLASSROOM_LOOKS.includes(s.preview.look) && typeof s.preview.until === 'number' ? { look: s.preview.look, until: s.preview.until, ...(s.preview.held === true ? { held: true } : {}) } : null;
   const cmds = (Array.isArray(s.cmds) ? s.cmds : []).map(sanitizeCmd).filter(Boolean).slice(-CLASSROOM_CMDS_MAX);
   return { rev: Number.isInteger(s.rev) && s.rev >= 0 ? s.rev : 0, show, preview, cmds };
 }

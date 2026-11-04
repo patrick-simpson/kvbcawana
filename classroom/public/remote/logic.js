@@ -37,6 +37,7 @@ export function nowWords({ now, stage, screenOnline, offline }) {
     if (now && now.board) sub = sub ? `${sub} · the black board is over it` : 'The black board is over it';
     return { kicker: `On the classroom TV · ${kind}`, main: shown.title, sub: sub || (screenOnline ? 'Showing until you press Back to schedule.' : 'Waiting for the classroom TV to pick it up…'), live: screenOnline };
   }
+  if (stage && stage.preview && stage.preview.held) return { kicker: 'On the classroom TV', main: VIEW_WORDS[stage.preview.look] || 'A screen', sub: screenOnline ? 'Showing until you press Back to schedule.' : 'Waiting for the classroom TV to pick it up…', live: screenOnline };
   if (stage && stage.preview) return { kicker: 'On the classroom TV · preview', main: VIEW_WORDS[stage.preview.look] || 'A preview', sub: 'For a minute, then back to the schedule.', live: screenOnline };
   if (!screenOnline) return { kicker: 'On the classroom TV', main: 'The classroom TV is not on', sub: 'Buttons still work: it shows them when it comes on.', live: false };
   return { kicker: 'On the classroom TV', main: now ? VIEW_WORDS[now.view] || 'The schedule' : 'The schedule', sub: '', live: true };
