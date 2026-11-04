@@ -334,6 +334,7 @@ jobs:
           working-directory: scripts/letterhead
       - run: npx playwright install --with-deps --only-shell chromium
       - run: node --check letterhead-print.mjs
+      - run: node --check print-pdf.mjs
       - run: npm test
 
   printer:
