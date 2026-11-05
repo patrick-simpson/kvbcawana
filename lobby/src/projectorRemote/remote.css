@@ -40,7 +40,7 @@ body { margin: 0; min-height: 100vh; background: var(--pr-ink); color: #fff; fon
 .pr-target-line { margin: 0; font-weight: 600; min-height: 1.4em; }
 .pr-fine { font-size: 0.875rem; color: var(--pr-soft); margin: 6px 0 10px; }
 .pr-note { font-weight: 600; min-height: 1.4em; margin: 10px 0 0; }
-.pr-press { min-height: 1.4em; margin: 0 0 18px; font-weight: 700; text-align: center; color: var(--pr-sun); }
+.pr-press { min-height: 1.4em; margin: 0 0 6px; font-weight: 700; text-align: center; color: var(--pr-sun); }
 
 .pr-btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 10px;
@@ -61,12 +61,23 @@ body { margin: 0; min-height: 100vh; background: var(--pr-ink); color: #fff; fon
 .pr-btn--countdown { border: 3px solid #fff; }
 .pr-btn--countdown[data-armed="1"] { background: var(--brand-sun, #FFC20E); color: var(--brand-ink, #231F20); border-color: var(--brand-sun, #FFC20E); }
 
-.pr-btn--score { text-decoration: none; margin: 0 0 4px; }
+.pr-btn--score { text-decoration: none; margin: 0 0 16px; background: var(--pr-sun); border-color: var(--pr-sun); color: var(--pr-ink); box-shadow: 0 5px 0 #A87808; }
+.pr-btn--score:active { translate: 0 4px; box-shadow: 0 1px 0 #A87808; }
 
 .pr-pad { display: grid; grid-template-columns: 1fr 1.4fr; gap: 14px; }
 .pr-pad-note { margin: 10px 0 14px; text-align: center; }
 
 .pr-backups { display: grid; gap: 10px; }
+/* The backups fold away (owner 2026-11-05): the page fits a phone without scrolling. */
+.pr-fold { padding: 0 16px; }
+.pr-fold[open] { padding-bottom: 14px; }
+.pr-fold__head { display: flex; align-items: center; gap: 10px; min-height: 56px; margin: 0 -16px; padding: 10px 16px; cursor: pointer; list-style: none; -webkit-tap-highlight-color: transparent; }
+.pr-fold__head::-webkit-details-marker { display: none; }
+.pr-fold__head .pr-label { margin: 0; }
+.pr-fold__hint { flex: 1; font-size: 0.875rem; color: var(--pr-soft); }
+.pr-fold__head::after { content: ''; flex: none; width: 12px; height: 12px; border-right: 3px solid #fff; border-bottom: 3px solid #fff; rotate: 45deg; translate: 0 -3px; }
+.pr-fold[open] .pr-fold__head::after { rotate: 225deg; translate: 0 3px; }
+.pr-fold__head:focus-visible { outline: 3px solid var(--pr-sun); outline-offset: 3px; border-radius: 14px; }
 .pr-backup { justify-content: flex-start; width: 100%; }
 .pr-ico { flex: none; width: 46px; height: 26px; display: inline-block; background: center / contain no-repeat; }
 /* A small American flag: 13 stripes and the canton, no stars at this size. */

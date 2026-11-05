@@ -43,23 +43,22 @@
         </section>
         <p class="pr-fine pr-pad-note">Next and Back move the opening slides, like the arrow keys. Before 6:00, Next starts the ceremony.</p>
         <button id="btn-countdown" type="button" class="pr-btn pr-btn--wide pr-btn--countdown">Back to the countdown</button>
-        <p class="pr-fine pr-pad-note">Pressed game time by mistake? This puts the countdown back up and keeps it there. Next then starts the ceremony again from the welcome.</p>
+        <p class="pr-fine pr-pad-note">Pressed game time by mistake? This puts the countdown back up and holds it.</p>
 
         <p id="press-note" class="pr-press" role="status" aria-live="polite"></p>
 
         <a class="pr-btn pr-btn--wide pr-btn--score" href="./scoreboard.html">Game time scoreboard <span aria-hidden="true">›</span></a>
-        <p class="pr-fine pr-pad-note">Scores for T&amp;T, Sparks and Cubbies, and the stopwatch, on this projector.</p>
 
-        <section class="pr-card" aria-labelledby="backup-h">
-          <h2 id="backup-h" class="pr-label">Backups</h2>
-          <p class="pr-fine">Only if the slides are not working. Each one covers the projector until you take it down.</p>
+        <details id="backups" class="pr-card pr-fold">
+          <summary class="pr-fold__head"><span id="backup-h" class="pr-label">Backups</span><span class="pr-fold__hint">Flags and verse, only if the slides fail</span></summary>
+          <p class="pr-fine">Each one covers the projector until you take it down.</p>
           <div class="pr-backups">
             <button type="button" class="pr-btn pr-backup" data-backup="us-flag"><span class="pr-ico pr-ico--us" aria-hidden="true"></span>American flag</button>
             <button type="button" class="pr-btn pr-backup" data-backup="awana-flag"><span class="pr-ico pr-ico--awana" aria-hidden="true"></span>Awana flag</button>
             <button type="button" class="pr-btn pr-backup" data-backup="verse"><span class="pr-ico pr-ico--verse" aria-hidden="true"></span>2 Timothy 2:15</button>
           </div>
           <button id="btn-backup-end" type="button" class="pr-btn pr-btn--wide">Take the backup down</button>
-        </section>
+        </details>
 
         <p class="pr-foot"><button id="signout" type="button" class="pr-link">Sign this phone out</button></p>
       </section>

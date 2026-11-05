@@ -41,6 +41,8 @@ test.describe('the opening-ceremony remote', () => {
     await page.locator('#btn-next').click();
     await expect(page.locator('#press-note')).toHaveText('Next: sent ✓');
     await page.locator('#btn-prev').click();
+    await expect(page.locator('[data-backup="us-flag"]')).toBeHidden();   // folded away until asked for
+    await page.locator('#backups summary').click();
     await page.locator('[data-backup="us-flag"]').click();
     await expect(page.locator('#press-note')).toHaveText('The American flag: sent ✓');
     await page.locator('#btn-backup-end').click();
@@ -50,6 +52,16 @@ test.describe('the opening-ceremony remote', () => {
     expect(sent.map((c) => c.body)).toEqual([
       { action: 'slide-next' }, { action: 'slide-prev' }, { action: 'backup', data: { what: 'us-flag' } }, { action: 'backup-end' },
     ]);
+  });
+
+  test('fits a 360 x 740 phone without scrolling, the scoreboard button on screen (owner 2026-11-05)', async ({ page }) => {
+    await stub(page);
+    await page.goto('/projector-remote.html');
+    await expect(page.locator('#target')).toHaveText('Gym projector · on');
+    const fits = await page.evaluate(() => document.documentElement.scrollHeight <= window.innerHeight + 1);
+    expect(fits).toBe(true);
+    await expect(page.locator('.pr-btn--score')).toBeInViewport({ ratio: 1 });
+    await expect(page.locator('.pr-btn--score')).toHaveAttribute('href', './scoreboard.html');
   });
 
   test('Back to the countdown takes two taps (owner 2026-10-22): the first only asks, the second sends it', async ({ page }) => {
