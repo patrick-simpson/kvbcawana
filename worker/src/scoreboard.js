@@ -55,8 +55,10 @@ export class Scoreboard {
     const tonight = nightOf(this.now());
     if (!this.cache || this.cache.night !== tonight) {
       const rev = this.cache ? this.cache.rev + 1 : 0;
+      const sounds = this.cache ? this.cache.sounds : false;   // a switch, not a score: it stays
       this.cache = emptyBoard(tonight);
       this.cache.rev = rev;
+      this.cache.sounds = sounds;
     }
     return this.cache;
   }
@@ -120,6 +122,20 @@ export class Scoreboard {
     const next = Math.min(SCORE_MAX, Math.max(0, d.scores[club][team] + delta));
     if (next === d.scores[club][team]) return this.answer(d);
     d.scores[club][team] = next;
+    return this.commit(d);
+  }
+
+  /**
+   * POST /v1/scoreboard/sounds {on}: the projector's scoreboard sounds (owner
+   * 2026-11-05: "add the sound switch"): the point chimes and the timer's buzzer
+   * play when this is on OR the projector's own Countdown sounds switch is.
+   * @param {any} body
+   */
+  async sounds(body) {
+    if (typeof body?.on !== 'boolean') return fail('Say on or off.', 400, { reason: 'bad-sounds' });
+    const d = await this.doc();
+    if (d.sounds === body.on) return this.answer(d);
+    d.sounds = body.on;
     return this.commit(d);
   }
 
@@ -210,5 +226,6 @@ export function mountScoreboard(registry, core) {
   registry.add('POST', '/v1/scoreboard/point', 'session', async ({ body }) => s().point(await body()));
   registry.add('POST', '/v1/scoreboard/end', 'session', async () => s().end());
   registry.add('POST', '/v1/scoreboard/setup', 'session', async ({ body }) => s().setup(await body()));
+  registry.add('POST', '/v1/scoreboard/sounds', 'session', async ({ body }) => s().sounds(await body()));
   registry.add('POST', '/v1/scoreboard/clock', 'session', async ({ body }) => s().clock(await body()));
 }

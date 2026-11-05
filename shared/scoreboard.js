@@ -14,6 +14,7 @@
 //     clock: null | { id, kind: 'stopwatch'|'timer', startedAt: ms|null,
 //                     elapsedMs, durationMs|null },
 //     finale: null | { id, club, teams: [team...], scores: {...}, at },
+//     sounds: boolean (the projector's point chimes and timer buzzer; kept across nights),
 //     rev, at }
 //
 // The clock is anchored to the WORKER's clock: `startedAt` is the Worker's time
@@ -113,6 +114,7 @@ export function emptyBoard(night) {
     scores: { tnt: emptyScores(), sparks: emptyScores(), cubbies: emptyScores() },
     clock: null,
     finale: null,
+    sounds: false,
     rev: 0,
     at: null,
   };
@@ -181,6 +183,7 @@ export function cleanBoard(b) {
   }
   out.clock = cleanClock(b.clock);
   out.finale = cleanFinale(b.finale);
+  out.sounds = b.sounds === true;
   return out;
 }
 

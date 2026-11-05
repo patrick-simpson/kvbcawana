@@ -346,6 +346,7 @@ export const App = () => {
                 serverNow={serverNow}
                 windows={effectiveWindows}
                 tally={tally}
+                sounds={board.sounds}
               />
             ) : (
             <ActiveView
@@ -358,6 +359,7 @@ export const App = () => {
               onBareChange={setBare}
               onIndexChange={onDeckIndex}
               clock={board?.clock ?? null}
+              sounds={board?.sounds === true}
               serverNow={serverNow}
             />
             )}
@@ -436,7 +438,7 @@ const slugFor = (state) =>
     [AppMode.SHUTDOWN]: 'shutdown',
   })[state.mode];
 
-const ActiveView = ({ state, now, tally, meetingTheme, onSelect, firstGameIndex, onBareChange, onIndexChange, clock, serverNow }) => {
+const ActiveView = ({ state, now, tally, meetingTheme, onSelect, firstGameIndex, onBareChange, onIndexChange, clock, serverNow, sounds }) => {
   switch (state.mode) {
     case AppMode.COUNTDOWN:
       return (
@@ -449,7 +451,7 @@ const ActiveView = ({ state, now, tally, meetingTheme, onSelect, firstGameIndex,
         />
       );
     case AppMode.GAME_TIME:
-      return <GameTimeView now={now} window={state.window} endsAt={state.endsAt} tally={tally} clock={clock} serverNow={serverNow} />;
+      return <GameTimeView now={now} window={state.window} endsAt={state.endsAt} tally={tally} clock={clock} serverNow={serverNow} sounds={sounds} />;
     case AppMode.SLIDESHOW:
       return (
         <SlideshowView

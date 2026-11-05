@@ -19,14 +19,17 @@ import { playTones } from '../lib/stingers.js';
  *   serverNow: () => number,
  *   accent: string,
  *   size: string,
+ *   sounds?: boolean,
  * }} props
  */
-export const ScoreClock = ({ clock, serverNow, accent, size }) => {
+export const ScoreClock = ({ clock, serverNow, accent, size, sounds = false }) => {
   const mainRef = useRef(/** @type {HTMLSpanElement|null} */ (null));
   const tenthRef = useRef(/** @type {HTMLSpanElement|null} */ (null));
   const barRef = useRef(/** @type {HTMLSpanElement|null} */ (null));
   const rootRef = useRef(/** @type {HTMLDivElement|null} */ (null));
   const buzzed = useRef(/** @type {number|null} */ (null));
+  const soundsRef = useRef(sounds);
+  useEffect(() => { soundsRef.current = sounds; }, [sounds]);
 
   useEffect(() => {
     let raf = 0;
@@ -46,7 +49,7 @@ export const ScoreClock = ({ clock, serverNow, accent, size }) => {
         if (state !== lastState && rootRef.current) { rootRef.current.dataset.state = state; lastState = state; }
         if (r.done && buzzed.current !== clock.id) {
           buzzed.current = clock.id;
-          buzz();
+          buzz(soundsRef.current);
         }
       }
       raf = requestAnimationFrame(draw);
@@ -86,11 +89,11 @@ function splitMain(main) {
 }
 
 /** The game-show buzzer: two low square blasts. */
-export function buzz() {
+export function buzz(force = false) {
   playTones([
     { freq: 196, at: 0, len: 0.42, type: 'square' },
     { freq: 147, at: 0, len: 0.42, type: 'square' },
     { freq: 196, at: 0.5, len: 0.6, type: 'square' },
     { freq: 147, at: 0.5, len: 0.6, type: 'square' },
-  ], 0.09);
+  ], 0.09, { force });
 }

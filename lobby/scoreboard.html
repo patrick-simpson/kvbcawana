@@ -50,7 +50,14 @@
         <p id="pick-note" class="sb-pick">Pick T&amp;T, Sparks or Cubbies above to put their scores on the projector.</p>
       </div>
 
-      <button id="end-btn" type="button" class="sb-wide sb-end" disabled>End game</button>
+      <div class="sb-foot">
+        <button id="sound-btn" type="button" class="sb-soundbtn" aria-pressed="false" aria-label="Sounds on the projector">
+          <svg class="sb-snd-on" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/></svg>
+          <svg class="sb-snd-off" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="M16 9.5l5 5M21 9.5l-5 5"/></svg>
+          <span id="sound-word" class="sb-soundbtn__word">Sound off</span>
+        </button>
+        <button id="end-btn" type="button" class="sb-wide sb-end" disabled>End game</button>
+      </div>
       <p class="sb-status"><span id="live" data-state="wait">Connecting…</span> · <button id="signout" type="button" class="sb-link">Sign out</button></p>
     </main>
 

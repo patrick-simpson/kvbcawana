@@ -113,6 +113,19 @@ form { display: grid; gap: 10px; margin-top: 14px; }
 .sb-teams[data-count='2'] { grid-template-rows: 1fr; }
 .sb-teams[data-count='2'] .sb-plus__num { font-size: clamp(3.6rem, 22vw, 6rem); }
 
+/* The speaker beside End game (owner 2026-11-05: "add the sound switch"):
+   the projector's point chimes and timer buzzer. */
+.sb-foot { flex: none; display: flex; gap: 10px; }
+.sb-foot .sb-wide { flex: 1; width: auto; }
+.sb-soundbtn { flex: none; height: 56px; padding: 0 14px; border: 0; border-radius: 14px; background: var(--sb-shade); display: inline-flex; align-items: center; gap: 8px; }
+.sb-soundbtn__word { font: 400 1rem/1 var(--sb-label); letter-spacing: 0.05em; text-transform: uppercase; }
+.sb-soundbtn .sb-snd-on { display: none; }
+.sb-soundbtn[aria-pressed='true'] { background: #fff; color: var(--sb-field); box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.45); }
+.sb-soundbtn[aria-pressed='true'] .sb-snd-on { display: inline; }
+.sb-soundbtn[aria-pressed='true'] .sb-snd-off { display: none; }
+.sb-soundbtn:active { translate: 2px 2px; transition: none; }
+@media (max-height: 680px) { .sb-soundbtn { height: 48px; } }
+
 /* ── The team setups sheet ── */
 .sb-optsbtn:disabled { opacity: 0.4; cursor: default; }
 .sb-sheet__title { margin: 0; font: 400 calc(1.25rem * 1.057) / 1.1 var(--sb-shout); text-align: center; }

@@ -33,6 +33,7 @@ function worker() {
     'POST /v1/scoreboard/end': () => core.end(),
     'POST /v1/scoreboard/clock': (b) => core.clock(b),
     'POST /v1/scoreboard/setup': (b) => core.setup(b),
+    'POST /v1/scoreboard/sounds': (b) => core.sounds(b),
   };
   /** @param {import('@playwright/test').Page} page */
   const attach = async (page) => {
@@ -145,6 +146,14 @@ test.describe('the game time scoreboard', () => {
     await ph.locator('#clock-reset').click();
     await expect(wall.locator('.pj-score-clock')).toHaveCount(0);
     await ph.locator('#sheet-close').click();
+
+    // The sound switch (owner 2026-11-05): the speaker beside End game.
+    await expect(ph.locator('#sound-btn')).toHaveAttribute('aria-pressed', 'false');
+    await ph.locator('#sound-btn').click();
+    await expect(ph.locator('#sound-btn')).toHaveAttribute('aria-pressed', 'true');
+    await expect(ph.locator('#sound-word')).toHaveText('Sound on');
+    expect((await w.core.state().then((r) => r.json())).board.sounds).toBe(true);
+    await shot(ph, 'phone-11-sound-on');
 
     // End takes two taps; the winner plays, then the schedule (T&T game time) is back.
     await ph.locator('#end-btn').click();

@@ -55,9 +55,10 @@ import {
  *   serverNow: () => number,
  *   windows: any[],
  *   tally: any,
+ *   sounds?: boolean,
  * }} props
  */
-export const ScoringView = ({ now, club, scores, teams = SCORE_TEAMS, clock, serverNow, windows, tally }) => {
+export const ScoringView = ({ now, club, scores, teams = SCORE_TEAMS, clock, serverNow, windows, tally, sounds = false }) => {
   const lowPower = useLowPower();
   const info = CLUBS[club];
   const gameWindow = useMemo(
@@ -90,7 +91,7 @@ export const ScoringView = ({ now, club, scores, teams = SCORE_TEAMS, clock, ser
     if (!gained.length) return;
     gained.forEach((g, i) => {
       const [a, b] = SCORE_TEAM_CHIMES[g.team];
-      playTones([{ freq: a, at: i * 0.05, len: 0.18 }, { freq: b, at: i * 0.05 + 0.08, len: 0.32 }]);
+      playTones([{ freq: a, at: i * 0.05, len: 0.18 }, { freq: b, at: i * 0.05 + 0.08, len: 0.32 }], undefined, { force: sounds });
     });
     const t = performance.now();
     setTakeover((cur) => {
@@ -149,7 +150,7 @@ export const ScoringView = ({ now, club, scores, teams = SCORE_TEAMS, clock, ser
               animate={{ opacity: 1, scale: 1, transition: { duration: DUR.pop, ease: EASE.pop } }}
               exit={{ opacity: 0, scale: 0.85, transition: { duration: DUR.exit, ease: EASE.exit } }}
             >
-              <ScoreClock clock={clock} serverNow={serverNow} accent={info.color} size="calc(19 * var(--u))" />
+              <ScoreClock clock={clock} serverNow={serverNow} accent={info.color} size="calc(19 * var(--u))" sounds={sounds} />
             </motion.div>
           )}
         </AnimatePresence>

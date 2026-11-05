@@ -164,6 +164,9 @@ function render() {
     /** @type {HTMLButtonElement} */ (document.querySelector(`.sb-minus[data-team="${t}"]`)).disabled = !club || shown[t] <= 0;
   }
   /** @type {HTMLButtonElement} */ ($('end-btn')).disabled = !club;
+  const sounds = soundsPending ?? board?.sounds === true;
+  $('sound-btn').setAttribute('aria-pressed', String(sounds));
+  setText($('sound-word'), sounds ? 'Sound on' : 'Sound off');
   /** @type {HTMLButtonElement} */ ($('opts-btn')).disabled = !club;
   if (!club && !$('opts').hidden) closeOpts();
   if (!$('opts').hidden) drawOpts();
@@ -365,6 +368,23 @@ async function endGame() {
   if (!res.ok && res.status !== 401) flash(res.status === 0 ? 'Offline: the game did not end.' : 'That did not go through. Try again.');
 }
 
+// ── The sound switch (owner 2026-11-05: "add the sound switch") ──────────
+
+/** This phone's switch still on its way (drawn at once; the Worker's answer replaces it). */
+let soundsPending = /** @type {boolean|null} */ (null);
+async function toggleSounds() {
+  const on = !(soundsPending ?? board?.sounds === true);
+  buzz();
+  soundsPending = on;
+  render();
+  const res = await authed('/v1/scoreboard/sounds', { method: 'POST', body: { on } });
+  soundsPending = null;
+  if (res.body?.board) take(res.body.board);
+  if (!res.ok && res.status !== 401) flash(res.status === 0 ? 'Offline: the sound did not change.' : 'That did not go through. Try again.');
+  else flash(on ? 'Projector sounds on: a chime per point, a buzzer at 0:00.' : 'Projector sounds off.');
+  render();
+}
+
 // ── Team setups (owner 2026-11-05: the Options button) ──────────────────
 
 let askingFor = /** @type {string|null} */ (null);
@@ -501,6 +521,7 @@ async function start() {
     point(btn.dataset.team || '', btn.classList.contains('sb-plus') ? 1 : -1);
   });
   $('opts-btn').addEventListener('click', openOpts);
+  $('sound-btn').addEventListener('click', toggleSounds);
   $('opts-close').addEventListener('click', closeOpts);
   $('opts-zero').addEventListener('click', () => { if (askingFor) sendSetup(askingFor, false); });
   $('opts-keep').addEventListener('click', () => { if (askingFor) sendSetup(askingFor, true); });

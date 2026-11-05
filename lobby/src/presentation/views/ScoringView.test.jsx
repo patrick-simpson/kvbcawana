@@ -69,6 +69,14 @@ describe('ScoringView', () => {
     expect(playTones).toHaveBeenCalledTimes(1);
   });
 
+  it('the phone\'s sound switch makes the chime play even with the projector\'s own switch off', () => {
+    const { rerender } = render(view(scores(0, 0, 0, 0), { sounds: true }));
+    rerender(view(scores(0, 1, 0, 0), { sounds: true }));
+    expect(playTones.mock.calls.at(-1)[2]).toEqual({ force: true });
+    rerender(view(scores(0, 2, 0, 0), { sounds: false }));
+    expect(playTones.mock.calls.at(-1)[2]).toEqual({ force: false });
+  });
+
   it('points close together share one takeover, split', () => {
     const { container, rerender } = render(view(scores(0, 0, 0, 0)));
     rerender(view(scores(0, 1, 0, 0)));

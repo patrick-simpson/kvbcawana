@@ -211,3 +211,20 @@ describe('team setups (owner 2026-11-05: Boys vs Girls, Red vs Green, Blue vs Ye
     expect(b.finale.teams).toEqual(['leaders', 'kids']);
   });
 });
+
+describe('the sound switch (owner 2026-11-05: "add the sound switch")', () => {
+  it('turns the projector\'s scoreboard sounds on and off, rings, and stays on the next night', async () => {
+    const s = await setup();
+    expect((await s.call('GET', '/v1/scoreboard')).body.board.sounds).toBe(false);
+    const on = (await s.call('POST', '/v1/scoreboard/sounds', { on: true })).body.board;
+    expect(on.sounds).toBe(true);
+    expect(s.rings().at(-1).d.board.sounds).toBe(true);
+    expect((await s.call('POST', '/v1/scoreboard/sounds', { on: 'yes' })).status).toBe(400);
+    expect((await s.call('POST', '/v1/scoreboard/sounds', { on: true }, null)).status).toBe(401);
+    s.setNow('2026-11-12T00:10:00Z');
+    const next = (await s.call('GET', '/v1/scoreboard')).body.board;
+    expect(next.night).toBe('2026-11-11');
+    expect(next.sounds).toBe(true);
+    expect((await s.call('POST', '/v1/scoreboard/sounds', { on: false })).body.board.sounds).toBe(false);
+  });
+});

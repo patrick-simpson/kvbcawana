@@ -84,7 +84,7 @@ export function countForClub(tally, clubId) {
   return found;
 }
 
-export const GameTimeView = ({ now, window: gameWindow, endsAt, tally, clock = null, serverNow }) => {
+export const GameTimeView = ({ now, window: gameWindow, endsAt, tally, clock = null, serverNow, sounds = false }) => {
   // Held still under ?vr=1 / OS reduced-motion, where every ambient layer stops.
   const lowPower = useLowPower();
   const clubs = gameWindow.clubs.map((id) => CLUBS[id]);
@@ -166,7 +166,7 @@ export const GameTimeView = ({ now, window: gameWindow, endsAt, tally, clock = n
             {clock && serverNow ? (
               // The scoreboard's stopwatch / timer (owner 2026-11-05: any game
               // time) takes the clock's place; the game clock moves into the chip.
-              <ScoreClock clock={clock} serverNow={serverNow} accent={primary.color} size="var(--text-game-timer)" />
+              <ScoreClock clock={clock} serverNow={serverNow} accent={primary.color} size="var(--text-game-timer)" sounds={sounds} />
             ) : (
             <BigTimer
               seconds={seconds}

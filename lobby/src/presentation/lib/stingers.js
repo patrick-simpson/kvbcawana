@@ -122,11 +122,14 @@ export function playStinger(intensity = 0.5) {
  * the timer's buzzer at 0). Same switch as the countdown chimes: OFF until the
  * operator arms "Countdown sounds" (a projector in a quiet room must never
  * surprise anyone), silent on the lobby's mirror.
+ * The scoreboard's own phone switch (`force`, owner 2026-11-05) turns them on
+ * too; nothing ever sounds on the mirror.
  * @param {{freq: number, at: number, len: number, type?: OscillatorType}[]} notes  at/len in seconds
  * @param {number} [gainMax]
+ * @param {{force?: boolean}} [opts]
  */
-export function playTones(notes, gainMax = 0.14) {
-  if (!enabled || silenced || typeof window === 'undefined') return;
+export function playTones(notes, gainMax = 0.14, opts = {}) {
+  if ((!enabled && !opts.force) || silenced || typeof window === 'undefined') return;
   const ac = audioCtx();
   if (!ac) return;
   try {
