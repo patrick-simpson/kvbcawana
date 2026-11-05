@@ -131,6 +131,10 @@ export const ScoringView = ({ now, club, scores, teams = SCORE_TEAMS, clock, ser
     .map((id) => ({ club: CLUBS[id], count: tallyFresh ? countForClub(tally, id) : null }))
     .filter((c) => c.club && c.count !== null);
   const endTimeStr = endsAt ? endsAt.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true }) : '';
+  // Before the club's game starts the chip says when it runs, never an hour-long countdown.
+  const nowMin = now.getHours() * 60 + now.getMinutes();
+  const notYet = gameWindow != null && Number.isFinite(gameWindow.startMin) && nowMin < gameWindow.startMin;
+  const hm = (mins) => `${((Math.floor(mins / 60) + 11) % 12) + 1}:${String(mins % 60).padStart(2, '0')}`;
 
   return (
     <div className="w-full h-full relative overflow-hidden" style={{ background: '#000000' }} data-scoring={club}>
@@ -170,8 +174,8 @@ export const ScoringView = ({ now, club, scores, teams = SCORE_TEAMS, clock, ser
                 data-warning={warning !== 'none' ? warning : undefined}
               >
                 <StepChip
-                  label={warning === 'none' ? `Game ends ${endTimeStr}` : WARNING_LABELS[warning]}
-                  value={formatLeft(seconds)}
+                  label={notYet ? 'Game time' : warning === 'none' ? `Game ends ${endTimeStr}` : WARNING_LABELS[warning]}
+                  value={notYet ? `${hm(gameWindow.startMin)}–${hm(gameWindow.endMin)}` : formatLeft(seconds)}
                   size="calc(2.4 * var(--u))"
                   plate={tone?.plate ?? info.deep}
                 />

@@ -47,6 +47,14 @@ describe('ScoringView', () => {
     expect(container.querySelector('.pj-score__strip').textContent).toMatch(/12:41/);
   });
 
+  it('before the club\'s game starts the strip says when it runs, not an hour-long countdown', () => {
+    const { container } = render(view(scores(0, 0, 0, 0), { club: 'cubbies', now: new Date(2026, 10, 4, 18, 17) }));
+    const strip = container.querySelector('.pj-score__strip').textContent;
+    expect(strip).toMatch(/GAME TIME/i);
+    expect(strip).toMatch(/7:00–7:30/);
+    expect(strip).not.toMatch(/72:/);
+  });
+
   it('the game clock leaves the strip once time is up; the scores stay', () => {
     const { container } = render(view(scores(3, 0, 0, 0), { now: new Date(2026, 10, 4, 18, 45) }));
     expect(container.querySelector('.pj-score__gameclock')).toBeNull();

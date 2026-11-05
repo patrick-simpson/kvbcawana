@@ -42,13 +42,24 @@ export function gameClockWords(schedule, club, now) {
   if (!club || !SCORE_CLUBS.includes(club)) return { label: 'Pick a club', left: '' };
   const end = gameEndMinute(schedule, club);
   if (end === null) return { label: 'No game time', left: '' };
-  const h = Math.floor(end / 60);
-  const m = end % 60;
-  const label = `Game ends ${((h + 11) % 12) + 1}:${String(m).padStart(2, '0')}`;
+  const clock = (mins) => `${((Math.floor(mins / 60) + 11) % 12) + 1}:${String(mins % 60).padStart(2, '0')}`;
+  const label = `Game ends ${clock(end)}`;
   const nowS = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
   const left = end * 60 - nowS;
   if (left <= 0) return { label: "Time's up", left: '' };
+  // Before the game starts: when it runs, not hours of countdown.
+  const start = gameStartMinute(schedule, club);
+  if (start !== null && nowS < start * 60) return { label: `Game time ${clock(start)}–${clock(end)}`, left: '' };
   return { label, left: `${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}` };
+}
+
+/** The club's game window start, minutes after midnight (null when none). @param {any} schedule @param {string} club */
+function gameStartMinute(schedule, club) {
+  const windows = Array.isArray(schedule) ? schedule : schedule?.windows;
+  const w = Array.isArray(windows) ? windows.find((x) => x && x.kind === 'game' && Array.isArray(x.clubs) && x.clubs.includes(club) && /^\d{1,2}:\d{2}$/.test(x.start)) : null;
+  if (!w) return null;
+  const [h, m] = w.start.split(':').map(Number);
+  return h * 60 + m;
 }
 
 /** The timer stepper: seconds moved by one step, kept 15 s to 60 min. @param {number} secs @param {1|-1} dir */

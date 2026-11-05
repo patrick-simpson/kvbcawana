@@ -18,6 +18,9 @@ describe('the scoreboard phone page', () => {
     expect(gameClockWords(schedule, 'sparks', at(18, 59, 59))).toEqual({ label: 'Game ends 7:00', left: '0:01' });
     expect(gameClockWords(schedule, 'cubbies', at(19, 31))).toEqual({ label: "Time's up", left: '' });
     expect(gameClockWords(schedule, null, at(18, 10)).label).toBe('Pick a club');
+    // Before the game: when it runs, never hours of countdown ("758:24", 2026-11-05).
+    expect(gameClockWords(schedule, 'tnt', at(5, 41, 36))).toEqual({ label: 'Game time 6:05–6:30', left: '' });
+    expect(gameClockWords(schedule, 'cubbies', at(18, 30))).toEqual({ label: 'Game time 7:00–7:30', left: '' });
   });
 
   it('the deep club fields stay dark enough for white text', () => {
