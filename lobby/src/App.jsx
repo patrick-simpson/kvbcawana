@@ -5,6 +5,9 @@ import BackgroundIframe from './components/BackgroundIframe.jsx';
 import Overlay from './components/Overlay.jsx';
 import ParticleLayer from './components/ParticleLayer.jsx';
 import TonightTicker, { tickerRows } from './components/TonightTicker.jsx';
+import ScoreTicker from './components/ScoreTicker.jsx';
+import { useScoreboard } from './hooks/useScoreboard.js';
+import { scoreTickerView, scoreTickerWanted } from './lib/scoreTicker.js';
 import CheckoutBoard from './components/CheckoutBoard.jsx';
 import CheckoutBanner from './components/CheckoutBanner.jsx';
 import NoticeBanner, { NOTICE_CHECK_MS, noticeShowing } from './components/NoticeBanner.jsx';
@@ -997,7 +1000,14 @@ export default function App() {
   }, [tonight]);   // re-stamp on new data so a fresh payload is never judged aged
   // The strip rides the waves in the foot, where the pickup board stands: it
   // steps away while the board is up, as it does for a name.
-  const tickerActive = tickerIsActive({ checkInUp: currentEvent != null, held: checkInsHeld, room });
+  const footActive = tickerIsActive({ checkInUp: currentEvent != null, held: checkInsHeld, room });
+  // The game time score bar (owner 2026-11-05, ScoreTicker.jsx): while a club
+  // is up on the scoreboard it has the foot the tonight strip rides in, and
+  // steps aside exactly as that strip does (a name, a held slide, the pickup
+  // board), rising again after.
+  const scoreboard = useScoreboard({ enabled: scoreTickerWanted({ overlay: FLAGS.overlay, configure: CONFIGURE, embedded: isEmbedded() }) });
+  const scoreView = scoreTickerView(scoreboard.board, scoreboard.finale);
+  const tickerActive = footActive && scoreView == null;
   const setupCard = useSetupCard({ status, hasDisplayKey });
   // Two of the facts setupUp judges flip before the room can see it, and the
   // card is judged by what the room sees:
@@ -1024,7 +1034,7 @@ export default function App() {
     panelOpen: settingsOpen || slideEditorOpen,
     checkInUp: setupNameUp,
     held: setupHeld,
-    ticker: !FLAGS.overlay && config.showTonightTicker === true && tickerActive && tickerRows(tonight, tonightNow).length > 0,
+    ticker: (scoreView != null && footActive) || (!FLAGS.overlay && config.showTonightTicker === true && tickerActive && tickerRows(tonight, tonightNow).length > 0),
     room,
   });
 
@@ -1618,7 +1628,7 @@ export default function App() {
               item={cornerItem}
               corner="bottom"
               loads={corner.loads}
-              hidden={cornerHidden}
+              hidden={cornerHidden || scoreView != null}
               showNote={syncNote}
               size="calc(3.1 * min(1vw, 1.7778vh))"
             />
@@ -1636,6 +1646,14 @@ export default function App() {
       {!overlay && config.showTonightTicker === true && (
         <ErrorBoundary label="tonight-ticker" eventKey={boardNow} onError={() => recordLayerFault('tonight strip')}>
           <TonightTicker tonight={tonight} active={tickerActive} now={tonightNow} />
+        </ErrorBoundary>
+      )}
+
+      {/* The game time score bar: the foot while a club is up on the
+          scoreboard (src/lib/scoreTicker.js, ScoreTicker.jsx). */}
+      {!overlay && (
+        <ErrorBoundary label="score-ticker" eventKey={scoreView?.club ?? ''} onError={() => recordLayerFault('score bar')}>
+          <ScoreTicker view={scoreView} active={footActive} clock={scoreboard.board?.clock ?? null} serverNow={scoreboard.serverNow} />
         </ErrorBoundary>
       )}
 

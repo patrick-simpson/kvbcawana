@@ -3006,6 +3006,210 @@ input:focus-visible {
   text-transform: uppercase;
 }
 
+/* ── The score bar (ScoreTicker.jsx; owner 2026-11-05, option A) ──────
+   A broadcast ticker along the bottom while a club is up on the game time
+   scoreboard: an ink bar with the kit's hard offset and a white keyline out
+   of register, the club's block (deep shade: white text clears AA), one chip
+   per team, the clock. It has the foot: the tonight strip and the bottom
+   corner chip step aside while it is up (App.jsx). 95.2u wide on the 16:9
+   stage (2.4u each side, as the mockup), 6.4u tall, 1.6u off the bottom.
+   Never framed (src/lib/scoreTicker.js scoreTickerWanted), so no
+   html.embedded rule. framer-motion owns the transform (the rise/drop). */
+.score-ticker {
+  position: absolute;
+  bottom: calc(1.6 * var(--u));
+  left: 0;
+  right: 0;
+  margin-inline: auto;
+  width: calc(95.2 * var(--u));
+  max-width: calc(100% - 2 * var(--safe-inset));
+  height: calc(6.4 * var(--u));
+  z-index: 3;
+  display: flex;
+  align-items: stretch;
+  border-radius: calc(1.2 * var(--u));
+  background: #231F20;
+  color: #fff;
+  box-shadow: calc(0.45 * var(--u)) calc(0.45 * var(--u)) 0 #000;
+  pointer-events: none;
+}
+.score-ticker::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border: calc(0.16 * var(--u)) solid #fff;
+  border-radius: inherit;
+  translate: calc(-0.3 * var(--u)) calc(-0.3 * var(--u));
+  pointer-events: none;
+}
+.score-ticker__sweepclip {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: inherit;
+  z-index: 2;
+  pointer-events: none;
+}
+.score-ticker__sweep {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 45%;
+  opacity: 0.55;
+  clip-path: polygon(22% 0, 100% 0, 78% 100%, 0 100%);
+}
+.score-ticker__club {
+  flex: none;
+  display: flex;
+  align-items: center;
+  padding: 0 calc(1.6 * var(--u));
+  background: var(--club);
+  border-radius: calc(1.2 * var(--u)) 0 0 calc(1.2 * var(--u));
+}
+.score-ticker__club-inner {
+  display: inline-flex;
+  align-items: center;
+  gap: calc(1 * var(--u));
+}
+.score-ticker__mark {
+  height: calc(3.4 * var(--u));
+  width: auto;
+  display: block;
+}
+.score-ticker__markword,
+.score-ticker__title,
+.score-ticker__live,
+.score-ticker__word,
+.score-ticker__clock-label {
+  font-family: var(--font-condensed);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  line-height: 1;
+}
+.score-ticker__markword,
+.score-ticker__title {
+  font-size: calc(2.2 * var(--u));
+  white-space: nowrap;
+}
+.score-ticker__live {
+  font-size: calc(1.3 * var(--u));
+  padding: calc(0.25 * var(--u)) calc(0.7 * var(--u));
+  border-radius: 999px;
+  /* The hot, darkened to clear AA under white (the site's --hot-btn). */
+  background: #CF4518;
+  color: #fff;
+}
+.score-ticker__live[data-final] {
+  background: #fff;
+  color: #231F20;
+}
+.score-ticker__teams {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: calc(0.8 * var(--u));
+  padding: 0 calc(1.2 * var(--u));
+}
+.score-ticker__team {
+  position: relative;
+  flex: 1 1 0;
+  min-width: 0;
+  height: calc(4.6 * var(--u));
+  /* Its soft squish sits the chip down onto the bar. */
+  transform-origin: 50% 100%;
+}
+.score-ticker__face {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: calc(0.6 * var(--u));
+  padding: 0 calc(1.2 * var(--u));
+  border-radius: calc(0.8 * var(--u));
+  background: var(--team);
+  color: var(--team-ink);
+  box-shadow: 0 calc(0.3 * var(--u)) 0 var(--team-deep);
+}
+.score-ticker__word {
+  font-size: calc(1.9 * var(--u));
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: clip;
+}
+.score-ticker__num {
+  display: inline-block;
+  font-family: var(--font-shout);
+  font-size: calc(3.3 * var(--u));
+  line-height: 0.95;
+  font-variant-numeric: tabular-nums;
+}
+.score-ticker__ring {
+  position: absolute;
+  inset: calc(-0.45 * var(--u));
+  border: calc(0.3 * var(--u)) solid #fff;
+  border-radius: calc(1.1 * var(--u));
+  pointer-events: none;
+}
+.score-ticker__plus {
+  position: absolute;
+  left: 0;
+  right: 0;
+  margin-inline: auto;
+  width: fit-content;
+  bottom: calc(100% + 0.9 * var(--u));
+  padding: calc(0.45 * var(--u)) calc(1.1 * var(--u));
+  border-radius: 999px;
+  background: #fff;
+  color: var(--team-deep);
+  font-family: var(--font-shout);
+  font-size: calc(2.4 * var(--u));
+  line-height: 1;
+  box-shadow: calc(0.22 * var(--u)) calc(0.22 * var(--u)) 0 var(--team-deep);
+  white-space: nowrap;
+}
+.score-ticker__team[data-final]:not([data-won]) .score-ticker__face {
+  opacity: 0.55;
+}
+.score-ticker__team[data-won] .score-ticker__face {
+  outline: calc(0.3 * var(--u)) solid #fff;
+  outline-offset: calc(0.25 * var(--u));
+}
+.score-ticker__clock {
+  flex: none;
+  min-width: calc(12 * var(--u));
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-end;
+  gap: calc(0.35 * var(--u));
+  padding: 0 calc(1.6 * var(--u));
+  border-left: calc(0.12 * var(--u)) solid #4a4546;
+}
+.score-ticker__clock-label {
+  font-size: calc(1.2 * var(--u));
+  letter-spacing: 0.06em;
+  color: #d6d2d3;
+  white-space: nowrap;
+}
+.score-ticker__clock-value {
+  font-family: var(--font-shout);
+  font-size: calc(2.6 * var(--u));
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  text-transform: uppercase;
+}
+.score-ticker__clock-value small {
+  font-size: 0.6em;
+}
+.score-ticker__clock[data-kind='game'] .score-ticker__clock-value,
+.score-ticker__clock[data-kind='final'] .score-ticker__clock-value {
+  font-size: calc(2.2 * var(--u));
+}
+
 /* ── Notice banner (onNotice): church-authored announcements ──────── */
 /* The kit's stepped chip (StepPlate): a Londrina label on the pill, the
    message in Figtree on the block, sized by NoticeBanner's fit

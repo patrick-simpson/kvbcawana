@@ -66,6 +66,31 @@ async function projector(browser, w) {
   return page;
 }
 
+/**
+ * A lobby TV on the same Worker, Date moved to 6:17:19 pm on a club night
+ * (only Date: timers and animation frames keep the real clock).
+ */
+async function lobby(browser, w) {
+  const page = await (await browser.newContext({ deviceScaleFactor: SHOTS ? 2 : 1 })).newPage();
+  await page.setViewportSize({ width: 1600, height: 900 });
+  const send = await liveChannel(page);
+  await w.attach(page);
+  w.onRing((payload) => { send.all('changed', payload).catch(() => {}); });
+  await page.route(/open-meteo/, (r) => r.abort());
+  await page.addInitScript(() => {
+    const offset = new Date('2026-11-04T18:17:19-05:00').getTime() - Date.now();
+    const Real = Date;
+    class Shifted extends Real {
+      constructor(...a) { if (a.length) super(...a); else super(Real.now() + offset); }
+      static now() { return Real.now() + offset; }
+    }
+    window.Date = Shifted;
+    localStorage.setItem('awanaSetupCardDismissed.v1', '1');
+  });
+  await page.goto('/index.html');
+  return { page, send };
+}
+
 async function phone(browser, w) {
   const page = await (await browser.newContext({ deviceScaleFactor: SHOTS ? 2 : 1 })).newPage();
   await page.route('**/shared/sync.json', (route) => route.fulfill({ contentType: 'application/json', body: JSON.stringify({ url: SYNC_BASE }) }));
@@ -229,6 +254,62 @@ test.describe('the game time scoreboard', () => {
     await wall.waitForTimeout(800);
     await shot(wall, 'wall-12-leaders-kids');
     await wall.context().close();
+    await ph.context().close();
+  });
+
+  test('the lobby\'s score bar: up with the club, a point, a name in between, the stopwatch, the final', async ({ browser }) => {
+    test.setTimeout(90000);
+    const w = worker();
+    const { page: tv, send } = await lobby(browser, w);
+    const ph = await phone(browser, w);
+    await expect(tv.locator('.score-ticker')).toHaveCount(0);
+    await ph.locator('.sb-club[data-club="tnt"]').click();
+    await expect(tv.locator('.score-ticker')).toBeVisible();
+    await expect(tv.locator('.score-ticker__team')).toHaveCount(4);
+    await expect(tv.locator('.score-ticker__clock')).toContainText('GAME ENDS 6:30', { ignoreCase: true });
+    await expect(tv.locator('.corner-bottom .corner-chip')).toHaveCount(0);
+
+    await w.seed('tnt', { blue: 12, red: 9, yellow: 14, green: 7 });
+    await tv.reload();
+    await expect(tv.locator('[data-team="red"] .score-ticker__num')).toHaveText('9');
+    await expect(ph.locator('.sb-plus[data-team="red"] .sb-plus__num')).toHaveText('9', { timeout: 8000 });
+    await tv.waitForTimeout(1500);
+    await shot(tv, 'lobby-1-bar');
+    await ph.locator('.sb-plus[data-team="red"]').click();
+    await expect(tv.locator('[data-team="red"] .score-ticker__plus')).toBeVisible();
+    await tv.waitForTimeout(300);
+    await shot(tv, 'lobby-2-point');
+    await expect(tv.locator('[data-team="red"] .score-ticker__num')).toHaveText('10');
+
+    // A name: the bar drops away for the welcome and rises after it.
+    await send('checkin', { id: 'e2e-ava', firstName: 'Ava', club: 'Sparks', at: new Date().toISOString() });
+    await expect(tv.locator('.score-ticker')).toHaveCount(0, { timeout: 5000 });
+    await tv.waitForTimeout(1500);
+    await shot(tv, 'lobby-3-checkin');
+    await ph.locator('.sb-plus[data-team="green"]').click();
+    await expect(tv.locator('.score-ticker')).toBeVisible({ timeout: 20000 });
+    await expect(tv.locator('[data-team="green"] .score-ticker__num')).toHaveText('8');
+    await expect(tv.locator('.score-ticker__plus')).toHaveCount(0);
+
+    // The stopwatch takes the clock slot.
+    await ph.locator('#clock-btn').click();
+    await ph.locator('#clock-go').click();
+    await expect(tv.locator('.score-ticker__clock[data-kind="stopwatch"]')).toBeVisible();
+    await tv.waitForTimeout(2300);
+    expect(await tv.locator('.score-ticker__clock-value').textContent()).toMatch(/^0:0[2-3]\.\d$/);
+    await shot(tv, 'lobby-4-stopwatch');
+    await ph.locator('#clock-reset').click();
+    await ph.locator('#sheet-close').click();
+
+    // End: the final, the winner named, then the bar goes.
+    await ph.locator('#end-btn').click();
+    await ph.locator('#end-btn').click();
+    await expect(tv.locator('.score-ticker[data-final="1"]')).toBeVisible();
+    await expect(tv.locator('.score-ticker__clock')).toContainText('YELLOW');
+    await tv.waitForTimeout(800);
+    await shot(tv, 'lobby-5-final');
+    await expect(tv.locator('.score-ticker')).toHaveCount(0, { timeout: 12000 });
+    await tv.context().close();
     await ph.context().close();
   });
 });
