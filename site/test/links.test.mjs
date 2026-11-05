@@ -17,7 +17,6 @@ const ALLOWED = [
   '/lobby/scoreboard.html', // the game time scoreboard (phone: four teams' scores and the stopwatch on the projector)
   '/settings', '/logo/',
   '/tools/letterhead/', // owner 2026-10-28: the letterhead maker is on the links page
-  '/tools/tally/', // owner 2026-11-04: the poster contest vote tally, shared on every device
   '/download/kvbc-awana', '/help', '/capabilities.html', '/release-notes/printer.md',
   '/',
 ];
@@ -48,4 +47,10 @@ test('no external hosts and no script', () => {
   assert.ok(!page.includes('https://'), 'no https:// URL');
   assert.ok(!page.includes('googleapis'), 'no Google Fonts');
   assert.ok(!/<script/i.test(page), 'no <script');
+});
+
+test('the archived poster tally (owner 2026-11-05) is off the list and its page runs nothing', () => {
+  assert.ok(!hrefs.includes('/tools/tally/'));
+  const tally = readFileSync(path.join(SITE, 'tools', 'tally', 'index.html'), 'utf8');
+  assert.doesNotMatch(tally, /<script|fetch\(|WebSocket|\/v1\//);
 });
