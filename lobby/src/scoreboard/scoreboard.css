@@ -115,16 +115,20 @@ form { display: grid; gap: 10px; margin-top: 14px; }
 
 /* The speaker beside End game (owner 2026-11-05: "add the sound switch"):
    the projector's point chimes and timer buzzer. */
-.sb-foot { flex: none; display: flex; gap: 10px; }
-.sb-foot .sb-wide { flex: 1; width: auto; }
-.sb-soundbtn { flex: none; height: 56px; padding: 0 14px; border: 0; border-radius: 14px; background: var(--sb-shade); display: inline-flex; align-items: center; gap: 8px; }
-.sb-soundbtn__word { font: 400 1rem/1 var(--sb-label); letter-spacing: 0.05em; text-transform: uppercase; }
-.sb-soundbtn .sb-snd-on { display: none; }
-.sb-soundbtn[aria-pressed='true'] { background: #fff; color: var(--sb-field); box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.45); }
-.sb-soundbtn[aria-pressed='true'] .sb-snd-on { display: inline; }
-.sb-soundbtn[aria-pressed='true'] .sb-snd-off { display: none; }
-.sb-soundbtn:active { translate: 2px 2px; transition: none; }
-@media (max-height: 680px) { .sb-soundbtn { height: 48px; } }
+.sb-soundrow { display: flex; align-items: center; gap: 12px; min-height: 64px; padding: 10px 14px; border: 0; border-radius: 14px; background: #262A33; text-align: left; }
+.sb-soundrow svg { flex: none; }
+.sb-soundrow .sb-snd-on { display: none; }
+.sb-soundrow[aria-checked='true'] .sb-snd-on { display: inline; }
+.sb-soundrow[aria-checked='true'] .sb-snd-off { display: none; }
+.sb-soundrow__words { flex: 1; display: grid; gap: 3px; }
+.sb-soundrow__title { font: 400 1.15rem/1.1 var(--sb-shout); }
+.sb-soundrow__note { font-size: 0.85rem; color: #D9D6D2; }
+.sb-soundrow__switch { flex: none; position: relative; width: 52px; height: 30px; border-radius: 999px; background: #4A505E; }
+.sb-soundrow__switch::after { content: ''; position: absolute; top: 3px; left: 3px; width: 24px; height: 24px; border-radius: 50%; background: #fff; transition: translate 0.15s ease; }
+.sb-soundrow[aria-checked='true'] .sb-soundrow__switch { background: var(--sb-hot); }
+.sb-soundrow[aria-checked='true'] .sb-soundrow__switch::after { translate: 22px 0; }
+.sb-sheet__sub { margin: 4px 0 0; font: 400 1.05rem/1.1 var(--sb-label); letter-spacing: 0.05em; text-transform: uppercase; color: #D9D6D2; }
+@media (prefers-reduced-motion: reduce) { .sb-soundrow__switch::after { transition: none; } }
 
 /* ── The team setups sheet ── */
 .sb-optsbtn:disabled { opacity: 0.4; cursor: default; }

@@ -165,10 +165,8 @@ function render() {
   }
   /** @type {HTMLButtonElement} */ ($('end-btn')).disabled = !club;
   const sounds = soundsPending ?? board?.sounds === true;
-  $('sound-btn').setAttribute('aria-pressed', String(sounds));
-  setText($('sound-word'), sounds ? 'Sound on' : 'Sound off');
-  /** @type {HTMLButtonElement} */ ($('opts-btn')).disabled = !club;
-  if (!club && !$('opts').hidden) closeOpts();
+  $('sound-btn').setAttribute('aria-checked', String(sounds));
+  setText($('sound-word'), sounds ? 'On: a chime per point, a buzzer at 0:00' : 'Off: no chime or buzzer');
   if (!$('opts').hidden) drawOpts();
   if (!club) disarmEnd();
   drawGameClock();
@@ -381,7 +379,6 @@ async function toggleSounds() {
   soundsPending = null;
   if (res.body?.board) take(res.body.board);
   if (!res.ok && res.status !== 401) flash(res.status === 0 ? 'Offline: the sound did not change.' : 'That did not go through. Try again.');
-  else flash(on ? 'Projector sounds on: a chime per point, a buzzer at 0:00.' : 'Projector sounds off.');
   render();
 }
 
@@ -391,7 +388,10 @@ let askingFor = /** @type {string|null} */ (null);
 
 function drawOpts() {
   const club = board?.active;
-  if (!club) return;
+  // The sound switch works any time; the team setups need a club up.
+  $('opts-none').hidden = Boolean(club);
+  $('opts-list').hidden = !club;
+  if (!club) { askingFor = null; $('opts-ask').hidden = true; setText($('opts-club'), 'the club'); return; }
   setText($('opts-club'), SCORE_CLUB_WORDS[club]);
   const list = $('opts-list');
   if (!list.childElementCount) {
@@ -419,12 +419,11 @@ function drawOpts() {
 }
 
 function openOpts() {
-  if (!board?.active) return;
   askingFor = null;
   $('opts').hidden = false;
   $('sheet-scrim').hidden = false;
   drawOpts();
-  /** @type {HTMLElement|null} */ (document.querySelector('.sb-setup[aria-checked="true"]'))?.focus();
+  $('sound-btn').focus();
 }
 function closeOpts() {
   askingFor = null;

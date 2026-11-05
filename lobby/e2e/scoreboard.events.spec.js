@@ -148,12 +148,15 @@ test.describe('the game time scoreboard', () => {
     await ph.locator('#sheet-close').click();
 
     // The sound switch (owner 2026-11-05): the speaker beside End game.
-    await expect(ph.locator('#sound-btn')).toHaveAttribute('aria-pressed', 'false');
+    // Owner 2026-11-05: "That setting should be under more": the More sheet.
+    await ph.locator('#opts-btn').click();
+    await expect(ph.locator('#sound-btn')).toHaveAttribute('aria-checked', 'false');
     await ph.locator('#sound-btn').click();
-    await expect(ph.locator('#sound-btn')).toHaveAttribute('aria-pressed', 'true');
-    await expect(ph.locator('#sound-word')).toHaveText('Sound on');
+    await expect(ph.locator('#sound-btn')).toHaveAttribute('aria-checked', 'true');
+    await expect(ph.locator('#sound-word')).toHaveText(/^On:/);
     expect((await w.core.state().then((r) => r.json())).board.sounds).toBe(true);
     await shot(ph, 'phone-11-sound-on');
+    await ph.locator('#opts-close').click();
 
     // End takes two taps; the winner plays, then the schedule (T&T game time) is back.
     await ph.locator('#end-btn').click();
@@ -192,6 +195,7 @@ test.describe('the game time scoreboard', () => {
     await expect(wall.locator('.pj-finale')).toHaveCount(0, { timeout: 12000 });
     await shot(wall, 'wall-10-cubbies');
 
+    // The More sheet opens before any club too (the sound switch), the setups waiting for one.
     // Team setups (owner 2026-11-05): Options; no points yet = at once.
     await ph.locator('#opts-btn').click();
     await expect(ph.locator('#opts')).toBeVisible();

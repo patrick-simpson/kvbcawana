@@ -37,7 +37,7 @@
           <span id="game-label" class="sb-gameclock__label">Pick a club</span>
           <span id="game-left" class="sb-gameclock__left"></span>
         </div>
-        <button id="opts-btn" type="button" class="sb-clockbtn sb-optsbtn" aria-label="Team options" aria-haspopup="dialog" disabled>
+        <button id="opts-btn" type="button" class="sb-clockbtn sb-optsbtn" aria-label="More: sound and teams" aria-haspopup="dialog">
           <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2.2"/><circle cx="10" cy="17" r="2.2"/></svg>
         </button>
         <button id="clock-btn" type="button" class="sb-clockbtn" aria-label="Stopwatch and timer" aria-haspopup="dialog">
@@ -50,14 +50,8 @@
         <p id="pick-note" class="sb-pick">Pick T&amp;T, Sparks or Cubbies above to put their scores on the projector.</p>
       </div>
 
-      <div class="sb-foot">
-        <button id="sound-btn" type="button" class="sb-soundbtn" aria-pressed="false" aria-label="Sounds on the projector">
-          <svg class="sb-snd-on" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/></svg>
-          <svg class="sb-snd-off" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="M16 9.5l5 5M21 9.5l-5 5"/></svg>
-          <span id="sound-word" class="sb-soundbtn__word">Sound off</span>
-        </button>
-        <button id="end-btn" type="button" class="sb-wide sb-end" disabled>End game</button>
-      </div>
+      <button id="end-btn" type="button" class="sb-wide sb-end" disabled>End game</button>
+
       <p class="sb-status"><span id="live" data-state="wait">Connecting…</span> · <button id="signout" type="button" class="sb-link">Sign out</button></p>
     </main>
 
@@ -92,7 +86,15 @@
     </section>
 
     <section id="opts" class="sb-sheet" role="dialog" aria-modal="true" aria-labelledby="opts-title" hidden>
-      <h2 id="opts-title" class="sb-sheet__title">Teams for <span id="opts-club">T&amp;T</span></h2>
+      <h2 class="sb-sheet__title">More</h2>
+      <button id="sound-btn" type="button" class="sb-soundrow" role="switch" aria-checked="false">
+        <svg class="sb-snd-on" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/></svg>
+        <svg class="sb-snd-off" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="M16 9.5l5 5M21 9.5l-5 5"/></svg>
+        <span class="sb-soundrow__words"><span class="sb-soundrow__title">Sounds on the projector</span><span id="sound-word" class="sb-soundrow__note">Off: no chime or buzzer</span></span>
+        <span class="sb-soundrow__switch" aria-hidden="true"></span>
+      </button>
+      <h3 id="opts-title" class="sb-sheet__sub">Teams for <span id="opts-club">the club</span></h3>
+      <p id="opts-none" class="sb-fine sb-center" hidden>Pick T&amp;T, Sparks or Cubbies first.</p>
       <div id="opts-list" class="sb-setups" role="radiogroup" aria-labelledby="opts-title"></div>
       <div id="opts-ask" class="sb-ask" hidden>
         <p id="opts-ask-words" class="sb-ask__words"></p>
