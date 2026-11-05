@@ -14,8 +14,7 @@ import {
 // The lobby's score bar (owner 2026-11-05, option A of three mockups: "a
 // lower third ... it needs to all animate really nicely and look super
 // professional"). A broadcast ticker along the bottom of the lobby while a
-// club is up on the game time scoreboard: the club's block (mark, GAME TIME,
-// LIVE), one chip per team in the phone's order, and a clock (the game
+// club is up on the game time scoreboard: the club's block (mark, GAME TIME), one chip per team in the phone's order, and a clock (the game
 // clock, or the stopwatch / timer while one runs). What it shows is the pure
 // scoreTickerView (src/lib/scoreTicker.js).
 //
@@ -271,7 +270,8 @@ export default function ScoreTicker({ view, active, clock, serverNow }) {
                 ? <img className="score-ticker__mark" src={palette.logo} alt={SCORE_CLUB_WORDS[view.club] || ''} />
                 : <span className="score-ticker__markword">{SCORE_CLUB_WORDS[view.club]}</span>}
               <span className="score-ticker__title">Game time</span>
-              <span className="score-ticker__live" data-final={view.final ? '1' : undefined}>{view.final ? 'Final' : 'Live'}</span>
+              {/* Owner 2026-11-05: no LIVE tag; the pill is only for the final. */}
+              {view.final && <span className="score-ticker__live" data-final="1">Final</span>}
             </M.span>
           </div>
           <div className="score-ticker__teams">

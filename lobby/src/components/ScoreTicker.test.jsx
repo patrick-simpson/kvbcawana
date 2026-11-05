@@ -20,7 +20,8 @@ describe('ScoreTicker', () => {
 
   it('draws the club and the four teams in the phone\'s order', () => {
     const { container } = render(bar(view(scores(12, 9, 14, 7))));
-    expect(container.querySelector('.score-ticker__live').textContent).toBe('Live');
+    // Owner 2026-11-05: no LIVE tag while the game is on.
+    expect(container.querySelector('.score-ticker__live')).toBeNull();
     const teams = [...container.querySelectorAll('.score-ticker__team')];
     expect(teams.map((t) => t.dataset.team)).toEqual(['blue', 'red', 'yellow', 'green']);
     expect(teams.map((t) => t.querySelector('.score-ticker__num').textContent)).toEqual(['12', '9', '14', '7']);
