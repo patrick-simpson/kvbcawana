@@ -1,15 +1,8 @@
 {
   "version": 1,
-  "generatedAt": "2026-10-29T15:13:14.945Z",
+  "generatedAt": "2026-11-05T16:27:42.156Z",
   "sourceUrl": "https://kvbchurch.twotimtwo.com/calendar/index",
   "events": [
-    {
-      "date": "2026-11-04",
-      "kind": "club",
-      "title": "Parent's Night - Poster Voting",
-      "isCancelled": false,
-      "isSpecial": true
-    },
     {
       "date": "2026-11-11",
       "kind": "club",
