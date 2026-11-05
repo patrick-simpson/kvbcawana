@@ -23,14 +23,18 @@ import '../../../shared/brand/fonts.css';
 import './scoreboard.css';
 import { loadSyncSession, resolveSyncUrl, saveSyncSession, syncLogin, syncRequest } from '../lib/syncService.js';
 import {
+  SCORE_ALL_TEAMS,
   SCORE_CLUBS,
   SCORE_CLUB_WORDS,
-  SCORE_TEAMS,
+  SCORE_SETUPS,
+  SCORE_SETUP_IDS,
+  SCORE_TEAM_WORDS,
   anyPoints,
   cleanBoard,
   clockFace,
   clockReading,
   createClockSync,
+  teamsFor,
 } from '../../../shared/scoreboard.js';
 import schedule from '../../../shared/schedule.json';
 import { CLUB_FIELDS, CONFIRM_MS, gameClockWords, liveWords, mmss, sheetButtons, shownScores, stepTimer } from './logic.js';
@@ -88,7 +92,7 @@ function take(raw, fromRead = false) {
   board = b;
   // A ring that already holds a tap of ours still on its way: count it once.
   if (fromRead && before && b.active && b.active === before.active && b.active === pendingClub) {
-    for (const t of SCORE_TEAMS) {
+    for (const t of SCORE_ALL_TEAMS) {
       const moved = b.scores[b.active][t] - before.scores[b.active][t];
       const p = pending[t] || 0;
       if (moved !== 0 && p !== 0 && Math.sign(moved) === Math.sign(p)) {
@@ -148,8 +152,10 @@ function render() {
   }
   const teams = $('teams');
   teams.dataset.off = club ? '0' : '1';
+  const playing = teamsFor(board, club);
+  buildTeams(playing);
   const shown = shownScores(board, club, pending);
-  for (const t of SCORE_TEAMS) {
+  for (const t of playing) {
     const num = document.querySelector(`.sb-plus[data-team="${t}"] .sb-plus__num`);
     if (num && num.textContent !== String(shown[t])) {
       num.textContent = String(shown[t]);
@@ -158,10 +164,35 @@ function render() {
     /** @type {HTMLButtonElement} */ (document.querySelector(`.sb-minus[data-team="${t}"]`)).disabled = !club || shown[t] <= 0;
   }
   /** @type {HTMLButtonElement} */ ($('end-btn')).disabled = !club;
+  /** @type {HTMLButtonElement} */ ($('opts-btn')).disabled = !club;
+  if (!club && !$('opts').hidden) closeOpts();
+  if (!$('opts').hidden) drawOpts();
   if (!club) disarmEnd();
   drawGameClock();
   drawClockButton();
   if (!$('sheet').hidden) drawSheet();
+}
+
+/** The plates for the teams in play: the 2 x 2, or two halves (owner 2026-11-05: team setups). */
+let builtFor = '';
+function buildTeams(playing) {
+  const key = playing.join();
+  if (key === builtFor) return;
+  builtFor = key;
+  const box = $('teams');
+  box.dataset.count = String(playing.length);
+  for (const el of box.querySelectorAll('.sb-team')) el.remove();
+  const note = $('pick-note');
+  for (const t of playing) {
+    const word = SCORE_TEAM_WORDS[t];
+    const name = word[0] + word.slice(1).toLowerCase();
+    const wrap = document.createElement('div');
+    wrap.className = 'sb-team';
+    wrap.dataset.team = t;
+    wrap.innerHTML = `<button type="button" class="sb-plus" data-team="${t}" aria-label="${name} plus one"><span class="sb-plus__name">${name}</span><span class="sb-plus__num">0</span><span class="sb-plus__hint">Tap +1</span></button>`
+      + `<button type="button" class="sb-minus" data-team="${t}" aria-label="${name} minus one">−1</button>`;
+    box.insertBefore(wrap, note);
+  }
 }
 
 function drawGameClock() {
@@ -294,7 +325,7 @@ async function pickClub(club) {
   if (!SCORE_CLUBS.includes(club) || board?.active === club) return;
   const cur = board?.active;
   // Switching away from a game with points ends it (its winner plays first): a second tap.
-  if (cur && anyPoints(board.scores[cur]) && armedSwitch !== club) {
+  if (cur && anyPoints(board.scores[cur], teamsFor(board, cur)) && armedSwitch !== club) {
     disarmSwitch();
     armedSwitch = club;
     const btn = document.querySelector(`.sb-club[data-club="${club}"]`);
@@ -332,6 +363,73 @@ async function endGame() {
   const res = await authed('/v1/scoreboard/end', { method: 'POST', body: {} });
   if (res.body?.board) take(res.body.board);
   if (!res.ok && res.status !== 401) flash(res.status === 0 ? 'Offline: the game did not end.' : 'That did not go through. Try again.');
+}
+
+// ── Team setups (owner 2026-11-05: the Options button) ──────────────────
+
+let askingFor = /** @type {string|null} */ (null);
+
+function drawOpts() {
+  const club = board?.active;
+  if (!club) return;
+  setText($('opts-club'), SCORE_CLUB_WORDS[club]);
+  const list = $('opts-list');
+  if (!list.childElementCount) {
+    for (const id of SCORE_SETUP_IDS) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'sb-setup';
+      b.dataset.setup = id;
+      b.setAttribute('role', 'radio');
+      b.innerHTML = `<span class="sb-setup__swatches" aria-hidden="true">${SCORE_SETUPS[id].teams.map((t) => `<i data-team="${t}"></i>`).join('')}</span><span class="sb-setup__words">${SCORE_SETUPS[id].words}</span>`;
+      b.addEventListener('click', () => chooseSetup(id));
+      list.append(b);
+    }
+  }
+  const current = board.setups[club];
+  for (const b of list.querySelectorAll('.sb-setup')) {
+    const on = /** @type {HTMLElement} */ (b).dataset.setup === current;
+    b.setAttribute('aria-checked', String(on));
+    b.dataset.asking = String(/** @type {HTMLElement} */ (b).dataset.setup === askingFor);
+  }
+  $('opts-ask').hidden = !askingFor;
+  if (askingFor) {
+    setText($('opts-ask-words'), `${SCORE_CLUB_WORDS[club]} has points. Start ${SCORE_SETUPS[askingFor].words} at 0 (the winner shows first), or keep tonight's scores?`);
+  }
+}
+
+function openOpts() {
+  if (!board?.active) return;
+  askingFor = null;
+  $('opts').hidden = false;
+  $('sheet-scrim').hidden = false;
+  drawOpts();
+  /** @type {HTMLElement|null} */ (document.querySelector('.sb-setup[aria-checked="true"]'))?.focus();
+}
+function closeOpts() {
+  askingFor = null;
+  $('opts').hidden = true;
+  if ($('sheet').hidden) $('sheet-scrim').hidden = true;
+  $('opts-btn').focus();
+}
+
+/** A setup tapped: the phone asks "start at 0 or keep?" when the game has points (owner: "Ask each time"). */
+function chooseSetup(id) {
+  const club = board?.active;
+  if (!club || board.setups[club] === id) { askingFor = null; drawOpts(); return; }
+  if (anyPoints(board.scores[club], teamsFor(board, club))) { askingFor = id; drawOpts(); return; }
+  sendSetup(id, false);
+}
+
+async function sendSetup(id, keep) {
+  const club = board?.active;
+  if (!club) return;
+  buzz();
+  askingFor = null;
+  const res = await authed('/v1/scoreboard/setup', { method: 'POST', body: { club, setup: id, keep } });
+  if (res.body?.board) take(res.body.board);
+  if (!res.ok && res.status !== 401) flash(res.status === 0 ? 'Offline: the teams did not change.' : 'That did not go through. Try again.');
+  else closeOpts();
 }
 
 // ── Sign in and out ──────────────────────────────────────────────────────
@@ -396,13 +494,25 @@ async function start() {
   $('signin-form').addEventListener('submit', signIn);
   $('signout').addEventListener('click', () => { saveSyncSession(''); board = null; showSignedOut('Signed out on this phone.'); });
   for (const el of document.querySelectorAll('.sb-club')) el.addEventListener('click', () => pickClub(/** @type {HTMLElement} */ (el).dataset.club || ''));
-  for (const el of document.querySelectorAll('.sb-plus')) el.addEventListener('click', () => point(/** @type {HTMLElement} */ (el).dataset.team || '', 1));
-  for (const el of document.querySelectorAll('.sb-minus')) el.addEventListener('click', () => point(/** @type {HTMLElement} */ (el).dataset.team || '', -1));
+  // The plates are rebuilt for each setup: one listener for them all.
+  $('teams').addEventListener('click', (e) => {
+    const btn = /** @type {HTMLElement|null} */ (/** @type {HTMLElement} */ (e.target).closest('.sb-plus, .sb-minus'));
+    if (!btn || /** @type {HTMLButtonElement} */ (btn).disabled) return;
+    point(btn.dataset.team || '', btn.classList.contains('sb-plus') ? 1 : -1);
+  });
+  $('opts-btn').addEventListener('click', openOpts);
+  $('opts-close').addEventListener('click', closeOpts);
+  $('opts-zero').addEventListener('click', () => { if (askingFor) sendSetup(askingFor, false); });
+  $('opts-keep').addEventListener('click', () => { if (askingFor) sendSetup(askingFor, true); });
   $('end-btn').addEventListener('click', endGame);
   $('clock-btn').addEventListener('click', openSheet);
   $('sheet-close').addEventListener('click', closeSheet);
-  $('sheet-scrim').addEventListener('click', closeSheet);
-  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('sheet').hidden) closeSheet(); });
+  $('sheet-scrim').addEventListener('click', () => { if (!$('opts').hidden) closeOpts(); else closeSheet(); });
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    if (!$('opts').hidden) closeOpts();
+    else if (!$('sheet').hidden) closeSheet();
+  });
   for (const el of document.querySelectorAll('.sb-seg__btn')) {
     el.addEventListener('click', () => { sheetKind = /** @type {any} */ (el).dataset.kind; drawSheet(); });
   }

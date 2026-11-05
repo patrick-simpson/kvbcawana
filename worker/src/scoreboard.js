@@ -24,9 +24,11 @@ import { fail, json } from './http.js';
 import {
   SCORE_CLUBS,
   SCORE_MAX,
-  SCORE_TEAMS,
+  SCORE_SETUPS,
+  SCORE_SETUP_IDS,
   TIMER_MAX_MS,
   anyPoints,
+  teamsFor,
   cleanBoard,
   clockReading,
   emptyBoard,
@@ -73,12 +75,17 @@ export class Scoreboard {
     return this.answer(d);
   }
 
-  /** The finale for the club leaving the wall (only when someone scored). @param {Board} d */
-  closeActive(d) {
-    const club = d.active;
-    if (club && anyPoints(d.scores[club])) {
-      d.finale = { id: d.rev + 1, club, scores: { ...d.scores[club] }, at: this.now() };
+  /** The finale for a club's game (only when someone scored). @param {Board} d @param {string|null} club */
+  finale(d, club) {
+    const teams = teamsFor(d, club);
+    if (club && anyPoints(d.scores[club], teams)) {
+      d.finale = { id: d.rev + 1, club, teams: teams.slice(), scores: { ...d.scores[club] }, at: this.now() };
     }
+  }
+
+  /** The finale for the club leaving the wall. @param {Board} d */
+  closeActive(d) {
+    this.finale(d, d.active);
     d.active = null;
   }
 
@@ -102,15 +109,38 @@ export class Scoreboard {
   async point(body) {
     const { club, team } = body || {};
     const delta = Number(body?.delta);
-    if (!SCORE_CLUBS.includes(club) || !SCORE_TEAMS.includes(team) || (delta !== 1 && delta !== -1)) {
+    if (!SCORE_CLUBS.includes(club) || typeof team !== 'string' || (delta !== 1 && delta !== -1)) {
       return fail('That is not a team or a point.', 400, { reason: 'bad-point' });
     }
     const d = await this.doc();
+    // Only a team of the club's setup scores (a phone on an old setup is told so).
+    if (!teamsFor(d, club).includes(team)) return fail('That team is not playing now.', 409, { reason: 'not-playing', board: d, serverNow: this.now() });
     // A phone still showing a club another phone has since changed is told so, never scores the wrong game.
     if (d.active !== club) return fail('Another club is on the projector now.', 409, { reason: 'not-active', board: d, serverNow: this.now() });
     const next = Math.min(SCORE_MAX, Math.max(0, d.scores[club][team] + delta));
     if (next === d.scores[club][team]) return this.answer(d);
     d.scores[club][team] = next;
+    return this.commit(d);
+  }
+
+  /**
+   * POST /v1/scoreboard/setup {club, setup, keep}: how the club's teams are split
+   * (owner 2026-11-05: the phone's Options; the phone asks each time). `keep`
+   * false = a new game: the old setup's winner first (when it is up and anyone
+   * scored), then the new teams at 0. `keep` true = the new teams keep tonight's
+   * scores (red stays red).
+   * @param {any} body
+   */
+  async setup(body) {
+    const { club, setup } = body || {};
+    if (!SCORE_CLUBS.includes(club) || !SCORE_SETUP_IDS.includes(setup)) return fail('That is not a team setup.', 400, { reason: 'bad-setup' });
+    const d = await this.doc();
+    if (d.setups[club] === setup) return this.answer(d);
+    if (body?.keep !== true) {
+      if (d.active === club) this.finale(d, club);
+      for (const t of SCORE_SETUPS[setup].teams) d.scores[club][t] = 0;
+    }
+    d.setups[club] = setup;
     return this.commit(d);
   }
 
@@ -179,5 +209,6 @@ export function mountScoreboard(registry, core) {
   registry.add('POST', '/v1/scoreboard/club', 'session', async ({ body }) => s().club(await body()));
   registry.add('POST', '/v1/scoreboard/point', 'session', async ({ body }) => s().point(await body()));
   registry.add('POST', '/v1/scoreboard/end', 'session', async () => s().end());
+  registry.add('POST', '/v1/scoreboard/setup', 'session', async ({ body }) => s().setup(await body()));
   registry.add('POST', '/v1/scoreboard/clock', 'session', async ({ body }) => s().clock(await body()));
 }

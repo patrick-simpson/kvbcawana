@@ -104,6 +104,33 @@ form { display: grid; gap: 10px; margin-top: 14px; }
 .sb-team[data-team='red'] { --c: #F04A4B; --d: #B82B32; --i: #fff; }
 .sb-team[data-team='yellow'] { --c: #FCB614; --d: #C97A08; --i: #231F20; }
 .sb-team[data-team='green'] { --c: #58BD79; --d: #2F8A4E; --i: #fff; }
+.sb-team[data-team='boys'] { --c: #4C72B8; --d: #2F4F8A; --i: #fff; }
+.sb-team[data-team='girls'] { --c: #F04A4B; --d: #B82B32; --i: #fff; }
+.sb-team[data-team='leaders'] { --c: #231F20; --d: #000; --i: #fff; }
+.sb-team[data-team='kids'] { --c: #FAA41D; --d: #C97A08; --i: #231F20; }
+.sb-team[data-team='leaders'] .sb-plus { outline: 2px solid rgba(255, 255, 255, 0.7); outline-offset: -2px; }
+/* Two teams: two tall halves side by side. */
+.sb-teams[data-count='2'] { grid-template-rows: 1fr; }
+.sb-teams[data-count='2'] .sb-plus__num { font-size: clamp(3.6rem, 22vw, 6rem); }
+
+/* ── The team setups sheet ── */
+.sb-optsbtn:disabled { opacity: 0.4; cursor: default; }
+.sb-sheet__title { margin: 0; font: 400 calc(1.25rem * 1.057) / 1.1 var(--sb-shout); text-align: center; }
+.sb-setups { display: grid; gap: 8px; }
+.sb-setup { display: flex; align-items: center; gap: 12px; min-height: 54px; padding: 8px 14px; border: 0; border-radius: 14px; background: #262A33; text-align: left; font: 400 1.15rem/1.1 var(--sb-shout); }
+.sb-setup[aria-checked='true'] { outline: 3px solid #fff; outline-offset: -3px; }
+.sb-setup[aria-checked='true']::after { content: 'On'; margin-left: auto; font: 400 1rem/1 var(--sb-label); letter-spacing: 0.06em; text-transform: uppercase; }
+.sb-setup[data-asking='true'] { outline: 3px solid #FCB614; outline-offset: -3px; }
+.sb-setup__swatches { display: inline-flex; gap: 4px; flex: none; }
+.sb-setup__swatches i { width: 16px; height: 26px; border-radius: 5px; background: var(--c); border: 2px solid rgba(255, 255, 255, 0.55); }
+.sb-setup__swatches i[data-team='blue'], .sb-setup__swatches i[data-team='boys'] { --c: #4C72B8; }
+.sb-setup__swatches i[data-team='red'], .sb-setup__swatches i[data-team='girls'] { --c: #F04A4B; }
+.sb-setup__swatches i[data-team='yellow'] { --c: #FCB614; }
+.sb-setup__swatches i[data-team='green'] { --c: #58BD79; }
+.sb-setup__swatches i[data-team='leaders'] { --c: #231F20; }
+.sb-setup__swatches i[data-team='kids'] { --c: #FAA41D; }
+.sb-ask { display: grid; gap: 10px; padding: 12px; border-radius: 14px; background: #2B2F39; }
+.sb-ask__words { margin: 0; font-weight: 600; text-align: center; }
 .sb-plus {
   position: relative;
   flex: 1;
@@ -138,7 +165,7 @@ form { display: grid; gap: 10px; margin-top: 14px; }
 .sb-plus:disabled, .sb-minus:disabled { cursor: default; }
 .sb-minus:disabled { opacity: 0.4; }
 .sb-teams[data-off='1'] .sb-team { opacity: 0.28; }
-.sb-pick {
+.sb-teams .sb-pick {
   display: none;
   position: absolute;
   inset: 0;

@@ -37,29 +37,16 @@
           <span id="game-label" class="sb-gameclock__label">Pick a club</span>
           <span id="game-left" class="sb-gameclock__left"></span>
         </div>
+        <button id="opts-btn" type="button" class="sb-clockbtn sb-optsbtn" aria-label="Team options" aria-haspopup="dialog" disabled>
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2.2"/><circle cx="10" cy="17" r="2.2"/></svg>
+        </button>
         <button id="clock-btn" type="button" class="sb-clockbtn" aria-label="Stopwatch and timer" aria-haspopup="dialog">
           <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="14" r="7.5"/><path d="M12 14V10.5M10 3h4M12 3v3.5M18.5 7.5l1.5-1.5"/></svg>
           <span id="clock-mini" class="sb-clockbtn__mini" hidden></span>
         </button>
       </div>
 
-      <div id="teams" class="sb-teams" data-off="1">
-        <div class="sb-team" data-team="blue">
-          <button type="button" class="sb-plus" data-team="blue" aria-label="Blue plus one"><span class="sb-plus__name">Blue</span><span class="sb-plus__num">0</span><span class="sb-plus__hint">Tap +1</span></button>
-          <button type="button" class="sb-minus" data-team="blue" aria-label="Blue minus one">−1</button>
-        </div>
-        <div class="sb-team" data-team="red">
-          <button type="button" class="sb-plus" data-team="red" aria-label="Red plus one"><span class="sb-plus__name">Red</span><span class="sb-plus__num">0</span><span class="sb-plus__hint">Tap +1</span></button>
-          <button type="button" class="sb-minus" data-team="red" aria-label="Red minus one">−1</button>
-        </div>
-        <div class="sb-team" data-team="yellow">
-          <button type="button" class="sb-plus" data-team="yellow" aria-label="Yellow plus one"><span class="sb-plus__name">Yellow</span><span class="sb-plus__num">0</span><span class="sb-plus__hint">Tap +1</span></button>
-          <button type="button" class="sb-minus" data-team="yellow" aria-label="Yellow minus one">−1</button>
-        </div>
-        <div class="sb-team" data-team="green">
-          <button type="button" class="sb-plus" data-team="green" aria-label="Green plus one"><span class="sb-plus__name">Green</span><span class="sb-plus__num">0</span><span class="sb-plus__hint">Tap +1</span></button>
-          <button type="button" class="sb-minus" data-team="green" aria-label="Green minus one">−1</button>
-        </div>
+      <div id="teams" class="sb-teams" data-off="1" data-count="4">
         <p id="pick-note" class="sb-pick">Pick T&amp;T, Sparks or Cubbies above to put their scores on the projector.</p>
       </div>
 
@@ -95,6 +82,20 @@
       </div>
       <p id="clock-note" class="sb-fine sb-center">Shows big on the projector. Closing this keeps it running.</p>
       <button id="sheet-close" type="button" class="sb-wide sb-wide--quiet">Close</button>
+    </section>
+
+    <section id="opts" class="sb-sheet" role="dialog" aria-modal="true" aria-labelledby="opts-title" hidden>
+      <h2 id="opts-title" class="sb-sheet__title">Teams for <span id="opts-club">T&amp;T</span></h2>
+      <div id="opts-list" class="sb-setups" role="radiogroup" aria-labelledby="opts-title"></div>
+      <div id="opts-ask" class="sb-ask" hidden>
+        <p id="opts-ask-words" class="sb-ask__words"></p>
+        <div class="sb-row2">
+          <button id="opts-zero" type="button" class="sb-go">Start at 0</button>
+          <button id="opts-keep" type="button" class="sb-quiet">Keep scores</button>
+        </div>
+      </div>
+      <p class="sb-fine sb-center">Each club keeps its setup for tonight. Tomorrow starts on the 4 colors.</p>
+      <button id="opts-close" type="button" class="sb-wide sb-wide--quiet">Close</button>
     </section>
 
     <script type="module" src="/src/scoreboard/main.js"></script>

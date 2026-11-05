@@ -9,10 +9,11 @@
 //
 // The board (numbers only, never a name):
 //   { v: 1, night: 'YYYY-MM-DD', active: club|null,
-//     scores: { tnt: {blue, red, yellow, green}, sparks: {...}, cubbies: {...} },
+//     setups: { tnt: 'four', sparks: 'boys-girls', cubbies: 'four' },
+//     scores: { tnt: {blue, red, yellow, green, boys, girls, leaders, kids}, ... },
 //     clock: null | { id, kind: 'stopwatch'|'timer', startedAt: ms|null,
 //                     elapsedMs, durationMs|null },
-//     finale: null | { id, club, scores: {blue, red, yellow, green}, at },
+//     finale: null | { id, club, teams: [team...], scores: {...}, at },
 //     rev, at }
 //
 // The clock is anchored to the WORKER's clock: `startedAt` is the Worker's time
@@ -24,7 +25,25 @@
 export const SCORE_CLUBS = Object.freeze(['tnt', 'sparks', 'cubbies']);
 /** The 2 x 2 order, top-left first (owner: blue top-left, red top-right, yellow bottom-left, green bottom-right). */
 export const SCORE_TEAMS = Object.freeze(['blue', 'red', 'yellow', 'green']);
-export const SCORE_TEAM_WORDS = Object.freeze({ blue: 'BLUE', red: 'RED', yellow: 'YELLOW', green: 'GREEN' });
+/** Every team any setup uses (each club keeps a score for each, per night). */
+export const SCORE_ALL_TEAMS = Object.freeze(['blue', 'red', 'yellow', 'green', 'boys', 'girls', 'leaders', 'kids']);
+export const SCORE_TEAM_WORDS = Object.freeze({
+  blue: 'BLUE', red: 'RED', yellow: 'YELLOW', green: 'GREEN', boys: 'BOYS', girls: 'GIRLS', leaders: 'LEADERS', kids: 'KIDS',
+});
+/**
+ * How the teams are split (owner 2026-11-05: the phone's Options): the four
+ * colours (the default), or two halves. Each club keeps its own setup for the
+ * night; a new night starts every club on the four colours. Two-team setups
+ * read left to right.
+ */
+export const SCORE_SETUPS = Object.freeze({
+  four: Object.freeze({ teams: SCORE_TEAMS, words: '4 colors' }),
+  'boys-girls': Object.freeze({ teams: Object.freeze(['boys', 'girls']), words: 'Boys vs Girls' }),
+  'red-green': Object.freeze({ teams: Object.freeze(['red', 'green']), words: 'Red vs Green' }),
+  'blue-yellow': Object.freeze({ teams: Object.freeze(['blue', 'yellow']), words: 'Blue vs Yellow' }),
+  'leaders-kids': Object.freeze({ teams: Object.freeze(['leaders', 'kids']), words: 'Leaders vs Kids' }),
+});
+export const SCORE_SETUP_IDS = Object.freeze(Object.keys(SCORE_SETUPS));
 /**
  * The four team colours, from the brand kit (shared/brand/tokens.json): the
  * plate, its hard-offset shade, and the ink drawn on it (yellow takes the kit's
@@ -35,9 +54,18 @@ export const SCORE_TEAM_COLORS = Object.freeze({
   red: Object.freeze({ fill: '#F04A4B', deep: '#B82B32', ink: '#FFFFFF' }),
   yellow: Object.freeze({ fill: '#FCB614', deep: '#C97A08', ink: '#231F20' }),
   green: Object.freeze({ fill: '#58BD79', deep: '#2F8A4E', ink: '#FFFFFF' }),
+  // Boys vs Girls: the blue and the red (the kit has no pink).
+  boys: Object.freeze({ fill: '#4C72B8', deep: '#2F4F8A', ink: '#FFFFFF' }),
+  girls: Object.freeze({ fill: '#F04A4B', deep: '#B82B32', ink: '#FFFFFF' }),
+  // Leaders vs Kids: the kit's ink (its white keyline carries it on the black wall) and Awana orange.
+  leaders: Object.freeze({ fill: '#231F20', deep: '#000000', ink: '#FFFFFF' }),
+  kids: Object.freeze({ fill: '#FAA41D', deep: '#C97A08', ink: '#231F20' }),
 });
 /** Each team's point chime (owner: "a short chime per point", a little different per team), in Hz. */
-export const SCORE_TEAM_CHIMES = Object.freeze({ blue: [523, 784], red: [587, 880], yellow: [659, 988], green: [698, 1047] });
+export const SCORE_TEAM_CHIMES = Object.freeze({
+  blue: [523, 784], red: [587, 880], yellow: [659, 988], green: [698, 1047],
+  boys: [523, 784], girls: [587, 880], leaders: [440, 659], kids: [784, 1175],
+});
 export const SCORE_CLUB_WORDS = Object.freeze({ tnt: 'T&T', sparks: 'SPARKS', cubbies: 'CUBBIES' });
 /** No score above this (a guard, not a real limit). */
 export const SCORE_MAX = 999;
@@ -59,9 +87,20 @@ export const SCORE_ZONE = 'America/New_York';
 const isInt = (n, lo, hi) => Number.isInteger(n) && n >= lo && n <= hi;
 const isTime = (n) => Number.isFinite(n) && n > 0 && n < 8.64e15;
 
-/** @returns {{blue: number, red: number, yellow: number, green: number}} */
+/** Every team's score at 0. @returns {Record<string, number>} */
 export function emptyScores() {
-  return { blue: 0, red: 0, yellow: 0, green: 0 };
+  return Object.fromEntries(SCORE_ALL_TEAMS.map((t) => [t, 0]));
+}
+
+/** Every club on the four colours. */
+export function emptySetups() {
+  return { tnt: 'four', sparks: 'four', cubbies: 'four' };
+}
+
+/** The teams a club plays as on this board. @param {any} board @param {string|null} club */
+export function teamsFor(board, club) {
+  const id = board && club && board.setups ? board.setups[club] : 'four';
+  return (SCORE_SETUPS[id] || SCORE_SETUPS.four).teams;
 }
 
 /** @param {string} night */
@@ -70,6 +109,7 @@ export function emptyBoard(night) {
     v: 1,
     night,
     active: null,
+    setups: emptySetups(),
     scores: { tnt: emptyScores(), sparks: emptyScores(), cubbies: emptyScores() },
     clock: null,
     finale: null,
@@ -85,11 +125,16 @@ export function nightOf(ms, zone = SCORE_ZONE) {
   return `${get('year')}-${get('month')}-${get('day')}`;
 }
 
-/** One club's four scores, or null when anything is off. @param {any} s */
+/**
+ * One club's scores, or null when anything is off. A team a board from before
+ * the setups (2026-11-05) never had reads 0.
+ * @param {any} s
+ */
 export function cleanScores(s) {
   if (!s || typeof s !== 'object') return null;
   const out = emptyScores();
-  for (const t of SCORE_TEAMS) {
+  for (const t of SCORE_ALL_TEAMS) {
+    if (s[t] === undefined && !SCORE_TEAMS.includes(t)) continue;
     if (!isInt(s[t], 0, SCORE_MAX)) return null;
     out[t] = s[t];
   }
@@ -112,7 +157,8 @@ function cleanFinale(f) {
   if (!f || typeof f !== 'object') return null;
   if (!SCORE_CLUBS.includes(f.club) || !isInt(f.id, 1, Number.MAX_SAFE_INTEGER) || !isTime(f.at)) return null;
   const scores = cleanScores(f.scores);
-  return scores ? { id: f.id, club: f.club, scores, at: f.at } : null;
+  const setup = Object.values(SCORE_SETUPS).find((x) => Array.isArray(f.teams) && x.teams.join() === f.teams.join());
+  return scores ? { id: f.id, club: f.club, teams: (setup || SCORE_SETUPS.four).teams.slice(), scores, at: f.at } : null;
 }
 
 /**
@@ -131,45 +177,46 @@ export function cleanBoard(b) {
   for (const club of SCORE_CLUBS) {
     const s = cleanScores(b.scores?.[club]);
     if (s) out.scores[club] = s;
+    if (SCORE_SETUP_IDS.includes(b.setups?.[club])) out.setups[club] = b.setups[club];
   }
   out.clock = cleanClock(b.clock);
   out.finale = cleanFinale(b.finale);
   return out;
 }
 
-/** True when any team has a point. @param {{[t: string]: number}} scores */
-export function anyPoints(scores) {
-  return SCORE_TEAMS.some((t) => scores[t] > 0);
+/** True when any of these teams has a point. @param {{[t: string]: number}} scores @param {readonly string[]} [teams] */
+export function anyPoints(scores, teams = SCORE_TEAMS) {
+  return teams.some((t) => scores[t] > 0);
 }
 
 /**
  * Who won: the team(s) with the top score. `tie` when two or more share it;
  * no teams when nobody scored.
- * @param {{[t: string]: number}} scores
+ * @param {{[t: string]: number}} scores @param {readonly string[]} [playing]
  * @returns {{teams: string[], tie: boolean, top: number}}
  */
-export function winnerOf(scores) {
-  const top = Math.max(...SCORE_TEAMS.map((t) => scores[t]));
+export function winnerOf(scores, playing = SCORE_TEAMS) {
+  const top = Math.max(...playing.map((t) => scores[t]));
   if (!(top > 0)) return { teams: [], tie: false, top: 0 };
-  const teams = SCORE_TEAMS.filter((t) => scores[t] === top);
+  const teams = playing.filter((t) => scores[t] === top);
   return { teams, tie: teams.length > 1, top };
 }
 
-/** The team in front alone, or null (no points, or a tie at the top). @param {{[t: string]: number}} scores */
-export function leaderOf(scores) {
-  const w = winnerOf(scores);
+/** The team in front alone, or null (no points, or a tie at the top). @param {{[t: string]: number}} scores @param {readonly string[]} [playing] */
+export function leaderOf(scores, playing = SCORE_TEAMS) {
+  const w = winnerOf(scores, playing);
   return w.teams.length === 1 ? w.teams[0] : null;
 }
 
 /**
  * Teams whose score went UP between two readings, with how many points.
  * A removed point gets no takeover (owner: "a removed point just ticks down quietly").
- * @param {{[t: string]: number}|null} before @param {{[t: string]: number}} after
+ * @param {{[t: string]: number}|null} before @param {{[t: string]: number}} after @param {readonly string[]} [playing]
  * @returns {{team: string, gained: number}[]}
  */
-export function pointsGained(before, after) {
+export function pointsGained(before, after, playing = SCORE_TEAMS) {
   if (!before) return [];
-  return SCORE_TEAMS.filter((t) => after[t] > before[t]).map((t) => ({ team: t, gained: after[t] - before[t] }));
+  return playing.filter((t) => after[t] > before[t]).map((t) => ({ team: t, gained: after[t] - before[t] }));
 }
 
 /**

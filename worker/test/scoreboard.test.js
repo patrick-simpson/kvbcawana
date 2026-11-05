@@ -41,7 +41,8 @@ describe('the game time scoreboard', () => {
     expect(a.status).toBe(200);
     expect(a.body.board.night).toBe('2026-11-04');
     expect(a.body.board.active).toBe(null);
-    expect(a.body.board.scores.tnt).toEqual({ blue: 0, red: 0, yellow: 0, green: 0 });
+    expect(a.body.board.scores.tnt).toMatchObject({ blue: 0, red: 0, yellow: 0, green: 0 });
+    expect(a.body.board.setups.tnt).toBe('four');
     expect(a.body.serverNow).toBe(s.now());
     for (const [m, p, b] of [['GET', '/v1/scoreboard'], ['POST', '/v1/scoreboard/club', { club: 'tnt' }], ['POST', '/v1/scoreboard/point', { club: 'tnt', team: 'red', delta: 1 }], ['POST', '/v1/scoreboard/end', {}], ['POST', '/v1/scoreboard/clock', { op: 'clear' }]]) {
       expect((await s.call(m, p, b, null)).status).toBe(401);
@@ -59,8 +60,8 @@ describe('the game time scoreboard', () => {
     expect(sparksMiss.status).toBe(409);
     expect(sparksMiss.body.board.active).toBe('tnt');
     const b = (await s.call('GET', '/v1/scoreboard')).body.board;
-    expect(b.scores.tnt).toEqual({ blue: 0, red: 2, yellow: 0, green: 0 });
-    expect(b.scores.sparks).toEqual({ blue: 0, red: 0, yellow: 0, green: 0 });
+    expect(b.scores.tnt).toMatchObject({ blue: 0, red: 2, yellow: 0, green: 0 });
+    expect(b.scores.sparks).toMatchObject({ blue: 0, red: 0, yellow: 0, green: 0 });
     expect((await s.storage.get(SCORE_KEY)).scores.tnt.red).toBe(2);
     expect(s.rings().length).toBe(3);   // club + two points
   });
@@ -76,7 +77,8 @@ describe('the game time scoreboard', () => {
     const s = await setup();
     await s.call('POST', '/v1/scoreboard/club', { club: 'tnt' });
     expect((await s.call('POST', '/v1/scoreboard/club', { club: 'trek' })).status).toBe(400);
-    expect((await point(s, 'tnt', 'purple')).status).toBe(400);
+    expect((await point(s, 'tnt', 'purple')).body.reason).toBe('not-playing');
+    expect((await s.call('POST', '/v1/scoreboard/point', { club: 'tnt', team: 7, delta: 1 })).status).toBe(400);
     expect((await point(s, 'tnt', 'red', 5)).status).toBe(400);
   });
 
@@ -168,5 +170,44 @@ describe('the game time scoreboard', () => {
     expect(b.clock.kind).toBe('stopwatch');
     expect((await s.call('POST', '/v1/scoreboard/clock', { op: 'pause' })).status).toBe(200);
     expect((await s.call('POST', '/v1/scoreboard/clock', { op: 'twist' })).status).toBe(400);
+  });
+});
+
+describe('team setups (owner 2026-11-05: Boys vs Girls, Red vs Green, Blue vs Yellow, Leaders vs Kids)', () => {
+  it('a setup is per club, scores only its own teams, and lasts the night', async () => {
+    const s = await setup();
+    await s.call('POST', '/v1/scoreboard/club', { club: 'tnt' });
+    const b = (await s.call('POST', '/v1/scoreboard/setup', { club: 'tnt', setup: 'boys-girls', keep: false })).body.board;
+    expect(b.setups).toEqual({ tnt: 'boys-girls', sparks: 'four', cubbies: 'four' });
+    expect((await point(s, 'tnt', 'boys')).status).toBe(200);
+    expect((await point(s, 'tnt', 'red')).body.reason).toBe('not-playing');
+    expect((await s.call('POST', '/v1/scoreboard/setup', { club: 'tnt', setup: 'pink-purple' })).status).toBe(400);
+    s.setNow('2026-11-12T00:10:00Z');
+    expect((await s.call('GET', '/v1/scoreboard')).body.board.setups.tnt).toBe('four');
+  });
+
+  it('a new setup at 0 plays the old game\'s winner first; keep carries matching teams over', async () => {
+    const s = await setup();
+    await s.call('POST', '/v1/scoreboard/club', { club: 'sparks' });
+    await point(s, 'sparks', 'red');
+    await point(s, 'sparks', 'red');
+    await point(s, 'sparks', 'green');
+    const kept = (await s.call('POST', '/v1/scoreboard/setup', { club: 'sparks', setup: 'red-green', keep: true })).body.board;
+    expect(kept.finale).toBe(null);
+    expect([kept.scores.sparks.red, kept.scores.sparks.green]).toEqual([2, 1]);
+    const fresh = (await s.call('POST', '/v1/scoreboard/setup', { club: 'sparks', setup: 'four', keep: false })).body.board;
+    expect(fresh.finale).toMatchObject({ club: 'sparks', teams: ['red', 'green'] });
+    expect(fresh.finale.scores.red).toBe(2);
+    expect(fresh.scores.sparks).toMatchObject({ blue: 0, red: 0, yellow: 0, green: 0 });
+    expect(fresh.active).toBe('sparks');
+  });
+
+  it('End on a two-team game names those two teams', async () => {
+    const s = await setup();
+    await s.call('POST', '/v1/scoreboard/club', { club: 'cubbies' });
+    await s.call('POST', '/v1/scoreboard/setup', { club: 'cubbies', setup: 'leaders-kids', keep: false });
+    await point(s, 'cubbies', 'kids');
+    const b = (await s.call('POST', '/v1/scoreboard/end', {})).body.board;
+    expect(b.finale.teams).toEqual(['leaders', 'kids']);
   });
 });

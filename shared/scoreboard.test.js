@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
+  SCORE_ALL_TEAMS,
+  SCORE_SETUPS,
+  SCORE_TEAM_WORDS,
   SCORE_TEAMS,
   SCORE_TEAM_COLORS,
   cleanBoard,
@@ -13,6 +16,7 @@ import {
   nightOf,
   offsetSample,
   pointsGained,
+  teamsFor,
   winnerOf,
 } from './scoreboard.js';
 import schedule from './schedule.json';
@@ -44,7 +48,7 @@ describe('the board', () => {
     expect(cleanBoard({ ...b, v: 2 })).toBe(null);
     expect(cleanBoard({ ...b, active: 'trek' }).active).toBe(null);
     const bad = cleanBoard({ ...b, scores: { ...b.scores, sparks: { blue: -1, red: 1, yellow: 1, green: 1 } } });
-    expect(bad.scores.sparks).toEqual({ blue: 0, red: 0, yellow: 0, green: 0 });
+    expect(bad.scores.sparks).toMatchObject({ blue: 0, red: 0, yellow: 0, green: 0 });
     expect(cleanBoard({ ...b, clock: { ...b.clock, durationMs: 10 } }).clock).toBe(null);
     expect(cleanBoard({ ...b, extra: 'Ava Smith' })).not.toHaveProperty('extra');
   });
@@ -109,6 +113,36 @@ describe('the stopwatch and timer', () => {
     sync.add(3000, 3300, 7400);   // rtt 300
     expect(sync.offset()).toBe(4000);
     expect(sync.known()).toBe(true);
+  });
+});
+
+describe('team setups', () => {
+  it('the four colours, and four two-team splits', () => {
+    expect(Object.fromEntries(Object.entries(SCORE_SETUPS).map(([k, v]) => [k, v.teams]))).toEqual({
+      four: ['blue', 'red', 'yellow', 'green'],
+      'boys-girls': ['boys', 'girls'],
+      'red-green': ['red', 'green'],
+      'blue-yellow': ['blue', 'yellow'],
+      'leaders-kids': ['leaders', 'kids'],
+    });
+    for (const t of SCORE_ALL_TEAMS) expect(SCORE_TEAM_COLORS[t] && SCORE_TEAM_WORDS[t]).toBeTruthy();
+  });
+
+  it('a board from before the setups reads as the four colours; a club\'s setup picks its teams', () => {
+    const old = { v: 1, night: '2026-11-04', active: 'tnt', rev: 3, at: null, clock: null, finale: null, scores: { tnt: { blue: 1, red: 2, yellow: 3, green: 4 } } };
+    const b = cleanBoard(old);
+    expect(b.setups.tnt).toBe('four');
+    expect(b.scores.tnt).toMatchObject({ red: 2, boys: 0 });
+    b.setups.tnt = 'boys-girls';
+    expect(teamsFor(b, 'tnt')).toEqual(['boys', 'girls']);
+    expect(cleanBoard({ ...b, setups: { tnt: 'nonsense' } }).setups.tnt).toBe('four');
+  });
+
+  it('who leads and who won among the teams playing only', () => {
+    const s = { blue: 9, red: 2, yellow: 0, green: 0, boys: 3, girls: 4, leaders: 0, kids: 0 };
+    expect(leaderOf(s, ['boys', 'girls'])).toBe('girls');
+    expect(winnerOf(s, ['boys', 'girls']).teams).toEqual(['girls']);
+    expect(pointsGained({ ...s, blue: 0 }, s, ['boys', 'girls'])).toEqual([]);
   });
 });
 

@@ -32,6 +32,7 @@ function worker() {
     'POST /v1/scoreboard/point': (b) => core.point(b),
     'POST /v1/scoreboard/end': () => core.end(),
     'POST /v1/scoreboard/clock': (b) => core.clock(b),
+    'POST /v1/scoreboard/setup': (b) => core.setup(b),
   };
   /** @param {import('@playwright/test').Page} page */
   const attach = async (page) => {
@@ -160,8 +161,8 @@ test.describe('the game time scoreboard', () => {
     await ph.context().close();
   });
 
-  test('switching clubs asks once more, then plays the old club\'s winner; Cubbies too', async ({ browser }) => {
-    test.setTimeout(60000);
+  test('switching clubs asks once more, then plays the old club\'s winner; Cubbies too; team setups', async ({ browser }) => {
+    test.setTimeout(90000);
     const w = worker();
     const wall = await projector(browser, w);
     const ph = await phone(browser, w);
@@ -181,6 +182,39 @@ test.describe('the game time scoreboard', () => {
     await shot(ph, 'phone-7-cubbies');
     await expect(wall.locator('.pj-finale')).toHaveCount(0, { timeout: 12000 });
     await shot(wall, 'wall-10-cubbies');
+
+    // Team setups (owner 2026-11-05): Options; no points yet = at once.
+    await ph.locator('#opts-btn').click();
+    await expect(ph.locator('#opts')).toBeVisible();
+    await shot(ph, 'phone-8-options');
+    await ph.locator('.sb-setup[data-setup="boys-girls"]').click();
+    await expect(ph.locator('#opts')).toBeHidden();
+    await expect(ph.locator('.sb-plus')).toHaveCount(2);
+    await expect(wall.locator('.pj-score[data-count="2"] .pj-score__team')).toHaveCount(2);
+    for (let i = 0; i < 4; i += 1) await ph.locator('.sb-plus[data-team="girls"]').click();
+    for (let i = 0; i < 3; i += 1) await ph.locator('.sb-plus[data-team="boys"]').click();
+    await expect(ph.locator('.sb-plus[data-team="boys"] .sb-plus__num')).toHaveText('3');
+    await expect(wall.locator('.pj-take')).toHaveCount(0, { timeout: 6000 });
+    await expect(wall.locator('[data-team="girls"] .pj-score__num')).toHaveText('4');
+    await wall.waitForTimeout(800);
+    await shot(ph, 'phone-9-boys-girls');
+    await shot(wall, 'wall-11-boys-girls');
+
+    // With points the phone asks; Start at 0 plays GIRLS WINS first.
+    await ph.locator('#opts-btn').click();
+    await ph.locator('.sb-setup[data-setup="leaders-kids"]').click();
+    await expect(ph.locator('#opts-ask')).toBeVisible();
+    await shot(ph, 'phone-10-ask');
+    await ph.locator('#opts-zero').click();
+    await expect(wall.locator('.pj-finale')).toContainText('GIRLS WINS!');
+    await expect(wall.locator('.pj-finale__chip')).toHaveCount(2);
+    await expect(wall.locator('.pj-finale')).toHaveCount(0, { timeout: 12000 });
+    await expect(wall.locator('[data-team="leaders"]')).toBeVisible();
+    await ph.locator('.sb-plus[data-team="kids"]').click();
+    await expect(wall.locator('.pj-take[data-teams="kids"]')).toBeVisible();
+    await expect(wall.locator('.pj-take')).toHaveCount(0, { timeout: 6000 });
+    await wall.waitForTimeout(800);
+    await shot(wall, 'wall-12-leaders-kids');
     await wall.context().close();
     await ph.context().close();
   });

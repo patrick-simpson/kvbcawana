@@ -2,7 +2,7 @@
 // The rules themselves are shared/scoreboard.js, one copy with the Worker and
 // the projector.
 
-import { SCORE_CLUBS, SCORE_TEAMS, TIMER_MAX_MS, gameEndMinute } from '../../../shared/scoreboard.js';
+import { SCORE_ALL_TEAMS, SCORE_CLUBS, TIMER_MAX_MS, gameEndMinute } from '../../../shared/scoreboard.js';
 
 /** The phone's field behind everything, per club (owner 2026-11-05: "Deep club shade"). */
 export const CLUB_FIELDS = Object.freeze({
@@ -27,7 +27,7 @@ export const TIMER_MIN_S = 15;
 export function shownScores(board, club, pending) {
   const base = board && club ? board.scores[club] : null;
   const out = {};
-  for (const t of SCORE_TEAMS) out[t] = Math.max(0, (base ? base[t] : 0) + (pending[t] || 0));
+  for (const t of SCORE_ALL_TEAMS) out[t] = Math.max(0, (base ? base[t] : 0) + (pending[t] || 0));
   return out;
 }
 

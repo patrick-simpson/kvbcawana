@@ -8,8 +8,8 @@ describe('the scoreboard phone page', () => {
     const b = emptyBoard('2026-11-04');
     b.active = 'tnt';
     b.scores.tnt.red = 3;
-    expect(shownScores(b, 'tnt', { red: 2, blue: -1 })).toEqual({ blue: 0, red: 5, yellow: 0, green: 0 });
-    expect(shownScores(null, null, {})).toEqual({ blue: 0, red: 0, yellow: 0, green: 0 });
+    expect(shownScores(b, 'tnt', { red: 2, blue: -1 })).toMatchObject({ blue: 0, red: 5, yellow: 0, green: 0, boys: 0 });
+    expect(shownScores(null, null, {})).toMatchObject({ blue: 0, red: 0, yellow: 0, green: 0, kids: 0 });
   });
 
   it('the game clock: ends time and time left, then TIME\'S UP', () => {

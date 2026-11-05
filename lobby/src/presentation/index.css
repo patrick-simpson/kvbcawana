@@ -660,10 +660,14 @@
   text-shadow: calc(0.55 * var(--u)) calc(0.55 * var(--u)) 0 var(--team-deep);
   margin-top: calc(1.4 * var(--u));
 }
+.pj-score[data-count='2'] .pj-score__grid { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr; gap: calc(2 * var(--u)); }
+.pj-score[data-count='2'] .pj-score__num { font-size: calc(26 * var(--u)); }
+.pj-score[data-count='2'] .pj-score__name { font-size: calc(4.2 * var(--u)); }
+.pj-score[data-compact='1'][data-count='2'] .pj-score__grid { left: calc(28 * var(--u)); right: calc(28 * var(--u)); grid-template-columns: 1fr 1fr; }
 .pj-score[data-compact='1'] .pj-score__team { justify-content: flex-end; padding: 0 calc(1.3 * var(--u)); border-radius: calc(1 * var(--u)); }
 .pj-score[data-compact='1'] .pj-score__team::after { border-width: calc(0.16 * var(--u)); transform: translate(calc(-0.3 * var(--u)), calc(-0.3 * var(--u))); }
-.pj-score[data-compact='1'] .pj-score__name { position: absolute; left: calc(1.3 * var(--u)); top: 50%; translate: 0 -50%; font-size: calc(2.2 * var(--u)); }
-.pj-score[data-compact='1'] .pj-score__num { font-size: calc(5.4 * var(--u)); margin-top: 0; text-shadow: calc(0.25 * var(--u)) calc(0.25 * var(--u)) 0 var(--team-deep); }
+.pj-score[data-compact='1'] .pj-score__name, .pj-score[data-compact='1'][data-count='2'] .pj-score__name { position: absolute; left: calc(1.3 * var(--u)); top: 50%; translate: 0 -50%; font-size: calc(2.2 * var(--u)); }
+.pj-score[data-compact='1'] .pj-score__num, .pj-score[data-compact='1'][data-count='2'] .pj-score__num { font-size: calc(5.4 * var(--u)); margin-top: 0; text-shadow: calc(0.25 * var(--u)) calc(0.25 * var(--u)) 0 var(--team-deep); }
 .pj-score__clock {
   position: absolute;
   left: 0;

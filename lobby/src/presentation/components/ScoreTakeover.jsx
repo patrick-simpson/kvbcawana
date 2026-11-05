@@ -15,11 +15,11 @@ import { EASE } from '../lib/motion-tokens.js';
  * `still` (low power / reduced motion): no wipe, no slam, no sparkles: the
  * finished card, held, then gone.
  *
- * @param {{ hits: {team: string, gained: number}[], scores: Record<string, number>, still: boolean }} props
+ * @param {{ hits: {team: string, gained: number}[], scores: Record<string, number>, teams?: readonly string[], still: boolean }} props
  */
-export const ScoreTakeover = ({ hits, scores, still }) => {
+export const ScoreTakeover = ({ hits, scores, teams = SCORE_TEAMS, still }) => {
   const one = hits.length === 1;
-  const origin = one ? CORNER[hits[0].team] : '50% 50%';
+  const origin = one ? originOf(hits[0].team, teams) : '50% 50%';
   return (
     <motion.div
       className="pj-take"
@@ -38,8 +38,13 @@ export const ScoreTakeover = ({ hits, scores, still }) => {
   );
 };
 
-/** Each team's corner in the 2 x 2 (the wipe starts where its plate sits). */
-const CORNER = { blue: '0% 0%', red: '100% 0%', yellow: '0% 100%', green: '100% 100%' };
+/** Where the team's plate sits (the wipe starts there): a corner of the 2 x 2, or a side of the two halves. */
+const CORNERS = ['0% 0%', '100% 0%', '0% 100%', '100% 100%'];
+const SIDES = ['0% 50%', '100% 50%'];
+function originOf(team, teams) {
+  const i = Math.max(0, teams.indexOf(team));
+  return (teams.length === 2 ? SIDES : CORNERS)[i] || '50% 50%';
+}
 
 /** The slant between bands, as a share of the wall's width. */
 const SLANT = 0.08;

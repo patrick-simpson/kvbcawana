@@ -1676,6 +1676,7 @@ with no club up and no clock.
 |---|---|---|---|
 | `GET /v1/scoreboard` | session | | `{ok, board, serverNow}` |
 | `POST /v1/scoreboard/club` | session | `{club: 'tnt'\|'sparks'\|'cubbies'}` | the state; 400 `bad-club` |
-| `POST /v1/scoreboard/point` | session | `{club, team: 'blue'\|'red'\|'yellow'\|'green', delta: 1\|-1}` | the state (never below 0, at most 999); 409 `not-active` (with the board) when that club is not up; 400 `bad-point` |
+| `POST /v1/scoreboard/point` | session | `{club, team, delta: 1\|-1}` (`team` one of the club's setup: blue/red/yellow/green, boys/girls, leaders/kids) | the state (never below 0, at most 999); 409 `not-active` (with the board) when that club is not up, 409 `not-playing` when the team is not in its setup; 400 `bad-point` |
 | `POST /v1/scoreboard/end` | session | `{}` | the state, `active: null` |
+| `POST /v1/scoreboard/setup` | session | `{club, setup: 'four'\|'boys-girls'\|'red-green'\|'blue-yellow'\|'leaders-kids', keep: boolean}` | the state; `keep: false` = a new game (the old setup's finale when that club is up and anyone scored, the new teams at 0), `keep: true` = the new teams keep tonight's scores; 400 `bad-setup`. Each club's setup lasts the night |
 | `POST /v1/scoreboard/clock` | session | `{op: 'start', kind: 'stopwatch'}` / `{op: 'start', kind: 'timer', durationMs: 1000..3600000}` / `{op: 'pause'\|'resume'\|'clear'}` | the state; 400 `bad-clock`; 409 `no-clock` |

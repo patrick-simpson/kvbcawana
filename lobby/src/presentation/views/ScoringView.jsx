@@ -49,14 +49,15 @@ import {
  * @param {{
  *   now: Date,
  *   club: 'tnt'|'sparks'|'cubbies',
- *   scores: {blue: number, red: number, yellow: number, green: number},
+ *   scores: Record<string, number>,
+ *   teams?: readonly string[],
  *   clock: any,
  *   serverNow: () => number,
  *   windows: any[],
  *   tally: any,
  * }} props
  */
-export const ScoringView = ({ now, club, scores, clock, serverNow, windows, tally }) => {
+export const ScoringView = ({ now, club, scores, teams = SCORE_TEAMS, clock, serverNow, windows, tally }) => {
   const lowPower = useLowPower();
   const info = CLUBS[club];
   const gameWindow = useMemo(
@@ -84,7 +85,7 @@ export const ScoringView = ({ now, club, scores, clock, serverNow, windows, tall
   const prev = useRef(scores);
   const ids = useRef(0);
   useEffect(() => {
-    const gained = pointsGained(prev.current, scores);
+    const gained = pointsGained(prev.current, scores, teams);
     prev.current = scores;
     if (!gained.length) return;
     gained.forEach((g, i) => {
@@ -101,12 +102,13 @@ export const ScoringView = ({ now, club, scores, clock, serverNow, windows, tall
           if (same) same.gained += g.gained;
           else hits.push(g);
         }
-        hits.sort((x, y) => SCORE_TEAMS.indexOf(x.team) - SCORE_TEAMS.indexOf(y.team));
+        hits.sort((x, y) => teams.indexOf(x.team) - teams.indexOf(y.team));
         return { id: cur.id, hits, startedAt: cur.startedAt, last: t };
       }
       ids.current += 1;
       return { id: ids.current, hits: gained, startedAt: t, last: t };
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scores]);
   useEffect(() => {
     if (!takeover) return undefined;
@@ -114,7 +116,7 @@ export const ScoringView = ({ now, club, scores, clock, serverNow, windows, tall
     return () => window.clearTimeout(timer);
   }, [takeover]);
 
-  const leader = leaderOf(scores);
+  const leader = leaderOf(scores, teams);
   const compact = Boolean(clock);
 
   // The strip's game clock drops in from the middle of the wall.
@@ -131,10 +133,10 @@ export const ScoringView = ({ now, club, scores, clock, serverNow, windows, tall
 
   return (
     <div className="w-full h-full relative overflow-hidden" style={{ background: '#000000' }} data-scoring={club}>
-      <div className="pj-frame pj-score" data-compact={compact ? '1' : '0'}>
+      <div className="pj-frame pj-score" data-compact={compact ? '1' : '0'} data-count={teams.length}>
         <div className="pj-score__grid">
-          {SCORE_TEAMS.map((team, i) => (
-            <TeamPlate key={team} team={team} score={scores[team]} index={i} leading={leader === team} compact={compact} still={lowPower} />
+          {teams.map((team, i) => (
+            <TeamPlate key={team} team={team} score={scores[team]} index={i} count={teams.length} leading={leader === team} compact={compact} still={lowPower} />
           ))}
         </div>
 
@@ -188,28 +190,26 @@ export const ScoringView = ({ now, club, scores, clock, serverNow, windows, tall
       </div>
 
       <AnimatePresence>
-        {takeover && <ScoreTakeover key={takeover.id} hits={takeover.hits} scores={scores} still={lowPower} />}
+        {takeover && <ScoreTakeover key={takeover.id} hits={takeover.hits} scores={scores} teams={teams} still={lowPower} />}
       </AnimatePresence>
     </div>
   );
 };
 
-/** The corners the plates fly in from, in the 2 x 2's order (blue, red, yellow, green). */
-const FROM = [
-  { x: -1, y: -1 },
-  { x: 1, y: -1 },
-  { x: -1, y: 1 },
-  { x: 1, y: 1 },
-];
+/** Where the plates fly in from: the 2 x 2's corners (blue, red, yellow, green), or the two halves' sides. */
+const FROM = {
+  4: [{ x: -1, y: -1 }, { x: 1, y: -1 }, { x: -1, y: 1 }, { x: 1, y: 1 }],
+  2: [{ x: -1, y: 0 }, { x: 1, y: 0 }],
+};
 
 /**
  * One team: its plate in its colour with a hard offset in its shade and a white
  * keyline out of register (the kit's stepped look), the name in Londrina caps,
  * the score in Paytone. A new score slams in; a lower one swaps quietly.
  */
-const TeamPlate = ({ team, score, index, leading, compact, still }) => {
+const TeamPlate = ({ team, score, index, count, leading, compact, still }) => {
   const c = SCORE_TEAM_COLORS[team];
-  const from = FROM[index];
+  const from = (FROM[count] || FROM[4])[index] || { x: 0, y: 1 };
   // Up or down since the last render (adjusted during render, never in an effect).
   const [seen, setSeen] = useState({ score, up: false });
   if (seen.score !== score) setSeen({ score, up: score > seen.score });

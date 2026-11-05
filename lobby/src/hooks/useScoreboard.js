@@ -50,7 +50,7 @@ export function useScoreboard({ enabled }) {
     const f = b.finale;
     if (f && f.id > finaleSeen.current) {
       finaleSeen.current = f.id;
-      if (wallNow() + sync.offset() - f.at <= FINALE_FRESH_MS) setFinale({ id: f.id, club: f.club, scores: f.scores });
+      if (wallNow() + sync.offset() - f.at <= FINALE_FRESH_MS) setFinale({ id: f.id, club: f.club, teams: f.teams, scores: f.scores });
     }
   }, [sync]);
 

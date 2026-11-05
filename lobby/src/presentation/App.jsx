@@ -25,6 +25,7 @@ import { GameTimeView } from './views/GameTimeView.jsx';
 import { ScoringView } from './views/ScoringView.jsx';
 import { ScoreFinale } from './components/ScoreFinale.jsx';
 import { useScoreboard } from '../hooks/useScoreboard.js';
+import { teamsFor } from '../../../shared/scoreboard.js';
 import { useLowPower } from './hooks/useLowPower.js';
 import { SlideshowView } from './views/SlideshowView.jsx';
 import { ShutdownView } from './views/ShutdownView.jsx';
@@ -325,7 +326,7 @@ export const App = () => {
           top at once and the countdown is let go under it. */}
       <AnimatePresence mode={!scoringClub && cutsIn(state, now) ? 'sync' : 'wait'} custom={!scoringClub && cutsIn(state, now)}>
         <motion.div
-          key={scoringClub ? `scoring:${scoringClub}` : stateKey(state)}
+          key={scoringClub ? `scoring:${scoringClub}:${board.setups[scoringClub]}` : stateKey(state)}
           className="absolute inset-0"
           data-mode={scoringClub ? 'scoring' : slugFor(state)}
           data-deck={state.mode === AppMode.SLIDESHOW ? state.deck : undefined}
@@ -340,6 +341,7 @@ export const App = () => {
                 now={now}
                 club={scoringClub}
                 scores={board.scores[scoringClub]}
+                teams={teamsFor(board, scoringClub)}
                 clock={board.clock}
                 serverNow={serverNow}
                 windows={effectiveWindows}
@@ -369,7 +371,7 @@ export const App = () => {
       <AnimatePresence>{backup && <BackupView key={backup} what={backup} />}</AnimatePresence>
 
       <AnimatePresence>
-        {finale && <ScoreFinale key={finale.id} club={finale.club} scores={finale.scores} still={lowPowerNow} />}
+        {finale && <ScoreFinale key={finale.id} club={finale.club} teams={finale.teams} scores={finale.scores} still={lowPowerNow} />}
       </AnimatePresence>
 
       {/* The scoreboard's plates fill the wall's corners: the logo steps aside. */}

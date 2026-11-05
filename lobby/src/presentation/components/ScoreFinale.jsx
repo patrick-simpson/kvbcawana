@@ -10,11 +10,11 @@ import { EASE } from '../lib/motion-tokens.js';
  * lifted and keylined; a tie splits the wall into the tied teams' colours with
  * "IT'S A TIE!". Held FINALE_MS (the caller's timer) over whatever comes next.
  *
- * @param {{ club: string, scores: Record<string, number>, still: boolean }} props
+ * @param {{ club: string, scores: Record<string, number>, teams?: readonly string[], still: boolean }} props
  */
-export const ScoreFinale = ({ club, scores, still }) => {
-  const w = winnerOf(scores);
-  const teams = w.teams.length ? w.teams : SCORE_TEAMS.slice(0, 1);
+export const ScoreFinale = ({ club, scores, teams: playing = SCORE_TEAMS, still }) => {
+  const w = winnerOf(scores, playing);
+  const teams = w.teams.length ? w.teams : playing.slice(0, 1);
   const ink = !w.tie && SCORE_TEAM_COLORS[teams[0]].ink !== '#FFFFFF' ? 'ink' : 'white';
   const head = w.tie ? "IT'S A TIE!" : `${SCORE_TEAM_WORDS[teams[0]]} WINS!`;
   return (
@@ -50,7 +50,7 @@ export const ScoreFinale = ({ club, scores, still }) => {
           {head}
         </motion.p>
         <div className="pj-finale__row">
-          {SCORE_TEAMS.map((t, i) => {
+          {playing.map((t, i) => {
             const c = SCORE_TEAM_COLORS[t];
             const won = w.teams.includes(t);
             return (
