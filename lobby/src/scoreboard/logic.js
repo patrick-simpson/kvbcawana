@@ -2,7 +2,7 @@
 // The rules themselves are shared/scoreboard.js, one copy with the Worker and
 // the projector.
 
-import { SCORE_ALL_TEAMS, SCORE_CLUBS, TIMER_MAX_MS, gameEndMinute } from '../../../shared/scoreboard.js';
+import { SCORE_ALL_TEAMS, TIMER_MAX_MS, gameClockWords } from '../../../shared/scoreboard.js';
 
 /** The phone's field behind everything, per club (owner 2026-11-05: "Deep club shade"). */
 export const CLUB_FIELDS = Object.freeze({
@@ -31,36 +31,8 @@ export function shownScores(board, club, pending) {
   return out;
 }
 
-/**
- * The game clock line for a club: "GAME ENDS 6:30" and the time left (m:ss),
- * or "TIME'S UP" once its game time is over. Minutes from the device's own
- * clock (the phone is in the church's zone).
- * @param {any} schedule @param {string|null} club @param {Date} now
- * @returns {{label: string, left: string}}
- */
-export function gameClockWords(schedule, club, now) {
-  if (!club || !SCORE_CLUBS.includes(club)) return { label: 'Pick a club', left: '' };
-  const end = gameEndMinute(schedule, club);
-  if (end === null) return { label: 'No game time', left: '' };
-  const clock = (mins) => `${((Math.floor(mins / 60) + 11) % 12) + 1}:${String(mins % 60).padStart(2, '0')}`;
-  const label = `Game ends ${clock(end)}`;
-  const nowS = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
-  const left = end * 60 - nowS;
-  if (left <= 0) return { label: "Time's up", left: '' };
-  // Before the game starts: when it runs, not hours of countdown.
-  const start = gameStartMinute(schedule, club);
-  if (start !== null && nowS < start * 60) return { label: `Game time ${clock(start)}–${clock(end)}`, left: '' };
-  return { label, left: `${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}` };
-}
-
-/** The club's game window start, minutes after midnight (null when none). @param {any} schedule @param {string} club */
-function gameStartMinute(schedule, club) {
-  const windows = Array.isArray(schedule) ? schedule : schedule?.windows;
-  const w = Array.isArray(windows) ? windows.find((x) => x && x.kind === 'game' && Array.isArray(x.clubs) && x.clubs.includes(club) && /^\d{1,2}:\d{2}$/.test(x.start)) : null;
-  if (!w) return null;
-  const [h, m] = w.start.split(':').map(Number);
-  return h * 60 + m;
-}
+/** The game clock line (shared/scoreboard.js, one copy with the lobby's score bar). */
+export { gameClockWords };
 
 /** The timer stepper: seconds moved by one step, kept 15 s to 60 min. @param {number} secs @param {1|-1} dir */
 export function stepTimer(secs, dir) {

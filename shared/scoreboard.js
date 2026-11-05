@@ -315,3 +315,33 @@ export function gameClubsWith(schedule, club) {
   const w = Array.isArray(windows) ? windows.find((x) => x && x.kind === 'game' && Array.isArray(x.clubs) && x.clubs.includes(club)) : null;
   return w ? w.clubs.filter((c) => typeof c === 'string') : [club];
 }
+
+/** The club's game window start, minutes after midnight (null when none). @param {any} schedule @param {string} club */
+export function gameStartMinute(schedule, club) {
+  const windows = Array.isArray(schedule) ? schedule : schedule?.windows;
+  const w = Array.isArray(windows) ? windows.find((x) => x && x.kind === 'game' && Array.isArray(x.clubs) && x.clubs.includes(club) && /^\d{1,2}:\d{2}$/.test(x.start)) : null;
+  if (!w) return null;
+  const [h, m] = w.start.split(':').map(Number);
+  return h * 60 + m;
+}
+
+/**
+ * The game clock line for a club, read the same on the phone and the lobby:
+ * "Game ends 6:30" and the time left (m:ss); before the game, when it runs
+ * ("Game time 6:05–6:30", never hours of countdown); "Time's up" after.
+ * Minutes from the device's own clock (the screens are in the church's zone).
+ * @param {any} schedule @param {string|null} club @param {Date} now
+ * @returns {{label: string, left: string}}
+ */
+export function gameClockWords(schedule, club, now) {
+  if (!club || !SCORE_CLUBS.includes(club)) return { label: 'Pick a club', left: '' };
+  const end = gameEndMinute(schedule, club);
+  if (end === null) return { label: 'No game time', left: '' };
+  const clock = (mins) => `${((Math.floor(mins / 60) + 11) % 12) + 1}:${String(mins % 60).padStart(2, '0')}`;
+  const nowS = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
+  const left = end * 60 - nowS;
+  if (left <= 0) return { label: "Time's up", left: '' };
+  const start = gameStartMinute(schedule, club);
+  if (start !== null && nowS < start * 60) return { label: `Game time ${clock(start)}–${clock(end)}`, left: '' };
+  return { label: `Game ends ${clock(end)}`, left: `${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}` };
+}
