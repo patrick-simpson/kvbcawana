@@ -1,4 +1,4 @@
-// The letterhead maker (owner 2026-10-28; awana.kvbchurch.org/tools/letterhead/,
+// The print tool (owner 2026-10-28, renamed from Letterhead 2026-11-05; awana.kvbchurch.org/tools/print/,
 // unlisted): type or paste a letter, see it on the Awana letterhead, print it
 // or save it as a PDF from the browser's print dialog. The drawing is
 // shared/letterhead.js (copied beside this file by site/build.mjs), the same

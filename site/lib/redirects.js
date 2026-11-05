@@ -14,6 +14,10 @@ export const PAGE_REDIRECTS = [
   ['/desk', '/checkin/'],
   ['/desk/', '/checkin/'],
   ['/desk/index.html', '/checkin/'],
+  // The letterhead maker became the Print tool (owner 2026-11-05): old bookmarks land there.
+  ['/tools/letterhead', '/tools/print/'],
+  ['/tools/letterhead/', '/tools/print/'],
+  ['/tools/letterhead/index.html', '/tools/print/'],
 ];
 
 export const pageRedirects = () => PAGE_REDIRECTS.map(([from, to]) => `${from} ${to} 301`);

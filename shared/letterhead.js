@@ -1,7 +1,7 @@
 // @ts-check
 // Awana letterhead (owner 2026-10-28): plain text in, one Letter page out, in
 // the 2026-27 catalog look with the church's own logo. ONE copy of the rules
-// and the drawing, used by the hidden page awana.kvbchurch.org/tools/letterhead/
+// and the drawing, used by the hidden page awana.kvbchurch.org/tools/print/
 // (preview, Print / Save as PDF) and by the print job
 // (scripts/letterhead/letterhead-print.mjs: PDF in Chromium, emailed to the
 // downstairs Epson). Pure (no DOM, no imports, no clock unless given): the

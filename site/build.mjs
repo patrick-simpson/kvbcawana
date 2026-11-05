@@ -148,14 +148,15 @@ run(`node scripts/stamp-build.mjs ${hashTree(path.join(ROOT, 'classroom', 'publi
   cpSync(path.join(ROOT, 'site', 'tools', 'handbook-form', 'index.html'), path.join(toolOut, 'index.html'));
 }
 
-// /tools/letterhead: the letterhead maker (site/tools/letterhead/, owner 2026-10-28), signed
+// /tools/print: the print tool (site/tools/print/; owner 2026-10-28 as the letterhead maker at
+// /tools/letterhead, renamed 2026-11-05, the old address 301s here), signed
 // in with the church passphrase. Its page drawing is shared/letterhead.js, copied beside it
 // with the two sign-in modules (the lobby's /lobby/shared/ copy carries no .js). The kit it
 // draws with is the lobby's /lobby/shared/brand/. On /links (owner); noindex as /tools/* below.
 {
-  const toolOut = path.join(OUT, 'tools', 'letterhead');
+  const toolOut = path.join(OUT, 'tools', 'print');
   mkdirSync(path.join(toolOut, 'shared'), { recursive: true });
-  for (const f of ['index.html', 'app.js']) cpSync(path.join(ROOT, 'site', 'tools', 'letterhead', f), path.join(toolOut, f));
+  for (const f of ['index.html', 'app.js']) cpSync(path.join(ROOT, 'site', 'tools', 'print', f), path.join(toolOut, f));
   for (const f of ['letterhead.js', 'sync-protocol.js', 'cloud-crypto.js']) cpSync(path.join(ROOT, 'shared', f), path.join(toolOut, 'shared', f));
 }
 
@@ -355,7 +356,7 @@ writeFileSync(path.join(OUT, '_routes.json'), `${JSON.stringify({
 writeFileSync(path.join(ROOT, 'site', 'lib', 'large-files.generated.js'),
   `// Written by site/build.mjs for build ${BUILD_ID}; not committed.\nexport const LARGE_FILES = ${JSON.stringify(largeFiles, null, 2)};\nexport const LARGE_PREFIXES = ${JSON.stringify(VIDEO_PREFIXES, null, 2)};\n`);
 
-for (const must of ['index.html', 'lobby/index.html', 'lobby/countdown.html', 'lobby/settings.html', 'lobby/projector-remote.html', 'lobby/scoreboard.html', 'journey/index.html', 'journey/remote/index.html', 'classroom/index.html', 'classroom/version.json', 'classroom/src/logic.js', 'classroom/src/stage.js', 'classroom/src/shared/classroomRemote.js', 'classroom/remote/index.html', 'classroom/remote/remote.js', 'journey/remote/remote.js', 'journey/src/shared/journeyRemote.js', 'lobby/shared/sync.json', 'checkin/index.html', 'checkin/ym/index.html', 'checkin/desk-transport.js', 'checkin/cloud-crypto.js', 'checkin/clubs.js', 'checkin/brand/fonts.css', 'links/index.html', 'logo/index.html', 'tools/handbook-form/index.html', 'tools/letterhead/index.html', 'tools/letterhead/shared/letterhead.js', 'tools/tally/index.html', 'presentation/index.html', 'presentation/app.js', 'presentation/shared/cloud-crypto.js', 'classic.html', 'robots.txt', 'lobby/showcase.html', 'lobby/countdown-showcase.html', 'lobby/settings-showcase.html', 'journey/showcase.html', 'journey/remote/showcase.html', 'checkin/showcase.html']) {
+for (const must of ['index.html', 'lobby/index.html', 'lobby/countdown.html', 'lobby/settings.html', 'lobby/projector-remote.html', 'lobby/scoreboard.html', 'journey/index.html', 'journey/remote/index.html', 'classroom/index.html', 'classroom/version.json', 'classroom/src/logic.js', 'classroom/src/stage.js', 'classroom/src/shared/classroomRemote.js', 'classroom/remote/index.html', 'classroom/remote/remote.js', 'journey/remote/remote.js', 'journey/src/shared/journeyRemote.js', 'lobby/shared/sync.json', 'checkin/index.html', 'checkin/ym/index.html', 'checkin/desk-transport.js', 'checkin/cloud-crypto.js', 'checkin/clubs.js', 'checkin/brand/fonts.css', 'links/index.html', 'logo/index.html', 'tools/handbook-form/index.html', 'tools/print/index.html', 'tools/print/shared/letterhead.js', 'tools/tally/index.html', 'presentation/index.html', 'presentation/app.js', 'presentation/shared/cloud-crypto.js', 'classic.html', 'robots.txt', 'lobby/showcase.html', 'lobby/countdown-showcase.html', 'lobby/settings-showcase.html', 'journey/showcase.html', 'journey/remote/showcase.html', 'checkin/showcase.html']) {
   if (!existsSync(path.join(OUT, must))) throw new Error(`site build is missing ${must}`);
 }
 console.log(`\n✓ site/dist built for ${ORIGIN} (build ${BUILD_ID.slice(0, 7)})`);

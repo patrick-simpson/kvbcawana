@@ -16,7 +16,7 @@ const ALLOWED = [
   '/lobby/projector-remote.html', // the opening ceremony remote (phone: Next and Back for the projector's slides)
   '/lobby/scoreboard.html', // the game time scoreboard (phone: four teams' scores and the stopwatch on the projector)
   '/settings', '/logo/',
-  '/tools/letterhead/', // owner 2026-10-28: the letterhead maker is on the links page
+  '/tools/print/', // owner 2026-10-28: the letterhead maker; renamed the Print tool 2026-11-05
   '/download/kvbc-awana', '/help', '/capabilities.html', '/release-notes/printer.md',
   '/',
 ];

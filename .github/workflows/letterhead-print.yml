@@ -1,7 +1,7 @@
 name: Print to the downstairs Epson
 
 # Owner 2026-10-28: newsletter text in, the Awana letterhead (shared/letterhead.js,
-# the same drawing as awana.kvbchurch.org/tools/letterhead/) out, COPIES times in
+# the same drawing as awana.kvbchurch.org/tools/print/) out, COPIES times in
 # ONE PDF, emailed from the owner's Gmail to the downstairs Epson (Epson Connect
 # email print takes no copy count from the mail, so the copies are pages).
 # Or a ready-made PDF, repeated the same way (owner 2026-11-04: the poster
@@ -24,7 +24,7 @@ on:
   workflow_dispatch:
     inputs:
       text:
-        description: 'The letter: first line is the title (see /tools/letterhead/ for the format). Leave empty with a PDF below.'
+        description: 'The letter: first line is the title (see /tools/print/ for the format). Leave empty with a PDF below.'
         type: string
         required: false
       pdf_url:

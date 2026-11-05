@@ -1625,7 +1625,7 @@ step, written through; a count never goes below 0. A change rings
 
 ### 10.16 Print from the letterhead page (BUILT, owner 2026-11-04)
 
-awana.kvbchurch.org/tools/letterhead/ uploads a PDF and a number of copies, or asks for
+awana.kvbchurch.org/tools/print/ uploads a PDF and a number of copies, or asks for
 today's handbook sheets; the Worker starts the GitHub Actions print job
 (`letterhead-print.yml` / `handbook-print.yml`) with the secret `PRINT_DISPATCH_TOKEN`
 (a fine-grained GitHub token, this repo only, Actions: read and write; setup in

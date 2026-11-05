@@ -158,7 +158,7 @@ a child gone between two genuinely read pages leaves tonight's count.
 
 ## The letterhead page's print buttons (`src/prints.js`, `src/routes.md` 10.16)
 
-awana.kvbchurch.org/tools/letterhead/ can send a PDF (any number of copies) or
+awana.kvbchurch.org/tools/print/ can send a PDF (any number of copies) or
 today's handbook sheets to the downstairs Epson. Printing is a GitHub Actions job,
 so the Worker needs a GitHub token that may start this repo's jobs and nothing else:
 

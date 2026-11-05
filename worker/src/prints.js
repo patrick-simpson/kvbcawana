@@ -2,7 +2,7 @@
 // Print from the letterhead page (owner 2026-11-04: "a page where I can upload a
 // PDF and it will send whatever quantity I specify ... I also want to have a
 // button that prints handbook sheets"; src/routes.md 10.16). The page is
-// awana.kvbchurch.org/tools/letterhead/.
+// awana.kvbchurch.org/tools/print/.
 //
 // Printing is a GitHub Actions job (.github/workflows/letterhead-print.yml,
 // handbook-print.yml) that mails a PDF to the downstairs Epson. The page cannot
