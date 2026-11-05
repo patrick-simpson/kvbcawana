@@ -25,6 +25,13 @@ import { DUR, EASE } from '../lib/motion-tokens.js';
 import { holdThen, partVariants } from '../lib/landing.js';
 import { useBirthdays } from '../hooks/useBirthdays.js';
 import { usePortrait } from '../lib/touch.js';
+import { ScoreClock } from '../components/ScoreClock.jsx';
+
+/** Seconds left as m:ss (the game clock in a chip while the stopwatch has the middle). */
+export const formatLeft = (seconds) => {
+  const s = Math.max(0, Math.floor(seconds));
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+};
 
 /** Tally older than this is treated as gone (print server offline). */
 const TALLY_STALE_MS = 10 * 60 * 1000;
@@ -77,7 +84,7 @@ export function countForClub(tally, clubId) {
   return found;
 }
 
-export const GameTimeView = ({ now, window: gameWindow, endsAt, tally }) => {
+export const GameTimeView = ({ now, window: gameWindow, endsAt, tally, clock = null, serverNow }) => {
   // Held still under ?vr=1 / OS reduced-motion, where every ambient layer stops.
   const lowPower = useLowPower();
   const clubs = gameWindow.clubs.map((id) => CLUBS[id]);
@@ -156,6 +163,11 @@ export const GameTimeView = ({ now, window: gameWindow, endsAt, tally }) => {
           />
 
           <motion.div variants={partVariants(3, LAND_HOLD)}>
+            {clock && serverNow ? (
+              // The scoreboard's stopwatch / timer (owner 2026-11-05: any game
+              // time) takes the clock's place; the game clock moves into the chip.
+              <ScoreClock clock={clock} serverNow={serverNow} accent={primary.color} size="var(--text-game-timer)" />
+            ) : (
             <BigTimer
               seconds={seconds}
               color="#FFFFFF"
@@ -163,6 +175,7 @@ export const GameTimeView = ({ now, window: gameWindow, endsAt, tally }) => {
               warnColor={tone?.digits}
               size="var(--text-game-timer)"
             />
+            )}
           </motion.div>
 
           <motion.div className="pj-chip-row pj-game__chips" variants={partVariants(4, LAND_HOLD)}>
@@ -176,7 +189,11 @@ export const GameTimeView = ({ now, window: gameWindow, endsAt, tally }) => {
                 exit={{ opacity: 0, scale: 0.85, transition: { duration: DUR.exit, ease: EASE.exit } }}
               >
                 {warning === 'none' ? (
-                  <StepChip label="Game ends" value={endTimeStr} size={CHIP_SIZE} plate={primary.deep} />
+                  clock ? (
+                    <StepChip label={`Game ends ${endTimeStr}`} value={formatLeft(seconds)} size={CHIP_SIZE} plate={primary.deep} />
+                  ) : (
+                    <StepChip label="Game ends" value={endTimeStr} size={CHIP_SIZE} plate={primary.deep} />
+                  )
                 ) : (
                   <StepChip
                     label={`Game ends ${endTimeStr}`}
@@ -240,11 +257,12 @@ export const GameTimeView = ({ now, window: gameWindow, endsAt, tally }) => {
  * shrinking to fit a long list rather than pushing the row off the wall.
  * The cake beside it sways gently unless the ambient layers are held still.
  */
-const BirthdayChip = ({ names, still }) => {
-  const maxU = usePortrait() ? PORTRAIT.birthdayMaxU : BIRTHDAY_MAX_U;
+export const BirthdayChip = ({ names, still, chipSize = CHIP_SIZE, maxWidthU }) => {
+  const portraitMax = usePortrait() ? PORTRAIT.birthdayMaxU : BIRTHDAY_MAX_U;
+  const maxU = maxWidthU ?? portraitMax;
   const label = 'HAPPY BIRTHDAY';
   const widthEm = chipGeometry(measureEm(label), measureEm(names), inkEm(names)).width;
-  const size = `min(${CHIP_SIZE}, calc(${(maxU / widthEm).toFixed(3)} * var(--u)))`;
+  const size = `min(${chipSize}, calc(${(maxU / widthEm).toFixed(3)} * var(--u)))`;
   return (
     <span className="pj-game__birthday">
       <span className="pj-game__cake" aria-hidden="true">

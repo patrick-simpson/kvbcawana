@@ -116,3 +116,35 @@ export function playStinger(intensity = 0.5) {
     /* audio blocked (no user gesture yet) — silently skip */
   }
 }
+
+/**
+ * Short tones for the scoreboard (owner 2026-11-05: "Short chime per point";
+ * the timer's buzzer at 0). Same switch as the countdown chimes: OFF until the
+ * operator arms "Countdown sounds" (a projector in a quiet room must never
+ * surprise anyone), silent on the lobby's mirror.
+ * @param {{freq: number, at: number, len: number, type?: OscillatorType}[]} notes  at/len in seconds
+ * @param {number} [gainMax]
+ */
+export function playTones(notes, gainMax = 0.14) {
+  if (!enabled || silenced || typeof window === 'undefined') return;
+  const ac = audioCtx();
+  if (!ac) return;
+  try {
+    const t0 = ac.currentTime;
+    for (const n of notes) {
+      const osc = ac.createOscillator();
+      const gain = ac.createGain();
+      osc.type = n.type || 'triangle';
+      osc.frequency.value = n.freq;
+      const start = t0 + n.at;
+      gain.gain.setValueAtTime(0, start);
+      gain.gain.linearRampToValueAtTime(gainMax, start + 0.015);
+      gain.gain.exponentialRampToValueAtTime(0.001, start + n.len);
+      osc.connect(gain).connect(ac.destination);
+      osc.start(start);
+      osc.stop(start + n.len + 0.05);
+    }
+  } catch {
+    /* audio unavailable */
+  }
+}

@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="theme-color" content="#1B1E26" />
+    <meta name="awana-page" content="scoreboard" />
+    <meta name="robots" content="noindex" />
+    <title>Game time scoreboard</title>
+  </head>
+  <body>
+    <noscript><p class="sb-note">The scoreboard needs JavaScript.</p></noscript>
+
+    <section id="signin" class="sb-signin" hidden>
+      <h1 class="sb-shout">Scoreboard</h1>
+      <p>Type the church passphrase to keep score on the game time projector from this phone.</p>
+      <form id="signin-form" autocomplete="off">
+        <label for="passphrase" class="sb-label">Passphrase</label>
+        <input id="passphrase" type="password" autocomplete="current-password" autocapitalize="none" spellcheck="false" enterkeyhint="go" />
+        <button id="signin-btn" type="submit" class="sb-wide sb-wide--hot">Sign in</button>
+      </form>
+      <p id="signin-note" class="sb-note" role="status"></p>
+      <p class="sb-fine">The passphrase is never saved on this phone; only the sign-in is.</p>
+    </section>
+
+    <main id="board" class="sb-board" hidden>
+      <div class="sb-toggle" role="group" aria-label="Which club is playing">
+        <button type="button" class="sb-club" data-club="tnt" aria-pressed="false">T&amp;T</button>
+        <button type="button" class="sb-club" data-club="sparks" aria-pressed="false">SPARKS</button>
+        <button type="button" class="sb-club" data-club="cubbies" aria-pressed="false">CUBBIES</button>
+      </div>
+
+      <div class="sb-info">
+        <div class="sb-gameclock" aria-live="off">
+          <span id="game-label" class="sb-gameclock__label">Pick a club</span>
+          <span id="game-left" class="sb-gameclock__left"></span>
+        </div>
+        <button id="clock-btn" type="button" class="sb-clockbtn" aria-label="Stopwatch and timer" aria-haspopup="dialog">
+          <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="14" r="7.5"/><path d="M12 14V10.5M10 3h4M12 3v3.5M18.5 7.5l1.5-1.5"/></svg>
+          <span id="clock-mini" class="sb-clockbtn__mini" hidden></span>
+        </button>
+      </div>
+
+      <div id="teams" class="sb-teams" data-off="1">
+        <div class="sb-team" data-team="blue">
+          <button type="button" class="sb-plus" data-team="blue" aria-label="Blue plus one"><span class="sb-plus__name">Blue</span><span class="sb-plus__num">0</span><span class="sb-plus__hint">Tap +1</span></button>
+          <button type="button" class="sb-minus" data-team="blue" aria-label="Blue minus one">−1</button>
+        </div>
+        <div class="sb-team" data-team="red">
+          <button type="button" class="sb-plus" data-team="red" aria-label="Red plus one"><span class="sb-plus__name">Red</span><span class="sb-plus__num">0</span><span class="sb-plus__hint">Tap +1</span></button>
+          <button type="button" class="sb-minus" data-team="red" aria-label="Red minus one">−1</button>
+        </div>
+        <div class="sb-team" data-team="yellow">
+          <button type="button" class="sb-plus" data-team="yellow" aria-label="Yellow plus one"><span class="sb-plus__name">Yellow</span><span class="sb-plus__num">0</span><span class="sb-plus__hint">Tap +1</span></button>
+          <button type="button" class="sb-minus" data-team="yellow" aria-label="Yellow minus one">−1</button>
+        </div>
+        <div class="sb-team" data-team="green">
+          <button type="button" class="sb-plus" data-team="green" aria-label="Green plus one"><span class="sb-plus__name">Green</span><span class="sb-plus__num">0</span><span class="sb-plus__hint">Tap +1</span></button>
+          <button type="button" class="sb-minus" data-team="green" aria-label="Green minus one">−1</button>
+        </div>
+        <p id="pick-note" class="sb-pick">Pick T&amp;T, Sparks or Cubbies above to put their scores on the projector.</p>
+      </div>
+
+      <button id="end-btn" type="button" class="sb-wide sb-end" disabled>End game</button>
+      <p class="sb-status"><span id="live" data-state="wait">Connecting…</span> · <button id="signout" type="button" class="sb-link">Sign out</button></p>
+    </main>
+
+    <div id="sheet-scrim" class="sb-scrim" hidden></div>
+    <section id="sheet" class="sb-sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-title" hidden>
+      <h2 id="sheet-title" class="sb-visually-hidden">Stopwatch and timer</h2>
+      <div class="sb-seg" role="tablist">
+        <button type="button" role="tab" class="sb-seg__btn" data-kind="stopwatch" aria-selected="true">Stopwatch</button>
+        <button type="button" role="tab" class="sb-seg__btn" data-kind="timer" aria-selected="false">Timer</button>
+      </div>
+      <div class="sb-readout" role="timer" aria-live="off"><span id="readout-main">0:00</span><small id="readout-tenth">.0</small></div>
+      <p id="readout-state" class="sb-readout-state"></p>
+      <div id="timer-set" class="sb-timerset" hidden>
+        <div class="sb-picks">
+          <button type="button" class="sb-pick-btn" data-secs="30">0:30</button>
+          <button type="button" class="sb-pick-btn" data-secs="60">1:00</button>
+          <button type="button" class="sb-pick-btn" data-secs="120">2:00</button>
+          <button type="button" class="sb-pick-btn" data-secs="300">5:00</button>
+        </div>
+        <div class="sb-step">
+          <button id="step-down" type="button" class="sb-step__btn" aria-label="15 seconds less">−15s</button>
+          <span id="step-value" class="sb-step__value">1:00</span>
+          <button id="step-up" type="button" class="sb-step__btn" aria-label="15 seconds more">+15s</button>
+        </div>
+      </div>
+      <div class="sb-row2">
+        <button id="clock-go" type="button" class="sb-go">Start</button>
+        <button id="clock-reset" type="button" class="sb-quiet">Reset</button>
+      </div>
+      <p id="clock-note" class="sb-fine sb-center">Shows big on the projector. Closing this keeps it running.</p>
+      <button id="sheet-close" type="button" class="sb-wide sb-wide--quiet">Close</button>
+    </section>
+
+    <script type="module" src="/src/scoreboard/main.js"></script>
+  </body>
+</html>

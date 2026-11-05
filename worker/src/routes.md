@@ -1649,3 +1649,33 @@ dispatch can be tried again. The handbook button: one print per 2 minutes.
 | `GET /v1/prints/pdf/:id` | machine token | | `{name, ct}` streamed |
 | `DELETE /v1/prints/pdf/:id` | machine token | | `{ok}` |
 | `POST /v1/prints/handbook` | session | `{}` | `{ok}`; 429 `just-sent`, 502 `dispatch` |
+
+### 10.17 The game time scoreboard (BUILT, owner 2026-11-05)
+
+Four colour teams (blue top-left, red top-right, yellow bottom-left, green bottom-right)
+for T&T, Sparks and Cubbies, scored from a leader's phone
+(awana.kvbchurch.org/lobby/scoreboard.html; also a button on the projector remote) and
+shown big on the game time projector, plus a stopwatch / countdown timer both share.
+Code `src/scoreboard.js`, rules `shared/scoreboard.js` (one copy for the Worker, the
+projector and the phone); tests `test/scoreboard.test.js`. Storage `score:board` (numbers
+only, never a name; shape in `shared/scoreboard.js`). Each press is one synchronous
+step, written through. A new night (the church's local date) starts every club at 0
+with no club up and no clock.
+
+- `active` is the club on the wall; while it is set the projector shows its scores
+  whatever the schedule says, until End or another club (owner: "it shouldn't switch
+  over to the next club until the leader hits an end button ... or switched toggles").
+- End, or a switch to another club, sets `finale` (that club's final scores) when anyone
+  scored; the projector plays the winner (or "IT'S A TIE!") for 8 s.
+- The clock is anchored to the Worker's clock (`startedAt`, `elapsedMs`); every answer
+  carries `serverNow`, and the screens time it against their measured offset.
+- Every change rings `changed {what: 'scoreboard', rev, board, now}` CARRYING the board,
+  so screens draw it without another request (other screens ignore the word).
+
+| Route | Auth | Body | Answer |
+|---|---|---|---|
+| `GET /v1/scoreboard` | session | | `{ok, board, serverNow}` |
+| `POST /v1/scoreboard/club` | session | `{club: 'tnt'\|'sparks'\|'cubbies'}` | the state; 400 `bad-club` |
+| `POST /v1/scoreboard/point` | session | `{club, team: 'blue'\|'red'\|'yellow'\|'green', delta: 1\|-1}` | the state (never below 0, at most 999); 409 `not-active` (with the board) when that club is not up; 400 `bad-point` |
+| `POST /v1/scoreboard/end` | session | `{}` | the state, `active: null` |
+| `POST /v1/scoreboard/clock` | session | `{op: 'start', kind: 'stopwatch'}` / `{op: 'start', kind: 'timer', durationMs: 1000..3600000}` / `{op: 'pause'\|'resume'\|'clear'}` | the state; 400 `bad-clock`; 409 `no-clock` |

@@ -29,6 +29,9 @@ const ALLOWED = new Set([
   // The screen registry (ROADMAP.md#settings-page, phase 2): one copy of "register, follow
   // my own settings, obey /settings" for the lobby TV and the projector.
   'src/hooks/useScreenSync.js',
+  // The game time scoreboard (owner 2026-11-05; routes.md 10.17): the board from
+  // the sync Worker's doorbell, cleaned by shared/scoreboard.js.
+  'src/hooks/useScoreboard.js',
 ]);
 
 const walk = (dir) => readdirSync(dir).flatMap((f) => {

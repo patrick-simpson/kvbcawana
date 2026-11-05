@@ -55,6 +55,7 @@ import { JourneyRemote, mountJourneyRemote } from './journeyRemote.js';
 import { Classroom, mountClassroom } from './classroom.js';
 import { Presentation, mountPresentation } from './presentation.js';
 import { Tally, mountTally } from './tally.js';
+import { Scoreboard, mountScoreboard } from './scoreboard.js';
 import { Prints, mountPrints } from './prints.js';
 import { parseSession, sessionBody } from './session.js';
 import { BadRequest, fail, json } from './http.js';
@@ -271,6 +272,9 @@ export class SyncCore {
     // The poster contest vote tally (tally.js, routes.md 10.15): six shared counts.
     this.tally = new Tally({ storage: this.storage, now: this.now, ring: (payload) => { this.broadcast(frameText(DOORBELL_EVENT, payload)); } });
     mountTally(this.registry, this);   // /v1/tally (routes.md 10.15)
+    // The game time scoreboard (scoreboard.js, routes.md 10.17): four teams per club, a shared stopwatch.
+    this.scoreboard = new Scoreboard({ storage: this.storage, now: this.now, ring: (payload) => { this.broadcast(frameText(DOORBELL_EVENT, payload)); } });
+    mountScoreboard(this.registry, this);   // /v1/scoreboard (routes.md 10.17)
     // Print from the letterhead page (prints.js, routes.md 10.16): a PDF or the
     // handbook sheets, started as a GitHub Actions job (PRINT_DISPATCH_TOKEN).
     this.prints = new Prints({ storage: this.storage, now: this.now, env: () => this.rawEnv || {}, fetchFn: this.fetchFn });

@@ -22,6 +22,10 @@ import { ceremonySlide } from './lib/ceremonySlide.js';
 import { SetupChecklist } from './components/SetupChecklist.jsx';
 import { CountdownView } from './views/CountdownView.jsx';
 import { GameTimeView } from './views/GameTimeView.jsx';
+import { ScoringView } from './views/ScoringView.jsx';
+import { ScoreFinale } from './components/ScoreFinale.jsx';
+import { useScoreboard } from '../hooks/useScoreboard.js';
+import { useLowPower } from './hooks/useLowPower.js';
 import { SlideshowView } from './views/SlideshowView.jsx';
 import { ShutdownView } from './views/ShutdownView.jsx';
 import { QuickNav } from './views/QuickNav.jsx';
@@ -93,6 +97,15 @@ export const App = () => {
   const scheduleCfg = useEffectiveSchedule();
   const effectiveWindows = windowsForDate(now, scheduleCfg) ?? scheduleCfg.windows;
   const firstGameIndex = effectiveWindows.findIndex((w) => w.kind === 'game');
+
+  // The game time scoreboard (owner 2026-11-05; routes.md 10.17): while the
+  // leader's phone has a club up, the wall shows its scores WHATEVER the
+  // schedule says ("it shouldn't switch over to the next club until the leader
+  // hits an end button ... or switched toggles"); End or another club plays the
+  // winner first (FINALE_MS). Never on the configure page or the lobby's mirror.
+  const { board, finale, serverNow } = useScoreboard({ enabled: !CONFIGURE && !MIRROR });
+  const scoringClub = board?.active ?? null;
+  const lowPowerNow = useLowPower();
 
   // ?view=game (the lobby's Settings → Other screens): open on game time
   // exactly as the menu would, so the watchdog and the resume pill still
@@ -310,18 +323,29 @@ export const App = () => {
           welcome film, starts on the countdown's own picture ("0:00" alone on
           black), so it is a cut, not a fade through black: the film lands on
           top at once and the countdown is let go under it. */}
-      <AnimatePresence mode={cutsIn(state, now) ? 'sync' : 'wait'} custom={cutsIn(state, now)}>
+      <AnimatePresence mode={!scoringClub && cutsIn(state, now) ? 'sync' : 'wait'} custom={!scoringClub && cutsIn(state, now)}>
         <motion.div
-          key={stateKey(state)}
+          key={scoringClub ? `scoring:${scoringClub}` : stateKey(state)}
           className="absolute inset-0"
-          data-mode={slugFor(state)}
+          data-mode={scoringClub ? 'scoring' : slugFor(state)}
           data-deck={state.mode === AppMode.SLIDESHOW ? state.deck : undefined}
-          initial={cutsIn(state, now) ? false : { opacity: 0, scale: 0.985 }}
+          initial={!scoringClub && cutsIn(state, now) ? false : { opacity: 0, scale: 0.985 }}
           animate={{ opacity: 1, scale: 1, transition: { duration: DUR.mode, ease: EASE.settle } }}
           variants={VIEW_VARIANTS}
           exit="leave"
         >
-          <ViewErrorBoundary label={labelFor(state)}>
+          <ViewErrorBoundary label={scoringClub ? 'scoreboard' : labelFor(state)}>
+            {scoringClub ? (
+              <ScoringView
+                now={now}
+                club={scoringClub}
+                scores={board.scores[scoringClub]}
+                clock={board.clock}
+                serverNow={serverNow}
+                windows={effectiveWindows}
+                tally={tally}
+              />
+            ) : (
             <ActiveView
               state={state}
               now={now}
@@ -331,7 +355,10 @@ export const App = () => {
               firstGameIndex={firstGameIndex}
               onBareChange={setBare}
               onIndexChange={onDeckIndex}
+              clock={board?.clock ?? null}
+              serverNow={serverNow}
             />
+            )}
           </ViewErrorBoundary>
         </motion.div>
       </AnimatePresence>
@@ -341,7 +368,12 @@ export const App = () => {
           signs the night off with the full logo, tagline and all. */}
       <AnimatePresence>{backup && <BackupView key={backup} what={backup} />}</AnimatePresence>
 
-      <ChurchMark hidden={bare && !backup} full={state.mode === AppMode.SHUTDOWN} />
+      <AnimatePresence>
+        {finale && <ScoreFinale key={finale.id} club={finale.club} scores={finale.scores} still={lowPowerNow} />}
+      </AnimatePresence>
+
+      {/* The scoreboard's plates fill the wall's corners: the logo steps aside. */}
+      <ChurchMark hidden={(bare && !backup) || Boolean(scoringClub) || Boolean(finale)} full={state.mode === AppMode.SHUTDOWN} />
 
       {MIRROR ? null : touch ? (
         <TouchMenu
@@ -402,7 +434,7 @@ const slugFor = (state) =>
     [AppMode.SHUTDOWN]: 'shutdown',
   })[state.mode];
 
-const ActiveView = ({ state, now, tally, meetingTheme, onSelect, firstGameIndex, onBareChange, onIndexChange }) => {
+const ActiveView = ({ state, now, tally, meetingTheme, onSelect, firstGameIndex, onBareChange, onIndexChange, clock, serverNow }) => {
   switch (state.mode) {
     case AppMode.COUNTDOWN:
       return (
@@ -415,7 +447,7 @@ const ActiveView = ({ state, now, tally, meetingTheme, onSelect, firstGameIndex,
         />
       );
     case AppMode.GAME_TIME:
-      return <GameTimeView now={now} window={state.window} endsAt={state.endsAt} tally={tally} />;
+      return <GameTimeView now={now} window={state.window} endsAt={state.endsAt} tally={tally} clock={clock} serverNow={serverNow} />;
     case AppMode.SLIDESHOW:
       return (
         <SlideshowView

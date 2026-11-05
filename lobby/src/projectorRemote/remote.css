@@ -61,6 +61,8 @@ body { margin: 0; min-height: 100vh; background: var(--pr-ink); color: #fff; fon
 .pr-btn--countdown { border: 3px solid #fff; }
 .pr-btn--countdown[data-armed="1"] { background: var(--brand-sun, #FFC20E); color: var(--brand-ink, #231F20); border-color: var(--brand-sun, #FFC20E); }
 
+.pr-btn--score { text-decoration: none; margin: 0 0 4px; }
+
 .pr-pad { display: grid; grid-template-columns: 1fr 1.4fr; gap: 14px; }
 .pr-pad-note { margin: 10px 0 14px; text-align: center; }
 

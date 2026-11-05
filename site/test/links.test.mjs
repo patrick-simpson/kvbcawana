@@ -14,6 +14,7 @@ const ALLOWED = [
   '/lobby/', '/lobby/countdown', '/journey/', '/journey/remote/',
   '/classroom/', '/classroom/remote/', // owner 2026-10-18: the Sparks remote is on the links page
   '/lobby/projector-remote.html', // the opening ceremony remote (phone: Next and Back for the projector's slides)
+  '/lobby/scoreboard.html', // the game time scoreboard (phone: four teams' scores and the stopwatch on the projector)
   '/settings', '/logo/',
   '/tools/letterhead/', // owner 2026-10-28: the letterhead maker is on the links page
   '/tools/tally/', // owner 2026-11-04: the poster contest vote tally, shared on every device

@@ -125,7 +125,9 @@ export function ringSyncDoorbell(payload) {
   // 'screen' and 'screen-action' name one registered screen (useScreenSync
   // checks the id); they ride the live channel only. 'classroom' is the
   // Sparks remote's (routes.md 10.13), for the downstairs classroom host only.
-  if (!['calendar', 'journey', 'template', 'screen', 'screen-action', 'classroom'].includes(what)) return;
+  // 'scoreboard' carries the game time scoreboard (routes.md 10.17), for the
+  // projector only (hooks/useScoreboard.js cleans it with shared/scoreboard.js).
+  if (!['calendar', 'journey', 'template', 'screen', 'screen-action', 'classroom', 'scoreboard'].includes(what)) return;
   doorbellListeners.forEach((fn) => fn(what, payload));
   if (what === 'template') syncNow();
 }

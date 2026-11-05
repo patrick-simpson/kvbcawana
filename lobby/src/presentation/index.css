@@ -579,6 +579,254 @@
   width: auto;
 }
 
+/* ── The game time scoreboard (views/ScoringView.jsx; owner 2026-11-05) ──
+   Four team plates in the phone's 2 x 2 on pure black, everything else small
+   along the bottom. Flat like the kit: hard offsets, a white keyline out of
+   register, no blur, no gradient. */
+.pj-score__grid {
+  position: absolute;
+  left: calc(2.4 * var(--u));
+  right: calc(2.4 * var(--u));
+  top: calc(2 * var(--u));
+  height: calc(43.4 * var(--u));
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  gap: calc(1.6 * var(--u));
+}
+.pj-score[data-compact='1'] .pj-score__grid {
+  left: calc(13 * var(--u));
+  right: calc(13 * var(--u));
+  height: calc(8.4 * var(--u));
+  grid-template-columns: repeat(4, 1fr);
+  grid-template-rows: 1fr;
+  gap: calc(1.4 * var(--u));
+}
+.pj-score__team {
+  position: relative;
+  border-radius: calc(1.4 * var(--u));
+  background: var(--team);
+  color: var(--team-ink);
+  box-shadow: calc(0.5 * var(--u)) calc(0.5 * var(--u)) 0 var(--team-deep);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.pj-score__team::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border: calc(0.22 * var(--u)) solid #ffffff;
+  border-radius: inherit;
+  transform: translate(calc(-0.45 * var(--u)), calc(-0.45 * var(--u)));
+  pointer-events: none;
+}
+.pj-score__name {
+  position: absolute;
+  left: calc(1.6 * var(--u));
+  top: calc(1.1 * var(--u));
+  font-family: var(--font-condensed);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: calc(3.2 * var(--u));
+  line-height: 1;
+}
+.pj-score__lead {
+  position: absolute;
+  right: calc(1.4 * var(--u));
+  top: calc(1.1 * var(--u));
+  background: #ffffff;
+  color: #231f20;
+  border-radius: 999px;
+  padding: calc(0.3 * var(--u)) calc(1 * var(--u));
+  font-family: var(--font-condensed);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: calc(1.8 * var(--u));
+  line-height: 1;
+  box-shadow: calc(0.25 * var(--u)) calc(0.25 * var(--u)) 0 var(--team-deep);
+}
+.pj-score__num-box {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.pj-score__num {
+  display: inline-block;
+  font-family: var(--font-display);
+  font-size: calc(17 * var(--u));
+  line-height: 0.93;
+  font-variant-numeric: tabular-nums;
+  text-shadow: calc(0.55 * var(--u)) calc(0.55 * var(--u)) 0 var(--team-deep);
+  margin-top: calc(1.4 * var(--u));
+}
+.pj-score[data-compact='1'] .pj-score__team { justify-content: flex-end; padding: 0 calc(1.3 * var(--u)); border-radius: calc(1 * var(--u)); }
+.pj-score[data-compact='1'] .pj-score__team::after { border-width: calc(0.16 * var(--u)); transform: translate(calc(-0.3 * var(--u)), calc(-0.3 * var(--u))); }
+.pj-score[data-compact='1'] .pj-score__name { position: absolute; left: calc(1.3 * var(--u)); top: 50%; translate: 0 -50%; font-size: calc(2.2 * var(--u)); }
+.pj-score[data-compact='1'] .pj-score__num { font-size: calc(5.4 * var(--u)); margin-top: 0; text-shadow: calc(0.25 * var(--u)) calc(0.25 * var(--u)) 0 var(--team-deep); }
+.pj-score__clock {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(13 * var(--u));
+  display: flex;
+  justify-content: center;
+}
+.pj-score__strip {
+  position: absolute;
+  left: calc(2.4 * var(--u));
+  right: calc(2.4 * var(--u));
+  bottom: calc(1.6 * var(--u));
+  height: calc(5.6 * var(--u));
+  display: flex;
+  align-items: center;
+  gap: calc(1.6 * var(--u));
+}
+.pj-score__marks { display: inline-flex; align-items: center; gap: calc(1.2 * var(--u)); }
+.pj-score__mark { height: calc(4.2 * var(--u)); width: auto; user-select: none; }
+.pj-score__markword { font-family: var(--font-display); font-size: calc(2.6 * var(--u)); }
+
+/* The stopwatch / timer (components/ScoreClock.jsx): the kick chip says which
+   and its state (PAUSED, TIME!), the figures in fixed cells, a timer's bar. */
+.pj-score-clock { display: flex; flex-direction: column; align-items: center; }
+.pj-score-clock__kick {
+  display: inline-block;
+  background: #f15a28;
+  color: #ffffff;
+  border-radius: calc(0.6 * var(--u));
+  padding: calc(0.4 * var(--u)) calc(1.6 * var(--u));
+  font-family: var(--font-condensed);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: calc(2.6 * var(--u));
+  line-height: 1;
+  box-shadow: calc(0.3 * var(--u)) calc(0.3 * var(--u)) 0 #9e3512;
+}
+.pj-score-clock__paused,
+.pj-score-clock__done { display: none; }
+.pj-score-clock[data-state='paused'] .pj-score-clock__word,
+.pj-score-clock[data-state='done'] .pj-score-clock__word { display: none; }
+.pj-score-clock[data-state='paused'] .pj-score-clock__paused,
+.pj-score-clock[data-state='done'] .pj-score-clock__done { display: inline; }
+.pj-score-clock[data-state='paused'] .pj-score-clock__kick { background: #ffffff; color: #231f20; box-shadow: calc(0.3 * var(--u)) calc(0.3 * var(--u)) 0 #6b6b6b; }
+.pj-score-clock__figures {
+  margin-top: calc(1 * var(--u));
+  font-family: var(--font-display);
+  font-size: var(--pj-clock-size);
+  line-height: 1.06;
+  color: #ffffff;
+  font-feature-settings: 'tnum';
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.pj-score-clock__tenth { font-size: 0.55em; }
+.pj-score-clock[data-state='paused'] .pj-score-clock__figures { opacity: 0.55; }
+.pj-score-clock[data-state='done'] .pj-score-clock__figures { color: #f15a28; }
+.pj-score-clock__bar {
+  position: relative;
+  display: block;
+  margin-top: calc(1.2 * var(--u));
+  width: calc(70 * var(--u));
+  max-width: 100%;
+  height: calc(1.4 * var(--u));
+  border-radius: 999px;
+  background: #262626;
+  overflow: hidden;
+}
+.pj-score-clock__fill {
+  position: absolute;
+  inset: 0;
+  background: #f15a28;
+  transform-origin: left center;
+}
+
+/* A point: the team's colour over the whole wall (components/ScoreTakeover.jsx). */
+.pj-take { position: absolute; inset: 0; z-index: 40; }
+.pj-take__band { position: absolute; inset: 0; }
+.pj-take__copy {
+  position: absolute;
+  top: 50%;
+  translate: -50% -50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  white-space: nowrap;
+}
+.pj-take__word {
+  font-family: var(--font-display);
+  line-height: 0.93;
+  text-transform: uppercase;
+  color: var(--team-ink);
+  text-shadow: calc(0.7 * var(--u)) calc(0.7 * var(--u)) 0 var(--team-deep);
+}
+.pj-take__total {
+  margin-top: calc(2 * var(--u));
+  font-family: var(--font-display);
+  line-height: 1;
+  background: #ffffff;
+  color: var(--team-deep);
+  border-radius: 999px;
+  padding: 0.18em 0.6em 0.22em;
+  box-shadow: calc(0.4 * var(--u)) calc(0.4 * var(--u)) 0 var(--team-deep);
+}
+.pj-take__sparkle { position: absolute; height: auto; }
+
+/* The winner (components/ScoreFinale.jsx), over everything for 8 s. */
+.pj-finale { position: absolute; inset: 0; z-index: 45; }
+.pj-finale__field { position: absolute; inset: 0; display: flex; }
+.pj-finale__field > span { flex: 1; }
+.pj-finale__frame { display: flex; flex-direction: column; align-items: center; color: #ffffff; }
+.pj-finale[data-ink='ink'] .pj-finale__frame { color: #231f20; }
+.pj-finale__kick {
+  margin-top: calc(6 * var(--u));
+  font-family: var(--font-condensed);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-size: calc(3.6 * var(--u));
+  line-height: 1;
+}
+.pj-finale__head {
+  margin-top: calc(1.4 * var(--u));
+  font-family: var(--font-display);
+  font-size: calc(11.5 * var(--u));
+  line-height: 0.93;
+  white-space: nowrap;
+  text-shadow: calc(0.7 * var(--u)) calc(0.7 * var(--u)) 0 var(--offset);
+}
+.pj-finale__row {
+  position: absolute;
+  bottom: calc(8 * var(--u));
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+  gap: calc(1.6 * var(--u));
+}
+.pj-finale__chip {
+  position: relative;
+  width: calc(17 * var(--u));
+  height: calc(8.4 * var(--u));
+  border-radius: calc(1 * var(--u));
+  background: var(--team);
+  color: var(--team-ink);
+  box-shadow: calc(0.35 * var(--u)) calc(0.35 * var(--u)) 0 var(--team-deep);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 calc(1.3 * var(--u));
+}
+/* The winner's plate wears the white keyline (and so never melts into a field of its own colour). */
+.pj-finale__chip[data-won='1']::after {
+  content: '';
+  position: absolute;
+  inset: calc(-0.5 * var(--u));
+  border: calc(0.35 * var(--u)) solid #ffffff;
+  border-radius: calc(1.4 * var(--u));
+}
+.pj-finale[data-ink='ink'] .pj-finale__chip[data-won='1']::after { border-color: #231f20; }
+.pj-finale__name { font-family: var(--font-condensed); text-transform: uppercase; letter-spacing: 0.04em; font-size: calc(2.2 * var(--u)); }
+.pj-finale__num { font-family: var(--font-display); font-size: calc(5.4 * var(--u)); text-shadow: calc(0.25 * var(--u)) calc(0.25 * var(--u)) 0 var(--team-deep); }
+
 /* ── Operator chrome: the kit's buttons and panels on black ─────── */
 /* The one hot button: Londrina on the hot red-orange with a hard offset
    shadow (flat, never a blur). */
