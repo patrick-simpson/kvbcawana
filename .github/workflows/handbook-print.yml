@@ -61,7 +61,7 @@ concurrency:
 jobs:
   print:
     name: Handbook sheets
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 50
     steps:
       - name: Is it time, and not printed yet today?

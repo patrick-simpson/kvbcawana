@@ -29,7 +29,7 @@ concurrency:
 
 jobs:
   transcode:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # 63 videos × (download + transcode + upload) — comfortably under the
     # 6h job ceiling, but nowhere near the default 360min either way.
     timeout-minutes: 350

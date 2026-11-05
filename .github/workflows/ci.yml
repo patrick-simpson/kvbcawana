@@ -74,7 +74,7 @@ jobs:
   #           shared/cloud-crypto.js, which the copies job checks)
   changes:
     name: What changed
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
       contents: read
@@ -140,7 +140,7 @@ jobs:
 
   copies:
     name: Family copies match
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
@@ -164,7 +164,7 @@ jobs:
     name: Lobby + projector (lint, types, unit tests)
     needs: changes
     if: needs.changes.outputs.lobby == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     concurrency:
       group: lobby-checks-${{ github.ref }}
@@ -191,7 +191,7 @@ jobs:
     name: Lobby + projector (browser smoke ${{ matrix.shard }}/4)
     needs: changes
     if: needs.changes.outputs.lobby == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     strategy:
       fail-fast: false
@@ -248,7 +248,7 @@ jobs:
 
   worker:
     name: Sync Worker
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     defaults:
       run:
@@ -266,7 +266,7 @@ jobs:
 
   journey:
     name: Journey kiosk
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     defaults:
       run:
@@ -282,7 +282,7 @@ jobs:
 
   classroom:
     name: Downstairs classroom
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     defaults:
       run:
@@ -300,7 +300,7 @@ jobs:
     # The 4 pm handbook sheets job's script (scripts/handbook/, run by
     # handbook-print.yml): its own small suite, a stand-in Worker and SMTP server.
     name: Handbook sheets script
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     defaults:
       run:
@@ -321,7 +321,7 @@ jobs:
     # in one PDF, a stand-in mailer. The text rules are shared/letterhead.test.js
     # (lobby vitest).
     name: Letterhead script
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     defaults:
       run:
@@ -340,7 +340,7 @@ jobs:
     name: Club Label Printer
     needs: changes
     if: needs.changes.outputs.printer == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 25
     concurrency:
       group: printer-${{ github.ref }}
@@ -377,7 +377,7 @@ jobs:
     # Actions storage, and with the owner's $0 Actions budget a full storage
     # would block the upload and stop every deploy (owner, 2026-10-12).
     name: The one site
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
@@ -413,7 +413,7 @@ jobs:
     # named: without that this older run would deploy untested.
     if: ${{ !failure() && !cancelled() && !contains(needs.*.result, 'cancelled') && github.event_name != 'pull_request' && github.ref == 'refs/heads/main' }}
     needs: [changes, copies, lobby-checks, lobby-e2e, worker, journey, classroom, printer, site]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     # Deploys take turns and are never cancelled; of several waiting, only
     # the newest stays (GitHub replaces an older pending job in a group).

@@ -90,7 +90,7 @@ permissions:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: ${{ inputs.test-timeout }}
     outputs:
       sha: ${{ steps.sha.outputs.sha }}
@@ -125,7 +125,7 @@ jobs:
 
   tag:
     needs: test
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     outputs:
       sha: ${{ steps.tag-printer.outputs.sha }}
@@ -486,7 +486,7 @@ jobs:
   release:
     # Publish only after the INSTALLED app passed the smoke test.
     needs: [tag, smoke-test]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # Download, publish, write the feed, dispatch the site build: minutes.
     timeout-minutes: 20
     env:
@@ -608,7 +608,7 @@ jobs:
     # failed jobs" still finds them.
     needs: [release]
     if: ${{ always() && needs.release.result != 'failure' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
       - name: Delete this run's installer files
