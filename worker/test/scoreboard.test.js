@@ -73,6 +73,22 @@ describe('the game time scoreboard', () => {
     expect((await s.call('GET', '/v1/scoreboard')).body.board.scores.sparks.green).toBe(25);
   });
 
+  it('a tap sent again with the same id (its answer was lost) counts once (owner 2026-11-06)', async () => {
+    const s = await setup();
+    await s.call('POST', '/v1/scoreboard/club', { club: 'tnt' });
+    const tap = { club: 'tnt', team: 'red', delta: 1, id: 'tap-aaaa-0001' };
+    await s.call('POST', '/v1/scoreboard/point', tap);
+    const again = await s.call('POST', '/v1/scoreboard/point', tap);
+    expect(again.status).toBe(200);
+    expect(again.body.board.scores.tnt.red).toBe(1);
+    await Promise.all([1, 2, 3].map(() => s.call('POST', '/v1/scoreboard/point', { ...tap, id: 'tap-bbbb-0002' })));
+    expect((await s.call('GET', '/v1/scoreboard')).body.board.scores.tnt.red).toBe(2);
+    // A different id is a different tap; a malformed id is ignored (the tap still counts).
+    await s.call('POST', '/v1/scoreboard/point', { ...tap, id: 'tap-cccc-0003' });
+    await s.call('POST', '/v1/scoreboard/point', { ...tap, id: 'x' });
+    expect((await s.call('GET', '/v1/scoreboard')).body.board.scores.tnt.red).toBe(4);
+  });
+
   it('refuses anything that is not a club, a team or a single point', async () => {
     const s = await setup();
     await s.call('POST', '/v1/scoreboard/club', { club: 'tnt' });

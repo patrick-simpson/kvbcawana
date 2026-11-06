@@ -1676,7 +1676,7 @@ with no club up and no clock.
 |---|---|---|---|
 | `GET /v1/scoreboard` | session | | `{ok, board, serverNow}` |
 | `POST /v1/scoreboard/club` | session | `{club: 'tnt'\|'sparks'\|'cubbies'}` | the state; 400 `bad-club` |
-| `POST /v1/scoreboard/point` | session | `{club, team, delta: 1\|-1}` (`team` one of the club's setup: blue/red/yellow/green, boys/girls, leaders/kids) | the state (never below 0, at most 999); 409 `not-active` (with the board) when that club is not up, 409 `not-playing` when the team is not in its setup; 400 `bad-point` |
+| `POST /v1/scoreboard/point` | session | `{club, team, delta: 1\|-1, id?}` (`id` 8-40 of `A-Za-z0-9_-`: the phone's tap id; a tap sent again with the same id after a lost answer counts once, the last 500 ids kept in memory; `team` one of the club's setup: blue/red/yellow/green, boys/girls, leaders/kids) | the state (never below 0, at most 999); 409 `not-active` (with the board) when that club is not up, 409 `not-playing` when the team is not in its setup; 400 `bad-point` |
 | `POST /v1/scoreboard/end` | session | `{}` | the state, `active: null` |
 | `POST /v1/scoreboard/sounds` | session | `{on: boolean}` | the state; `sounds` = the projector's point chimes and timer buzzer on (or the projector's own Countdown sounds switch); kept across nights; 400 `bad-sounds` |
 | `POST /v1/scoreboard/setup` | session | `{club, setup: 'four'\|'boys-girls'\|'red-green'\|'blue-yellow'\|'leaders-kids', keep: boolean}` | the state; `keep: false` = a new game (the old setup's finale when that club is up and anyone scored, the new teams at 0), `keep: true` = the new teams keep tonight's scores; 400 `bad-setup`. Each club's setup lasts the night |

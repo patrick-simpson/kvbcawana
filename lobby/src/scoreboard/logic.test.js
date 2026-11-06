@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { CLUB_FIELDS, gameClockWords, liveWords, mmss, sheetButtons, shownScores, stepTimer } from './logic.js';
+import {
+  CLUB_FIELDS, RETRY_MAX_MS, gameClockWords, liveWords, mmss, newTapId, nextRetryMs, retryable, sheetButtons,
+  shownScores, stepTimer, waitingWords,
+} from './logic.js';
 import { emptyBoard } from '../../../shared/scoreboard.js';
 import schedule from '../../../shared/schedule.json';
 
@@ -51,5 +54,25 @@ describe('the scoreboard phone page', () => {
   it('says plainly whether taps reach the projector', () => {
     expect(liveWords('ok')).toMatch(/Live/);
     expect(liveWords('off')).toMatch(/Offline/);
+  });
+
+  it('taps that do not get through wait and are sent again; a refusal is final (owner 2026-11-06)', () => {
+    expect(retryable(0)).toBe(true);     // no signal, or the answer was lost
+    expect(retryable(503)).toBe(true);
+    expect(retryable(429)).toBe(true);
+    expect(retryable(409)).toBe(false);  // another club is up: never retried
+    expect(retryable(400)).toBe(false);
+    expect(nextRetryMs(1000)).toBe(2000);
+    expect(nextRetryMs(RETRY_MAX_MS)).toBe(RETRY_MAX_MS);
+    expect(waitingWords(1)).toBe('1 tap waiting to send · still trying');
+    expect(waitingWords(3)).toMatch(/^3 taps waiting/);
+  });
+
+  it('every tap has an id the Worker accepts', () => {
+    const ok = /^[A-Za-z0-9_-]{8,40}$/;
+    expect(newTapId()).toMatch(ok);
+    expect(newTapId(() => '')).toMatch(ok);           // no crypto.randomUUID: a random one
+    expect(newTapId(() => 'not ok!')).toMatch(ok);
+    expect(newTapId()).not.toBe(newTapId());
   });
 });

@@ -70,3 +70,43 @@ export function liveWords(state) {
     wait: 'Connecting…',
   }[state] || 'Connecting…';
 }
+
+// ── Taps that could not be sent (owner 2026-11-06: "don't lose taps") ─────
+
+/** The first wait before a tap that did not get through is sent again; it doubles to RETRY_MAX_MS. */
+export const RETRY_MIN_MS = 1000;
+export const RETRY_MAX_MS = 8000;
+/** At most this many taps wait on the phone (a whole game's worth). */
+export const OUTBOX_MAX = 200;
+
+/**
+ * A tap that should be sent again: it never got there or the answer was lost
+ * (status 0), or the service was busy or down (429, 5xx). Its id makes a
+ * second arrival count once (worker/src/scoreboard.js). A 4xx refusal is final.
+ * @param {number} status
+ */
+export function retryable(status) {
+  return status === 0 || status === 429 || status >= 500;
+}
+
+/** The wait after one more failure. @param {number} ms */
+export function nextRetryMs(ms) {
+  return Math.min(RETRY_MAX_MS, Math.max(RETRY_MIN_MS, ms * 2));
+}
+
+/** The status line while taps wait. @param {number} n */
+export function waitingWords(n) {
+  return n === 1 ? '1 tap waiting to send · still trying' : `${n} taps waiting to send · still trying`;
+}
+
+/**
+ * A tap's id (8-40 of A-Za-z0-9_-; worker/src/scoreboard.js TAP_ID).
+ * @param {() => string} [uuid]
+ */
+export function newTapId(uuid = () => (globalThis.crypto?.randomUUID ? globalThis.crypto.randomUUID() : '')) {
+  const id = uuid();
+  if (/^[A-Za-z0-9_-]{8,40}$/.test(id)) return id;
+  let out = '';
+  while (out.length < 20) out += Math.random().toString(36).slice(2);
+  return `t${out.slice(0, 20)}`;
+}

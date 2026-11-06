@@ -39,6 +39,11 @@ export const SCORE_KEY = 'score:board';
 
 /** @typedef {ReturnType<typeof emptyBoard>} Board */
 
+/** A tap's id from the phone (its retries carry the same one). */
+const TAP_ID = /^[A-Za-z0-9_-]{8,40}$/;
+/** How many tap ids are remembered (a night's worth of retries, far more than needed). */
+const TAP_IDS_KEPT = 500;
+
 export class Scoreboard {
   /** @param {{ storage: any, now: () => number, ring?: (payload: Record<string, unknown>) => void }} deps */
   constructor({ storage, now, ring }) {
@@ -47,6 +52,14 @@ export class Scoreboard {
     this.ring = (/** @type {Record<string, unknown>} */ p) => { try { ring?.(p); } catch { /* the screens' own read catches up */ } };
     /** @type {Board|null} */
     this.cache = null;
+    /**
+     * Tap ids already counted (owner 2026-11-06, "don't lose taps"): a phone
+     * that lost the answer to a tap sends it again with the same id, and it
+     * counts once. Memory only, the last TAP_IDS_KEPT; a Worker restart between
+     * a try and its retry could count that one tap twice (accepted).
+     * @type {Set<string>}
+     */
+    this.taps = new Set();
   }
 
   /** Tonight's board (a stored one from another night starts over). */
@@ -119,6 +132,12 @@ export class Scoreboard {
     if (!teamsFor(d, club).includes(team)) return fail('That team is not playing now.', 409, { reason: 'not-playing', board: d, serverNow: this.now() });
     // A phone still showing a club another phone has since changed is told so, never scores the wrong game.
     if (d.active !== club) return fail('Another club is on the projector now.', 409, { reason: 'not-active', board: d, serverNow: this.now() });
+    const id = typeof body?.id === 'string' && TAP_ID.test(body.id) ? body.id : null;
+    if (id && this.taps.has(id)) return this.answer(d);
+    if (id) {
+      this.taps.add(id);
+      if (this.taps.size > TAP_IDS_KEPT) this.taps.delete(this.taps.values().next().value);
+    }
     const next = Math.min(SCORE_MAX, Math.max(0, d.scores[club][team] + delta));
     if (next === d.scores[club][team]) return this.answer(d);
     d.scores[club][team] = next;

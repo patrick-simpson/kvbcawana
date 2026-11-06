@@ -37,7 +37,10 @@ import {
   teamsFor,
 } from '../../../shared/scoreboard.js';
 import schedule from '../../../shared/schedule.json';
-import { CLUB_FIELDS, CONFIRM_MS, gameClockWords, liveWords, mmss, sheetButtons, shownScores, stepTimer } from './logic.js';
+import {
+  CLUB_FIELDS, CONFIRM_MS, OUTBOX_MAX, RETRY_MIN_MS, gameClockWords, liveWords, mmss, newTapId, nextRetryMs,
+  retryable, sheetButtons, shownScores, stepTimer, waitingWords,
+} from './logic.js';
 
 /** A read while a game or a clock is on: another phone's taps show within this. */
 const GAME_READ_MS = 3 * 1000;
@@ -114,9 +117,13 @@ async function read() {
   if (!loadSyncSession() || document.hidden) return;
   const res = await authed('/v1/scoreboard');
   if (res.status === 401) return;
-  if (res.ok) { take(res.body.board, true); if ($('live').dataset.state !== 'bad') setLive('ok'); }
+  if (res.ok) {
+    take(res.body.board, true);
+    if (outbox.length && retryTimer) flush();
+    else if ($('live').dataset.state !== 'bad') setLive('ok');
+  }
   else setLive(res.status === 0 ? 'off' : 'wait');
-  if (Date.now() - lastActive > IDLE_STOP_MS) { paused = true; setText($('live'), 'Paused · tap anywhere to update'); return; }
+  if (Date.now() - lastActive > IDLE_STOP_MS && !outbox.length) { paused = true; letSleep(); setText($('live'), 'Paused · tap anywhere to update'); return; }
   scheduleRead();
 }
 let readTimer = 0;
@@ -277,20 +284,82 @@ async function point(team, delta) {
   if (!club) return;
   const shown = shownScores(board, club, pending);
   if (delta < 0 && shown[team] <= 0) return;
+  if (outbox.length >= OUTBOX_MAX) { flash('Too many taps waiting. Check the Wi-Fi.'); return; }
   buzz();
   pendingClub = club;
   pending[team] = (pending[team] || 0) + delta;
   bump(team, delta);
   render();
-  const res = await authed('/v1/scoreboard/point', { method: 'POST', body: { club, team, delta } });
-  // This tap is answered: it leaves the pending count (or the absorbed one, if a ring counted it first).
-  if (pendingClub === club) {
-    if ((absorbed[team] || 0) !== 0 && Math.sign(absorbed[team]) === Math.sign(delta)) absorbed[team] -= delta;
-    else pending[team] = (pending[team] || 0) - delta;
+  outbox.push({ id: newTapId(), club, team, delta });
+  flush();
+}
+
+// The taps on their way (owner 2026-11-06: "don't lose taps"): sent one at a
+// time in the order tapped; one that does not get through (no signal, the
+// answer lost, the service busy) stays first in line and is sent again, with
+// the same id so the Worker counts it once, 1 s then doubling to 8 s, at once
+// when the phone is back online or a read gets through. The plates already
+// show it (pending). Memory only: a reload loses taps still waiting.
+/** @type {{id: string, club: string, team: string, delta: number}[]} */
+const outbox = [];
+let sending = false;
+let retryTimer = 0;
+let retryMs = RETRY_MIN_MS;
+
+/** One answered tap leaves the pending count (or the absorbed one, if a read counted it first). */
+function settle(tap) {
+  if (pendingClub !== tap.club) return;
+  const { team, delta } = tap;
+  if ((absorbed[team] || 0) !== 0 && Math.sign(absorbed[team]) === Math.sign(delta)) absorbed[team] -= delta;
+  else pending[team] = (pending[team] || 0) - delta;
+}
+
+async function flush() {
+  if (sending) return;
+  clearTimeout(retryTimer);
+  retryTimer = 0;
+  sending = true;
+  try {
+    while (outbox.length) {
+      const tap = outbox[0];
+      const res = await authed('/v1/scoreboard/point', { method: 'POST', body: tap });
+      if (res.status === 401) {
+        // Signed out: these taps cannot go anywhere now.
+        outbox.length = 0;
+        pending = {};
+        absorbed = {};
+        break;
+      }
+      if (retryable(res.status)) {
+        retryTimer = window.setTimeout(flush, retryMs);
+        retryMs = nextRetryMs(retryMs);
+        return;
+      }
+      outbox.shift();
+      retryMs = RETRY_MIN_MS;
+      settle(tap);
+      if (res.body?.board) take(res.body.board);
+      if (!res.ok) flash(res.body?.reason === 'not-active' ? 'Another club is up now.' : 'That point did not go through. Tap again.');
+      render();
+    }
+  } finally {
+    sending = false;
+    drawWaiting();
   }
-  if (res.body?.board) take(res.body.board);
-  if (!res.ok && res.status !== 401) flash(res.status === 0 ? 'Offline: that point did not reach the projector.' : res.body?.reason === 'not-active' ? 'Another club is up now.' : 'That point did not go through. Tap again.');
-  render();
+}
+
+/** The status line says how many taps are waiting while one has failed; back to Live when all are in. */
+let wasWaiting = false;
+function drawWaiting() {
+  const waiting = outbox.length > 0 && retryTimer !== 0;
+  if (waiting) {
+    const el = $('live');
+    el.dataset.state = 'queued';
+    setText(el, waitingWords(outbox.length));
+  } else if (wasWaiting) {
+    setLive('ok');
+  }
+  wasWaiting = waiting;
 }
 
 function bump(team, delta) {
@@ -506,7 +575,15 @@ async function holdWake() {
 
 function active() {
   lastActive = Date.now();
+  // A phone may let the screen lock go (a call, a notification): ask again on every touch.
+  if (!$('board').hidden) holdWake();
   if (paused) { paused = false; read(); }
+}
+
+/** Let the screen sleep again (30 min with no touch: the scorekeeper put the phone away). */
+function letSleep() {
+  try { wakeLock?.release(); } catch { /* already gone */ }
+  wakeLock = null;
 }
 
 async function start() {
@@ -557,7 +634,7 @@ async function start() {
     read();
     holdWake();
   });
-  window.addEventListener('online', () => { if (!$('board').hidden) read(); });
+  window.addEventListener('online', () => { if (outbox.length) flush(); if (!$('board').hidden) read(); });
   base = await resolveSyncUrl();
   if (!base) { showSignedOut('The sync service is not set up yet, so the scoreboard cannot work.'); return; }
   if (loadSyncSession()) showSignedIn();

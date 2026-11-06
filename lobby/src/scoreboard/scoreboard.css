@@ -217,7 +217,8 @@ form { display: grid; gap: 10px; margin-top: 14px; }
 .sb-wide:active:not(:disabled) { translate: 2px 2px; box-shadow: 1px 1px 0 rgba(0, 0, 0, 0.45); transition: none; }
 
 .sb-status { flex: none; margin: 0; text-align: center; font-size: 0.82rem; opacity: 0.92; }
-#live[data-state='bad'] { color: #FCB614; font-weight: 700; }
+#live[data-state='bad'],
+#live[data-state='queued'] { color: #FCB614; font-weight: 700; }
 .sb-link { border: 0; background: none; padding: 0; color: #fff; text-decoration: underline; font-size: inherit; }
 
 /* ── The stopwatch / timer sheet ── */
