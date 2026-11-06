@@ -77,6 +77,26 @@ describe('ScoringView', () => {
     expect(playTones).toHaveBeenCalledTimes(1);
   });
 
+  it('a point that puts a team in front alone calls it: TAKES THE LEAD! (owner 2026-11-06)', () => {
+    const { container, rerender } = render(view(scores(3, 3, 0, 0)));
+    rerender(view(scores(3, 4, 0, 0)));
+    const take = container.querySelector('.pj-take');
+    expect(take.dataset.lead).toBe('red');
+    expect(take.querySelector('.pj-take__lead').textContent).toMatch(/takes the lead/i);
+    // The chime climbs one more step for the lead.
+    expect(playTones.mock.calls.at(-1)[0]).toHaveLength(3);
+  });
+
+  it('no lead call for the first point of a game or a team adding to its own lead', () => {
+    const { container, rerender } = render(view(scores(0, 0, 0, 0)));
+    rerender(view(scores(0, 1, 0, 0)));
+    expect(container.querySelector('.pj-take__lead')).toBeNull();
+    act(() => { vi.advanceTimersByTime(3000); });
+    rerender(view(scores(0, 2, 0, 0)));
+    expect(container.querySelector('.pj-take__lead')).toBeNull();
+    expect(playTones.mock.calls.at(-1)[0]).toHaveLength(2);
+  });
+
   it('the phone\'s sound switch makes the chime play even with the projector\'s own switch off', () => {
     const { rerender } = render(view(scores(0, 0, 0, 0), { sounds: true }));
     rerender(view(scores(0, 1, 0, 0), { sounds: true }));

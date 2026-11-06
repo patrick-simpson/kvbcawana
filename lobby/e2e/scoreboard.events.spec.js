@@ -40,10 +40,14 @@ function worker() {
     await page.route(`${SYNC_BASE}/**`, async (route) => {
       const req = route.request();
       if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: CORS });
+      // No signal at all (Chrome's offline switch does not reach routed requests).
+      if (api.down) return route.abort('internetdisconnected');
       const path = new URL(req.url()).pathname.replace('/api', '');
       const handler = routes[`${req.method()} ${path}`];
       if (!handler) return route.fulfill({ status: 503, headers: CORS, contentType: 'application/json', body: '{}' });
       const res = await handler(req.postData() ? JSON.parse(req.postData()) : {});
+      // The Worker did it, but the phone never hears back (the gym's Wi-Fi).
+      if (path === '/v1/scoreboard/point' && api.loseAnswers > 0) { api.loseAnswers -= 1; return route.abort('connectionreset'); }
       return route.fulfill({ status: res.status, headers: CORS, contentType: 'application/json', body: await res.text() });
     });
   };
@@ -53,7 +57,8 @@ function worker() {
     for (const [team, n] of Object.entries(points)) for (let i = 0; i < n; i += 1) await core.point({ club, team, delta: 1 });
     quiet = false;
   };
-  return { core, attach, seed, onRing: (fn) => rings.push(fn) };
+  const api = { core, attach, seed, onRing: (fn) => rings.push(fn), loseAnswers: 0, down: false };
+  return api;
 }
 
 /** The projector at 6:17:19 pm on a club night (T&T game time, 12:41 left). */
@@ -310,6 +315,52 @@ test.describe('the game time scoreboard', () => {
     await shot(tv, 'lobby-5-final');
     await expect(tv.locator('.score-ticker')).toHaveCount(0, { timeout: 12000 });
     await tv.context().close();
+    await ph.context().close();
+  });
+
+  test('taps made while the Wi-Fi is down wait on the phone and all arrive, each once (owner 2026-11-06)', async ({ browser }) => {
+    test.setTimeout(60000);
+    const w = worker();
+    const wall = await projector(browser, w);
+    const ph = await phone(browser, w);
+    await ph.locator('.sb-club[data-club="sparks"]').click();
+    await expect(wall.locator('[data-scoring="sparks"]')).toBeVisible();
+
+    // No signal: the taps show at once and wait.
+    w.down = true;
+    for (let i = 0; i < 3; i += 1) await ph.locator('.sb-plus[data-team="red"]').click();
+    await expect(ph.locator('.sb-plus[data-team="red"] .sb-plus__num')).toHaveText('3');
+    await expect(ph.locator('#live')).toHaveText(/3 taps waiting to send/, { timeout: 5000 });
+    expect((await w.core.state().then((r) => r.json())).board.scores.sparks.red).toBe(0);
+    await shot(ph, 'phone-12-waiting');
+
+    // Back online: all three arrive, in order, and the line says Live again.
+    w.down = false;
+    await expect.poll(async () => (await w.core.state().then((r) => r.json())).board.scores.sparks.red, { timeout: 15000 }).toBe(3);
+    await expect(ph.locator('#live')).not.toHaveText(/waiting/, { timeout: 10000 });
+    await expect(wall.locator('[data-team="red"] .pj-score__num')).toHaveText('3');
+
+    // The Worker counted a tap but its answer was lost: sent again, counted once.
+    w.loseAnswers = 1;
+    await ph.locator('.sb-plus[data-team="green"]').click();
+    await expect.poll(async () => (await w.core.state().then((r) => r.json())).board.scores.sparks.green, { timeout: 15000 }).toBe(1);
+    await expect(ph.locator('#live')).not.toHaveText(/waiting/, { timeout: 10000 });
+    await ph.waitForTimeout(3500);   // a read or two later, still exactly one
+    expect((await w.core.state().then((r) => r.json())).board.scores.sparks.green).toBe(1);
+    await expect(ph.locator('.sb-plus[data-team="green"] .sb-plus__num')).toHaveText('1');
+
+    // Green catches red (3-3), then passes it: TAKES THE LEAD! on the wall.
+    await expect(wall.locator('.pj-take')).toHaveCount(0, { timeout: 6000 });
+    await ph.locator('.sb-plus[data-team="green"]').click();
+    await ph.locator('.sb-plus[data-team="green"]').click();
+    await expect.poll(async () => (await w.core.state().then((r) => r.json())).board.scores.sparks.green, { timeout: 8000 }).toBe(3);
+    await expect(wall.locator('.pj-take')).toHaveCount(0, { timeout: 6000 });
+    await ph.locator('.sb-plus[data-team="green"]').click();
+    await expect(wall.locator('.pj-take[data-lead="green"]')).toBeVisible();
+    await expect(wall.locator('.pj-take__lead')).toHaveText(/takes the lead/i);
+    await wall.waitForTimeout(1300);
+    await shot(wall, 'wall-13-lead');
+    await wall.context().close();
     await ph.context().close();
   });
 });

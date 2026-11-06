@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  leadChange,
   SCORE_ALL_TEAMS,
   SCORE_SETUPS,
   SCORE_TEAM_WORDS,
@@ -153,5 +154,23 @@ describe('the schedule', () => {
     expect(gameEndMinute(schedule, 'cubbies')).toBe(19 * 60 + 30);
     expect(gameClubsWith(schedule, 'cubbies').sort()).toEqual(['cubbies', 'puggles']);
     expect(gameEndMinute(schedule, 'trek')).toBe(null);
+  });
+});
+
+describe('leadChange (owner 2026-11-06: "RED TAKES THE LEAD!")', () => {
+  const sc = (blue, red, yellow, green) => ({ blue, red, yellow, green });
+  it('a team passing the leader, or breaking a tie at the top, takes the lead', () => {
+    expect(leadChange(sc(3, 3, 0, 0), sc(3, 4, 0, 0))).toBe('red');
+    expect(leadChange(sc(5, 4, 0, 0), sc(5, 6, 0, 0))).toBe('red');
+  });
+  it('the first point, adding to a lead, or catching up to a tie: no call', () => {
+    expect(leadChange(sc(0, 0, 0, 0), sc(0, 1, 0, 0))).toBeNull();
+    expect(leadChange(sc(0, 4, 0, 0), sc(0, 5, 0, 0))).toBeNull();
+    expect(leadChange(sc(5, 4, 0, 0), sc(5, 5, 0, 0))).toBeNull();
+    expect(leadChange(null, sc(0, 1, 0, 0))).toBeNull();
+  });
+  it('only the playing teams count (two-team setups)', () => {
+    const before = { boys: 2, girls: 2, blue: 9 };
+    expect(leadChange(before, { boys: 2, girls: 3, blue: 9 }, ['boys', 'girls'])).toBe('girls');
   });
 });

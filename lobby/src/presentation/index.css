@@ -773,6 +773,19 @@
   padding: 0.18em 0.6em 0.22em;
   box-shadow: calc(0.4 * var(--u)) calc(0.4 * var(--u)) 0 var(--team-deep);
 }
+.pj-take__lead {
+  /* The stamp over the word: the kit's white plate, the team's deep ink, a hard offset. */
+  margin-bottom: calc(2.4 * var(--u));
+  font-family: var(--font-display);
+  text-transform: uppercase;
+  font-size: calc(5.6 * var(--u));
+  line-height: 1;
+  padding: 0.2em 0.55em 0.26em;
+  border-radius: calc(1.2 * var(--u));
+  background: #ffffff;
+  color: var(--team-deep);
+  box-shadow: calc(0.5 * var(--u)) calc(0.5 * var(--u)) 0 var(--team-deep);
+}
 .pj-take__sparkle { position: absolute; height: auto; }
 
 /* The winner (components/ScoreFinale.jsx), over everything for 8 s. */

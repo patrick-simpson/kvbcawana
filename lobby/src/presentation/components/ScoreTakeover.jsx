@@ -15,9 +15,12 @@ import { EASE } from '../lib/motion-tokens.js';
  * `still` (low power / reduced motion): no wipe, no slam, no sparkles: the
  * finished card, held, then gone.
  *
- * @param {{ hits: {team: string, gained: number}[], scores: Record<string, number>, teams?: readonly string[], still: boolean }} props
+ * A point that puts its team in front alone (owner 2026-11-06: "RED TAKES THE
+ * LEAD!") adds a stamp over the word, TAKES THE LEAD!, slammed in after it, and
+ * the takeover holds LEAD_HOLD_MS longer; only on a one-team takeover.
+ * @param {{ hits: {team: string, gained: number}[], lead?: string|null, scores: Record<string, number>, teams?: readonly string[], still: boolean }} props
  */
-export const ScoreTakeover = ({ hits, scores, teams = SCORE_TEAMS, still }) => {
+export const ScoreTakeover = ({ hits, lead = null, scores, teams = SCORE_TEAMS, still }) => {
   const one = hits.length === 1;
   const origin = one ? originOf(hits[0].team, teams) : '50% 50%';
   return (
@@ -25,18 +28,22 @@ export const ScoreTakeover = ({ hits, scores, teams = SCORE_TEAMS, still }) => {
       className="pj-take"
       data-teams={hits.map((h) => h.team).join(' ')}
       role="status"
-      aria-label={hits.map((h) => `${SCORE_TEAM_WORDS[h.team]} plus ${h.gained}`).join(', ')}
+      data-lead={lead || undefined}
+      aria-label={hits.map((h) => `${SCORE_TEAM_WORDS[h.team]} plus ${h.gained}${h.team === lead ? ', takes the lead' : ''}`).join(', ')}
       initial={still ? { opacity: 1 } : { clipPath: `circle(0% at ${origin})` }}
       animate={{ clipPath: `circle(150% at ${origin})`, opacity: 1, transition: still ? { duration: 0 } : { duration: 0.42, ease: EASE.wipe } }}
       exit={{ opacity: 0, scale: still ? 1 : 1.04, transition: { duration: still ? 0 : 0.22, ease: EASE.exit } }}
     >
       {hits.map((h, i) => (
-        <Band key={h.team} hit={h} total={scores[h.team]} index={i} count={hits.length} still={still} />
+        <Band key={h.team} hit={h} lead={one && h.team === lead} total={scores[h.team]} index={i} count={hits.length} still={still} />
       ))}
       {!still && one && <Sparkles color={SCORE_TEAM_COLORS[hits[0].team].ink === '#FFFFFF' ? '#FFFFFF' : '#231F20'} />}
     </motion.div>
   );
 };
+
+/** How much longer a takeover that calls the lead stays up. */
+export const LEAD_HOLD_MS = 700;
 
 /** Where the team's plate sits (the wipe starts there): a corner of the 2 x 2, or a side of the two halves. */
 const CORNERS = ['0% 0%', '100% 0%', '0% 100%', '100% 100%'];
@@ -49,7 +56,7 @@ function originOf(team, teams) {
 /** The slant between bands, as a share of the wall's width. */
 const SLANT = 0.08;
 
-const Band = ({ hit, total, index, count, still }) => {
+const Band = ({ hit, lead, total, index, count, still }) => {
   const c = SCORE_TEAM_COLORS[hit.team];
   const w = 1 / count;
   const x0 = index * w;
@@ -66,6 +73,21 @@ const Band = ({ hit, total, index, count, still }) => {
   return (
     <div className="pj-take__band" style={{ background: c.fill, clipPath: clip, '--team-deep': c.deep, '--team-ink': c.ink }}>
       <div className="pj-take__copy" style={{ left: `${(centre * 100).toFixed(2)}%` }}>
+        {lead && (
+          <motion.div
+            className="pj-take__lead"
+            style={{ rotate: -3 }}
+            initial={still ? false : { scale: 0, opacity: 0, rotate: -14 }}
+            animate={still ? undefined : {
+              scale: [0, 1.18, 0.96, 1],
+              opacity: [0, 1, 1, 1],
+              rotate: [-14, -3, -3, -3],
+              transition: { duration: 0.5, times: [0, 0.5, 0.75, 1], ease: 'easeOut', delay: 0.62 },
+            }}
+          >
+            Takes the lead!
+          </motion.div>
+        )}
         <motion.div
           className="pj-take__word"
           style={{ fontSize: `calc(${size} * var(--u))` }}

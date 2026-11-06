@@ -212,6 +212,23 @@ export function leaderOf(scores, playing = SCORE_TEAMS) {
 }
 
 /**
+ * The team that just took the lead (owner 2026-11-06: "RED TAKES THE LEAD!"):
+ * in front alone now, and before it was another team in front or a tie at the
+ * top with points on the board. The first point of a game is not a lead change
+ * (nobody was ahead), and nor is a team adding to its own lead.
+ * @param {{[t: string]: number}|null} before @param {{[t: string]: number}} after @param {readonly string[]} [playing]
+ * @returns {string|null}
+ */
+export function leadChange(before, after, playing = SCORE_TEAMS) {
+  if (!before) return null;
+  const now = leaderOf(after, playing);
+  if (!now) return null;
+  const was = winnerOf(before, playing);
+  if (was.top <= 0) return null;
+  return was.teams.length === 1 && was.teams[0] === now ? null : now;
+}
+
+/**
  * Teams whose score went UP between two readings, with how many points.
  * A removed point gets no takeover (owner: "a removed point just ticks down quietly").
  * @param {{[t: string]: number}|null} before @param {{[t: string]: number}} after @param {readonly string[]} [playing]

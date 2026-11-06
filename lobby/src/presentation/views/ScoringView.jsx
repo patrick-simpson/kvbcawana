@@ -4,7 +4,7 @@ import { CLUBS } from '../config.js';
 import { THEME, artUrl } from '../lib/shared-config.js';
 import { StepChip } from '../components/StepChip.jsx';
 import { ScoreClock } from '../components/ScoreClock.jsx';
-import { ScoreTakeover } from '../components/ScoreTakeover.jsx';
+import { LEAD_HOLD_MS, ScoreTakeover } from '../components/ScoreTakeover.jsx';
 import { useLowPower } from '../hooks/useLowPower.js';
 import { useBirthdays } from '../hooks/useBirthdays.js';
 import { birthdaysThisWeek, listNames } from '../lib/birthdays.js';
@@ -21,6 +21,7 @@ import {
   SCORE_TEAM_COLORS,
   SCORE_TEAM_WORDS,
   TAKEOVER_MS,
+  leadChange,
   leaderOf,
   pointsGained,
 } from '../../../../shared/scoreboard.js';
@@ -87,11 +88,17 @@ export const ScoringView = ({ now, club, scores, teams = SCORE_TEAMS, clock, ser
   const ids = useRef(0);
   useEffect(() => {
     const gained = pointsGained(prev.current, scores, teams);
+    // A team that just went in front (owner 2026-11-06: "RED TAKES THE LEAD!"), only by its own point.
+    const taken = leadChange(prev.current, scores, teams);
+    const lead = taken && gained.some((g) => g.team === taken) ? taken : null;
     prev.current = scores;
     if (!gained.length) return;
     gained.forEach((g, i) => {
       const [a, b] = SCORE_TEAM_CHIMES[g.team];
-      playTones([{ freq: a, at: i * 0.05, len: 0.18 }, { freq: b, at: i * 0.05 + 0.08, len: 0.32 }], undefined, { force: sounds });
+      const notes = [{ freq: a, at: i * 0.05, len: 0.18 }, { freq: b, at: i * 0.05 + 0.08, len: 0.32 }];
+      // The lead: the chime climbs one more step.
+      if (g.team === lead) notes.push({ freq: b * 1.5, at: i * 0.05 + 0.2, len: 0.4 });
+      playTones(notes, undefined, { force: sounds });
     });
     const t = performance.now();
     setTakeover((cur) => {
@@ -104,16 +111,18 @@ export const ScoringView = ({ now, club, scores, teams = SCORE_TEAMS, clock, ser
           else hits.push(g);
         }
         hits.sort((x, y) => teams.indexOf(x.team) - teams.indexOf(y.team));
-        return { id: cur.id, hits, startedAt: cur.startedAt, last: t };
+        // The lead call belongs to a one-team takeover: a shared one drops it.
+        const keep = hits.length === 1 ? lead || cur.lead : null;
+        return { id: cur.id, hits, startedAt: cur.startedAt, last: t, lead: keep };
       }
       ids.current += 1;
-      return { id: ids.current, hits: gained, startedAt: t, last: t };
+      return { id: ids.current, hits: gained, startedAt: t, last: t, lead: gained.length === 1 ? lead : null };
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scores]);
   useEffect(() => {
     if (!takeover) return undefined;
-    const timer = window.setTimeout(() => setTakeover(null), TAKEOVER_MS + (takeover.last - takeover.startedAt));
+    const timer = window.setTimeout(() => setTakeover(null), TAKEOVER_MS + (takeover.lead ? LEAD_HOLD_MS : 0) + (takeover.last - takeover.startedAt));
     return () => window.clearTimeout(timer);
   }, [takeover]);
 
@@ -195,7 +204,7 @@ export const ScoringView = ({ now, club, scores, teams = SCORE_TEAMS, clock, ser
       </div>
 
       <AnimatePresence>
-        {takeover && <ScoreTakeover key={takeover.id} hits={takeover.hits} scores={scores} teams={teams} still={lowPower} />}
+        {takeover && <ScoreTakeover key={takeover.id} hits={takeover.hits} lead={takeover.lead} scores={scores} teams={teams} still={lowPower} />}
       </AnimatePresence>
     </div>
   );
