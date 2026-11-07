@@ -25,3 +25,6 @@ journey/public/current-lesson-video.mp4
 printer/reel/music/*.mp3
 printer/reel/music/*.m4a
 printer/reel/music/*.wav
+
+# Claude Code local settings (may hold secrets from approved commands)
+.claude/settings.local.json
