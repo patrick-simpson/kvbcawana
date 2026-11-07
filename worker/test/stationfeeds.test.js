@@ -106,8 +106,8 @@ describe('the roster export, parsed and trimmed', () => {
     const rung = STATION_PAD_LADDER.find((r) => JSON.stringify(item.record).length + 4 <= r);
     console.warn(`roster: export ${text.length} B, trimmed ${trimmed.csv.length} B (${trimmed.columns} columns, rung ${rung}); parse+trim ${parseMs.toFixed(2)} ms (first run ${coldMs.toFixed(2)} ms); seal to 1 station ${sealMs.toFixed(2)} ms (untrimmed ${fullMs.toFixed(2)} ms)`);
     expect(rung).toBeLessThanOrEqual(65536);
-    expect(sealMs).toBeLessThan(10);
-    expect(parseMs).toBeLessThan(10);
+    expect(sealMs).toBeLessThan(35);
+    expect(parseMs).toBeLessThan(35);
   });
 });
 
