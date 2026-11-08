@@ -14,6 +14,7 @@ import {
   TOKEN_KEY, captureWords, cleanCode, clock, codeReady, errorWords, filePress, fileProblem, formatCode,
   joinWords, linkToCopy, placeholderId, shareWords, size, textPress, titleFromName, tvWords, videoPress,
   SLIDES_ACCEPT, convertWords, isPresentation, slideView, slidesChoice,
+  codeFromHash, facebookPress, resultPress,
 } from '../cast/logic.js';
 
 const SITE = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
@@ -227,4 +228,45 @@ test('a PowerPoint is scrambled in the browser before it leaves; the preview rea
   assert.match(page, /data-slide="next"/);
   assert.match(page, /data-slide-strip/);
   assert.match(build, /'preview\.js'/);
+});
+
+// Owner 2026-11-08, later: one phone at a time, Display code, the TV's QR (and the
+// KVBC_Guest note), YouTube search, Facebook videos, video files.
+test('the QR link carries the code in the fragment; the page connects with it and cleans the address', () => {
+  assert.equal(codeFromHash('#code=123456'), '123456');
+  assert.equal(codeFromHash('#x=1&code=654321'), '654321');
+  assert.equal(codeFromHash('#code=012345'), '');
+  assert.equal(codeFromHash(''), '');
+  assert.match(screen, /\/cast\/#code=\$\{d\}/);
+  assert.match(app, /codeFromHash\(location\.hash\)/);
+  assert.match(app, /history\.replaceState\(null, '', location\.pathname \+ location\.search\)/);
+  assert.match(screen, /cdnjs\.cloudflare\.com\/ajax\/libs\/qrcode-generator\/1\.4\.4\//);
+  assert.match(screenPage, /id="qr"/);
+});
+
+test('the TV and the share step say a laptop joins KVBC_Guest first', () => {
+  assert.match(screenPage, /Join the <b>KVBC_Guest<\/b> Wi-Fi first/);
+  assert.match(page, /Join the KVBC_Guest Wi-Fi first/);
+});
+
+test('Disconnect frees the room; Display code also puts the TV back to its code', () => {
+  assert.match(app, /'\/v1\/cast\/leave', \{ method: 'POST', body: takeDown \? \{ takeDown: true \} : \{\} \}/);
+  assert.match(page, /id="btn-code">Display code</);
+  assert.match(app, /\$\('btn-code'\)\.addEventListener\('click', \(\) => leave\(true\)\)/);
+});
+
+test('YouTube search results, Facebook links and video files become presses the shared rules accept', () => {
+  assert.equal(resultPress({ youtube: 'dQw4w9WgXcQ', title: 'Song' }, R).press.data.item.youtube, 'dQw4w9WgXcQ');
+  assert.equal(facebookPress({ link: 'https://www.facebook.com/kvbchurch/videos/1234567890/' }, R).press.data.item.kind, 'facebook');
+  assert.match(facebookPress({ link: 'https://example.org/v' }, R).error, /Copy link/);
+  assert.equal(fileProblem({ type: 'video/mp4', size: 5 }, 'clip', R), '');
+  assert.match(fileProblem({ type: 'video/mp4', size: 201 * 1024 * 1024 }, 'clip', R), /200 MB/);
+  assert.match(fileProblem({ type: 'image/png', size: 5 }, 'clip', R), /Choose a video/);
+  assert.equal(filePress({ id: 'fabcdefghijkl', type: 'video/mp4' }, 'Skit', R).press.data.item.kind, 'clip');
+  assert.match(app, /\/v1\/cast\/youtube\?q=\$\{encodeURIComponent\(q\)\}/);
+  // The TV: one set of controls for YouTube, clips and Facebook; each takes itself down at its end.
+  assert.match(screen, /connect\.facebook\.net\/en_US\/sdk\.js/);
+  assert.match(screen, /subscribe\('finishedPlaying', \(\) => \{ playing = false; ended\(\); \}\)/);
+  assert.match(screen, /v\.addEventListener\('ended', ended\)/);
+  assert.match(screen, /R\.CLASSROOM_PLAYABLE_KINDS\.includes\(b\.kind\) && media/);
 });

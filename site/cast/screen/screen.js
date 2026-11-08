@@ -19,6 +19,14 @@
 //   first PDF). Video commands run once by id, never ones from before this page loaded.
 // - Reports what it shows (POST /v1/cast/screen/now) only while a presenter watches
 //   (the Worker's `watch`): on a change, and every 10 s in a video.
+// - The code screen carries a QR code of awana.kvbchurch.org/cast/#code=<code> (the
+//   presenter page reads the code from it and connects) and says a laptop must join the
+//   KVBC_Guest Wi-Fi to share its screen (owner 2026-11-08). The QR is drawn by
+//   qrcode-generator (cdnjs), flat charcoal on the cream; no QR when it cannot load.
+// - Videos (owner 2026-11-08): an uploaded video (`clip`) read with the session into a
+//   blob and played in a <video>; a public Facebook video in Facebook's own embedded
+//   player (its SDK, connect.facebook.net). One set of controls for YouTube, clips and
+//   Facebook (`media`); every one takes itself down when it ends.
 // - ?configure=1 (KVBC Awana's display Settings window, coordinator 2026-11-08): a
 //   short note only. No room is opened, no socket, nothing closed on pagehide.
 //
@@ -32,6 +40,8 @@ const SESSION_RE = /^v1\.\d+\.\d+\.[A-Za-z0-9_-]{20,}$/;
 const SYNC_INDEX = new URL('/lobby/shared/sync.json', location.href).href;
 const PDFJS = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/';
 const YT_API = 'https://www.youtube.com/iframe_api';
+const QR_LIB = 'https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js';
+const FB_SDK = 'https://connect.facebook.net/en_US/sdk.js';
 const T = Object.assign({
   pollMs: 30000, reportVideoMs: 10000, timeoutMs: 10000, fadeMs: 450,
   pingMs: 25000, silentMs: 70000, retryMinMs: 2000, retryMaxMs: 60000,
@@ -51,8 +61,8 @@ let watch = false;
 let showKey = '';
 let busy = Promise.resolve();
 const ran = new Set();
-let player = null;
-let playerReady = false;
+/** The video up now, whatever plays it: { play, pause, paused, seekBy, mute, unmute, muted, volume, setVolume, t, d, destroy }. */
+let media = null;
 let blobUrl = '';
 let pdf = null; // { doc, pages }
 let shownPage = 0;
@@ -93,6 +103,7 @@ function calm(title, words) {
   $('card-go').textContent = words;
   $('code').hidden = true;
   $('card-foot').hidden = true;
+  $('qr').hidden = true;
 }
 
 function drawCode() {
@@ -102,6 +113,55 @@ function drawCode() {
   $('code-a').textContent = d ? d.slice(0, 3) : '···';
   $('code-b').textContent = d ? d.slice(3) : '···';
   c.setAttribute('aria-label', d ? `Code ${d.split('').join(' ')}` : 'Getting a code');
+  drawQr(d);
+}
+
+/* ── The QR code: the presenter page with the code in it ── */
+
+let qrLib = null;
+function qrcodeLib() {
+  if (window.castQr) return Promise.resolve(window.castQr);
+  if (!qrLib) {
+    qrLib = new Promise((ok, no) => {
+      const sc = document.createElement('script');
+      sc.src = QR_LIB;
+      sc.onload = () => (typeof window.qrcode === 'function' ? ok(window.qrcode) : no(new Error('qr')));
+      sc.onerror = () => { qrLib = null; no(new Error('qr')); };
+      document.head.append(sc);
+    });
+  }
+  return qrLib;
+}
+
+/** Where the QR sends a phone (the code in the fragment: never sent to a server). @param {string} d */
+export function qrUrl(d) {
+  const origin = /^https:\/\//.test(location.origin) ? location.origin : 'https://awana.kvbchurch.org';
+  return `${origin}/cast/#code=${d}`;
+}
+
+async function drawQr(d) {
+  const box = $('qr');
+  if (!d) { box.hidden = true; return; }
+  try {
+    const qrcode = await qrcodeLib();
+    if (code !== d) return;
+    const q = qrcode(0, 'M');
+    q.addData(qrUrl(d));
+    q.make();
+    const n = q.getModuleCount();
+    const quiet = 2;
+    const canvas = $('qr-canvas');
+    const px = Math.max(4, Math.floor(512 / (n + quiet * 2)));
+    canvas.width = canvas.height = px * (n + quiet * 2);
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#F6F2EA';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#3A332A';
+    for (let r = 0; r < n; r += 1) for (let col = 0; col < n; col += 1) if (q.isDark(r, col)) ctx.fillRect((col + quiet) * px, (r + quiet) * px, px, px);
+    box.hidden = false;
+  } catch {
+    box.hidden = true;
+  }
 }
 
 /* ── The room ── */
@@ -179,6 +239,8 @@ async function change(show) {
   layer.hidden = false;
   const b = show.button;
   if (b.kind === 'video') playVideo(b);
+  else if (b.kind === 'clip') playClip(b, show);
+  else if (b.kind === 'facebook') playFacebook(b);
   else if (b.kind === 'text') drawText(b);
   else if (b.kind === 'image') drawImage(prepared);
   else if (b.kind === 'pdf') await openPdf(prepared, show.page);
@@ -189,9 +251,8 @@ async function change(show) {
 }
 
 function clear() {
-  if (player) { try { player.destroy(); } catch { /* gone */ } }
-  player = null;
-  playerReady = false;
+  if (media) { try { media.destroy(); } catch { /* gone */ } }
+  media = null;
   if (rtc) { try { rtc.pc.close(); } catch { /* closed */ } }
   rtc = null;
   shareTries = 0;
@@ -332,44 +393,152 @@ async function playVideo(b) {
   layer.append(host);
   const YT = await ytApi();
   if (!layer.contains(host)) return;
-  player = new YT.Player(host, {
+  const player = new YT.Player(host, {
     host: 'https://www.youtube-nocookie.com',
     videoId: b.youtube,
     width: '100%',
     height: '100%',
     playerVars: { autoplay: 1, controls: 0, rel: 0, modestbranding: 1, playsinline: 1, iv_load_policy: 3, fs: 0, disablekb: 1, start: b.start || 0, origin: location.origin },
     events: {
-      onReady: (e) => { playerReady = true; try { e.target.unMute(); e.target.playVideo(); } catch { /* blocked */ } report(); },
+      onReady: (e) => {
+        if (!layer.contains(e.target.getIframe())) return;
+        media = {
+          play: () => player.playVideo(), pause: () => player.pauseVideo(), paused: () => player.getPlayerState() !== 1,
+          seekBy: (by) => player.seekTo(Math.max(0, player.getCurrentTime() + by), true),
+          mute: () => player.mute(), unmute: () => player.unMute(), muted: () => player.isMuted(),
+          volume: () => player.getVolume(), setVolume: (v) => player.setVolume(v),
+          t: () => player.getCurrentTime(), d: () => player.getDuration(), destroy: () => player.destroy(),
+        };
+        try { e.target.unMute(); e.target.playVideo(); } catch { /* blocked */ }
+        report();
+      },
       // Ended: black at once (never YouTube's end screen), then the TV takes it down itself
       // (POST /v1/cast/screen/back) and the code comes back, like the classroom's video.
       onStateChange: (e) => {
-        if (e.data === 0) {
-          const f = layer.querySelector('iframe');
-          if (f) f.style.visibility = 'hidden';
-          request('/v1/cast/screen/back', { method: 'POST', body: {} }).catch(() => {});
-        }
+        if (e.data === 0) ended();
         report();
       },
     },
   });
 }
 
+/** A video ended: black at once (never an end screen), then the TV takes it down and the code comes back. */
+function ended() {
+  for (const el of layer.querySelectorAll('iframe, video, .fb-video')) el.style.visibility = 'hidden';
+  request('/v1/cast/screen/back', { method: 'POST', body: {} }).catch(() => {});
+}
+
+/* ── An uploaded video (a clip) ── */
+
+async function playClip(b, show) {
+  status('Loading the video…', b.title && b.title !== 'Video' ? b.title : '');
+  const blob = await fetchFile(b.file);
+  if (showKey !== `${show.button.id}@${show.at}`) return;
+  if (!blob) { status('The video could not be loaded.', 'Try putting it up again.'); return; }
+  layer.querySelector('.status')?.remove();
+  blobUrl = URL.createObjectURL(blob);
+  const v = document.createElement('video');
+  v.src = blobUrl;
+  v.playsInline = true;
+  v.autoplay = true;
+  v.addEventListener('ended', ended);
+  for (const ev of ['play', 'pause', 'volumechange']) v.addEventListener(ev, () => report());
+  layer.append(v);
+  media = {
+    play: () => v.play().catch(() => {}), pause: () => v.pause(), paused: () => v.paused,
+    seekBy: (by) => { v.currentTime = Math.min(Math.max(0, v.currentTime + by), v.duration || 0); },
+    mute: () => { v.muted = true; }, unmute: () => { v.muted = false; }, muted: () => v.muted,
+    volume: () => Math.round(v.volume * 100), setVolume: (x) => { v.volume = x / 100; },
+    t: () => v.currentTime, d: () => (Number.isFinite(v.duration) ? v.duration : 0),
+    destroy: () => { v.pause(); v.removeAttribute('src'); v.load(); },
+  };
+  // Sound on when the browser allows it (KVBC Awana does); else the picture, muted.
+  v.muted = false;
+  v.play().catch(() => { v.muted = true; v.play().catch(() => {}); });
+  report(true);
+}
+
+/* ── A public Facebook video, in Facebook's own player ── */
+
+let fbReady = null;
+function facebookSdk() {
+  if (window.castFacebook) return Promise.resolve(window.castFacebook);
+  if (!fbReady) {
+    fbReady = new Promise((ok, no) => {
+      window.fbAsyncInit = () => { window.FB.init({ xfbml: false, version: 'v19.0' }); ok(window.FB); };
+      const sc = document.createElement('script');
+      sc.src = FB_SDK;
+      sc.async = true;
+      sc.onerror = () => { fbReady = null; no(new Error('facebook')); };
+      document.head.append(sc);
+    });
+  }
+  return fbReady;
+}
+
+async function playFacebook(b) {
+  status('Loading the Facebook video…', b.title && b.title !== 'Facebook video' ? b.title : '');
+  const box = document.createElement('div');
+  box.className = 'fb-box';
+  const el = document.createElement('div');
+  el.className = 'fb-video';
+  el.dataset.href = b.href;
+  el.dataset.autoplay = 'true';
+  el.dataset.allowfullscreen = 'false';
+  el.dataset.showText = 'false';
+  el.dataset.showCaptions = 'false';
+  // Facebook's player takes a width; it picks the height from the video's shape.
+  el.dataset.width = String(Math.round(Math.min(window.innerWidth, window.innerHeight * (16 / 9))));
+  el.id = `fb-${b.id}`;
+  box.append(el);
+  layer.append(box);
+  let FB;
+  try { FB = await facebookSdk(); } catch { status('Facebook did not load.', 'The video may be private, or Facebook is blocked here.'); return; }
+  if (!layer.contains(box)) return;
+  const onReady = (msg) => {
+    if (msg.type !== 'video' || msg.id !== el.id || !layer.contains(box)) return;
+    FB.Event.unsubscribe('xfbml.ready', onReady);
+    const p = msg.instance;
+    layer.querySelector('.status')?.remove();
+    let playing = false;
+    const subs = [
+      p.subscribe('startedPlaying', () => { playing = true; report(); }),
+      p.subscribe('paused', () => { playing = false; report(); }),
+      p.subscribe('finishedPlaying', () => { playing = false; ended(); }),
+      p.subscribe('error', () => status('Facebook would not play that video.', 'Only public videos can be shown.')),
+    ];
+    media = {
+      play: () => p.play(), pause: () => p.pause(), paused: () => !playing,
+      seekBy: (by) => p.seek(Math.max(0, p.getCurrentPosition() + by)),
+      mute: () => p.mute(), unmute: () => p.unmute(), muted: () => p.isMuted(),
+      volume: () => Math.round(p.getVolume() * 100), setVolume: (x) => p.setVolume(x / 100),
+      t: () => p.getCurrentPosition(), d: () => p.getDuration(),
+      destroy: () => { for (const sub of subs) { try { sub.release(); } catch { /* gone */ } } },
+    };
+    try { p.unmute(); p.play(); } catch { /* blocked */ }
+    report(true);
+  };
+  FB.Event.subscribe('xfbml.ready', onReady);
+  FB.XFBML.parse(box);
+}
+
+/* ── The video presses (YouTube, a clip, Facebook) ── */
+
 function videoCmd(d) {
-  if (!player || !playerReady || !d) return;
+  if (!media || !d) return;
   try {
-    const paused = player.getPlayerState() !== 1;
-    if (d.op === 'toggle') { if (paused) player.playVideo(); else player.pauseVideo(); }
-    if (d.op === 'play') player.playVideo();
-    if (d.op === 'pause') player.pauseVideo();
-    if (d.op === 'mute') player.mute();
-    if (d.op === 'unmute') player.unMute();
-    if (d.op === 'seek') player.seekTo(Math.max(0, player.getCurrentTime() + d.by), true);
+    if (d.op === 'toggle') { if (media.paused()) media.play(); else media.pause(); }
+    if (d.op === 'play') media.play();
+    if (d.op === 'pause') media.pause();
+    if (d.op === 'mute') media.mute();
+    if (d.op === 'unmute') media.unmute();
+    if (d.op === 'seek') media.seekBy(d.by);
     if (d.op === 'volume') {
-      const v = Math.min(100, Math.max(0, Math.round((player.getVolume() + d.step * R.CLASSROOM_VOLUME_STEP_PCT) / 10) * 10));
-      player.setVolume(v);
-      if (v > 0 && player.isMuted()) player.unMute();
+      const v = Math.min(100, Math.max(0, Math.round((media.volume() + d.step * R.CLASSROOM_VOLUME_STEP_PCT) / 10) * 10));
+      media.setVolume(v);
+      if (v > 0 && media.muted()) media.unmute();
     }
-    if (d.op === 'play' || d.op === 'toggle' || d.op === 'seek') { const f = layer.querySelector('iframe'); if (f) f.style.visibility = ''; }
+    if (d.op === 'play' || d.op === 'toggle' || d.op === 'seek') for (const el of layer.querySelectorAll('iframe, video, .fb-video')) el.style.visibility = '';
   } catch { /* the player is not ready */ }
   setTimeout(() => report(), 250);
 }
@@ -436,8 +605,8 @@ function nowReport() {
   const out = { view: b ? b.kind : 'waiting' };
   if (b) { out.button = b.id; out.title = b.title; }
   if (b && b.kind === 'pdf' && pdf) { out.page = shownPage || 1; out.pages = pdf.pages; }
-  if (b && b.kind === 'video' && player && playerReady) {
-    try { out.video = { t: player.getCurrentTime(), d: player.getDuration(), paused: player.getPlayerState() !== 1, muted: player.isMuted(), volume: player.getVolume() }; } catch { /* not yet */ }
+  if (b && R.CLASSROOM_PLAYABLE_KINDS.includes(b.kind) && media) {
+    try { out.video = { t: media.t(), d: media.d(), paused: media.paused(), muted: media.muted(), volume: media.volume() }; } catch { /* not yet */ }
   }
   return R.sanitizeClassroomNow(out);
 }
@@ -548,7 +717,7 @@ async function start() {
     if (pdf && shownPage) busy = busy.then(() => drawPdfPage(shownPage)).catch(() => {});
   });
   setInterval(() => { if (session() && code) read(); }, T.pollMs);
-  setInterval(() => { if (stage.show && stage.show.button.kind === 'video') report(true); }, T.reportVideoMs);
+  setInterval(() => { if (stage.show && R.CLASSROOM_PLAYABLE_KINDS.includes(stage.show.button.kind)) report(true); }, T.reportVideoMs);
 }
 
 start();

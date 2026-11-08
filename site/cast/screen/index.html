@@ -22,11 +22,16 @@
   .card { background: var(--cream); display: grid; grid-template-rows: auto 1fr auto; padding: 6.2vh 7vw 6.6vh; transition: opacity .5s ease; }
   .card.is-away { opacity: 0; }
   .card .logo { width: calc(26 * var(--u)); min-width: 260px; height: auto; display: block; }
-  .card .middle { align-self: center; }
+  .card .middle { align-self: center; display: grid; grid-template-columns: 1fr auto; gap: calc(5 * var(--u)); align-items: center; }
+  .middle > div { min-width: 0; }
+  .qr { margin: 0; text-align: center; }
+  .qr canvas { display: block; width: calc(20 * var(--u)); height: calc(20 * var(--u)); image-rendering: pixelated; }
+  .qr figcaption { margin-top: calc(1 * var(--u)); font: 500 calc(1.6 * var(--u))/1.3 var(--heading); letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+  .card .foot b { font-weight: 700; color: var(--charcoal); }
   .card h1 { font: 500 calc(5 * var(--u))/1.05 var(--heading); letter-spacing: -.01em; margin: 0; }
   .card .go { font: 400 calc(2.5 * var(--u))/1.4 var(--body); color: var(--muted); margin: calc(1.6 * var(--u)) 0 0; }
   .card .go b { font-weight: 700; color: var(--charcoal); }
-  .code { display: flex; gap: calc(4.5 * var(--u)); margin: calc(3.4 * var(--u)) 0 0; font: 400 calc(19 * var(--u))/.9 var(--heading); letter-spacing: .06em; color: var(--green); font-variant-numeric: tabular-nums; }
+  .code { display: flex; gap: calc(3.6 * var(--u)); margin: calc(3.4 * var(--u)) 0 0; font: 400 calc(14.5 * var(--u))/.9 var(--heading); letter-spacing: .06em; color: var(--green); font-variant-numeric: tabular-nums; }
   .code.is-empty { color: var(--rule); }
   .card .foot { display: flex; align-items: center; gap: calc(1.2 * var(--u)); border-top: 1px solid var(--rule); padding-top: calc(1.8 * var(--u)); font: 400 calc(1.7 * var(--u))/1.4 var(--body); color: var(--muted); }
   .card .foot::before { content: ''; width: calc(.9 * var(--u)); height: calc(.9 * var(--u)); border-radius: 50%; background: var(--tan); flex: none; }
@@ -44,6 +49,8 @@
   #show img { width: 100%; height: 100%; object-fit: contain; }
   #show video { width: 100%; height: 100%; object-fit: contain; background: #000; }
   #show iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+  #show .fb-box { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
+  #show .fb-box iframe { position: static; }
   .text { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center; padding: 9vh 9vw; overflow: hidden; }
   .text--page { background: var(--cream); color: var(--charcoal); }
   .text--board { background: #1C1915; color: #F6F2EA; }
@@ -60,11 +67,14 @@
   <section class="layer card" id="card">
     <img class="logo" src="/cast/church/kvbc-logo.png" alt="Kennebec Valley Baptist Church" width="1302" height="277">
     <div class="middle">
-      <h1 id="card-title">Present on this screen</h1>
-      <p class="go" id="card-go">Go to <b>awana.kvbchurch.org/cast</b> and enter</p>
-      <p class="code is-empty" id="code" aria-label="Code"><span id="code-a">···</span><span id="code-b">···</span></p>
+      <div>
+        <h1 id="card-title">Present on this screen</h1>
+        <p class="go" id="card-go">Go to <b>awana.kvbchurch.org/cast</b> and enter</p>
+        <p class="code is-empty" id="code" aria-label="Code"><span id="code-a">···</span><span id="code-b">···</span></p>
+      </div>
+      <figure class="qr" id="qr" hidden><canvas id="qr-canvas" aria-label="QR code: open the Cast page with this code"></canvas><figcaption>Or scan</figcaption></figure>
     </div>
-    <p class="foot" id="card-foot">Share your screen, play a YouTube video, or show slides, pictures or text.</p>
+    <p class="foot" id="card-foot"><span>Casting a laptop? Join the <b>KVBC_Guest</b> Wi-Fi first. Phones can present on any connection.</span></p>
   </section>
   <!-- Something a presenter put up -->
   <section class="layer" id="show" hidden></section>

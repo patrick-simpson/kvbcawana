@@ -87,8 +87,33 @@ export function textPress(form, R) {
  */
 export function filePress(file, title, R) {
   const kind = R.kindOfType(file && file.type);
-  if (!kind) return { ok: false, error: 'Only a picture or a PDF can go on the TV.' };
-  return checked({ id: placeholderId(), kind, file: file.id, type: file.type, title: R.oneLine(title, R.CLASSROOM_TITLE_MAX) || (kind === 'pdf' ? 'Slides' : 'Picture') }, R);
+  if (!kind) return { ok: false, error: 'Only a picture, a PDF or a video can go on the TV.' };
+  const fallback = { pdf: 'Slides', clip: 'Video' }[kind] || 'Picture';
+  return checked({ id: placeholderId(), kind, file: file.id, type: file.type, title: R.oneLine(title, R.CLASSROOM_TITLE_MAX) || fallback }, R);
+}
+
+/**
+ * A Facebook video link (and an optional title) as an item press, or the problem.
+ * @param {{ link: string, title?: string }} form @param {any} R
+ */
+export function facebookPress(form, R) {
+  const href = R.facebookVideoFrom(form.link);
+  if (!href) return { ok: false, error: 'That does not look like a Facebook video link. On the video, tap Share, then Copy link.' };
+  return checked({ id: placeholderId(), kind: 'facebook', href, title: R.oneLine(form.title, R.CLASSROOM_TITLE_MAX) || 'Facebook video' }, R);
+}
+
+/**
+ * A YouTube search result ({youtube, title}) as an item press.
+ * @param {{ youtube: string, title?: string }} result @param {any} R
+ */
+export function resultPress(result, R) {
+  return videoPress({ link: result && result.youtube, title: result && result.title }, R);
+}
+
+/** The code in the QR's link (awana.kvbchurch.org/cast/#code=123456), '' when none. @param {unknown} hash */
+export function codeFromHash(hash) {
+  const m = /(?:^#|&)code=(\d{6})(?:&|$)/.exec(typeof hash === 'string' ? hash : '');
+  return m && codeReady(m[1]) ? m[1] : '';
 }
 
 /** Through the shared rules, as the Worker will check it. */
@@ -99,12 +124,17 @@ function checked(item, R) {
 
 /**
  * Why a chosen file cannot be sent ('' = it can). @param {{ type: string, size: number }} file
- * @param {'image'|'pdf'} want @param {any} R
+ * @param {'image'|'pdf'|'clip'} want @param {any} R
  */
 export function fileProblem(file, want, R) {
   const kind = R.kindOfType(file && file.type);
   if (want === 'pdf' && kind !== 'pdf') return 'Choose a PDF. From PowerPoint: File, Save As, PDF.';
   if (want === 'image' && kind !== 'image') return 'Choose a picture (JPEG, PNG, GIF or WebP).';
+  if (want === 'clip') {
+    if (kind !== 'clip') return 'Choose a video (MP4, MOV or WebM).';
+    if (file.size > R.CLASSROOM_CLIP_MAX_BYTES) return `That video is ${size(file.size)}; 200 MB at most. Trim it, or share your screen.`;
+    return file.size ? '' : 'That file is empty.';
+  }
   if (file.size > R.CLASSROOM_FILE_MAX_BYTES) return `That file is ${size(file.size)}; 20 MB at most.`;
   if (!file.size) return 'That file is empty.';
   return '';
@@ -141,7 +171,7 @@ export function errorWords(status, body) {
   return (body && typeof body.error === 'string' && body.error) || 'That did not work. Try again.';
 }
 
-const KIND_WORDS = { video: 'a YouTube video', image: 'a picture', pdf: 'slides', text: 'text', screen: 'a shared screen' };
+const KIND_WORDS = { video: 'a YouTube video', clip: 'a video', facebook: 'a Facebook video', image: 'a picture', pdf: 'slides', text: 'text', screen: 'a shared screen' };
 
 /**
  * The "On the TV now" line.

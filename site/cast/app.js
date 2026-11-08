@@ -17,6 +17,13 @@
 //   GitHub job that turns it into a PDF with LibreOffice (about a minute); this page asks
 //   for the status every CONVERT_POLL_MS and puts the PDF up when it is ready.
 // - Slides on the TV: the phone's preview (preview.js): this slide, the next, every slide.
+// - ONE presenter at a time (owner 2026-11-08): a join while someone else presents is
+//   refused (the Worker's 409 `busy`, its own words); Disconnect frees the room
+//   (POST /v1/cast/leave) and "Display code" also puts the TV back to its code.
+// - The TV's QR code opens this page as /cast/#code=123456: the code is read from the
+//   fragment, the address cleaned, and it connects.
+// - YouTube: search (GET /v1/cast/youtube, the Worker's key) or a link; a public
+//   Facebook video's link; a video file (a clip, up to 200 MB, sent in ~1 MB parts).
 // - "On the TV now": GET /v1/cast/state every 2 s while this page is visible (which
 //   is also what makes the TV report), nothing while hidden, and it stops after 30
 //   minutes with no touch (the free plan's daily requests).
@@ -28,6 +35,7 @@ import {
   TOKEN_KEY, TOKEN_RE, captureWords, cleanCode, codeReady, errorWords, filePress, fileProblem, formatCode,
   joinWords, linkToCopy, shareWords, size, textPress, titleFromName, tvWords, videoPress,
   CONVERT_GIVE_UP_MS, CONVERT_POLL_MS, SLIDES_ACCEPT, convertWords, slidesChoice,
+  clock, codeFromHash, facebookPress, resultPress,
 } from '/cast/logic.js';
 import { createPreview } from '/cast/preview.js';
 
@@ -54,6 +62,7 @@ let shareId = ''; // the stage button id of this page's share
 let shareStream = null;
 let pdfFile = null; // { file, title } the last PDF sent
 let converting = ''; // the id of the PowerPoint being made into slides
+let clipFile = null; // { file, title } the last video sent
 let preview = null;
 const pictures = []; // { file, url, title }
 
@@ -109,7 +118,7 @@ function disconnected(words) {
 }
 
 async function join(event) {
-  event.preventDefault();
+  if (event) event.preventDefault();
   const code = cleanCode($('code').value);
   if (!codeReady(code)) { showJoin('The code is six numbers, shown on the TV.', true); $('code').focus(); return; }
   if (!base) { showJoin('Cast cannot reach the church’s service right now. Reload in a minute.', true); return; }
@@ -133,12 +142,14 @@ function onCodeInput() {
   if (d.length === 6 && $('join-note').classList.contains('bad')) setText($('join-note'), '');
 }
 
-function leave() {
-  if (shareId) stopShare();
+/** Free the room (the Worker drops this page's token); takeDown puts the TV back to its code. */
+async function leave(takeDown) {
+  if (shareId) { const id = shareId; endShareHere(); setShare('stopped'); if (!takeDown && state && state.stage.show && state.stage.show.button.id === id) await press('back', null, 'Your screen is off the TV'); }
   converting = '';
+  if (tokenStore.get()) await request('/v1/cast/leave', { method: 'POST', body: takeDown ? { takeDown: true } : {} });
   tokenStore.set('');
   state = null;
-  showJoin('Disconnected. Type the code again to present.');
+  showJoin(takeDown ? 'The code is back on the TV, ready for the next person. Thanks!' : 'Disconnected. Type the code again to present.');
 }
 
 /* ── What's on the TV ── */
@@ -183,12 +194,12 @@ function render() {
   $('tv').dataset.online = String(w.online);
   const shown = state.stage.show ? state.stage.show.button : null;
   const kind = shown ? shown.kind : '';
-  $('ctl-video').hidden = kind !== 'video';
+  $('ctl-video').hidden = !R.CLASSROOM_PLAYABLE_KINDS.includes(kind);
   if (preview) {
     if (kind === 'pdf') preview.show(shown.file, state.stage.show.page, state.now && state.now.button === shown.id ? state.now.pages || 0 : 0);
     else preview.hide();
   }
-  $('ctl-down').hidden = !shown;
+  $('btn-down').hidden = !shown;
   setText($('btn-down'), shown && shown.id === shareId ? 'Stop sharing' : 'Take it down');
   const video = state.now && shown && state.now.button === shown.id ? state.now.video : null;
   setText($('btn-play'), video && video.paused ? 'Play' : 'Pause');
@@ -227,6 +238,87 @@ function sendVideo(e) {
   const out = videoPress({ link: $('video-link').value, title: $('video-title').value }, R);
   if (!out.ok) { setText($('press-note'), out.error); return; }
   press(out.press.action, out.press.data, 'The video is going up').then((r) => { if (r && r.ok) { $('video-link').value = ''; $('video-title').value = ''; } });
+}
+
+/* ── YouTube search (the Worker asks YouTube with the church's key) ── */
+
+async function searchYouTube(e) {
+  e.preventDefault();
+  touch();
+  const q = $('yt-q').value.trim();
+  const note = $('yt-note');
+  const list = $('yt-results');
+  note.classList.remove('bad');
+  if (!q) { setText(note, 'Type something to search for.'); return; }
+  setText(note, 'Searching…');
+  const r = await request(`/v1/cast/youtube?q=${encodeURIComponent(q)}`, { timeoutMs: 15000 });
+  if (r.status === 401) return;
+  if (!r.ok || !r.body) { setText(note, errorWords(r.status, r.body)); note.classList.add('bad'); return; }
+  const results = Array.isArray(r.body.results) ? r.body.results : [];
+  list.textContent = '';
+  setText(note, results.length ? 'Tap one to play it on the TV.' : 'Nothing found. Try other words.');
+  for (const v of results) {
+    if (!R.youtubeIdFrom(v.youtube)) continue;
+    const li = document.createElement('li');
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'result';
+    const img = document.createElement('img');
+    img.src = `https://i.ytimg.com/vi/${v.youtube}/mqdefault.jpg`;
+    img.alt = '';
+    img.loading = 'lazy';
+    const words = document.createElement('div');
+    const t = document.createElement('b');
+    t.textContent = String(v.title || 'YouTube video');
+    const sub = document.createElement('span');
+    sub.textContent = [String(v.channel || ''), v.seconds ? clock(v.seconds) : ''].filter(Boolean).join(' · ');
+    words.append(t, sub);
+    b.append(img, words);
+    b.addEventListener('click', () => {
+      const out = resultPress({ youtube: v.youtube, title: String(v.title || '').slice(0, R.CLASSROOM_TITLE_MAX) }, R);
+      if (!out.ok) { setText($('press-note'), out.error); return; }
+      press(out.press.action, out.press.data, 'The video is going up');
+    });
+    li.append(b);
+    list.append(li);
+  }
+}
+
+function sendFacebook(e) {
+  e.preventDefault();
+  const out = facebookPress({ link: $('fb-link').value, title: $('fb-title').value }, R);
+  if (!out.ok) { setText($('press-note'), out.error); return; }
+  press(out.press.action, out.press.data, 'The Facebook video is going up').then((r) => { if (r && r.ok) { $('fb-link').value = ''; $('fb-title').value = ''; } });
+}
+
+/* ── A video file: sent in ~1 MB parts, then played ── */
+
+async function sendClip(e) {
+  touch();
+  const file = e.target.files && e.target.files[0];
+  e.target.value = '';
+  if (!file) return;
+  const note = $('clip-note');
+  note.classList.remove('bad');
+  // A phone may report no type for a .mov: go by the name.
+  const type = file.type || (/\.mov$/i.test(file.name) ? 'video/quicktime' : /\.webm$/i.test(file.name) ? 'video/webm' : /\.(mp4|m4v)$/i.test(file.name) ? 'video/mp4' : '');
+  const typed = type === file.type ? file : new File([file], file.name, { type });
+  const problem = fileProblem(typed, 'clip', R);
+  if (problem) { setText(note, problem); note.classList.add('bad'); return; }
+  const done = await upload(typed, (w) => setText(note, w));
+  if (!done) { note.classList.add('bad'); return; }
+  clipFile = { file: done, title: titleFromName(file.name) };
+  setText(note, '');
+  setText($('clip-ready-words'), `${clipFile.title || 'Video'} · ${size(done.bytes || file.size)}`);
+  $('clip-ready').hidden = false;
+  showClip();
+}
+
+function showClip() {
+  if (!clipFile) return;
+  const out = filePress(clipFile.file, clipFile.title, R);
+  if (!out.ok) { setText($('press-note'), out.error); return; }
+  press(out.press.action, out.press.data, 'The video is going up');
 }
 
 function sendText(e) {
@@ -500,7 +592,12 @@ function endShareHere(words) {
 async function start() {
   $('join-form').addEventListener('submit', join);
   $('code').addEventListener('input', onCodeInput);
-  $('leave').addEventListener('click', leave);
+  $('leave').addEventListener('click', () => leave(false));
+  $('btn-code').addEventListener('click', () => leave(true));
+  $('yt-search-form').addEventListener('submit', searchYouTube);
+  $('fb-form').addEventListener('submit', sendFacebook);
+  $('clip-input').addEventListener('change', sendClip);
+  $('clip-show').addEventListener('click', showClip);
   document.querySelector('.choices').addEventListener('click', onChoice);
   $('video-form').addEventListener('submit', sendVideo);
   $('text-form').addEventListener('submit', sendText);
@@ -553,9 +650,13 @@ async function start() {
   // The Worker is this site's /api: same origin whatever sync.json said.
   if (!base && location.protocol === 'https:') base = `${location.origin}/api`;
 
+  // The TV's QR code: /cast/#code=123456. The code leaves the address bar at once.
+  const fromQr = codeFromHash(location.hash);
+  if (fromQr) { try { history.replaceState(null, '', location.pathname + location.search); } catch { /* fine */ } }
   if (tokenStore.get() && base) showPresent();
+  else if (fromQr && base) { showJoin(''); $('code').value = formatCode(fromQr); join(null); }
   else showJoin('');
-  if (!tokenStore.get()) $('code').focus();
+  if (!tokenStore.get() && !fromQr) $('code').focus();
 }
 
 start();
