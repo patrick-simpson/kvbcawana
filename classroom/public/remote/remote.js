@@ -177,7 +177,7 @@ function render() {
   $('btn-back').hidden = !shown && !held;
   watchShare(shown);
   $('tile-sparks').setAttribute('aria-pressed', String(held && state.stage.preview.look === 'sparks'));
-  $('video').hidden = !shown || shown.kind !== 'video';
+  $('video').hidden = !shown || !R.CLASSROOM_PLAYABLE_KINDS.includes(shown.kind);
   $('pdf').hidden = !shown || shown.kind !== 'pdf';
   const video = state.now && shown && state.now.button === shown.id ? state.now.video : null;
   setText($('btn-play'), video && video.paused ? 'Play' : 'Pause');
@@ -188,10 +188,12 @@ function render() {
   $('empty').hidden = state.buttons.videos.length + state.buttons.items.length > 0;
 }
 
-const KIND = { video: 'Video', image: 'Picture', pdf: 'PDF', text: 'Text' };
+const KIND = { video: 'Video', clip: 'Video', image: 'Picture', pdf: 'PDF', text: 'Text' };
 // The handbook's round badges: one drawn mark per kind (24 grid, stroked; fixed markup, never data).
+const VIDEO_ICON = '<svg viewBox="0 0 24 24"><path d="M9 7l8 5-8 5z" fill="currentColor"/></svg>';
 const ICONS = {
-  video: '<svg viewBox="0 0 24 24"><path d="M9 7l8 5-8 5z" fill="currentColor"/></svg>',
+  video: VIDEO_ICON,
+  clip: VIDEO_ICON,
   image: '<svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="14" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M5 17l5-5 4 4 2-2 3 3"/></svg>',
   pdf: '<svg viewBox="0 0 24 24"><path d="M7 3h7l4 4v14H7z"/><path d="M14 3v4h4M10 12h5M10 15h5M10 18h3"/></svg>',
   text: '<svg viewBox="0 0 24 24"><path d="M5 18L9.5 6h1L15 18M6.8 14h6.4"/><path d="M17 11.5c1.5-1 4-.6 4 1.5V18m0-3c-2-.5-4 0-4 1.6 0 1.4 2.2 1.8 4 .2"/></svg>',
@@ -356,8 +358,10 @@ function drawEditor() {
   ibox.replaceChildren(...editing.rows.items.map((row, i) => (row.kind === 'text' ? textRow(row, i) : fileRow(row, i))));
   $('add-video').hidden = editing.rows.videos.length >= R.CLASSROOM_VIDEOS_MAX;
   const full = editing.rows.items.length >= R.CLASSROOM_ITEMS_MAX;
+  const clips = editing.rows.items.filter(isClipRow).length;
   $('add-file').disabled = full;
   $('add-text').disabled = full;
+  $('add-clip').disabled = full || clips >= R.CLASSROOM_CLIPS_MAX;
 }
 
 const fromTemplate = (id) => /** @type {HTMLElement} */ ($(id).content.firstElementChild.cloneNode(true));
@@ -395,12 +399,20 @@ function textRow(row, i) {
   return el;
 }
 
+const isClipRow = (row) => row.kind === 'file' && (row.want === 'clip' || row.fileKind === 'clip');
+
 function fileRow(row, i) {
   const el = fromTemplate('file-row');
+  const clip = isClipRow(row);
+  if (clip) {
+    el.querySelector('.f-input').accept = 'video/mp4,video/quicktime,video/webm,.mp4,.mov,.m4v,.webm';
+    for (const sel of ['.f-linklabel', '.f-copy', '.f-help']) el.querySelector(sel).hidden = true;
+    el.querySelector('.f-clipnote').hidden = false;
+  }
   el.dataset.at = `item-${i}`;
   bindInput(el, '.f-title', row, 'title');
   const link = el.querySelector('.f-link');
-  const fileWords = () => setText(el.querySelector('.f-file'), row.file ? `${row.fileKind === 'pdf' ? 'PDF' : 'Picture'} ready${row.name ? `: ${row.name}` : ''} ✓` : 'No picture or PDF yet.');
+  const fileWords = () => setText(el.querySelector('.f-file'), row.file ? (clip ? `Video ready${row.name ? `: ${row.name}` : ''} ✓` : `${row.fileKind === 'pdf' ? 'PDF' : 'Picture'} ready${row.name ? `: ${row.name}` : ''} ✓`) : (clip ? 'No video yet.' : 'No picture or PDF yet.'));
   fileWords();
   const progress = el.querySelector('.f-progress');
   const done = (b, name) => {
@@ -411,7 +423,7 @@ function fileRow(row, i) {
   el.querySelector('.f-input').addEventListener('change', async (e) => {
     const file = e.target.files && e.target.files[0];
     if (!file) return;
-    const b = await upload(file, (words) => setText(progress, words));
+    const b = await upload(file, (words) => setText(progress, words), clip);
     if (b) { done(b, file.name); setText(progress, ''); }
   });
   el.querySelector('.f-copy').addEventListener('click', async () => {
@@ -427,10 +439,14 @@ function fileRow(row, i) {
 }
 
 /** Sends a file in parts; answers the finished file, or null (words said). */
-async function upload(file, say) {
-  const type = file.type;
-  if (!R.CLASSROOM_FILE_TYPES.includes(type)) { say('Only a picture (JPEG, PNG, GIF, WebP) or a PDF can go on the screen.'); return null; }
-  if (file.size > R.CLASSROOM_FILE_MAX_BYTES) { say(`That file is ${logic.size(file.size)}; 20 MB at most.`); return null; }
+async function upload(file, say, wantClip) {
+  // A phone may report no type for a video: take it from the name then.
+  const byName = { mov: 'video/quicktime', mp4: 'video/mp4', m4v: 'video/mp4', webm: 'video/webm' }[(file.name.split('.').pop() || '').toLowerCase()];
+  const type = file.type || byName || '';
+  const isClip = R.isClipType(type);
+  if (wantClip && !isClip) { say('Choose a video (MP4, MOV or WebM).'); return null; }
+  if (!R.CLASSROOM_FILE_TYPES.includes(type) && !isClip) { say('Only a picture (JPEG, PNG, GIF, WebP), a PDF or a video (MP4, MOV, WebM) can go on the screen.'); return null; }
+  if (file.size > R.fileLimits(type).max) { say(isClip ? `That video is ${logic.size(file.size)}; 200 MB at most.` : `That file is ${logic.size(file.size)}; 20 MB at most.`); return null; }
   say(`Sending ${logic.size(file.size)}…`);
   const start = await request('/v1/classroom/files', { method: 'POST', body: { type, bytes: file.size, name: file.name } });
   if (!start.ok || !start.body) { say((start.body && start.body.error) || 'Could not start the upload.'); return null; }
@@ -454,6 +470,7 @@ function addRow(kind) {
   if (!editing) return;
   if (kind === 'video') editing.rows.videos.push({ id: logic.newButtonId(), title: '', link: '' });
   else if (kind === 'text') editing.rows.items.push({ id: logic.newButtonId(), kind: 'text', title: '', heading: '', text: '', look: 'page' });
+  else if (kind === 'clip') editing.rows.items.push({ id: logic.newButtonId(), kind: 'file', want: 'clip', title: '' });
   else editing.rows.items.push({ id: logic.newButtonId(), kind: 'file', title: '' });
   drawEditor();
 }
@@ -520,6 +537,7 @@ async function start() {
   $('add-video').addEventListener('click', () => addRow('video'));
   $('add-file').addEventListener('click', () => addRow('file'));
   $('add-text').addEventListener('click', () => addRow('text'));
+  $('add-clip').addEventListener('click', () => addRow('clip'));
   $('edit-cancel').addEventListener('click', closeEditor);
   $('edit-save').addEventListener('click', saveEditor);
   wireMark();

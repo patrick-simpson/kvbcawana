@@ -44,6 +44,20 @@ describe('the remote\'s words', () => {
     assert.deepEqual(logic.rowsFromButtons(out.buttons).videos[0], { id: 'bvideo01', title: 'Song', link: 'https://youtu.be/dQw4w9WgXcQ?t=65' });
     assert.match(logic.newButtonId(), /^b[a-z0-9]{10}$/);
   });
+  it('a video file row: a clip button, the words for it, and back to a row', () => {
+    const clip = { id: 'bclip0001', kind: 'file', want: 'clip', title: 'Skit', file: 'fabcdefghijkl0003', type: 'video/mp4', fileKind: 'clip' };
+    const out = logic.buttonsFromRows({ videos: [], items: [clip] }, R);
+    assert.equal(out.ok, true);
+    assert.deepEqual(out.buttons.items, [{ id: 'bclip0001', kind: 'clip', title: 'Skit', file: 'fabcdefghijkl0003', type: 'video/mp4' }]);
+    assert.deepEqual(logic.rowsFromButtons(out.buttons).items[0], { id: 'bclip0001', kind: 'file', title: 'Skit', file: 'fabcdefghijkl0003', type: 'video/mp4', fileKind: 'clip', want: 'clip' });
+    // A clip row with no file says so in video words; a picture row keeps its own.
+    assert.deepEqual(logic.buttonsFromRows({ videos: [], items: [{ id: 'bclip0002', kind: 'file', want: 'clip', title: 'Skit' }] }, R), { ok: false, error: 'Button 1: choose a video.', at: 'item-0' });
+    assert.match(logic.buttonsFromRows({ videos: [], items: [{ id: 'bfile001', kind: 'file', title: 'Map' }] }, R).error, /picture or PDF/);
+    // The TV card names it a video, with the video's time words.
+    const stage = { show: { button: { id: 'bclip0001', kind: 'clip', title: 'Skit' }, page: 1 } };
+    const now = { view: 'clip', button: 'bclip0001', video: { t: 5, d: 60, paused: false, muted: false, volume: 100 } };
+    assert.deepEqual(logic.nowWords({ now, stage, screenOnline: true }), { kicker: 'On the classroom TV · Video', main: 'Skit', sub: '0:05 / 1:00 · volume 100%', live: true });
+  });
 });
 
 const SESSION = `v1.1.${Date.now()}.${'s'.repeat(43)}`;

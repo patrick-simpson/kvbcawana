@@ -109,6 +109,7 @@
             <div class="add-row">
               <button id="add-file" type="button" class="btn btn-add">+ Picture or PDF</button>
               <button id="add-text" type="button" class="btn btn-add">+ Text</button>
+              <button id="add-clip" type="button" class="btn btn-add">+ Video file</button>
             </div>
             <p id="edit-note" class="note" role="status"></p>
             <div class="save-row">
@@ -135,9 +136,10 @@
       <label class="fine">Name on the button <input class="f-title" type="text" maxlength="60" placeholder="Handbook page 12" /></label>
       <p class="f-file fine">No picture or PDF yet.</p>
       <label class="btn btn-mid f-choose">Choose a file<input class="f-input" type="file" accept="image/jpeg,image/png,image/gif,image/webp,application/pdf" hidden /></label>
-      <label class="fine">…or paste a link to one <input class="f-link" type="url" inputmode="url" autocapitalize="none" spellcheck="false" placeholder="https://…" /></label>
+      <label class="fine f-linklabel">…or paste a link to one <input class="f-link" type="url" inputmode="url" autocapitalize="none" spellcheck="false" placeholder="https://…" /></label>
       <button type="button" class="btn btn-mid f-copy">Use this link</button>
-      <p class="fine">A Google Slides link works when it is shared “Anyone with the link”: it shows as pages, with Next and Back. For PowerPoint, save it as a PDF and choose the file, or use Share my screen.</p>
+      <p class="fine f-help">A Google Slides link works when it is shared “Anyone with the link”: it shows as pages, with Next and Back. For PowerPoint, save it as a PDF and choose the file, or use Share my screen.</p>
+      <p class="fine f-clipnote" hidden>MP4, MOV or WebM, up to 200 MB. A big video takes a few minutes to send.</p>
       <p class="f-progress fine" role="status"></p>
       <button type="button" class="link f-remove">Remove</button>
     </div>

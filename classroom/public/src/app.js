@@ -340,7 +340,7 @@ function maybeChalk(dateKey) {
 let welcomes = L.emptyWelcomes();
 // No welcome over a video the remote put up (owner 2026-10-18); over a picture or text, yes.
 // A remote video or a shared screen: nobody is welcomed (no card, no ding) over it.
-const isMediaShow = () => Boolean(stageApi && ['video', 'screen'].includes(stageApi.showing()));
+const isMediaShow = () => Boolean(stageApi && ['video', 'clip', 'screen'].includes(stageApi.showing()));
 const welcomingNow = () => (stageApi && isMediaShow() ? [] : L.welcomesUp(welcomes, clubs, now().getTime()));
 function drawWelcomes() {
   const up = welcomingNow();

@@ -20,7 +20,7 @@ const VIEW_WORDS = {
   waiting: 'A shared screen is starting',
   screen: 'A shared screen',
 };
-const KIND_WORDS = { video: 'Video', image: 'Picture', pdf: 'PDF', text: 'Text', screen: 'Shared screen' };
+const KIND_WORDS = { video: 'Video', clip: 'Video', image: 'Picture', pdf: 'PDF', text: 'Text', screen: 'Shared screen' };
 
 /**
  * What the "On the classroom TV" card says.
@@ -80,7 +80,7 @@ export function buttonsFromRows(rows, rules) {
       if (!text) { if (!String(r.title || '').trim() && !String(r.heading || '').trim()) continue; return { ok: false, error: `Button ${i + 1}: type the words to show.`, at: `item-${i}` }; }
       items.push({ id: r.id, kind: 'text', title: rules.oneLine(r.title, rules.CLASSROOM_TITLE_MAX), heading: rules.oneLine(r.heading, rules.CLASSROOM_HEADING_MAX), text, look: r.look === 'board' ? 'board' : 'page' });
     } else {
-      if (!r.file) { if (!String(r.title || '').trim()) continue; return { ok: false, error: `Button ${i + 1}: choose a picture or PDF, or paste a link to one.`, at: `item-${i}` }; }
+      if (!r.file) { if (!String(r.title || '').trim()) continue; return { ok: false, error: r.want === 'clip' ? `Button ${i + 1}: choose a video.` : `Button ${i + 1}: choose a picture or PDF, or paste a link to one.`, at: `item-${i}` }; }
       items.push({ id: r.id, kind: r.fileKind, title: rules.oneLine(r.title, rules.CLASSROOM_TITLE_MAX), file: r.file, type: r.type });
     }
   }
@@ -95,6 +95,6 @@ export function rowsFromButtons(buttons) {
     videos: buttons.videos.map((v) => ({ id: v.id, title: v.title, link: `https://youtu.be/${v.youtube}${v.start ? `?t=${v.start}` : ''}` })),
     items: buttons.items.map((b) => (b.kind === 'text'
       ? { id: b.id, kind: 'text', title: b.title, heading: b.heading || '', text: b.text, look: b.look }
-      : { id: b.id, kind: 'file', title: b.title, file: b.file, type: b.type, fileKind: b.kind })),
+      : { id: b.id, kind: 'file', title: b.title, file: b.file, type: b.type, fileKind: b.kind, ...(b.kind === 'clip' ? { want: 'clip' } : {}) })),
   };
 }

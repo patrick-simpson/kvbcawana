@@ -21,14 +21,15 @@ const SKIP = !chromium || !existsSync(CHROMIUM) ? 'no Chromium here (set PLAYWRI
 if (SKIP) console.log(`# classroom stage tests skipped: ${SKIP}`);
 
 const SESSION = `v1.1.${Date.now()}.${'s'.repeat(43)}`;
+const CLIP = Buffer.from('not really a video, only bytes: the page needs a <video> element and its events');
 const PNG = readFileSync(path.join(PUBLIC, 'art', 'sparky-flying.png'));
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.png': 'image/png', '.json': 'application/json', '.woff2': 'font/woff2' };
 const LOBBY_STAND_IN = `<!doctype html><script>
   addEventListener('message', (e) => { if (e.data && e.data.post) parent.postMessage(e.data.post, location.origin); });
 </script>`;
 
-const worker = { stage: { rev: 0, show: null, preview: null, cmds: [] }, watch: true, reads: 0, now: [], remote: [], offer: null, answers: [] };
-const resetWorker = () => Object.assign(worker, { stage: { rev: 0, show: null, preview: null, cmds: [] }, watch: true, reads: 0, now: [], remote: [], offer: null, answers: [] });
+const worker = { stage: { rev: 0, show: null, preview: null, cmds: [] }, watch: true, reads: 0, now: [], remote: [], offer: null, answers: [], fileReads: [] };
+const resetWorker = () => Object.assign(worker, { stage: { rev: 0, show: null, preview: null, cmds: [] }, watch: true, reads: 0, now: [], remote: [], offer: null, answers: [], fileReads: [] });
 let server;
 let base;
 let browser;
@@ -50,7 +51,7 @@ before(async () => {
         if (p === '/v1/classroom/remote') { worker.remote.push(body); worker.stage = { ...worker.stage, rev: worker.stage.rev + 1, show: body.action === 'back' ? null : worker.stage.show }; send(200, { ok: true }); return; }
         if (p === '/v1/classroom/signal' && req.method === 'GET') { send(200, { signal: worker.offer, id: url.searchParams.get('id') }); return; }
         if (p === '/v1/classroom/signal' && req.method === 'POST') { worker.answers.push(body.signal); send(200, { ok: true }); return; }
-        if (p.startsWith('/v1/classroom/files/')) { send(200, PNG, 'image/png'); return; }
+        if (p.startsWith('/v1/classroom/files/')) { worker.fileReads.push(p); send(200, p.endsWith('0004') ? CLIP : PNG, p.endsWith('0004') ? 'video/webm' : 'image/png'); return; }
         send(404, { error: 'no' });
       });
       return;
@@ -174,6 +175,34 @@ describe('the Sparks remote on the classroom screen', { skip: SKIP }, () => {
     assert.ok(worker.now.some((n) => n.view === 'video' && n.button === 'bvideo01' && n.video && n.video.d === 200));
     // It ends: the TV tells the service, and the schedule comes back.
     await page.evaluate(() => window.__yt.player.end());
+    await page.waitForSelector('#show', { state: 'hidden' });
+    assert.deepEqual(worker.remote.at(-1), { action: 'back' });
+    await page.close();
+  });
+
+  it('an uploaded video plays in a <video>, takes the video presses, reports, and ends back to the schedule', async () => {
+    const page = await open(CLUB_NIGHT);
+    await page.waitForFunction(() => document.documentElement.dataset.phase === 'sparks');
+    show({ id: 'bclip0001', kind: 'clip', title: 'Skit', file: 'fabcdefghijkl0004', type: 'video/webm' });
+    await page.waitForSelector('#show:not([hidden]) video.cr-show-screen');
+    assert.equal(await page.evaluate(() => document.documentElement.dataset.show), 'clip');
+    assert.match(await page.getAttribute('video.cr-show-screen', 'src'), /^blob:/);
+    assert.ok(worker.fileReads.some((p) => p.endsWith('fabcdefghijkl0004')), 'read with the session');
+    assert.equal(await page.evaluate(() => document.querySelector('video.cr-show-screen').playsInline), true);
+    // The video presses reach the clip.
+    worker.stage = { ...worker.stage, rev: worker.stage.rev + 1, cmds: [
+      { id: 'k1', action: 'video', data: { op: 'volume', step: -1 }, at: Date.now() },
+      { id: 'k2', action: 'video', data: { op: 'mute' }, at: Date.now() },
+    ] };
+    await page.waitForFunction(() => { const v = document.querySelector('video.cr-show-screen'); return v.muted && Math.round(v.volume * 100) === 90; });
+    worker.stage = { ...worker.stage, rev: worker.stage.rev + 1, cmds: [...worker.stage.cmds, { id: 'k3', action: 'video', data: { op: 'unmute' }, at: Date.now() }] };
+    await page.waitForFunction(() => !document.querySelector('video.cr-show-screen').muted);
+    // The report says what is on, as for a YouTube video.
+    await page.waitForFunction(() => true);
+    await new Promise((r) => setTimeout(r, 600));
+    assert.ok(worker.now.some((n) => n.view === 'clip' && n.button === 'bclip0001' && n.video && n.video.volume === 90 && n.video.muted === false), JSON.stringify(worker.now.slice(-2)));
+    // It ends: the TV tells the service, and the schedule comes back.
+    await page.evaluate(() => document.querySelector('video.cr-show-screen').dispatchEvent(new Event('ended')));
     await page.waitForSelector('#show', { state: 'hidden' });
     assert.deepEqual(worker.remote.at(-1), { action: 'back' });
     await page.close();

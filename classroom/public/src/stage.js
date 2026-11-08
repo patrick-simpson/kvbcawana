@@ -48,6 +48,7 @@ const tuning = () => Object.assign({}, TUNING, window.classroomStageTuning || {}
  */
 export async function createStage(deps) {
   const R = deps.rules;
+  const isPlayable = (kind) => R.CLASSROOM_PLAYABLE_KINDS.includes(kind);
   const $ = (id) => /** @type {HTMLElement} */ (document.getElementById(id));
   const layer = $('show');
   const swoop = $('swoop');
@@ -62,6 +63,7 @@ export async function createStage(deps) {
   let pdfPages = 0;
   let player = null; // the YouTube player
   let playerReady = false;
+  let media = null; // the playing video's controls, YouTube's or a clip's (see ytMedia / clipMedia)
   let blobUrl = '';
   let share = null; // the shared screen on show: { id, pc, video, answered, timer, until }
   let lastReport = '';
@@ -163,6 +165,7 @@ export async function createStage(deps) {
       deps.onShow();
       const b = show.button;
       if (b.kind === 'video') playVideo(b);
+      else if (b.kind === 'clip') playClip(b);
       else if (b.kind === 'text') drawText(b);
       else if (b.kind === 'image') drawImage(prepared);
       else if (b.kind === 'pdf') { shownPage = 0; openPdf(b.file, prepared, show.page); }
@@ -176,6 +179,8 @@ export async function createStage(deps) {
     if (player) { try { player.destroy(); } catch { /* gone */ } }
     player = null;
     playerReady = false;
+    if (media) { try { media.destroy(); } catch { /* gone */ } }
+    media = null;
     layer.replaceChildren();
     layer.className = 'cr-layer cr-show';
     if (blobUrl) { URL.revokeObjectURL(blobUrl); blobUrl = ''; }
@@ -393,7 +398,7 @@ export async function createStage(deps) {
       height: '100%',
       playerVars: { autoplay: 1, controls: 0, rel: 0, modestbranding: 1, playsinline: 1, iv_load_policy: 3, fs: 0, disablekb: 1, start: b.start || 0, origin: window.location.origin },
       events: {
-        onReady: (e) => { playerReady = true; try { e.target.playVideo(); } catch { /* blocked */ } report(); },
+        onReady: (e) => { playerReady = true; media = ytMedia(); try { e.target.playVideo(); } catch { /* blocked */ } report(); },
         onStateChange: (e) => {
           if (e.data === 0) ended();
           report();
@@ -411,20 +416,77 @@ export async function createStage(deps) {
     });
   }
 
+  /** The YouTube player behind the one set of controls a video press uses. */
+  function ytMedia() {
+    return {
+      play: () => player.playVideo(),
+      pause: () => player.pauseVideo(),
+      paused: () => player.getPlayerState() !== 1,
+      seekBy: (by) => player.seekTo(Math.max(0, player.getCurrentTime() + by), true),
+      mute: () => player.mute(),
+      unmute: () => player.unMute(),
+      muted: () => player.isMuted(),
+      volume: () => player.getVolume(),
+      setVolume: (v) => player.setVolume(v),
+      t: () => player.getCurrentTime(),
+      d: () => player.getDuration(),
+      destroy: () => {},
+    };
+  }
+
+  /** An uploaded clip: the file comes over with the session, then plays in a <video>. */
+  async function playClip(b) {
+    layer.classList.add('cr-show--video');
+    const wait = document.createElement('p');
+    wait.className = 'cr-show-missing';
+    wait.textContent = 'Loading the video…';
+    layer.append(wait);
+    const key = showKey;
+    const blob = await fetchFile(b.file);
+    if (showKey !== key || !layer.contains(wait)) return; // replaced while it came over
+    wait.remove();
+    if (!blob) { missing('The video could not be loaded.'); return; }
+    blobUrl = URL.createObjectURL(blob);
+    const v = document.createElement('video');
+    v.className = 'cr-show-screen';
+    v.playsInline = true;
+    v.autoplay = true;
+    v.src = blobUrl;
+    v.addEventListener('ended', ended);
+    for (const ev of ['play', 'pause', 'volumechange']) v.addEventListener(ev, () => report());
+    layer.append(v);
+    media = {
+      play: () => { v.play().catch(() => {}); },
+      pause: () => v.pause(),
+      paused: () => v.paused,
+      seekBy: (by) => { v.currentTime = Math.max(0, Math.min(v.duration || 0, v.currentTime + by)); },
+      mute: () => { v.muted = true; },
+      unmute: () => { v.muted = false; },
+      muted: () => v.muted,
+      volume: () => Math.round(v.volume * 100),
+      setVolume: (n) => { v.volume = n / 100; },
+      t: () => v.currentTime,
+      d: () => v.duration || 0,
+      destroy: () => { v.pause(); v.removeAttribute('src'); v.load(); },
+    };
+    // Sound on; a browser that refuses it plays muted rather than not at all.
+    v.play().catch(() => { v.muted = true; v.play().catch(() => {}); });
+    report();
+  }
+
   function videoCmd(d) {
-    if (!player || !playerReady || !d) return;
+    if (!media || !d) return;
     try {
-      const paused = player.getPlayerState() !== 1;
-      if (d.op === 'toggle') { if (paused) player.playVideo(); else player.pauseVideo(); }
-      if (d.op === 'play') player.playVideo();
-      if (d.op === 'pause') player.pauseVideo();
-      if (d.op === 'mute') player.mute();
-      if (d.op === 'unmute') player.unMute();
-      if (d.op === 'seek') player.seekTo(Math.max(0, player.getCurrentTime() + d.by), true);
+      if (d.op === 'toggle') { if (media.paused()) media.play(); else media.pause(); }
+      if (d.op === 'play') media.play();
+      if (d.op === 'pause') media.pause();
+      if (d.op === 'mute') media.mute();
+      if (d.op === 'unmute') media.unmute();
+      if (d.op === 'seek') media.seekBy(d.by);
       if (d.op === 'volume') {
-        const v = Math.min(100, Math.max(0, Math.round((player.getVolume() + d.step * R.CLASSROOM_VOLUME_STEP_PCT) / 10) * 10));
-        player.setVolume(v);
-        if (v > 0 && player.isMuted()) player.unMute();
+        const v = Math.min(100, Math.max(0, Math.round((media.volume() + d.step * R.CLASSROOM_VOLUME_STEP_PCT) / 10) * 10));
+        media.setVolume(v);
+        if (v > 0 && media.muted()) media.unmute();
       }
     } catch { /* the player is not ready */ }
     setTimeout(report, 250);
@@ -432,7 +494,7 @@ export async function createStage(deps) {
 
   /** The black board went up over a video: hold it there. */
   function pauseVideo() {
-    if (player && playerReady) { try { player.pauseVideo(); } catch { /* fine */ } }
+    if (media) { try { media.pause(); } catch { /* fine */ } }
   }
 
   /* ── Sparky's flight (the easter egg: a long press on the remote's mark) ── */
@@ -477,8 +539,8 @@ export async function createStage(deps) {
     if (b) { out.button = b.id; out.title = b.title; }
     if (b && b.kind === 'screen' && !(share && !share.video.hidden)) out.view = 'waiting'; // not on screen yet
     if (b && b.kind === 'pdf' && pdfPages) { out.page = shownPage || 1; out.pages = pdfPages; }
-    if (b && b.kind === 'video' && player && playerReady) {
-      try { out.video = { t: player.getCurrentTime(), d: player.getDuration(), paused: player.getPlayerState() !== 1, muted: player.isMuted(), volume: player.getVolume() }; } catch { /* not yet */ }
+    if (b && isPlayable(b.kind) && media) {
+      try { out.video = { t: media.t(), d: media.d(), paused: media.paused(), muted: media.muted(), volume: media.volume() }; } catch { /* not yet */ }
     }
     if (previewLook()) out.preview = previewLook();
     if (sc.board) out.board = true;
@@ -511,7 +573,7 @@ export async function createStage(deps) {
   // any other time the doorbell alone brings a press (the remote may then say the
   // TV is off: accepted by the owner).
   setInterval(() => { if (typeof deps.backupNow !== 'function' || deps.backupNow()) read(); }, tuning().pollMs);
-  reportTimer = window.setInterval(() => { if (stage.show && stage.show.button.kind === 'video') report(true); }, tuning().reportVideoMs);
+  reportTimer = window.setInterval(() => { if (stage.show && isPlayable(stage.show.button.kind)) report(true); }, tuning().reportVideoMs);
   void reportTimer;
   read();
 
@@ -523,7 +585,8 @@ export async function createStage(deps) {
     /** A remote video is playing (or buffering) now, or a shared screen is live: the things the opening ceremony never covers. */
     videoPlaying: () => {
       if (stage.show && stage.show.button.kind === 'screen') return Boolean(share && !share.video.hidden);
-      if (!stage.show || stage.show.button.kind !== 'video' || !player || !playerReady) return false;
+      if (!stage.show || !isPlayable(stage.show.button.kind) || !media) return false;
+      if (stage.show.button.kind === 'clip') return !media.paused(); // a clip waiting to load is not playing yet
       try { const s = player.getPlayerState(); return s === 1 || s === 3; } catch { return false; }
     },
     pauseVideo,
