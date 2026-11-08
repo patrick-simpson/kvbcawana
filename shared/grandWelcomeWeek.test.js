@@ -1,22 +1,32 @@
 import { describe, expect, it } from 'vitest';
-import { FILM_FIRST_NIGHT, clubWeek, welcomeStyle } from './grandWelcomeWeek.js';
+import { FILM_FIRST_NIGHT, FILM_ON, alternatingStyle, clubWeek, welcomeStyle } from './grandWelcomeWeek.js';
 
 // Owner 2026-11-01: the 3D film alternates with the old style each week.
+// Owner 2026-11-08: the film is off; the 2D welcome every week.
 const at = (s) => new Date(s);
 
-describe('the grand welcome alternates each club week', () => {
+describe('the film is off: the 2D welcome every week (owner 2026-11-08)', () => {
+  it('FILM_ON is false and every week, film weeks included, is classic', () => {
+    expect(FILM_ON).toBe(false);
+    for (const s of ['2026-11-04T18:00:00', '2026-11-11T18:00:00', '2026-11-18T18:00:00', '2027-03-17T18:00:00']) {
+      expect(welcomeStyle(at(s))).toBe('classic');
+    }
+  });
+});
+
+describe('while FILM_ON, the grand welcome alternates each club week', () => {
   it('the film\'s first night is a Wednesday, and a film week', () => {
     const first = new Date(FILM_FIRST_NIGHT.year, FILM_FIRST_NIGHT.month - 1, FILM_FIRST_NIGHT.day, 18);
     expect(first.getDay()).toBe(3);
-    expect(welcomeStyle(first)).toBe('film');
+    expect(alternatingStyle(first)).toBe('film');
   });
 
   it('alternates Wednesday to Wednesday, both ways', () => {
-    expect(welcomeStyle(at('2026-11-04T18:00:00'))).toBe('film');
-    expect(welcomeStyle(at('2026-11-11T18:00:00'))).toBe('classic');
-    expect(welcomeStyle(at('2026-11-18T18:00:00'))).toBe('film');
-    expect(welcomeStyle(at('2026-10-28T18:00:00'))).toBe('classic');
-    expect(welcomeStyle(at('2026-10-21T18:00:00'))).toBe('film');
+    expect(alternatingStyle(at('2026-11-04T18:00:00'))).toBe('film');
+    expect(alternatingStyle(at('2026-11-11T18:00:00'))).toBe('classic');
+    expect(alternatingStyle(at('2026-11-18T18:00:00'))).toBe('film');
+    expect(alternatingStyle(at('2026-10-28T18:00:00'))).toBe('classic');
+    expect(alternatingStyle(at('2026-10-21T18:00:00'))).toBe('film');
   });
 
   it('a week runs Wednesday to Tuesday: the whole club night, and the days around it, agree', () => {
@@ -29,7 +39,7 @@ describe('the grand welcome alternates each club week', () => {
 
   it('a clock change never shifts a week (local calendar days)', () => {
     // US clocks fall back on 2026-11-01 and spring forward on 2027-03-14.
-    expect(welcomeStyle(at('2027-03-17T18:00:00'))).toBe(clubWeek(at('2027-03-17T18:00:00')) % 2 === 0 ? 'film' : 'classic');
+    expect(alternatingStyle(at('2027-03-17T18:00:00'))).toBe(clubWeek(at('2027-03-17T18:00:00')) % 2 === 0 ? 'film' : 'classic');
     expect(clubWeek(at('2027-03-17T18:00:00')) - clubWeek(at('2027-03-10T18:00:00'))).toBe(1);
     expect(clubWeek(at('2026-11-11T18:00:00')) - clubWeek(at('2026-11-04T18:00:00'))).toBe(1);
   });

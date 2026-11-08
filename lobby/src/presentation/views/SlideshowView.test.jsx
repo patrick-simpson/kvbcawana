@@ -3,6 +3,13 @@ import { act, cleanup, fireEvent, render, waitFor } from '@testing-library/react
 import { MotionConfig } from 'framer-motion';
 
 vi.mock('../hooks/useCalendarEvents.js', () => ({ useCalendarEvents: () => [] }));
+// The film is off (owner 2026-11-08); the film tests below turn it on for themselves (filmWeeks), so the film
+// still works the day FILM_ON comes back.
+let filmWeeks = false;
+vi.mock('../../../../shared/grandWelcomeWeek.js', async (orig) => {
+  const real = await orig();
+  return { ...real, welcomeStyle: (d) => (filmWeeks ? real.alternatingStyle(d) : real.welcomeStyle(d)) };
+});
 
 import { SlideshowView } from './SlideshowView.jsx';
 import { nightLabel, nightOf } from './Slide.jsx';
@@ -34,7 +41,7 @@ const newestFrom = (container) => {
 };
 
 describe('SlideshowView: the operator\'s keys still drive the deck', () => {
-  afterEach(cleanup);
+  afterEach(() => { cleanup(); filmWeeks = false; });
 
   it('on a classic week opens on the animated welcome, kicked by the night it is', () => {
     expect(welcomeStyle(NOW)).toBe('classic');
@@ -62,7 +69,15 @@ describe('SlideshowView: the operator\'s keys still drive the deck', () => {
     }
   });
 
-  it('on a film week opens on the welcome: the grand welcome film', () => {
+  it('the film is off: even the film\'s first night opens on the classic welcome', () => {
+    expect(welcomeStyle(FILM_NOW)).toBe('classic');
+    const { container } = render(deck({ now: FILM_NOW }));
+    expect(container.querySelector('.pj-grand__word').textContent).toBe('WELCOME');
+    expect(container.querySelector('video')).toBeNull();
+  });
+
+  it('with the film on, a film week opens on the welcome: the grand welcome film', () => {
+    filmWeeks = true;
     expect(welcomeStyle(FILM_NOW)).toBe('film');
     const { container } = render(deck({ now: FILM_NOW }));
     expect(current(container)).toBe(ORDER[0]);
@@ -76,6 +91,7 @@ describe('SlideshowView: the operator\'s keys still drive the deck', () => {
   });
 
   it('the film moves the deck on when it ends; its timer is only a cap past the film', () => {
+    filmWeeks = true;
     vi.useFakeTimers();
     try {
       const { container } = render(deck({ now: FILM_NOW }));
@@ -91,6 +107,7 @@ describe('SlideshowView: the operator\'s keys still drive the deck', () => {
   });
 
   it('the film\'s timer moves the deck on if the film never says it ended', () => {
+    filmWeeks = true;
     vi.useFakeTimers();
     try {
       const { container } = render(deck({ now: FILM_NOW }));
@@ -102,6 +119,7 @@ describe('SlideshowView: the operator\'s keys still drive the deck', () => {
   });
 
   it('a film still leaving after a leader\'s Next never skips the pledge', () => {
+    filmWeeks = true;
     const { container } = render(deck({ now: FILM_NOW }));
     const video = container.querySelector('video');
     press('Space');

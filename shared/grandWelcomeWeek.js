@@ -11,6 +11,13 @@
 // FILM_FIRST_NIGHT, starts a film week, and they alternate from there both
 // ways. Local calendar days, so a clock change never shifts a week.
 // Pure, no imports: the lobby and the projector import it in place.
+//
+// Owner 2026-11-08: "always show the 2d, don't show the 3d anymore". FILM_ON is
+// false, so every week is 'classic'; the film and its code stay, and setting
+// FILM_ON back to true brings the week-by-week alternation back unchanged.
+
+/** Whether the 3D film is shown at all (owner 2026-11-08: no, the 2D welcome every week). */
+export const FILM_ON = false;
 
 /** The film's first club night (a Wednesday), as a local date. */
 export const FILM_FIRST_NIGHT = Object.freeze({ year: 2026, month: 11, day: 4 });
@@ -34,10 +41,19 @@ export function clubWeek(now) {
 }
 
 /**
- * This week's grand welcome.
+ * The week-by-week alternation (owner 2026-11-01), used while FILM_ON.
+ * @param {Date} now
+ * @returns {'film' | 'classic'}
+ */
+export function alternatingStyle(now) {
+  return clubWeek(now) % 2 === 0 ? 'film' : 'classic';
+}
+
+/**
+ * This week's grand welcome: 'classic' every week while the film is off.
  * @param {Date} now
  * @returns {'film' | 'classic'}
  */
 export function welcomeStyle(now) {
-  return clubWeek(now) % 2 === 0 ? 'film' : 'classic';
+  return FILM_ON ? alternatingStyle(now) : 'classic';
 }
