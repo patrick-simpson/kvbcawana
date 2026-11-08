@@ -38,6 +38,7 @@ import {
   sanitizeButtons,
   sanitizeClassroomNow,
   sanitizeClassroomPress,
+  sanitizeSignal,
   sanitizeStage,
 } from '../../shared/classroomRemote.js';
 import { fail, json } from './http.js';
@@ -57,8 +58,11 @@ export const CLASSROOM_ONLINE_MS = 45 * 1000;
 /** @param {number} bytes */
 const partsFor = (bytes) => Math.max(1, Math.ceil(bytes / CLASSROOM_FILE_PART_BYTES));
 
+/** A screen share's offer waits for its answer this long (memory only). */
+export const SIGNAL_TTL_MS = 2 * 60 * 1000;
+
 /** A new id: a letter then lowercase base36 from random bytes. @param {string} letter @param {number} n */
-function newId(letter, n) {
+export function newId(letter, n) {
   const bytes = crypto.getRandomValues(new Uint8Array(n));
   return letter + [...bytes].map((b) => (b % 36).toString(36)).join('');
 }
@@ -75,9 +79,12 @@ export function sniffType(b) {
 
 export class Classroom {
   /**
-   * @param {{ storage: any, now: () => number, ring: (payload: Record<string, unknown>) => void, fetchFn?: typeof fetch }} deps
+   * @param {{ storage: any, now: () => number, ring: (payload: Record<string, unknown>) => void, fetchFn?: typeof fetch,
+   *   room?: { what: string, buttonsKey: string, stageKey: string, filePrefix: string, partPrefix: string } }} deps
+   * `room`: the lobby's Cast screen (cast.js) runs a second copy under its own keys and doorbell.
    */
-  constructor({ storage, now, ring, fetchFn }) {
+  constructor({ storage, now, ring, fetchFn, room }) {
+    this.room = room || { what: 'classroom', buttonsKey: BUTTONS_KEY, stageKey: STAGE_KEY, filePrefix: FILE_PREFIX, partPrefix: PART_PREFIX };
     this.storage = storage;
     this.now = now;
     this.ring = ring;
@@ -92,13 +99,15 @@ export class Classroom {
     this.seq = 0;
     /** @type {Map<string, { tokens: number, t: number }>} */
     this.buckets = new Map();
+    /** The screen share now up: its offer and answer (memory only). @type {{ id: string, offer: any, answer: any, at: number } | null} */
+    this.rtc = null;
   }
 
   watching() { return this.watchAt > 0 && this.now() - this.watchAt <= CLASSROOM_WATCH_MS; }
 
   /** @returns {Promise<{ rev: number, savedAt: string | null, buttons: ReturnType<typeof sanitizeButtons> }>} */
   async buttonsDoc() {
-    const d = await this.storage.get(BUTTONS_KEY);
+    const d = await this.storage.get(this.room.buttonsKey);
     return { rev: Number.isInteger(d?.rev) ? d.rev : 0, savedAt: typeof d?.savedAt === 'string' ? d.savedAt : null, buttons: sanitizeButtons(d?.buttons) };
   }
 
@@ -109,11 +118,11 @@ export class Classroom {
     const buttons = sanitizeButtons(body?.buttons);
     // Every file a button names must be a finished file here.
     for (const f of filesOf(buttons)) {
-      const meta = await this.storage.get(FILE_PREFIX + f);
+      const meta = await this.storage.get(this.room.filePrefix + f);
       if (!meta?.done) return fail('A picture or PDF is still uploading, or was removed. Add it again.', 400, { reason: 'file-missing' });
     }
     const next = { rev: doc.rev + 1, savedAt: new Date(this.now()).toISOString(), buttons };
-    await this.storage.put(BUTTONS_KEY, next);
+    await this.storage.put(this.room.buttonsKey, next);
     await this.sweepFiles(buttons);
     return json({ ok: true, ...next });
   }
@@ -124,7 +133,7 @@ export class Classroom {
     // The stage's button is a copy: keep its file while it is up.
     const shown = (await this.stage()).show?.button;
     if (shown && 'file' in shown && shown.file) keep.add(shown.file);
-    const metas = await this.storage.list({ prefix: FILE_PREFIX });
+    const metas = await this.storage.list({ prefix: this.room.filePrefix });
     const t = this.now();
     for (const [, meta] of metas) {
       if (!meta || !isFileId(meta.id) || keep.has(meta.id)) continue;
@@ -135,8 +144,8 @@ export class Classroom {
 
   /** @param {{ id: string, parts: number }} meta */
   async deleteFile(meta) {
-    for (let n = 0; n < (meta.parts || 0); n += 1) await this.storage.delete(`${PART_PREFIX}${meta.id}:${n}`);
-    await this.storage.delete(FILE_PREFIX + meta.id);
+    for (let n = 0; n < (meta.parts || 0); n += 1) await this.storage.delete(`${this.room.partPrefix}${meta.id}:${n}`);
+    await this.storage.delete(this.room.filePrefix + meta.id);
   }
 
   /**
@@ -153,13 +162,13 @@ export class Classroom {
     if (!Number.isInteger(bytes) || bytes < 1) return fail('That file is empty.', 400, { reason: 'empty' });
     if (bytes > CLASSROOM_FILE_MAX_BYTES) return fail('That file is too big (20 MB at most).', 413, { reason: 'too-big' });
     const meta = { id: newId('f', 16), type, bytes, parts: partsFor(bytes), next: 0, name: oneLine(body?.name, 80), done: false, at: this.now() };
-    await this.storage.put(FILE_PREFIX + meta.id, meta);
+    await this.storage.put(this.room.filePrefix + meta.id, meta);
     return json({ ok: true, id: meta.id, parts: meta.parts, partBytes: CLASSROOM_FILE_PART_BYTES });
   }
 
   /** PUT /v1/classroom/files/:id/:n with the part's bytes. @param {string} id @param {string} n @param {Request} request */
   async putPart(id, n, request) {
-    const meta = isFileId(id) ? await this.storage.get(FILE_PREFIX + id) : null;
+    const meta = isFileId(id) ? await this.storage.get(this.room.filePrefix + id) : null;
     const i = Number(n);
     if (!meta || meta.done) return fail('There is no upload by that name.', 404);
     // Parts arrive in order (the remote sends one at a time); a repeat of the
@@ -168,23 +177,23 @@ export class Classroom {
     const buf = new Uint8Array(await request.arrayBuffer());
     const want = i === meta.parts - 1 ? meta.bytes - i * CLASSROOM_FILE_PART_BYTES : CLASSROOM_FILE_PART_BYTES;
     if (buf.length !== want) return fail('That part is the wrong size.', 400, { reason: 'size' });
-    await this.storage.put(`${PART_PREFIX}${id}:${i}`, buf);
-    if (i === meta.next) await this.storage.put(FILE_PREFIX + id, { ...meta, next: i + 1 });
+    await this.storage.put(`${this.room.partPrefix}${id}:${i}`, buf);
+    if (i === meta.next) await this.storage.put(this.room.filePrefix + id, { ...meta, next: i + 1 });
     return json({ ok: true, next: Math.max(meta.next, i + 1) });
   }
 
   /** POST /v1/classroom/files/:id/done: every part is here and the file is what it says. @param {string} id */
   async finishFile(id) {
-    const meta = isFileId(id) ? await this.storage.get(FILE_PREFIX + id) : null;
+    const meta = isFileId(id) ? await this.storage.get(this.room.filePrefix + id) : null;
     if (!meta) return fail('There is no upload by that name.', 404);
     if (meta.done) return json({ ok: true, id, type: meta.type, bytes: meta.bytes, kind: kindOfType(meta.type) });
     if (meta.next !== meta.parts) return fail('Part of the file did not arrive. Try again.', 400, { reason: 'parts', next: meta.next });
-    const first = await this.storage.get(`${PART_PREFIX}${id}:0`);
+    const first = await this.storage.get(`${this.room.partPrefix}${id}:0`);
     if (sniffType(new Uint8Array(first)) !== meta.type) {
       await this.deleteFile(meta);
       return fail('That file is not the picture or PDF it says it is.', 400, { reason: 'type' });
     }
-    await this.storage.put(FILE_PREFIX + id, { ...meta, done: true });
+    await this.storage.put(this.room.filePrefix + id, { ...meta, done: true });
     return json({ ok: true, id, type: meta.type, bytes: meta.bytes, kind: kindOfType(meta.type) });
   }
 
@@ -207,22 +216,23 @@ export class Classroom {
     if (!type) return fail('That link is not a picture or a PDF (a web page, perhaps). Use the link to the file itself, or upload it.', 400, { reason: 'type' });
     const meta = { id: newId('f', 16), type, bytes: bytes.length, parts: partsFor(bytes.length), next: partsFor(bytes.length), name: oneLine(name, 80) || oneLine(new URL(url).pathname.split('/').pop(), 80), done: false, at: this.now() };
     for (let n = 0; n < meta.parts; n += 1) {
-      await this.storage.put(`${PART_PREFIX}${meta.id}:${n}`, bytes.slice(n * CLASSROOM_FILE_PART_BYTES, (n + 1) * CLASSROOM_FILE_PART_BYTES));
+      await this.storage.put(`${this.room.partPrefix}${meta.id}:${n}`, bytes.slice(n * CLASSROOM_FILE_PART_BYTES, (n + 1) * CLASSROOM_FILE_PART_BYTES));
     }
-    await this.storage.put(FILE_PREFIX + meta.id, { ...meta, done: true });
+    await this.storage.put(this.room.filePrefix + meta.id, { ...meta, done: true });
     return json({ ok: true, id: meta.id, type, bytes: meta.bytes, kind: kindOfType(type), name: meta.name });
   }
 
   /** GET /v1/classroom/files/:id: the file, part by part (never all in memory at once). @param {string} id */
   async readFile(id) {
-    const meta = isFileId(id) ? await this.storage.get(FILE_PREFIX + id) : null;
+    const meta = isFileId(id) ? await this.storage.get(this.room.filePrefix + id) : null;
     if (!meta?.done) return fail('There is no such file.', 404);
     const storage = this.storage;
+    const partPrefix = this.room.partPrefix;
     let n = 0;
     const body = new ReadableStream({
       async pull(controller) {
         if (n >= meta.parts) { controller.close(); return; }
-        const part = await storage.get(`${PART_PREFIX}${id}:${n}`);
+        const part = await storage.get(`${partPrefix}${id}:${n}`);
         n += 1;
         if (!part) { controller.error(new Error('missing part')); return; }
         controller.enqueue(new Uint8Array(part));
@@ -233,7 +243,7 @@ export class Classroom {
 
   /** The stage, from memory after the first read. */
   async stage() {
-    if (!this.stageCache) this.stageCache = sanitizeStage(await this.storage.get(STAGE_KEY));
+    if (!this.stageCache) this.stageCache = sanitizeStage(await this.storage.get(this.room.stageKey));
     return this.stageCache;
   }
 
@@ -241,8 +251,8 @@ export class Classroom {
   async saveStage(next) {
     const clean = sanitizeStage({ ...next, rev: (await this.stage()).rev + 1 });
     this.stageCache = clean;
-    await this.storage.put(STAGE_KEY, clean);
-    this.ring({ what: 'classroom', rev: clean.rev });
+    await this.storage.put(this.room.stageKey, clean);
+    this.ring({ what: this.room.what, rev: clean.rev });
     return clean;
   }
 
@@ -275,10 +285,29 @@ export class Classroom {
         if (!video && !item) return fail('That button is gone. The list has been reloaded.', 404, { reason: 'no-button' });
         // One thing up at a time: a button takes a held look (the Sparks screen) down.
         next = { ...stage, show: { button: video ? { ...video, kind: 'video' } : item, at: t, page: 1 }, preview: stage.preview?.held ? null : stage.preview, cmds };
+        this.rtc = null;
+        break;
+      }
+      // Cast (cast.js): an item put up directly; its file must be a finished file of this room.
+      case 'item': {
+        const item = /** @type {any} */ (p.data?.item);
+        if (item.file) {
+          const meta = await this.storage.get(this.room.filePrefix + item.file);
+          if (!meta?.done) return fail('That picture or PDF is still uploading, or was removed. Add it again.', 400, { reason: 'file-missing' });
+        }
+        next = { ...stage, show: { button: { ...item, id: newId('b', 10) }, at: t, page: 1 }, preview: stage.preview?.held ? null : stage.preview, cmds };
+        this.rtc = null;
+        break;
+      }
+      // A screen share starting: the screen button goes up; its offer follows (putSignal).
+      case 'screen': {
+        const id = newId('b', 10);
+        this.rtc = { id, offer: null, answer: null, at: t };
+        next = { ...stage, show: { button: { id, kind: 'screen', title: p.data?.title || 'Shared screen' }, at: t, page: 1 }, preview: stage.preview?.held ? null : stage.preview, cmds };
         break;
       }
       // Back to the schedule: whatever the remote put up goes, a held look too.
-      case 'back': next = { ...stage, show: null, preview: stage.preview?.held ? null : stage.preview, cmds }; break;
+      case 'back': next = { ...stage, show: null, preview: stage.preview?.held ? null : stage.preview, cmds }; this.rtc = null; break;
       case 'video':
         if (stage.show?.button?.kind !== 'video') return fail('No video is on the screen.', 409, { reason: 'no-video' });
         next = { ...stage, cmds: cmd('video', p.data) };
@@ -302,7 +331,33 @@ export class Classroom {
       default: return fail('That is not something the Sparks remote can ask.', 400);
     }
     const saved = await this.saveStage(next);
-    return json({ ok: true, rev: saved.rev, screenOnline: this.screenOnline() });
+    const shown = saved.show?.button;
+    return json({ ok: true, rev: saved.rev, screenOnline: this.screenOnline(), ...(p.action === 'screen' || p.action === 'item' ? { button: shown?.id } : {}) });
+  }
+
+  /**
+   * A screen share's offer (the presenter) or answer (the TV): {signal}. Only for
+   * the share now up; an answer only after its offer. The doorbell rings so the
+   * other side reads it at once (memory only, never stored).
+   * @param {any} body
+   */
+  async putSignal(body) {
+    const sig = sanitizeSignal(body?.signal);
+    if (!sig) return fail('That screen share message is not readable.', 400);
+    const t = this.now();
+    if (!this.rtc || this.rtc.id !== sig.id || t - this.rtc.at > SIGNAL_TTL_MS + 60 * 60 * 1000) return fail('That screen share has ended.', 409, { reason: 'ended' });
+    if (sig.type === 'offer') this.rtc = { id: sig.id, offer: sig, answer: null, at: t };
+    else if (!this.rtc.offer) return fail('There is no offer to answer.', 409, { reason: 'no-offer' });
+    else this.rtc = { ...this.rtc, answer: sig };
+    this.ring({ what: this.room.what, rtc: sig.type, rev: (await this.stage()).rev });
+    return json({ ok: true });
+  }
+
+  /** GET the share's offer (the TV) or answer (the presenter): {signal | null}. @param {'offer'|'answer'} type @param {string | null} id */
+  readSignal(type, id) {
+    const r = this.rtc;
+    const fresh = r && (!id || r.id === id) && this.now() - r.at <= SIGNAL_TTL_MS;
+    return json({ signal: fresh ? r[type] : null, id: r?.id || null });
   }
 
   screenOnline() { return this.screenAt > 0 && this.now() - this.screenAt <= CLASSROOM_ONLINE_MS; }
@@ -331,7 +386,7 @@ export class Classroom {
     const t = this.now();
     const was = this.watching();
     this.watchAt = t;
-    if (!was) this.ring({ what: 'classroom', rev: (await this.stage()).rev, watch: true });
+    if (!was) this.ring({ what: this.room.what, rev: (await this.stage()).rev, watch: true });
     const doc = await this.buttonsDoc();
     const stage = await this.stage();
     return json({
@@ -362,4 +417,7 @@ export function mountClassroom(registry, core) {
   registry.add('GET', '/v1/classroom/remote/state', 'session', async () => c().remoteState());
   registry.add('GET', '/v1/classroom/stage', 'session', async ({ url }) => c().readStage(url.searchParams.get('from') !== 'app'));
   registry.add('POST', '/v1/classroom/now', 'session', async ({ body }) => c().putNow(await body()));
+  // A screen share (owner 2026-11-08): the remote's offer, the TV's answer; each reads the other's.
+  registry.add('POST', '/v1/classroom/signal', 'session', async ({ body }) => c().putSignal(await body()));
+  registry.add('GET', '/v1/classroom/signal', 'session', async ({ url }) => c().readSignal(url.searchParams.get('type') === 'answer' ? 'answer' : 'offer', url.searchParams.get('id')));
 }

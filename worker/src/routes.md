@@ -1682,3 +1682,39 @@ with no club up and no clock.
 | `POST /v1/scoreboard/sounds` | session | `{on: boolean}` | the state; `sounds` = the projector's point chimes and timer buzzer on (or the projector's own Countdown sounds switch); kept across nights; 400 `bad-sounds` |
 | `POST /v1/scoreboard/setup` | session | `{club, setup: 'four'\|'boys-girls'\|'red-green'\|'blue-yellow'\|'leaders-kids', keep: boolean}` | the state; `keep: false` = a new game (the old setup's finale when that club is up and anyone scored, the new teams at 0), `keep: true` = the new teams keep tonight's scores; 400 `bad-setup`. Each club's setup lasts the night |
 | `POST /v1/scoreboard/clock` | session | `{op: 'start', kind: 'stopwatch'}` / `{op: 'start', kind: 'timer', durationMs: 1000..3600000}` / `{op: 'pause'\|'resume'\|'clear'}` | the state; 400 `bad-clock`; 409 `no-clock` |
+
+### 10.18 Cast, the lobby computer's AirServer-like screen (BUILT, owner 2026-11-08)
+
+Owner 2026-11-08: "set it up kind of like an air server ... present from their laptop but
+through a webpage that is controlling that computer"; "TV code only". KVBC Awana's tray turns
+the Cast screen on (`site/cast/screen/`, signed in like every screen); it opens a ROOM and shows
+a six-digit CODE. A presenter on awana.kvbchurch.org/cast types the code (no passphrase) and gets
+a TOKEN, carried as `X-Cast-Token` on the presenter routes. Engine = the Sparks remote's
+(`worker/src/classroom.js`, rules `shared/classroomRemote.js`) in a second room (`worker/src/cast.js`;
+storage `cast:stage`, `castmeta:<id>`/`castpart:`, `cast:room {code, at, tokens: [{hash, at}]}`;
+doorbell `changed {what: 'cast', rev, rtc?}`). Opening (a new code) or closing clears the stage,
+every file and every token. More than `JOIN_FAILS_MAX` (20) wrong codes within `JOIN_WINDOW_MS`
+(10 min) refuse every join for the rest of the window; tokens stored hashed (SHA-256), at most 20,
+each good for `TOKEN_TTL_MS` (8 h).
+
+| Route | Auth | Request | Answer |
+| --- | --- | --- | --- |
+| `POST /v1/cast/open` | session (the Cast screen) | `{}` | `{ok, code}`: a fresh code; whatever was up, every file and token gone |
+| `POST /v1/cast/close` | session | `{}` | `{ok}`: no code, nothing kept (KVBC Awana turning Cast off) |
+| `GET /v1/cast/screen` | session | | as `GET /v1/classroom/stage` plus `code` |
+| `GET /v1/cast/screen/files/:id` | session | | the file (as 10.13) |
+| `POST /v1/cast/screen/now` | session | `{now}` | as `POST /v1/classroom/now` (views add `screen`, `waiting`) |
+| `GET /v1/cast/screen/signal` | session | | `{signal: {type: 'offer', id, sdp} \| null, id}`: the share's offer |
+| `POST /v1/cast/screen/signal` | session | `{signal: {type: 'answer', id, sdp}}` | `{ok}`; 409 `no-offer`, `ended` |
+| `POST /v1/cast/join` | public | `{code}` (spaces ignored) | `{ok, token, ttlMs}`; 403 `wrong-code` / `off`; 429 `locked` |
+| `GET /v1/cast/state` | public + token | | as `GET /v1/classroom/remote/state` (reading it is watching) |
+| `POST /v1/cast/press` | public + token | as `POST /v1/classroom/remote`; `item {item}` puts a video, text, picture or PDF up directly (its file a finished file of this room, else 400 `file-missing`), `screen {title?}` puts a shared screen up | as 10.13 plus `button` (the new stage button's id) for `item`/`screen` |
+| `POST /v1/cast/files`, `PUT /v1/cast/files/:id/:n`, `POST /v1/cast/files/:id/done` | public + token | as 10.13 (a `{url}` copy too: a Google Slides/Docs link is copied as its PDF export) | as 10.13 |
+| `POST /v1/cast/signal` | public + token | `{signal: {type: 'offer', id, sdp}}` (id = the screen button's) | `{ok}`; 409 `ended` |
+| `GET /v1/cast/signal?id=` | public + token | | `{signal: {type: 'answer', id, sdp} \| null, id}` |
+
+Screen shares in the classroom too (signed in): `POST /v1/classroom/remote {action: 'screen'}`,
+`POST /v1/classroom/signal {signal}` (the remote's offer, the TV's answer), `GET
+/v1/classroom/signal?type=offer|answer&id=`. Signals live in memory only (`SIGNAL_TTL_MS` 2 min for
+reading), the picture itself goes laptop to TV over the church network (WebRTC, no TURN server);
+a press of another button, Back, or a new code ends the share.

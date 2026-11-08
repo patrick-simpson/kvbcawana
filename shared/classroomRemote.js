@@ -18,6 +18,14 @@
 // a PDF's page, a /settings preview of one look for a minute, and the last
 // few momentary commands (a video's pause, seek, volume; Sparky's flight),
 // each run once by id.
+//
+// Cast (owner 2026-11-08: "set it up kind of like an air server ... present from
+// their laptop but through a webpage"): the SAME rules drive the lobby computer's
+// Cast screen (worker/src/cast.js, site/cast/). A guest there has no button list,
+// so a press may put an item up directly (`item`), and either room may show a
+// laptop's SCREEN, shared live (`screen`): the picture goes laptop to TV over the
+// church network (WebRTC); the Worker only passes the offer and the answer
+// (sanitizeSignal), never the picture.
 
 export const CLASSROOM_VIDEOS_MAX = 4;
 export const CLASSROOM_ITEMS_MAX = 8;
@@ -49,10 +57,12 @@ export const CLASSROOM_VOLUME_STEP_PCT = 10;
 export const CLASSROOM_TEXT_LOOKS = Object.freeze(['page', 'board']);
 export const CLASSROOM_ITEM_KINDS = Object.freeze(['image', 'pdf', 'text']);
 /** Everything a remote (or /settings) may ask. */
-export const CLASSROOM_ACTIONS = Object.freeze(['show', 'back', 'video', 'page', 'preview', 'preview-end', 'sparky']);
+export const CLASSROOM_ACTIONS = Object.freeze(['show', 'back', 'video', 'page', 'preview', 'preview-end', 'sparky', 'item', 'screen']);
+/** A screen share's offer or answer (SDP text) is at most this long. */
+export const CLASSROOM_SIGNAL_MAX = 24000;
 export const CLASSROOM_VIDEO_OPS = Object.freeze(['toggle', 'play', 'pause', 'seek', 'volume', 'mute', 'unmute']);
 /** What the screen can be showing (its report's `view`). */
-export const CLASSROOM_VIEWS = Object.freeze(['off', 'cubbies', 'black', 'sparks', 'lobby', 'board', 'video', 'image', 'pdf', 'text']);
+export const CLASSROOM_VIEWS = Object.freeze(['off', 'cubbies', 'black', 'sparks', 'lobby', 'board', 'video', 'image', 'pdf', 'text', 'screen', 'waiting']);
 
 const BUTTON_ID_RE = /^b[a-z0-9]{6,20}$/;
 const FILE_ID_RE = /^f[a-z0-9]{12,24}$/;
@@ -128,6 +138,12 @@ export function fileLinkFrom(text) {
   let u;
   try { u = new URL(s); } catch { return ''; }
   if (u.protocol !== 'https:' || u.username || u.password) return '';
+  // A Google Slides or Docs link (owner 2026-11-08: "PowerPoint/google slides"): its PDF
+  // export, which the Worker copies like any PDF (the file must be shared "anyone with the link").
+  if (u.hostname === 'docs.google.com') {
+    const m = /^\/(presentation|document)\/d\/([A-Za-z0-9_-]{10,})/.exec(u.pathname);
+    if (m) return `https://docs.google.com/${m[1]}/d/${m[2]}/export/pdf`;
+  }
   if (u.hostname === 'drive.google.com') {
     const m = /^\/file\/d\/([A-Za-z0-9_-]{10,})/.exec(u.pathname);
     const id = m ? m[1] : u.searchParams.get('id');
@@ -190,9 +206,10 @@ export function filesOf(buttons) {
   return new Set((buttons?.items || []).map((i) => i.file).filter(isFileId));
 }
 
-/** A button as it went up on the stage: a video or an item (a copy). @param {unknown} v */
+/** A button as it went up on the stage: a video, an item (a copy), or a shared screen. @param {unknown} v */
 export function sanitizeShown(v) {
   if (!isObj(v)) return null;
+  if (v.kind === 'screen') return isButtonId(v.id) ? { id: v.id, kind: 'screen', title: oneLine(v.title, CLASSROOM_TITLE_MAX) || 'Shared screen' } : null;
   if (v.kind === 'video') {
     const video = sanitizeVideo(v);
     return video ? { ...video, kind: 'video' } : null;
@@ -202,7 +219,9 @@ export function sanitizeShown(v) {
 
 /**
  * One press, or null. data: show {button}, video {op, by?|step?}, page {step},
- * preview {look, hold?}; the others none. Never free text.
+ * preview {look, hold?}, item {item} (a video or an item put up directly, Cast),
+ * screen {title?} (a screen share starting); the others none. Never free text
+ * but an item's own (cleaned by sanitizeShown).
  * @param {unknown} action @param {unknown} data
  * @returns {{ action: string, data?: Record<string, any> } | null}
  */
@@ -219,6 +238,11 @@ export function sanitizeClassroomPress(action, data) {
     }
     case 'page': return d.step === 1 || d.step === -1 ? { action, data: { step: d.step } } : null;
     case 'preview': return CLASSROOM_LOOKS.includes(d.look) ? { action, data: { look: d.look, ...(d.hold === true ? { hold: true } : {}) } } : null;
+    case 'item': {
+      const item = sanitizeShown(d.item);
+      return item && item.kind !== 'screen' ? { action, data: { item } } : null;
+    }
+    case 'screen': return { action, data: { title: oneLine(d.title, CLASSROOM_TITLE_MAX) || 'Shared screen' } };
     default: return { action };
   }
 }
@@ -264,4 +288,17 @@ export function sanitizeClassroomNow(v) {
   if (CLASSROOM_LOOKS.includes(v.preview)) out.preview = v.preview;
   if (v.board === true) out.board = true;
   return out;
+}
+
+/**
+ * A screen share's offer or answer: {type, sdp, id}, or null. The SDP is the
+ * browser's own text (line breaks kept, nothing else odd, capped); `id` names
+ * the share it belongs to (the stage's screen button id).
+ * @param {unknown} v
+ */
+export function sanitizeSignal(v) {
+  if (!isObj(v) || (v.type !== 'offer' && v.type !== 'answer') || typeof v.sdp !== 'string' || !isButtonId(v.id)) return null;
+  // eslint-disable-next-line no-control-regex
+  if (!v.sdp.startsWith('v=0') || v.sdp.length > CLASSROOM_SIGNAL_MAX || /[\u0000-\u0009\u000b\u000c\u000e-\u001f\u007f]/.test(v.sdp)) return null;
+  return { type: v.type, sdp: v.sdp, id: v.id };
 }

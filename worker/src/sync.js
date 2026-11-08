@@ -53,6 +53,7 @@ import { mountBarf } from './barf.js';
 import { Screens } from './screens.js';
 import { JourneyRemote, mountJourneyRemote } from './journeyRemote.js';
 import { Classroom, mountClassroom } from './classroom.js';
+import { Cast, mountCast } from './cast.js';
 import { Presentation, mountPresentation } from './presentation.js';
 import { Tally, mountTally } from './tally.js';
 import { Scoreboard, mountScoreboard } from './scoreboard.js';
@@ -259,6 +260,15 @@ export class SyncCore {
       ring: (payload) => { this.broadcast(frameText(DOORBELL_EVENT, payload)); },
     });
     mountClassroom(this.registry, this);   // /v1/classroom/* (routes.md 10.13)
+    // Cast (cast.js, routes.md 10.18): the lobby computer's AirServer-like screen, the
+    // Sparks remote's engine in a second room, joined with the code on the TV.
+    this.cast = new Cast({
+      storage: this.storage,
+      now: this.now,
+      fetchFn: this.fetchFn,
+      ring: (payload) => { this.broadcast(frameText(DOORBELL_EVENT, payload)); },
+    });
+    mountCast(this.registry, this);   // /v1/cast/* (routes.md 10.18)
     // The presentation (presentation.js, routes.md 10.14): the sealed congregation deck the
     // weekly AwanaReports job sends, and the slide every presentation screen shows.
     this.presentation = new Presentation({
