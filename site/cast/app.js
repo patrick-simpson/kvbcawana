@@ -8,10 +8,15 @@
 //   the token's 8 hours up): the token is dropped and the code asked again.
 // - Five things to show: the laptop's screen, live (WebRTC laptop to TV over the
 //   church network, shared/screenShare.js; the Worker only passes the offer and the
-//   answer), a YouTube video, text, pictures, slides (a PDF, PowerPoint saved as PDF,
-//   or a Google Slides link the Worker copies as its PDF export). Each goes up as ONE
+//   answer), a YouTube video, text, pictures, slides (a PDF, a PowerPoint, or a Google
+//   Slides link the Worker copies as its PDF export). Each goes up as ONE
 //   press (`item` / `screen`), cleaned by the same rules the Worker applies
 //   (shared/classroomRemote.js).
+// - A PowerPoint (owner 2026-11-08, the exact copy): scrambled HERE (AES-256-GCM, a
+//   fresh key), sent in parts to /v1/cast/convert, then "start" hands the key on to the
+//   GitHub job that turns it into a PDF with LibreOffice (about a minute); this page asks
+//   for the status every CONVERT_POLL_MS and puts the PDF up when it is ready.
+// - Slides on the TV: the phone's preview (preview.js): this slide, the next, every slide.
 // - "On the TV now": GET /v1/cast/state every 2 s while this page is visible (which
 //   is also what makes the TV report), nothing while hidden, and it stops after 30
 //   minutes with no touch (the free plan's daily requests).
@@ -22,7 +27,9 @@ import { canShareScreen, startSharing } from '/cast/shared/screenShare.js';
 import {
   TOKEN_KEY, TOKEN_RE, captureWords, cleanCode, codeReady, errorWords, filePress, fileProblem, formatCode,
   joinWords, linkToCopy, shareWords, size, textPress, titleFromName, tvWords, videoPress,
+  CONVERT_GIVE_UP_MS, CONVERT_POLL_MS, SLIDES_ACCEPT, convertWords, slidesChoice,
 } from '/cast/logic.js';
+import { createPreview } from '/cast/preview.js';
 
 const SYNC_INDEX = new URL('/lobby/shared/sync.json', location.href).href;
 const TUNING = Object.assign({ pollMs: 2000, idleMs: 30 * 60 * 1000, timeoutMs: 12000, failuresBeforeWarning: 2 }, window.castTuning || {});
@@ -46,6 +53,8 @@ let sharing = null; // { pc, stop } while this page shares its screen
 let shareId = ''; // the stage button id of this page's share
 let shareStream = null;
 let pdfFile = null; // { file, title } the last PDF sent
+let converting = ''; // the id of the PowerPoint being made into slides
+let preview = null;
 const pictures = []; // { file, url, title }
 
 /* ── Requests ── */
@@ -126,6 +135,7 @@ function onCodeInput() {
 
 function leave() {
   if (shareId) stopShare();
+  converting = '';
   tokenStore.set('');
   state = null;
   showJoin('Disconnected. Type the code again to present.');
@@ -166,13 +176,18 @@ function render() {
   const w = offline
     ? { main: 'Not reaching the TV right now.', sub: navigator.onLine === false ? 'This device is offline.' : 'Trying again…', online: false }
     : tvWords(state);
+  // Slides: the preview says which slide (no second "Page 2 of 9" line above it).
+  if (!offline && w.online && state.stage.show && state.stage.show.button.kind === 'pdf') w.sub = '';
   setText($('tv-main'), w.main);
   setText($('tv-sub'), w.sub);
   $('tv').dataset.online = String(w.online);
   const shown = state.stage.show ? state.stage.show.button : null;
   const kind = shown ? shown.kind : '';
   $('ctl-video').hidden = kind !== 'video';
-  $('ctl-pdf').hidden = kind !== 'pdf';
+  if (preview) {
+    if (kind === 'pdf') preview.show(shown.file, state.stage.show.page, state.now && state.now.button === shown.id ? state.now.pages || 0 : 0);
+    else preview.hide();
+  }
   $('ctl-down').hidden = !shown;
   setText($('btn-down'), shown && shown.id === shareId ? 'Stop sharing' : 'Take it down');
   const video = state.now && shown && state.now.button === shown.id ? state.now.video : null;
@@ -292,11 +307,79 @@ async function sendPdfFile(e) {
   if (!file) return;
   const note = $('pdf-note');
   note.classList.remove('bad');
-  const problem = fileProblem(file, 'pdf', R);
-  if (problem) { setText(note, problem); note.classList.add('bad'); return; }
+  const choice = slidesChoice(file, R);
+  if (!choice.ok) { setText(note, choice.error); note.classList.add('bad'); return; }
+  if (choice.kind === 'pptx') { await convertPptx(file); return; }
   const done = await upload(file, (w) => setText(note, w));
   if (!done) { note.classList.add('bad'); return; }
+  if (preview) preview.remember(done.id, file);
   pdfReady(done, titleFromName(file.name));
+}
+
+/* ── A PowerPoint: scrambled here, made into slides by the GitHub job ── */
+
+/** The file scrambled with a fresh key: 12-byte IV + AES-256-GCM ciphertext, and the key (base64url). @param {File} file */
+async function scramble(file) {
+  const key = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, ['encrypt']);
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ct = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, await file.arrayBuffer()));
+  const out = new Uint8Array(12 + ct.length);
+  out.set(iv);
+  out.set(ct, 12);
+  const raw = new Uint8Array(await crypto.subtle.exportKey('raw', key));
+  const b64 = btoa(String.fromCharCode(...raw)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  return { bytes: out, key: b64 };
+}
+
+async function convertPptx(file) {
+  const note = $('pdf-note');
+  const say = (w, bad) => { setText(note, w); note.classList.toggle('bad', Boolean(bad)); };
+  if (converting) { say('Slides are already being made from another file. Wait for them first.', true); return; }
+  say(convertWords('uploading'));
+  const { bytes, key } = await scramble(file);
+  const start = await request('/v1/cast/convert', { method: 'POST', body: { bytes: bytes.length, name: file.name } });
+  if (!start.ok || !start.body) { if (start.status !== 401) say(errorWords(start.status, start.body), true); return; }
+  const { id, parts, partBytes } = start.body;
+  converting = id;
+  try {
+    for (let n = 0; n < parts; n += 1) {
+      let r = null;
+      for (let tries = 0; tries < 3; tries += 1) {
+        r = await request(`/v1/cast/convert/${id}/${n}`, { method: 'PUT', body: bytes.subarray(n * partBytes, (n + 1) * partBytes), timeoutMs: 30000 });
+        if (r.ok || r.status === 401) break;
+      }
+      if (!r || !r.ok) { if (r && r.status !== 401) say('The upload stopped (the internet?). Try again.', true); return; }
+      if (parts > 1) say(`Sending the PowerPoint… ${Math.round(((n + 1) / parts) * 100)}%`);
+    }
+    const go = await request(`/v1/cast/convert/${id}/start`, { method: 'POST', body: { key } });
+    if (!go.ok) { if (go.status !== 401) say(errorWords(go.status, go.body), true); return; }
+    const began = Date.now();
+    say(convertWords('converting', '', 0));
+    for (;;) {
+      await new Promise((r) => setTimeout(r, CONVERT_POLL_MS));
+      if (!tokenStore.get() || converting !== id) return;
+      const seconds = Math.round((Date.now() - began) / 1000);
+      if (Date.now() - began > CONVERT_GIVE_UP_MS) { say(convertWords('gave-up'), true); return; }
+      const st = await request(`/v1/cast/convert/${id}`);
+      if (st.status === 401) return;
+      if (!st.ok || !st.body) { if (st.status === 404) { say(convertWords('failed', 'convert'), true); return; } continue; }
+      if (st.body.status === 'done' && st.body.file) { pdfReady(st.body.file, titleFromName(file.name)); return; }
+      if (st.body.status === 'failed') { say(convertWords('failed', st.body.error), true); return; }
+      say(convertWords(st.body.status, '', seconds));
+    }
+  } finally {
+    if (converting === id) converting = '';
+  }
+}
+
+/** The room's PDF for the phone's preview (this page's token). @param {string} id */
+async function fetchPdf(id) {
+  try {
+    const res = await fetch(`${base}/v1/cast/files/${encodeURIComponent(id)}`, { headers: { 'X-Cast-Token': tokenStore.get() }, cache: 'no-store' });
+    return res.ok ? await res.arrayBuffer() : null;
+  } catch {
+    return null;
+  }
 }
 
 async function copyPdfLink() {
@@ -440,9 +523,16 @@ async function start() {
     const p = R.sanitizeClassroomPress('video', data);
     if (p) press('video', p.data, b.textContent.trim());
   });
-  $('ctl-pdf').addEventListener('click', (e) => {
-    const b = e.target.closest('[data-step]');
-    if (b) press('page', { step: Number(b.dataset.step) }, Number(b.dataset.step) > 0 ? 'Next page' : 'Previous page');
+  $('pdf-input').setAttribute('accept', SLIDES_ACCEPT);
+  // The slides on the TV: the preview's Back / Next and its strip are presses.
+  preview = createPreview({
+    root: $('ctl-pdf'),
+    fetchPdf,
+    go: (to, step) => {
+      touch();
+      if (to) press('page', { to }, `Slide ${to} is going up`);
+      else press('page', { step }, step > 0 ? 'Next slide' : 'Previous slide');
+    },
   });
   // iPhones and iPads (and most phones) cannot share a screen from a web page: say so instead.
   if (!canShareScreen()) { $('li-screen').hidden = true; $('li-noshare').hidden = false; }

@@ -96,6 +96,30 @@
   .ready { margin: 16px 0 0; padding: 14px 16px; border: 1px solid var(--rule); border-radius: 6px; background: #fff; display: flex; gap: 12px; align-items: center; justify-content: space-between; font-size: 15px; }
   .ready .primary { width: auto; margin: 0; min-height: 48px; font-size: 16px; }
 
+  /* ── the slides on the TV (the phone's preview) ── */
+  .slides { margin-top: 16px; }
+  .slide-now { position: relative; aspect-ratio: 16 / 9; background: var(--charcoal); border-radius: 4px; overflow: hidden; }
+  .slide-now canvas, .slide-next canvas { display: block; width: 100%; height: 100%; object-fit: contain; }
+  .slides[data-preview="none"] .slide-now, .slides[data-preview="none"] .slide-next, .slides[data-preview="none"] .strip { display: none; }
+  .slides[data-preview="loading"] .slide-now::after { content: 'Loading the slides…'; position: absolute; inset: 0; display: grid; place-items: center; color: var(--cream); font: 400 15px/1 var(--body); }
+  .slide-row { display: grid; grid-template-columns: 42% 1fr; gap: 12px; margin-top: 12px; align-items: start; }
+  .slides[data-preview="none"] .slide-row { grid-template-columns: 1fr; }
+  .slide-next { position: relative; }
+  .slide-next canvas { aspect-ratio: 16 / 9; background: var(--sand); border-radius: 3px; }
+  .slide-cap { display: block; font: 500 11px/1 var(--heading); letter-spacing: .16em; text-transform: uppercase; color: var(--muted); margin: 0 0 6px; }
+  .slide-endword { display: none; aspect-ratio: 16 / 9; place-items: center; text-align: center; border: 1px dashed var(--rule); border-radius: 3px; font-size: 14px; color: var(--muted); }
+  .slide-next[data-end="true"] canvas { display: none; }
+  .slide-next[data-end="true"] .slide-endword { display: grid; }
+  .slide-buttons { display: grid; gap: 8px; }
+  .slide-buttons .primary { margin: 0; min-height: 64px; font-size: 20px; }
+  .slide-buttons .quiet { min-height: 48px; }
+  .slide-label { margin: 0; font: 500 16px/1.2 var(--heading); font-variant-numeric: tabular-nums; }
+  .strip { display: flex; gap: 8px; overflow-x: auto; margin: 14px -20px 0; padding: 4px 20px 10px; scroll-snap-type: x proximity; -webkit-overflow-scrolling: touch; }
+  .strip-slide { position: relative; flex: none; width: 112px; padding: 0; border: 1px solid var(--rule); border-radius: 3px; background: var(--sand); scroll-snap-align: center; }
+  .strip-slide canvas { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: contain; }
+  .strip-slide span { position: absolute; left: 4px; bottom: 4px; min-width: 20px; padding: 2px 5px; border-radius: 2px; background: var(--charcoal); color: var(--cream); font: 500 11px/1.2 var(--heading); text-align: center; }
+  .strip-slide[aria-current="true"] { outline: 3px solid var(--green); outline-offset: 1px; }
+
   footer { margin-top: 48px; font-size: 13px; color: var(--muted); }
 
   @media (min-width: 720px) {
@@ -137,9 +161,24 @@
         <button class="quiet" type="button" data-op="volume" data-step="1" aria-label="Volume up">Volume +</button>
         <button class="quiet" type="button" data-op="mute" id="btn-mute">Mute</button>
       </div>
-      <div class="controls" id="ctl-pdf" hidden>
-        <button class="quiet" type="button" data-step="-1">Previous page</button>
-        <button class="quiet" type="button" data-step="1">Next page</button>
+      <!-- The slides on the TV: this one big, the next beside Back / Next, then every slide. -->
+      <div class="slides" id="ctl-pdf" data-preview="none" hidden>
+        <div class="slide-now">
+          <canvas data-slide="now" aria-hidden="true"></canvas>
+        </div>
+        <div class="slide-row">
+          <div class="slide-next" data-slide-box="next" data-end="false">
+            <span class="slide-cap">Next</span>
+            <canvas data-slide="next" aria-hidden="true"></canvas>
+            <span class="slide-endword">End of the slides</span>
+          </div>
+          <div class="slide-buttons">
+            <p class="slide-label" data-slide-label aria-live="polite">Slide 1</p>
+            <button class="quiet" type="button" data-step="-1">Back</button>
+            <button class="primary" type="button" data-step="1">Next</button>
+          </div>
+        </div>
+        <div class="strip" data-slide-strip aria-label="Every slide"></div>
       </div>
       <p id="share-state" hidden></p>
       <div class="controls" id="ctl-down" hidden>
@@ -199,9 +238,9 @@
         </div>
       </li>
       <li>
-        <button class="choice" type="button" aria-expanded="false" aria-controls="p-pdf"><b>Slides or PDF</b><span>A PDF, PowerPoint saved as PDF, or Google Slides.</span></button>
+        <button class="choice" type="button" aria-expanded="false" aria-controls="p-pdf"><b>Slides</b><span>PowerPoint, a PDF, or Google Slides.</span></button>
         <div class="panel" id="p-pdf" hidden>
-          <label class="file-pick">Choose a PDF<input type="file" id="pdf-input" accept="application/pdf"></label>
+          <label class="file-pick">Choose a PowerPoint or PDF<input type="file" id="pdf-input"></label>
           <div class="or">or</div>
           <label for="pdf-link">Google Slides link</label>
           <div class="row">
@@ -210,7 +249,7 @@
           </div>
           <p class="note" id="pdf-note" role="status"></p>
           <div class="ready" id="pdf-ready" hidden><span id="pdf-ready-words"></span><button class="primary" type="button" id="pdf-show">Show</button></div>
-          <p class="help">Google Slides must be shared as “Anyone with the link”. From PowerPoint: File, Save As, PDF. Animations and videos inside slides don’t carry over; for those, use Share my screen.</p>
+          <p class="help">A PowerPoint takes about a minute to turn into slides; a PDF goes up at once. Google Slides must be shared as “Anyone with the link”. Animations and videos inside slides don’t carry over; for those, use Share my screen.</p>
         </div>
       </li>
     </ul>

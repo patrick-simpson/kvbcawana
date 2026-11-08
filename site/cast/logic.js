@@ -186,3 +186,80 @@ export function captureWords(err) {
   if (name === 'NotFoundError') return 'There was nothing to share.';
   return 'This browser could not share the screen.';
 }
+
+/* ── PowerPoint into slides, and the phone's preview (owner 2026-11-08: "Support pptx
+   upload and show a preview on the phone screen"; the exact copy, current + next) ── */
+
+/** The largest PowerPoint the Worker takes (its CONVERT_MAX_BYTES). */
+export const PRESENTATION_MAX_BYTES = 40 * 1024 * 1024;
+const PRESENTATION_TYPES = [
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  'application/vnd.ms-powerpoint',
+  'application/vnd.oasis.opendocument.presentation',
+];
+/** What the slides file picker accepts: a PDF or a PowerPoint (Keynote: export as PowerPoint). */
+export const SLIDES_ACCEPT = ['application/pdf', '.pdf', '.pptx', '.ppt', '.odp', ...PRESENTATION_TYPES].join(',');
+
+/** A PowerPoint (or LibreOffice) presentation, by type or name. @param {{ type?: string, name?: string }} file */
+export function isPresentation(file) {
+  if (!file) return false;
+  return PRESENTATION_TYPES.includes(String(file.type || '')) || /\.(pptx|ppt|odp)$/i.test(String(file.name || ''));
+}
+
+/**
+ * A chosen slides file: 'pdf' (sent as it is), 'pptx' (turned into slides first), or
+ * the problem in words. @param {{ type: string, name?: string, size: number }} file @param {any} R
+ * @returns {{ ok: true, kind: 'pdf' | 'pptx' } | { ok: false, error: string }}
+ */
+export function slidesChoice(file, R) {
+  if (!file || !file.size) return { ok: false, error: 'That file is empty.' };
+  if (isPresentation(file)) {
+    if (file.size > PRESENTATION_MAX_BYTES) return { ok: false, error: `That PowerPoint is ${size(file.size)}; 40 MB at most. Save it as a PDF, or share your screen.` };
+    return { ok: true, kind: 'pptx' };
+  }
+  const problem = fileProblem(file, 'pdf', R);
+  if (problem) return { ok: false, error: /PowerPoint/.test(problem) ? 'Choose a PDF or a PowerPoint (.pptx).' : problem };
+  return { ok: true, kind: 'pdf' };
+}
+
+/** Making the slides takes about this long; the page stops waiting after CONVERT_GIVE_UP_MS. */
+export const CONVERT_POLL_MS = 3000;
+export const CONVERT_GIVE_UP_MS = 6 * 60 * 1000;
+
+/**
+ * Where a PowerPoint is, in words (the Worker's status and error, routes.md 10.18).
+ * @param {string} status @param {string} [error] @param {number} [seconds] since the job started
+ */
+export function convertWords(status, error, seconds = 0) {
+  switch (status) {
+    case 'uploading': return 'Sending the PowerPoint…';
+    case 'converting':
+      if (seconds >= 150) return `Still making the slides (${clock(seconds)}). GitHub may be busy; it usually takes about a minute.`;
+      return `Making the slides… this takes about a minute${seconds >= 5 ? ` (${clock(seconds)})` : ''}.`;
+    case 'done': return '';
+    case 'failed':
+      if (error === 'type') return 'That file is not a PowerPoint LibreOffice can open. Save it as a PDF and send that.';
+      if (error === 'too-big') return 'The slides came out over 20 MB. Save it as a PDF with smaller pictures, or share your screen.';
+      return 'The slides could not be made from that file. Save it as a PDF and send that, or share your screen.';
+    case 'gave-up': return 'Making the slides is taking too long. Try again, or save it as a PDF.';
+    default: return '';
+  }
+}
+
+/**
+ * The phone's preview of the slides on the TV: which page is up, which is next.
+ * @param {number} page the page on the TV (1-based) @param {number} pages 0 while unknown
+ * @returns {{ now: number, next: number, label: string, first: boolean, last: boolean }}
+ */
+export function slideView(page, pages) {
+  const known = Number.isInteger(pages) && pages >= 1;
+  const now = Math.max(1, Math.min(Number.isInteger(page) ? page : 1, known ? pages : 9999));
+  const last = known && now >= pages;
+  return {
+    now,
+    next: last ? 0 : now + 1,
+    label: known ? `Slide ${now} of ${pages}` : `Slide ${now}`,
+    first: now <= 1,
+    last,
+  };
+}

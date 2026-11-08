@@ -13,6 +13,7 @@ import * as R from '../../shared/classroomRemote.js';
 import {
   TOKEN_KEY, captureWords, cleanCode, clock, codeReady, errorWords, filePress, fileProblem, formatCode,
   joinWords, linkToCopy, placeholderId, shareWords, size, textPress, titleFromName, tvWords, videoPress,
+  SLIDES_ACCEPT, convertWords, isPresentation, slideView, slidesChoice,
 } from '../cast/logic.js';
 
 const SITE = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
@@ -23,6 +24,7 @@ const screenPage = read('cast', 'screen', 'index.html');
 const screen = read('cast', 'screen', 'screen.js');
 const css = read('cast', 'church', 'church.css');
 const build = read('build.mjs');
+const previewJs = read('cast', 'preview.js');
 
 test('the code: digits only, six of them, shown as two groups of three', () => {
   assert.equal(cleanCode('482 913'), '482913');
@@ -174,4 +176,55 @@ test('the build copies both pages, the church kit and the shared modules', () =>
   assert.match(build, /path\.join\(OUT, 'cast'\)/);
   assert.match(build, /\['classroomRemote\.js', 'screenShare\.js'\]/);
   for (const f of ['cast/index.html', 'cast/screen/index.html', 'cast/screen/screen.js', 'cast/shared/screenShare.js', 'cast/church/church.css']) assert.ok(build.includes(`'${f}'`), f);
+});
+
+// PowerPoint (owner 2026-11-08: "Support pptx upload and show a preview on the phone
+// screen", the exact copy; current + next on the phone).
+test('a PowerPoint is turned into slides; a PDF goes as it is; anything else says why', () => {
+  assert.equal(isPresentation({ name: 'Easter.PPTX', type: '' }), true);
+  assert.equal(isPresentation({ name: 'x', type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation' }), true);
+  assert.equal(isPresentation({ name: 'old.ppt', type: '' }), true);
+  assert.equal(isPresentation({ name: 'a.pdf', type: 'application/pdf' }), false);
+  assert.deepEqual(slidesChoice({ name: 'a.pptx', type: '', size: 1000 }, R), { ok: true, kind: 'pptx' });
+  assert.deepEqual(slidesChoice({ name: 'a.pdf', type: 'application/pdf', size: 1000 }, R), { ok: true, kind: 'pdf' });
+  assert.match(slidesChoice({ name: 'a.pptx', type: '', size: 41 * 1024 * 1024 }, R).error, /40 MB at most/);
+  assert.match(slidesChoice({ name: 'a.docx', type: 'application/msword', size: 10 }, R).error, /PDF or a PowerPoint/);
+  assert.match(SLIDES_ACCEPT, /\.pptx/);
+  assert.match(SLIDES_ACCEPT, /application\/pdf/);
+});
+
+test('the PowerPoint\'s progress and failures in plain words', () => {
+  assert.match(convertWords('converting', '', 0), /about a minute\.$/);
+  assert.match(convertWords('converting', '', 70), /\(1:10\)/);
+  assert.match(convertWords('converting', '', 200), /GitHub may be busy/);
+  assert.match(convertWords('failed', 'type'), /not a PowerPoint/);
+  assert.match(convertWords('failed', 'too-big'), /20 MB/);
+  assert.match(convertWords('failed', 'whatever'), /Save it as a PDF/);
+  assert.equal(convertWords('done'), '');
+});
+
+test('the preview: this slide, the next, none past the last', () => {
+  assert.deepEqual(slideView(3, 12), { now: 3, next: 4, label: 'Slide 3 of 12', first: false, last: false });
+  assert.deepEqual(slideView(12, 12), { now: 12, next: 0, label: 'Slide 12 of 12', first: false, last: true });
+  assert.deepEqual(slideView(40, 12).now, 12);
+  assert.deepEqual(slideView(0, 0), { now: 1, next: 2, label: 'Slide 1', first: true, last: false });
+});
+
+test('a PowerPoint is scrambled in the browser before it leaves; the preview reads the room\'s file with the token', () => {
+  assert.match(app, /crypto\.subtle\.encrypt\(\{ name: 'AES-GCM', iv \}/);
+  assert.match(app, /'\/v1\/cast\/convert', \{ method: 'POST', body: \{ bytes: bytes\.length/);
+  assert.match(app, /\/v1\/cast\/convert\/\$\{id\}\/start`, \{ method: 'POST', body: \{ key \}/);
+  assert.match(app, /\/v1\/cast\/files\/\$\{encodeURIComponent\(id\)\}`, \{ headers: \{ 'X-Cast-Token': tokenStore\.get\(\) \}/);
+  // A slide in the strip is a press straight to it; Back/Next step.
+  assert.match(app, /press\('page', \{ to \}/);
+  assert.match(app, /press\('page', \{ step \}/);
+  assert.equal(R.sanitizeClassroomPress('page', { to: 5 }).data.to, 5);
+  // pdf.js from cdnjs, the TV's version; strip thumbnails drawn only when seen.
+  assert.match(previewJs, /cdnjs\.cloudflare\.com\/ajax\/libs\/pdf\.js\/3\.11\.174\//);
+  assert.match(screen, /pdf\.js\/3\.11\.174/);
+  assert.match(previewJs, /new IntersectionObserver/);
+  assert.match(page, /data-slide="now"/);
+  assert.match(page, /data-slide="next"/);
+  assert.match(page, /data-slide-strip/);
+  assert.match(build, /'preview\.js'/);
 });
