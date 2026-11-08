@@ -1,0 +1,188 @@
+// Cast's words and choices, pure (no DOM, no network, no imports), so the tests can
+// ask them anything (site/test/cast.test.mjs). The shared rules
+// (shared/classroomRemote.js) are handed in as `R` where a choice needs them, so this
+// file carries no copy of them.
+//
+// Cast (owner 2026-11-08: "set it up kind of like an air server ... present from
+// their laptop but through a webpage that is controlling that computer"; "TV code
+// only"): worker/src/routes.md 10.18.
+
+export const CODE_DIGITS = 6;
+export const TOKEN_KEY = 'awanaCastToken.v1';
+/** A presenter's token: the Worker's shape (t + base36). */
+export const TOKEN_RE = /^t[a-z0-9]{24,40}$/;
+
+/** The digits of whatever was typed or pasted ("123 456", "123-456"), at most six. @param {unknown} text */
+export function cleanCode(text) {
+  return typeof text === 'string' ? text.replace(/\D/g, '').slice(0, CODE_DIGITS) : '';
+}
+
+/** Six digits, not starting with 0 (the Worker never makes one). @param {unknown} code */
+export function codeReady(code) {
+  return typeof code === 'string' && /^[1-9]\d{5}$/.test(code);
+}
+
+/** The code as the TV shows it: two groups of three. @param {unknown} code */
+export function formatCode(code) {
+  const d = cleanCode(typeof code === 'string' ? code : '');
+  return d.length > 3 ? `${d.slice(0, 3)} ${d.slice(3)}` : d;
+}
+
+/** A placeholder button id (the Worker gives the real one): the shared rules' shape. */
+export function placeholderId() {
+  const bytes = crypto.getRandomValues(new Uint8Array(10));
+  return `b${[...bytes].map((b) => (b % 36).toString(36)).join('')}`;
+}
+
+/** m:ss (or h:mm:ss). @param {number} s */
+export function clock(s) {
+  const n = Math.max(0, Math.floor(Number(s) || 0));
+  const h = Math.floor(n / 3600);
+  const m = Math.floor((n % 3600) / 60);
+  const sec = String(n % 60).padStart(2, '0');
+  return h ? `${h}:${String(m).padStart(2, '0')}:${sec}` : `${m}:${sec}`;
+}
+
+/** File sizes in words. @param {number} n */
+export function size(n) {
+  if (n >= 1024 * 1024) return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+  return `${Math.max(1, Math.round(n / 1024))} KB`;
+}
+
+/** A title from a file name: no extension, underscores as spaces. @param {unknown} name */
+export function titleFromName(name) {
+  if (typeof name !== 'string') return '';
+  return name.replace(/\.[a-z0-9]{1,5}$/i, '').replace(/[_]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 60);
+}
+
+/**
+ * A YouTube link (and an optional title) as an item press, or the problem in words.
+ * @param {{ link: string, title?: string }} form @param {any} R
+ */
+export function videoPress(form, R) {
+  const youtube = R.youtubeIdFrom(form.link);
+  if (!youtube) return { ok: false, error: 'That does not look like a YouTube link. Copy it from the Share button on YouTube.' };
+  const item = { id: placeholderId(), kind: 'video', youtube, start: R.youtubeStartFrom(form.link), title: R.oneLine(form.title, R.CLASSROOM_TITLE_MAX) || 'YouTube video' };
+  return checked(item, R);
+}
+
+/**
+ * Text (an optional heading, up to 8 lines) as an item press, or the problem in words.
+ * @param {{ heading?: string, text: string, look?: string }} form @param {any} R
+ */
+export function textPress(form, R) {
+  const text = R.cleanText(form.text);
+  if (!text) return { ok: false, error: 'Type something to show first.' };
+  const lines = String(form.text).replace(/\r\n?/g, '\n').split('\n').filter((l) => l.trim()).length;
+  if (lines > 8) return { ok: false, error: 'Eight lines at most. Shorten it a little.' };
+  if (String(form.text).trim().length > R.CLASSROOM_TEXT_MAX) return { ok: false, error: `That is too long for the TV (${R.CLASSROOM_TEXT_MAX} letters at most).` };
+  const heading = R.oneLine(form.heading, R.CLASSROOM_HEADING_MAX);
+  const look = form.look === 'board' ? 'board' : 'page';
+  return checked({ id: placeholderId(), kind: 'text', title: heading || R.oneLine(text, R.CLASSROOM_TITLE_MAX), text, ...(heading ? { heading } : {}), look }, R);
+}
+
+/**
+ * A finished upload (the Worker's answer: {id, type, kind}) as an item press.
+ * @param {{ id: string, type: string, kind?: string }} file @param {string} title @param {any} R
+ */
+export function filePress(file, title, R) {
+  const kind = R.kindOfType(file && file.type);
+  if (!kind) return { ok: false, error: 'Only a picture or a PDF can go on the TV.' };
+  return checked({ id: placeholderId(), kind, file: file.id, type: file.type, title: R.oneLine(title, R.CLASSROOM_TITLE_MAX) || (kind === 'pdf' ? 'Slides' : 'Picture') }, R);
+}
+
+/** Through the shared rules, as the Worker will check it. */
+function checked(item, R) {
+  const p = R.sanitizeClassroomPress('item', { item });
+  return p ? { ok: true, press: p } : { ok: false, error: 'That cannot go on the TV.' };
+}
+
+/**
+ * Why a chosen file cannot be sent ('' = it can). @param {{ type: string, size: number }} file
+ * @param {'image'|'pdf'} want @param {any} R
+ */
+export function fileProblem(file, want, R) {
+  const kind = R.kindOfType(file && file.type);
+  if (want === 'pdf' && kind !== 'pdf') return 'Choose a PDF. From PowerPoint: File, Save As, PDF.';
+  if (want === 'image' && kind !== 'image') return 'Choose a picture (JPEG, PNG, GIF or WebP).';
+  if (file.size > R.CLASSROOM_FILE_MAX_BYTES) return `That file is ${size(file.size)}; 20 MB at most.`;
+  if (!file.size) return 'That file is empty.';
+  return '';
+}
+
+/**
+ * A pasted Slides/PDF link: what the Worker should copy, or the problem.
+ * @param {string} text @param {any} R
+ */
+export function linkToCopy(text, R) {
+  const url = R.fileLinkFrom(text);
+  if (!url) return { ok: false, error: 'Paste a full link that starts with https://.' };
+  return { ok: true, url, google: /^https:\/\/docs\.google\.com\//.test(url) };
+}
+
+/**
+ * The words for a refused join (the Worker's own sentence when it sent one).
+ * @param {number} status @param {any} body
+ */
+export function joinWords(status, body) {
+  if (status === 0) return 'This page could not reach the internet. Check the Wi-Fi and try again.';
+  if ((status === 403 || status === 429) && body && typeof body.error === 'string') return body.error;
+  if (status === 429) return 'Too many tries. Wait a few minutes, then try again.';
+  return (body && typeof body.error === 'string' && body.error) || 'That did not work. Try again.';
+}
+
+/**
+ * Any other refusal as one plain sentence.
+ * @param {number} status @param {any} body
+ */
+export function errorWords(status, body) {
+  if (status === 0) return 'That did not reach the TV. Check the internet and try again.';
+  if (status === 429) return 'Too many at once. Wait a moment, then try again.';
+  return (body && typeof body.error === 'string' && body.error) || 'That did not work. Try again.';
+}
+
+const KIND_WORDS = { video: 'a YouTube video', image: 'a picture', pdf: 'slides', text: 'text', screen: 'a shared screen' };
+
+/**
+ * The "On the TV now" line.
+ * @param {{ stage: any, now: any, screenOnline: boolean }} s
+ * @returns {{ main: string, sub: string, online: boolean }}
+ */
+export function tvWords({ stage, now, screenOnline }) {
+  const shown = stage && stage.show ? stage.show.button : null;
+  if (!shown) {
+    return screenOnline
+      ? { main: 'Nothing yet. The TV is showing its code.', sub: '', online: true }
+      : { main: 'The TV is not answering right now.', sub: 'It may be turning on. Anything you send will show when it does.', online: false };
+  }
+  const mine = now && now.button === shown.id ? now : null;
+  let sub = '';
+  if (mine && mine.video) sub = `${clock(mine.video.t)} of ${clock(mine.video.d)}${mine.video.paused ? ', paused' : ''}${mine.video.muted ? ', muted' : `, volume ${mine.video.volume}%`}`;
+  else if (mine && mine.pages) sub = `Page ${mine.page} of ${mine.pages}`;
+  else if (shown.kind === 'pdf') sub = `Page ${stage.show.page}`;
+  if (!screenOnline) sub = 'Waiting for the TV to pick it up.';
+  const title = shown.kind === 'screen' || !shown.title ? '' : `: ${shown.title}`;
+  return { main: `On the TV now: ${KIND_WORDS[shown.kind] || 'something'}${title}`, sub, online: screenOnline };
+}
+
+/** The screen share's state in words. @param {string} state @param {string} [error] */
+export function shareWords(state, error) {
+  switch (state) {
+    case 'choosing': return 'Choose a screen, window or tab to share.';
+    case 'connecting': case 'new': return 'Connecting to the TV…';
+    case 'waiting': return 'Waiting for the TV to answer…';
+    case 'connected': return 'Sharing. The TV shows what you see.';
+    case 'disconnected': return 'The connection dropped for a moment. Trying to hold on…';
+    case 'failed': return error || 'Sharing stopped. The laptop and the TV may not be on the same Wi-Fi.';
+    case 'closed': case 'stopped': return 'Sharing stopped.';
+    default: return '';
+  }
+}
+
+/** The browser's refusal of getDisplayMedia, in words. @param {unknown} err */
+export function captureWords(err) {
+  const name = err && typeof err === 'object' && 'name' in err ? String(err.name) : '';
+  if (name === 'NotAllowedError' || name === 'AbortError') return 'Sharing was cancelled.';
+  if (name === 'NotFoundError') return 'There was nothing to share.';
+  return 'This browser could not share the screen.';
+}

@@ -1,0 +1,23 @@
+/* The church's own look for Cast (owner 2026-11-08: "Branding should not be for
+   Awana, and you should get brand guidance off of the church website"). Taken from
+   kvbchurch.org: Jost headings, Almarai text, warm charcoal on cream, tan and deep
+   green as the accents. Full OFL files from google/fonts, served from here (never
+   from Google at runtime). Licences beside them in fonts/. */
+@font-face { font-family: 'Jost'; font-style: normal; font-weight: 100 900; font-display: swap; src: url('/cast/church/fonts/Jost-Variable.ttf') format('truetype'); }
+@font-face { font-family: 'Almarai'; font-style: normal; font-weight: 300; font-display: swap; src: url('/cast/church/fonts/Almarai-Light.ttf') format('truetype'); }
+@font-face { font-family: 'Almarai'; font-style: normal; font-weight: 400; font-display: swap; src: url('/cast/church/fonts/Almarai-Regular.ttf') format('truetype'); }
+@font-face { font-family: 'Almarai'; font-style: normal; font-weight: 700; font-display: swap; src: url('/cast/church/fonts/Almarai-Bold.ttf') format('truetype'); }
+
+:root {
+  --charcoal: #3A332A;
+  --cream: #F6F2EA;
+  --sand: #EEE3D7;
+  --tan: #B9A48E;
+  --green: #344F3D;
+  --green-press: #2A4032;
+  --muted: #6E6457;
+  --rule: #DCCFBF;
+  --error: #8A3A22;
+  --heading: 'Jost', 'Futura', 'Century Gothic', system-ui, sans-serif;
+  --body: 'Almarai', system-ui, -apple-system, 'Segoe UI', sans-serif;
+}

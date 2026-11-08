@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Cast · Kennebec Valley Baptist Church</title>
+<link rel="preload" href="/cast/church/fonts/Jost-Variable.ttf" as="font" type="font/ttf" crossorigin>
+<link rel="stylesheet" href="/cast/church/church.css">
+<style>
+  /* The Cast screen (owner 2026-11-08; worker/src/routes.md 10.18): what KVBC Awana
+     shows on the lobby TV while Cast is on. Waiting = the code on the church's cream;
+     anything a presenter puts up = on black, edge to edge. Sizes in --u, 1% of the
+     largest 16:9 box in the window, so 720p, 1080p and 4K draw the same picture. */
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; }
+  body { background: #000; color: var(--charcoal); font-family: var(--body); -webkit-font-smoothing: antialiased; cursor: none; --u: min(1vw, 1.7778vh); }
+  [hidden] { display: none !important; }
+  .layer { position: fixed; inset: 0; }
+
+  /* ── waiting: the code ── */
+  .card { background: var(--cream); display: grid; grid-template-rows: auto 1fr auto; padding: 6.2vh 7vw 6.6vh; transition: opacity .5s ease; }
+  .card.is-away { opacity: 0; }
+  .card .logo { width: calc(26 * var(--u)); min-width: 260px; height: auto; display: block; }
+  .card .middle { align-self: center; }
+  .card h1 { font: 500 calc(5 * var(--u))/1.05 var(--heading); letter-spacing: -.01em; margin: 0; }
+  .card .go { font: 400 calc(2.5 * var(--u))/1.4 var(--body); color: var(--muted); margin: calc(1.6 * var(--u)) 0 0; }
+  .card .go b { font-weight: 700; color: var(--charcoal); }
+  .code { display: flex; gap: calc(4.5 * var(--u)); margin: calc(3.4 * var(--u)) 0 0; font: 400 calc(19 * var(--u))/.9 var(--heading); letter-spacing: .06em; color: var(--green); font-variant-numeric: tabular-nums; }
+  .code.is-empty { color: var(--rule); }
+  .card .foot { display: flex; align-items: center; gap: calc(1.2 * var(--u)); border-top: 1px solid var(--rule); padding-top: calc(1.8 * var(--u)); font: 400 calc(1.7 * var(--u))/1.4 var(--body); color: var(--muted); }
+  .card .foot::before { content: ''; width: calc(.9 * var(--u)); height: calc(.9 * var(--u)); border-radius: 50%; background: var(--tan); flex: none; }
+
+  /* configure mode and the signed-out card: calm, on the same cream, no code */
+  .card.calm h1 { font-size: calc(3.6 * var(--u)); max-width: 30ch; }
+  .card.calm .go { max-width: 48ch; }
+  body.configure { cursor: auto; overflow: auto; background: var(--cream); --u: min(1.6vw, 2.4vh); }
+  body.configure .card { position: static; min-height: 100vh; padding: 32px 28px; }
+
+  /* ── something up ── */
+  #show { background: #000; opacity: 0; transition: opacity .45s ease; }
+  #show.is-in { opacity: 1; }
+  #show img, #show canvas, #show video { position: absolute; inset: 0; margin: auto; max-width: 100%; max-height: 100%; }
+  #show img { width: 100%; height: 100%; object-fit: contain; }
+  #show video { width: 100%; height: 100%; object-fit: contain; background: #000; }
+  #show iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+  .text { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center; padding: 9vh 9vw; overflow: hidden; }
+  .text--page { background: var(--cream); color: var(--charcoal); }
+  .text--board { background: #1C1915; color: #F6F2EA; }
+  .text .heading { font: 500 calc(2.4 * var(--u))/1.2 var(--heading); letter-spacing: .14em; text-transform: uppercase; color: var(--tan); margin: 0 0 calc(2.4 * var(--u)); flex: none; }
+  .text--page .heading { color: #8C7760; }
+  .text .words { font: 400 calc(var(--words-size, 6) * var(--u))/1.3 var(--heading); margin: 0; white-space: pre-line; flex: none; }
+  .text--page .words { border-left: 3px solid var(--tan); padding-left: calc(3 * var(--u)); }
+  .status { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; text-align: center; padding: 10vw; font: 400 calc(2.4 * var(--u))/1.4 var(--heading); color: #CFC4B5; }
+  .status small { display: block; margin-top: calc(1 * var(--u)); font: 400 calc(1.6 * var(--u))/1.4 var(--body); color: #8F8577; }
+</style>
+</head>
+<body>
+  <!-- Waiting: the code (or, signed out / configure mode, a calm note) -->
+  <section class="layer card" id="card">
+    <img class="logo" src="/cast/church/kvbc-logo.png" alt="Kennebec Valley Baptist Church" width="1302" height="277">
+    <div class="middle">
+      <h1 id="card-title">Present on this screen</h1>
+      <p class="go" id="card-go">Go to <b>awana.kvbchurch.org/cast</b> and enter</p>
+      <p class="code is-empty" id="code" aria-label="Code"><span id="code-a">···</span><span id="code-b">···</span></p>
+    </div>
+    <p class="foot" id="card-foot">Share your screen, play a YouTube video, or show slides, pictures or text.</p>
+  </section>
+  <!-- Something a presenter put up -->
+  <section class="layer" id="show" hidden></section>
+  <script type="module" src="/cast/screen/screen.js"></script>
+</body>
+</html>
