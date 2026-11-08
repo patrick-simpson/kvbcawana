@@ -218,7 +218,7 @@ export function sanitizeShown(v) {
 }
 
 /**
- * One press, or null. data: show {button}, video {op, by?|step?}, page {step},
+ * One press, or null. data: show {button}, video {op, by?|step?}, page {step}|{to},
  * preview {look, hold?}, item {item} (a video or an item put up directly, Cast),
  * screen {title?} (a screen share starting); the others none. Never free text
  * but an item's own (cleaned by sanitizeShown).
@@ -236,7 +236,10 @@ export function sanitizeClassroomPress(action, data) {
       if (d.op === 'volume') return d.step === 1 || d.step === -1 ? { action, data: { op: 'volume', step: d.step } } : null;
       return { action, data: { op: d.op } };
     }
-    case 'page': return d.step === 1 || d.step === -1 ? { action, data: { step: d.step } } : null;
+    // A step (Back/Next), or straight to a page (Cast's slide strip, owner 2026-11-08).
+    case 'page':
+      if (d.step === 1 || d.step === -1) return { action, data: { step: d.step } };
+      return Number.isInteger(d.to) && d.to >= 1 && d.to <= 9999 ? { action, data: { to: d.to } } : null;
     case 'preview': return CLASSROOM_LOOKS.includes(d.look) ? { action, data: { look: d.look, ...(d.hold === true ? { hold: true } : {}) } } : null;
     case 'item': {
       const item = sanitizeShown(d.item);

@@ -212,14 +212,25 @@ export class Classroom {
     if (Number.isFinite(declared) && declared > CLASSROOM_FILE_MAX_BYTES) return fail('That file is too big (20 MB at most).', 413, { reason: 'too-big' });
     const bytes = new Uint8Array(await res.arrayBuffer());
     if (bytes.length > CLASSROOM_FILE_MAX_BYTES) return fail('That file is too big (20 MB at most).', 413, { reason: 'too-big' });
+    const file = await this.storeBytes(bytes, oneLine(name, 80) || oneLine(new URL(url).pathname.split('/').pop(), 80));
+    if (!file) return fail('That link is not a picture or a PDF (a web page, perhaps). Use the link to the file itself, or upload it.', 400, { reason: 'type' });
+    return json({ ok: true, ...file });
+  }
+
+  /**
+   * Stores whole bytes as a finished file (a copied link, Cast's converted PowerPoint).
+   * Null when they are not a picture or a PDF (or too big).
+   * @param {Uint8Array} bytes @param {string} name
+   */
+  async storeBytes(bytes, name) {
     const type = sniffType(bytes);
-    if (!type) return fail('That link is not a picture or a PDF (a web page, perhaps). Use the link to the file itself, or upload it.', 400, { reason: 'type' });
-    const meta = { id: newId('f', 16), type, bytes: bytes.length, parts: partsFor(bytes.length), next: partsFor(bytes.length), name: oneLine(name, 80) || oneLine(new URL(url).pathname.split('/').pop(), 80), done: false, at: this.now() };
+    if (!type || bytes.length > CLASSROOM_FILE_MAX_BYTES) return null;
+    const meta = { id: newId('f', 16), type, bytes: bytes.length, parts: partsFor(bytes.length), next: partsFor(bytes.length), name: oneLine(name, 80), done: false, at: this.now() };
     for (let n = 0; n < meta.parts; n += 1) {
       await this.storage.put(`${this.room.partPrefix}${meta.id}:${n}`, bytes.slice(n * CLASSROOM_FILE_PART_BYTES, (n + 1) * CLASSROOM_FILE_PART_BYTES));
     }
     await this.storage.put(this.room.filePrefix + meta.id, { ...meta, done: true });
-    return json({ ok: true, id: meta.id, type, bytes: meta.bytes, kind: kindOfType(type), name: meta.name });
+    return { id: meta.id, type, bytes: meta.bytes, kind: kindOfType(type), name: meta.name };
   }
 
   /** GET /v1/classroom/files/:id: the file, part by part (never all in memory at once). @param {string} id */
@@ -315,7 +326,8 @@ export class Classroom {
       case 'page': {
         if (stage.show?.button?.kind !== 'pdf') return fail('No PDF is on the screen.', 409, { reason: 'no-pdf' });
         const pages = this.report?.button === stage.show.button.id && this.report.pages ? this.report.pages : 9999;
-        const page = Math.min(Math.max(1, stage.show.page + (p.data?.step || 0)), pages);
+        const want = Number.isInteger(p.data?.to) ? p.data.to : stage.show.page + (p.data?.step || 0);
+        const page = Math.min(Math.max(1, want), pages);
         if (page === stage.show.page) return json({ ok: true, already: true, rev: stage.rev });
         next = { ...stage, show: { ...stage.show, page }, cmds };
         break;

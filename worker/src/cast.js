@@ -16,6 +16,17 @@
 // Opening (a new code) or closing the room clears the stage, every file and every
 // token: nothing a guest put up outlives their session.
 //
+// PowerPoint (owner 2026-11-08: "Support pptx upload and show a preview on the phone
+// screen", the exact copy): the presenter's browser scrambles the .pptx (AES-256-GCM,
+// a fresh key) and uploads the ciphertext here in parts (castconv:<id>,
+// castconvpart:<id>:<n>); "start" hands the GitHub job cast-convert.yml the id and the
+// key as ONE dispatch input (the print tool's way, prints.js: the key passes through
+// in memory only). The job reads the ciphertext with the machine token (HANDBOOK_TOKEN),
+// turns it into a PDF with LibreOffice, and sends the PDF back: it becomes an ordinary
+// file of the room, and the presenter's page (polling the status) puts it up. The
+// ciphertext is deleted once the job answers, whatever happened; anything left over
+// goes with the room (a new code, Cast off) or after CONVERT_TTL_MS.
+//
 // A wrong code is refused; more than JOIN_FAILS_MAX wrong codes within
 // JOIN_WINDOW_MS refuses every join for the rest of that window (a million codes
 // cannot be walked). Tokens are stored hashed (SHA-256), at most TOKENS_MAX, each
@@ -33,6 +44,24 @@ export const JOIN_WINDOW_MS = 10 * 60 * 1000;
 export const CODE_DIGITS = 6;
 const TOKEN_RE = /^t[a-z0-9]{24,40}$/;
 
+/** The largest PowerPoint (bytes) the presenter may send to be turned into slides. */
+export const CONVERT_MAX_BYTES = 40 * 1024 * 1024;
+export const CONVERT_PART_BYTES = 96 * 1024;
+/** An unfinished or finished conversion's record is deleted after this. */
+export const CONVERT_TTL_MS = 60 * 60 * 1000;
+/** Conversions waiting at once, and started per room per hour (each one is a GitHub job). */
+export const CONVERT_PENDING_MAX = 3;
+export const CONVERT_PER_HOUR = 10;
+export const CONVERT_WORKFLOW = 'cast-convert.yml';
+/** Why a conversion failed: the job names one, the page words it. */
+export const CONVERT_FAILS = Object.freeze(['type', 'too-big', 'convert', 'key']);
+const CONV_PREFIX = 'castconv:';
+const CONV_PART_PREFIX = 'castconvpart:';
+const CONV_ID_RE = /^c[a-z0-9]{16}$/;
+const KEY_RE = /^[A-Za-z0-9_-]{43}$/;
+// Ciphertext = 12-byte IV + the file + 16-byte tag.
+const CONVERT_MAX_CT = CONVERT_MAX_BYTES + 28;
+
 /** SHA-256 of a token, hex. @param {string} token */
 async function hashOf(token) {
   const d = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(token)));
@@ -47,11 +76,15 @@ export function newCode() {
 
 export class Cast {
   /**
-   * @param {{ storage: any, now: () => number, ring: (payload: Record<string, unknown>) => void, fetchFn?: typeof fetch }} deps
+   * @param {{ storage: any, now: () => number, ring: (payload: Record<string, unknown>) => void, fetchFn?: typeof fetch, prints?: () => any }} deps
    */
-  constructor({ storage, now, ring, fetchFn }) {
+  constructor({ storage, now, ring, fetchFn, prints }) {
     this.storage = storage;
     this.now = now;
+    /** The print tool's GitHub dispatch and machine token (prints.js). */
+    this.prints = prints || (() => null);
+    /** Conversions started this hour: { n, since }. */
+    this.converts = { n: 0, since: 0 };
     this.engine = new Classroom({
       storage, now, ring, fetchFn,
       room: { what: 'cast', buttonsKey: 'cast:buttons', stageKey: 'cast:stage', filePrefix: 'castmeta:', partPrefix: 'castpart:' },
@@ -71,6 +104,9 @@ export class Cast {
     this.engine.rtc = null;
     const metas = await this.storage.list({ prefix: 'castmeta:' });
     for (const [, meta] of metas) if (meta?.id) await this.engine.deleteFile(meta);
+    const convs = await this.storage.list({ prefix: CONV_PREFIX });
+    for (const [, conv] of convs) if (conv?.id) await this.dropConvert(conv, true);
+    this.converts = { n: 0, since: 0 };
     const stage = await this.engine.stage();
     if (stage.show || stage.preview) await this.engine.saveStage({ ...stage, show: null, preview: null, cmds: [] });
   }
@@ -125,6 +161,136 @@ export class Cast {
     const body = await res.json();
     return json({ ...body, code: room.code });
   }
+
+  /* ── PowerPoint into slides ── */
+
+  /** Ready to convert: the print tool's dispatch token and the job's machine token are set. */
+  convertReady() {
+    const p = this.prints();
+    return Boolean(p && p.configured() && p.env()?.HANDBOOK_TOKEN);
+  }
+
+  /** A conversion's record (deleted when past its time). @param {string} id */
+  async convertDoc(id) {
+    if (!CONV_ID_RE.test(id || '')) return null;
+    const conv = await this.storage.get(CONV_PREFIX + id);
+    if (conv && this.now() - (conv.at || 0) > CONVERT_TTL_MS) { await this.dropConvert(conv, true); return null; }
+    return conv || null;
+  }
+
+  /** Delete a conversion's ciphertext (and, with all, its record). @param {any} conv @param {boolean} [all] */
+  async dropConvert(conv, all) {
+    for (let n = 0; n < (conv.parts || 0); n += 1) await this.storage.delete(`${CONV_PART_PREFIX}${conv.id}:${n}`);
+    if (all) await this.storage.delete(CONV_PREFIX + conv.id);
+    else await this.storage.put(CONV_PREFIX + conv.id, { ...conv, parts: 0 });
+  }
+
+  /** POST /v1/cast/convert {bytes, name}: start sending a scrambled PowerPoint. @param {any} body */
+  async convertStart(body) {
+    if (!this.convertReady()) return fail('PowerPoint is not set up here yet. Save it as a PDF and send that instead.', 503, { reason: 'not-configured' });
+    const bytes = Number(body?.bytes);
+    if (!Number.isInteger(bytes) || bytes < 29) return fail('That file is empty.', 400, { reason: 'empty' });
+    if (bytes > CONVERT_MAX_CT) return fail('That PowerPoint is too big (40 MB at most). Save it as a PDF, or share your screen.', 413, { reason: 'too-big' });
+    const t = this.now();
+    let pending = 0;
+    for (const [, c] of await this.storage.list({ prefix: CONV_PREFIX })) {
+      if (!c?.id) continue;
+      if (t - (c.at || 0) > CONVERT_TTL_MS) { await this.dropConvert(c, true); continue; }
+      if (c.status === 'uploading' || c.status === 'converting') pending += 1;
+    }
+    if (pending >= CONVERT_PENDING_MAX) return fail('Other slides are being made right now. Try again in a minute.', 429, { reason: 'busy' });
+    const id = newId('c', 16);
+    const parts = Math.ceil(bytes / CONVERT_PART_BYTES);
+    const name = String(body?.name || '').replace(/\.(pptx?|odp)$/i, '').replace(/\s+/g, ' ').trim().slice(0, 80);
+    await this.storage.put(CONV_PREFIX + id, { id, parts, bytes, next: 0, name, status: 'uploading', at: t });
+    return json({ ok: true, id, parts, partBytes: CONVERT_PART_BYTES });
+  }
+
+  /** PUT /v1/cast/convert/:id/:n, one part of the ciphertext. @param {string} id @param {string} n @param {Request} request */
+  async convertPart(id, n, request) {
+    const conv = await this.convertDoc(id);
+    const i = Number(n);
+    if (!conv || conv.status !== 'uploading') return fail('There is no upload by that name.', 404, { reason: 'no-upload' });
+    if (!Number.isInteger(i) || i < 0 || i >= conv.parts || i > conv.next || i < conv.next - 1) return fail('That part is out of order.', 409, { reason: 'order', next: conv.next });
+    const buf = new Uint8Array(await request.arrayBuffer());
+    const want = i === conv.parts - 1 ? conv.bytes - i * CONVERT_PART_BYTES : CONVERT_PART_BYTES;
+    if (buf.length !== want) return fail('That part is the wrong size.', 400, { reason: 'size' });
+    await this.storage.put(`${CONV_PART_PREFIX}${id}:${i}`, buf);
+    if (i === conv.next) await this.storage.put(CONV_PREFIX + id, { ...conv, next: i + 1 });
+    return json({ ok: true, next: Math.max(conv.next, i + 1) });
+  }
+
+  /** POST /v1/cast/convert/:id/start {key}: every part is here; start the GitHub job. @param {string} id @param {any} body */
+  async convertGo(id, body) {
+    const conv = await this.convertDoc(id);
+    if (!conv) return fail('There is no upload by that name.', 404, { reason: 'no-upload' });
+    if (conv.status !== 'uploading') return json({ ok: true, status: conv.status });
+    if (conv.next !== conv.parts) return fail('Part of the file did not arrive. Try again.', 400, { reason: 'parts', next: conv.next });
+    const key = String(body?.key || '');
+    if (!KEY_RE.test(key)) return fail('That is not a key.', 400, { reason: 'bad-key' });
+    const t = this.now();
+    if (t - this.converts.since > 60 * 60 * 1000) this.converts = { n: 0, since: t };
+    if (this.converts.n >= CONVERT_PER_HOUR) return fail('That is a lot of PowerPoints this hour. Save it as a PDF and send that instead.', 429, { reason: 'too-many' });
+    const p = this.prints();
+    if (!this.convertReady()) return fail('PowerPoint is not set up here yet. Save it as a PDF and send that instead.', 503, { reason: 'not-configured' });
+    // Marked BEFORE the dispatch: a second tap never starts a second job.
+    await this.storage.put(CONV_PREFIX + id, { ...conv, status: 'converting', startedAt: t });
+    const r = await p.dispatch(CONVERT_WORKFLOW, { job: `${id}.${key}` });
+    if (!r.ok) {
+      await this.storage.put(CONV_PREFIX + id, { ...conv });
+      return fail('GitHub did not start making the slides. Try again in a minute, or save it as a PDF.', 502, { reason: 'dispatch', status: r.status });
+    }
+    this.converts.n += 1;
+    return json({ ok: true, status: 'converting' });
+  }
+
+  /** GET /v1/cast/convert/:id (the presenter): where it is. @param {string} id */
+  async convertStatus(id) {
+    const conv = await this.convertDoc(id);
+    if (!conv) return fail('There is no upload by that name.', 404, { reason: 'no-upload' });
+    return json({ ok: true, status: conv.status, ...(conv.file ? { file: conv.file } : {}), ...(conv.error ? { error: conv.error } : {}) });
+  }
+
+  /** GET /v1/cast/convert/:id/job (the job, machine token): the ciphertext's bytes. @param {string} id */
+  async convertJob(id) {
+    const conv = await this.convertDoc(id);
+    if (!conv || conv.status !== 'converting' || !conv.parts) return fail('There is no upload by that name.', 404, { reason: 'no-upload' });
+    const storage = this.storage;
+    let n = 0;
+    const body = new ReadableStream({
+      async pull(controller) {
+        if (n >= conv.parts) { controller.close(); return; }
+        const part = await storage.get(`${CONV_PART_PREFIX}${conv.id}:${n}`);
+        n += 1;
+        if (!part) { controller.error(new Error('missing part')); return; }
+        controller.enqueue(new Uint8Array(part));
+      },
+    });
+    return new Response(body, { headers: { 'Content-Type': 'application/octet-stream', 'Content-Length': String(conv.bytes), 'Cache-Control': 'no-store' } });
+  }
+
+  /** PUT /v1/cast/convert/:id/result (the job): the PDF, kept as a file of the room. @param {string} id @param {Request} request */
+  async convertResult(id, request) {
+    const conv = await this.convertDoc(id);
+    if (!conv || conv.status !== 'converting') return fail('There is no upload by that name.', 404, { reason: 'no-upload' });
+    const bytes = new Uint8Array(await request.arrayBuffer());
+    const file = await this.engine.storeBytes(bytes, conv.name || 'Slides');
+    if (!file || file.kind !== 'pdf') {
+      await this.dropConvert({ ...conv, status: 'failed', error: bytes.length > 20 * 1024 * 1024 ? 'too-big' : 'convert' });
+      return fail('That is not a PDF of 20 MB at most.', 400, { reason: 'type' });
+    }
+    await this.dropConvert({ ...conv, status: 'done', file });
+    return json({ ok: true, id: file.id });
+  }
+
+  /** POST /v1/cast/convert/:id/failed {reason} (the job). @param {string} id @param {any} body */
+  async convertFailed(id, body) {
+    const conv = await this.convertDoc(id);
+    if (!conv) return json({ ok: true });
+    const error = CONVERT_FAILS.includes(body?.reason) ? body.reason : 'convert';
+    if (conv.status !== 'done') await this.dropConvert({ ...conv, status: 'failed', error });
+    return json({ ok: true });
+  }
 }
 
 /**
@@ -161,4 +327,21 @@ export function mountCast(registry, core) {
   registry.add('POST', '/v1/cast/files/:id/done', 'public', presenter(async ({ params }) => c().engine.finishFile(params.id)));
   registry.add('POST', '/v1/cast/signal', 'public', presenter(async ({ body }) => c().engine.putSignal(await body())));
   registry.add('GET', '/v1/cast/signal', 'public', presenter(async ({ url }) => c().engine.readSignal('answer', url.searchParams.get('id'))));
+  // The phone's preview of the slides on the TV: the room's own file.
+  registry.add('GET', '/v1/cast/files/:id', 'public', presenter(async ({ params }) => c().engine.readFile(params.id)));
+  // PowerPoint into slides: the GitHub job's routes (the machine token, HANDBOOK_TOKEN),
+  // registered first so `/:id/result` is never taken for a part number...
+  const machine = (/** @type {(ctx: any) => Promise<Response>} */ fn) => async (/** @type {any} */ ctx) => {
+    const p = core.prints;
+    if (!p || !p.machineOk(ctx.request)) return fail('Not signed in.', 401, { reason: 'signed-out' });
+    return fn(ctx);
+  };
+  registry.add('GET', '/v1/cast/convert/:id/job', 'public', machine(async ({ params }) => c().convertJob(params.id)));
+  registry.add('PUT', '/v1/cast/convert/:id/result', 'public', machine(async ({ params, request }) => c().convertResult(params.id, request)));
+  registry.add('POST', '/v1/cast/convert/:id/failed', 'public', machine(async ({ params, body }) => c().convertFailed(params.id, await body())));
+  // ...then the presenter's upload and status.
+  registry.add('POST', '/v1/cast/convert', 'public', presenter(async ({ body }) => c().convertStart(await body())));
+  registry.add('PUT', '/v1/cast/convert/:id/:n', 'public', presenter(async ({ params, request }) => c().convertPart(params.id, params.n, request)));
+  registry.add('POST', '/v1/cast/convert/:id/start', 'public', presenter(async ({ params, body }) => c().convertGo(params.id, await body())));
+  registry.add('GET', '/v1/cast/convert/:id', 'public', presenter(async ({ params }) => c().convertStatus(params.id)));
 }

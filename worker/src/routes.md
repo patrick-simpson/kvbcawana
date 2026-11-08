@@ -1713,6 +1713,23 @@ each good for `TOKEN_TTL_MS` (8 h).
 | `POST /v1/cast/files`, `PUT /v1/cast/files/:id/:n`, `POST /v1/cast/files/:id/done` | public + token | as 10.13 (a `{url}` copy too: a Google Slides/Docs link is copied as its PDF export) | as 10.13 |
 | `POST /v1/cast/signal` | public + token | `{signal: {type: 'offer', id, sdp}}` (id = the screen button's) | `{ok}`; 409 `ended` |
 | `GET /v1/cast/signal?id=` | public + token | | `{signal: {type: 'answer', id, sdp} \| null, id}` |
+| `GET /v1/cast/files/:id` | public + token | | the room's file (as 10.13): the phone's preview of the slides on the TV |
+| `POST /v1/cast/convert` | public + token | `{bytes, name}` (bytes = the SCRAMBLED PowerPoint's: 12-byte IV + AES-256-GCM ciphertext; at most `CONVERT_MAX_BYTES` 40 MB + 28) | `{ok, id, parts, partBytes}` (96 KiB); 503 `not-configured` (no `PRINT_DISPATCH_TOKEN` or `HANDBOOK_TOKEN`), 413 `too-big`, 429 `busy` (`CONVERT_PENDING_MAX` 3 waiting) |
+| `PUT /v1/cast/convert/:id/:n` | public + token | the part's bytes, in order | `{ok, next}`; 404 `no-upload`, 409 `order`, 400 `size` |
+| `POST /v1/cast/convert/:id/start` | public + token | `{key}` (43 chars base64url) | `{ok, status: 'converting'}`: starts GitHub `cast-convert.yml` with input `job` = `<id>.<key>` (the key in memory only); marked before the dispatch (a second tap starts nothing); 502 `dispatch` (left `uploading`, try again), 429 `too-many` (`CONVERT_PER_HOUR` 10 a room) |
+| `GET /v1/cast/convert/:id` | public + token | | `{ok, status: uploading\|converting\|done\|failed, file?, error?}`: `file` = a finished PDF file of the room (put it up with `item`); `error` one of `CONVERT_FAILS` (`type`, `too-big`, `convert`, `key`) |
+| `GET /v1/cast/convert/:id/job` | machine (`HANDBOOK_TOKEN`) | | the ciphertext's bytes |
+| `PUT /v1/cast/convert/:id/result` | machine | the PDF's bytes (20 MB at most) | `{ok, id}`: kept as a file of the room, status `done`; not a PDF: 400 `type`, status `failed` |
+| `POST /v1/cast/convert/:id/failed` | machine | `{reason}` | `{ok}`: status `failed` |
+
+PowerPoint (owner 2026-11-08, "Support pptx upload and show a preview on the phone screen", the
+exact copy): the presenter's browser scrambles the file, the job (`scripts/cast/convert.mjs`) reads
+it with the machine token, LibreOffice makes the PDF, the PDF comes back as a file of the room; the
+ciphertext is deleted once the job answers, records after `CONVERT_TTL_MS` (1 h) or with the room
+(storage `castconv:<id>`, `castconvpart:<id>:<n>`). The key is a dispatch input, so it shows in the
+job's public log (the print tool's accepted trade, 10.16): the ciphertext also needs the machine
+token and is gone once the job ran. `page {to}` (a press) jumps straight to a page (the phone's
+slide strip; `page {step}` still steps).
 
 Screen shares in the classroom too (signed in): `POST /v1/classroom/remote {action: 'screen'}`,
 `POST /v1/classroom/signal {signal}` (the remote's offer, the TV's answer), `GET

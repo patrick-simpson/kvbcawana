@@ -266,6 +266,7 @@ export class SyncCore {
       storage: this.storage,
       now: this.now,
       fetchFn: this.fetchFn,
+      prints: () => this.prints,
       ring: (payload) => { this.broadcast(frameText(DOORBELL_EVENT, payload)); },
     });
     mountCast(this.registry, this);   // /v1/cast/* (routes.md 10.18)
