@@ -206,7 +206,7 @@ describe('display/displays', () => {
 
 describe('display/screens', () => {
   // Moved from lobby/desktop/src/screens.test.js (KVBC Awana v9); vitest -> node:test.
-  const { SCREENS, isScreenPage, screenFor, screenUrls } = require('../src/display/screens');
+  const { SCREENS, CHOOSABLE, isScreenPage, screenFor, screenUrls } = require('../src/display/screens');
 
   const SITE = 'https://awana.kvbchurch.org/lobby/';
 
@@ -221,7 +221,14 @@ describe('display/screens', () => {
       expect(screenUrls(SITE, 'presentation').configure).toBe('https://awana.kvbchurch.org/presentation/?configure=1');
       expect(isScreenPage('https://awana.kvbchurch.org/presentation/?configure=1', screenUrls(SITE, 'presentation').base)).toBe(true);
       expect(SCREENS.presentation.always).toBe(true);
-      expect(Object.keys(SCREENS)).toEqual(['lobby', 'projector', 'journey', 'classroom', 'presentation']);
+      expect(Object.keys(SCREENS)).toEqual(['lobby', 'projector', 'journey', 'classroom', 'presentation', 'cast']);
+    });
+
+    it('Cast (owner 2026-11-08) is the tray switch, up whenever on, never one of the Screen menu\'s choices', () => {
+      expect(screenUrls(SITE, 'cast').page).toBe('https://awana.kvbchurch.org/cast/screen/');
+      expect(screenUrls(SITE, 'cast').configure).toBe('https://awana.kvbchurch.org/cast/screen/?configure=1');
+      expect(SCREENS.cast.always).toBe(true);
+      expect(CHOOSABLE.map((x) => x.id)).toEqual(['lobby', 'projector', 'journey', 'classroom', 'presentation']);
     });
 
     it('gives each a configure-mode page', () => {

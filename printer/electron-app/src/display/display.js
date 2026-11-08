@@ -27,7 +27,7 @@ const path = require('path');
 const { clubNightToday, displayWindow, nextClubNight } = require('./clubNight');
 const { NO_OVERRIDES, decideVisibility, hide, showNow, tidy } = require('./visibility');
 const { findDisplay, rememberDisplay } = require('./displays');
-const { SCREENS, isScreenPage, screenUrls } = require('./screens');
+const { CHOOSABLE, isScreenPage, screenUrls } = require('./screens');
 const { hoursMinutes, moveToFourPm, normalizeSettings, parseTime, settingsForScreen } = require('./settings');
 const { shutdownDeadline, shutdownStep } = require('./shutdown');
 const { createPenWatch } = require('./pen-watch');
@@ -701,6 +701,28 @@ function createDisplay(opts) {
     return 'shown';
   }
 
+  /**
+   * Cast on (the tray switch, owner 2026-11-08): the screen now up is remembered and
+   * the Cast screen goes up whatever the hours or a tray Hide said (showScreen).
+   */
+  function castOn() {
+    if (state.settings.screen === 'cast') return;
+    state.castReturn = state.settings.screen;
+    saveState();
+    log('cast on (was', state.castReturn, ')');
+    showScreen('cast');
+    if (opts.onCast) { try { opts.onCast(true); } catch { /* best effort */ } }
+  }
+
+  /** Cast off: back to the screen before it; main.js closes the room (no code, nothing kept). */
+  function castOff() {
+    if (state.settings.screen !== 'cast') return;
+    const back = typeof state.castReturn === 'string' && state.castReturn !== 'cast' ? state.castReturn : 'lobby';
+    log('cast off, back to', back);
+    setScreen(back);
+    if (opts.onCast) { try { opts.onCast(false); } catch { /* best effort */ } }
+  }
+
   /** New hours apply at once: the screen opens or closes on the next evaluate. */
   function setHours(h) {
     const next = normalizeSettings({ ...state.settings, hours: h });
@@ -806,7 +828,7 @@ function createDisplay(opts) {
       version: opts.version(),
       dev: DEV,
       settings: state.settings,
-      screens: Object.values(SCREENS).map(({ id, name, defaults }) => ({ id, name, ...(defaults ? { hours: defaults.hours } : {}) })),
+      screens: CHOOSABLE.map(({ id, name, defaults }) => ({ id, name, ...(defaults ? { hours: defaults.hours } : {}) })),
       monitor: saved ? (saved.label || `${saved.size.width} x ${saved.size.height}`) : null,
       monitors: displays.length,
       where: where(),
@@ -911,10 +933,12 @@ function createDisplay(opts) {
       { label: 'Display settings...', click: openConfigurator },
       {
         label: 'Screen',
-        submenu: Object.values(SCREENS).map(({ id, name }) => ({
+        submenu: CHOOSABLE.map(({ id, name }) => ({
           label: name, type: 'radio', checked: state.settings.screen === id, click: () => setScreen(id),
         })),
       },
+      // Cast (owner 2026-11-08: "enabled by right clicking on the icon in the task bar").
+      { label: 'Cast (screen sharing)', type: 'checkbox', checked: state.settings.screen === 'cast', click: () => (state.settings.screen === 'cast' ? castOff() : castOn()) },
       { label: 'Show now (for 3 hours)', enabled: !scheduledNow(t), click: requestShow },
       { label: 'Hide until the next club night', enabled: visible, click: () => { state.overrides = hide(state.overrides, currentWindow()); blackDismissed = true; saveState(); evaluate(); } },
       { label: 'Resume schedule', enabled: overridden, click: () => { state.overrides = NO_OVERRIDES; saveState(); evaluate(); } },
@@ -1104,7 +1128,7 @@ function createDisplay(opts) {
   return {
     start, stop, isRunning: () => running,
     menuItems, statusLine, requestShow, openConfigurator, openChooser,
-    prepareInstall, cancelInstall, beforeQuit, configure, showScreen, info, log,
+    prepareInstall, cancelInstall, beforeQuit, configure, showScreen, castOn, castOff, info, log,
   };
 }
 

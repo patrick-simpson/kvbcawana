@@ -32,7 +32,14 @@ const { createDeviceSync } = require('./src/device-sync');
 const { readLogTail } = require('./src/log-tail');
 const stationFace = require('./src/station');
 const { findDisplay } = require('./src/display/displays');
-const { SCREENS } = require('./src/display/screens');
+const { CHOOSABLE } = require('./src/display/screens');
+
+// Screen sharing to Cast and the classroom (owner 2026-11-08; shared/screenShare.js): the
+// screen pages answer a laptop's offer with this computer's REAL local address, so a
+// laptop on the guest Wi-Fi (another network, mDNS names do not resolve there) can
+// reach it through the one UniFi firewall rule. Chromium hides it behind an mDNS name
+// by default; this app's pages are the church's own.
+app.commandLine.appendSwitch('disable-features', 'WebRtcHideLocalIpsWithMdns');
 
 // Every user-visible name (windows, tray, notifications, dialogs).
 const APP_NAME = 'KVBC Awana';
@@ -1403,6 +1410,17 @@ app.whenReady().then(async () => {
     setAutostart,
     // A change in the display's Settings window goes up to /settings too.
     onChange: () => { refreshTray(); if (deviceSync) deviceSync.nudge(); },
+    // Cast turned off from the tray (owner 2026-11-08): the room closes at once, so the
+    // old code joins nothing and nothing a presenter put up is kept (routes.md 10.18).
+    onCast: (on) => {
+      refreshTray();
+      if (on) return;
+      const sess = deviceSession();
+      if (!sess || !syncClient) return;
+      syncClient.syncRequest(sess.url, '/v1/cast/close', { method: 'POST', body: {}, session: sess.session })
+        .then((r) => console.log('[cast] room closed:', r && r.status))
+        .catch((e) => console.log('[cast] could not close the room:', e && e.message));
+    },
     // The classroom screen's /settings preview (display/classroom-preview.js;
     // worker/src/routes.md 10.13), asked with this computer's own sign-in.
     classroomStage: async () => {
@@ -1487,7 +1505,7 @@ app.whenReady().then(async () => {
         roles,
         config: { printerName: cfg.printerName || '', checkinUrl: cfg.checkinUrl || '', launchOnBoot: cfg.launchOnBoot !== false },
         display: { settings: d.settings, monitorId: here ? here.id : null },
-        screens: Object.values(SCREENS).map(({ id, name, defaults }) => ({ id, name, ...(defaults ? { hours: defaults.hours } : {}) })),
+        screens: CHOOSABLE.map(({ id, name, defaults }) => ({ id, name, ...(defaults ? { hours: defaults.hours } : {}) })),
         sync: syncSession.status(),
       };
     },

@@ -126,3 +126,28 @@ describe('show-presentation from afar (owner 2026-11-08: the presentation contro
     assert.match(fn, /if \(lobby\) return 'already';/);
   });
 });
+
+describe('Cast from the tray (owner 2026-11-08: "enabled by right clicking on the icon in the task bar")', () => {
+  it('a checkbox in the display\'s tray items turns Cast on and off', () => {
+    assert.match(display, /label: 'Cast \(screen sharing\)', type: 'checkbox', checked: state\.settings\.screen === 'cast', click: \(\) => \(state\.settings\.screen === 'cast' \? castOff\(\) : castOn\(\)\)/);
+  });
+
+  it('on remembers the screen before and shows Cast whatever the hours; off goes back to it', () => {
+    const on = display.slice(display.indexOf('function castOn()'), display.indexOf('function castOff()'));
+    assert.match(on, /state\.castReturn = state\.settings\.screen;/);
+    assert.match(on, /showScreen\('cast'\);/);
+    const off = display.slice(display.indexOf('function castOff()'), display.indexOf('/** New hours apply at once'));
+    assert.match(off, /setScreen\(back\);/);
+    assert.match(off, /: 'lobby';/);
+  });
+
+  it('turning Cast off closes the room with this computer\'s own sign-in', () => {
+    assert.match(main, /onCast: \(on\) => \{/);
+    assert.match(main, /syncClient\.syncRequest\(sess\.url, '\/v1\/cast\/close', \{ method: 'POST'/);
+  });
+
+  it('screen pages answer with the real local address (no mDNS hiding), set before the app is ready', () => {
+    assert.match(main, /app\.commandLine\.appendSwitch\('disable-features', 'WebRtcHideLocalIpsWithMdns'\);/);
+    assert.ok(main.indexOf("appendSwitch('disable-features'") < main.indexOf('app.whenReady()'));
+  });
+});

@@ -15,10 +15,16 @@
 // on the TV (`query` screen=tv), the presenter view in the Settings window (its
 // configure page carries no `query`). Up whenever it is chosen (`always`): it is
 // for one night, not a club-night screen (display.js).
+//
+// Cast (owner 2026-11-08: the lobby computer "kind of like an air server"; "It should
+// be allowed to be enabled by right clicking on the icon in the task bar"): the tray's
+// "Cast (screen sharing)" switch puts it up (site/cast/screen/: a code on the TV,
+// presenters on awana.kvbchurch.org/cast) and back to the screen before. `toggle`:
+// it is not one of the Screen menu's choices or the wizard's (display.js castOn/castOff).
 'use strict';
 
-/** @typedef {'lobby' | 'projector' | 'journey' | 'classroom' | 'presentation'} ScreenId */
-/** @typedef {{ id: ScreenId, name: string, short: string, dir: string, page: string, background: string, query?: Record<string, string>, always?: boolean, defaults?: { hours: { start: string, end: string }, shutdownAt: string } }} Screen */
+/** @typedef {'lobby' | 'projector' | 'journey' | 'classroom' | 'presentation' | 'cast'} ScreenId */
+/** @typedef {{ id: ScreenId, name: string, short: string, dir: string, page: string, background: string, query?: Record<string, string>, always?: boolean, toggle?: boolean, defaults?: { hours: { start: string, end: string }, shutdownAt: string } }} Screen */
 
 /** @type {Record<ScreenId, Screen>} */
 const SCREENS = {
@@ -32,6 +38,10 @@ const SCREENS = {
   presentation: {
     id: 'presentation', name: 'Presentation', short: 'the presentation', dir: '../presentation/', page: '', background: '#000000',
     query: { screen: 'tv' }, always: true,
+  },
+  cast: {
+    id: 'cast', name: 'Cast (screen sharing)', short: 'Cast', dir: '../cast/screen/', page: '', background: '#F6F2EA',
+    always: true, toggle: true,
   },
 };
 
@@ -76,4 +86,7 @@ function isScreenPage(url, base) {
   } catch { return false; }
 }
 
-module.exports = { SCREENS, DEFAULT_SCREEN, screenFor, screenUrls, isScreenPage };
+/** The screens someone chooses from (the Screen menu, the wizard): not the Cast switch. */
+const CHOOSABLE = Object.freeze(Object.values(SCREENS).filter((x) => !x.toggle));
+
+module.exports = { SCREENS, CHOOSABLE, DEFAULT_SCREEN, screenFor, screenUrls, isScreenPage };
