@@ -16,6 +16,12 @@
      also tells the TV to report what it shows). Everything the Worker returns
      is cleaned with the same rules it applies (src/shared/classroomRemote.js).
    - A long press on the Sparks mark sends Sparky across the TV (easter egg).
+   - Share my screen (owner 2026-11-08: "Screen sharing would be super cool"):
+     where the browser can (not iPhones or iPads) the laptop's screen goes on the
+     TV. One press puts the share up, then the offer goes to the TV through the
+     Worker (/v1/classroom/signal) and the picture goes straight to it over the
+     church network (shared/screenShare.js). Stop, or the browser's own "Stop
+     sharing", presses Back.
    - Keeps the phone awake (Screen Wake Lock) while open and visible. */
 
 const V = new URL(import.meta.url).search; // the build stamp, carried to every module this loads
@@ -42,6 +48,8 @@ let pollTimer = null;
 let wakeLock = null;
 let memorySession = '';
 let editing = null; // { rev, rows } while the editor is open
+let screenShare = null; // shared/screenShare.js
+let sharing = null; // { id, stream, handle, seen, ended } while this page shares its screen
 
 function session() {
   const s = (store.get(SESSION_KEY) || memorySession || '').trim();
@@ -167,6 +175,7 @@ function render() {
   const shown = state.stage.show ? state.stage.show.button : null;
   const held = Boolean(state.stage.preview && state.stage.preview.held);
   $('btn-back').hidden = !shown && !held;
+  watchShare(shown);
   $('tile-sparks').setAttribute('aria-pressed', String(held && state.stage.preview.look === 'sparks'));
   $('video').hidden = !shown || shown.kind !== 'video';
   $('pdf').hidden = !shown || shown.kind !== 'pdf';
@@ -229,6 +238,81 @@ function onTile(e) {
   const t = e.target.closest('.tile');
   if (!t) return;
   press('show', { button: t.dataset.button }, `“${t.firstChild.textContent}” is going up`);
+}
+
+/* ── Share my screen ── */
+
+function shareNote(words) { setText($('sharing-note'), words); }
+
+/** Ends this page's share: the tracks stop, the connection closes, Back goes up unless the TV already moved on. */
+function endShare(words, { back = true } = {}) {
+  const s = sharing;
+  if (!s || s.ended) return;
+  s.ended = true;
+  sharing = null;
+  try { s.handle && s.handle.stop(); } catch { /* closed */ }
+  for (const t of s.stream.getTracks()) { try { t.stop(); } catch { /* stopped */ } }
+  $('sharing').hidden = true;
+  $('tile-share').disabled = false;
+  if (back) press('back', null, words || 'Stopped sharing');
+  else if (words) setText($('press-note'), words);
+}
+
+/** Someone pressed another button or Back (anywhere): the TV let go, so this page does too. */
+function watchShare(shown) {
+  if (!sharing) return;
+  if (shown && shown.id === sharing.id) { sharing.seen = true; return; }
+  if (sharing.seen) endShare('The TV moved on, so sharing stopped.', { back: false });
+}
+
+async function shareMyScreen() {
+  if (sharing) return;
+  let stream;
+  try {
+    // Straight from the tap: the browser asks which screen or window to share.
+    stream = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: 30 }, audio: true });
+  } catch (err) {
+    setText($('press-note'), err && err.name === 'NotAllowedError' ? 'Sharing was cancelled.' : 'This browser could not share its screen.');
+    return;
+  }
+  const s = { id: '', stream, handle: null, seen: false, ended: false };
+  sharing = s;
+  $('tile-share').disabled = true;
+  $('sharing').hidden = false;
+  shareNote('Starting…');
+  const video = stream.getVideoTracks()[0];
+  if (video) video.addEventListener('ended', () => endShare('Stopped sharing')); // the browser's own Stop sharing
+  const r = await request('/v1/classroom/remote', { method: 'POST', body: { action: 'screen', data: { title: 'Shared screen' } } });
+  if (s.ended) return;
+  if (!r.ok || !r.body || !r.body.button) {
+    endShare(r.status === 429 ? 'Too many presses at once. Wait a moment.' : 'That did not reach the TV. Try again.', { back: false });
+    return;
+  }
+  s.id = r.body.button;
+  shareNote('Waiting for the TV…');
+  try {
+    const handle = await screenShare.startSharing({
+      stream,
+      sendOffer: async (sdp) => {
+        const o = await request('/v1/classroom/signal', { method: 'POST', body: { signal: { type: 'offer', id: s.id, sdp } } });
+        if (!o.ok) throw new Error('The TV did not take the share. Try again.');
+      },
+      readAnswer: async () => {
+        if (s.ended) throw new Error('stopped');
+        const a = await request(`/v1/classroom/signal?type=answer&id=${encodeURIComponent(s.id)}`);
+        return a.ok && a.body && a.body.signal && typeof a.body.signal.sdp === 'string' ? a.body.signal.sdp : null;
+      },
+      onState: (st) => {
+        if (s.ended) return;
+        if (st === 'connected') shareNote('Sharing your screen. The room can see it.');
+        else if (st === 'failed') endShare('The picture stopped reaching the TV. Is this computer on the church Wi-Fi?');
+      },
+    });
+    if (s.ended) handle.stop(); else s.handle = handle;
+  } catch (err) {
+    if (s.ended) return;
+    endShare(err && err.message && err.message !== 'stopped' ? err.message : 'The TV did not answer. Try again.');
+  }
 }
 
 /* ── Sparky (a long press on the mark) ── */
@@ -409,6 +493,11 @@ function releaseWake() { if (wakeLock) wakeLock.release().catch(() => {}); wakeL
 /* ── Start ── */
 async function start() {
   [R, logic] = await Promise.all([import(`../src/shared/classroomRemote.js${V}`), import(`./logic.js${V}`)]);
+  // Loaded up front so the Share tap goes straight to the browser's picker (it wants a fresh tap).
+  try { screenShare = await import(`../src/shared/screenShare.js${V}`); } catch { /* no sharing here */ }
+  $('tile-share').hidden = !(screenShare && screenShare.canShareScreen());
+  $('tile-share').addEventListener('click', shareMyScreen);
+  $('btn-stop-share').addEventListener('click', () => endShare('Stopped sharing'));
   $('signin-form').addEventListener('submit', signIn);
   $('signout').addEventListener('click', signOut);
   $('video-tiles').addEventListener('click', onTile);

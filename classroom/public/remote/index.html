@@ -44,6 +44,12 @@
             <button id="btn-back" type="button" class="btn btn-big btn-hot" hidden>Back to schedule</button>
           </section>
 
+          <section id="sharing" class="card controls" aria-labelledby="sharing-h" hidden>
+            <h2 id="sharing-h" class="label">Sharing your screen</h2>
+            <p id="sharing-note" class="now-sub" role="status">Starting…</p>
+            <button id="btn-stop-share" type="button" class="btn btn-big btn-hot">Stop sharing</button>
+          </section>
+
           <section id="video" class="card controls" aria-labelledby="video-h" hidden>
             <h2 id="video-h" class="label">Video</h2>
             <div class="pad3">
@@ -77,6 +83,8 @@
             <div class="tiles">
               <!-- Owner 2026-11-04: the Sparks screen any time, until Back (preview {look, hold}). -->
               <button id="tile-sparks" type="button" class="tile" data-kind="look" aria-pressed="false"><span class="tile-name">Sparks screen</span><span class="tile-badge" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3l2.6 5.6 6 .7-4.5 4.1 1.2 6-5.3-3-5.3 3 1.2-6L3.4 9.3l6-.7z"/></svg></span><span class="tile-kind">Large Group Time</span></button>
+              <!-- Owner 2026-11-08: share this computer's screen on the TV. Shown only where the browser can (not iPhones or iPads). -->
+              <button id="tile-share" type="button" class="tile" data-kind="screen" hidden><span class="tile-name">Share my screen</span><span class="tile-badge" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="12" rx="2"/><path d="M8 21h8M12 17v4"/></svg></span><span class="tile-kind">From this computer</span></button>
             </div>
             <div class="row-head">
               <h2 class="label">Videos</h2>
@@ -129,6 +137,7 @@
       <label class="btn btn-mid f-choose">Choose a file<input class="f-input" type="file" accept="image/jpeg,image/png,image/gif,image/webp,application/pdf" hidden /></label>
       <label class="fine">…or paste a link to one <input class="f-link" type="url" inputmode="url" autocapitalize="none" spellcheck="false" placeholder="https://…" /></label>
       <button type="button" class="btn btn-mid f-copy">Use this link</button>
+      <p class="fine">A Google Slides link works when it is shared “Anyone with the link”: it shows as pages, with Next and Back. For PowerPoint, save it as a PDF and choose the file, or use Share my screen.</p>
       <p class="f-progress fine" role="status"></p>
       <button type="button" class="link f-remove">Remove</button>
     </div>

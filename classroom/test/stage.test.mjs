@@ -27,8 +27,8 @@ const LOBBY_STAND_IN = `<!doctype html><script>
   addEventListener('message', (e) => { if (e.data && e.data.post) parent.postMessage(e.data.post, location.origin); });
 </script>`;
 
-const worker = { stage: { rev: 0, show: null, preview: null, cmds: [] }, watch: true, reads: 0, now: [], remote: [] };
-const resetWorker = () => Object.assign(worker, { stage: { rev: 0, show: null, preview: null, cmds: [] }, watch: true, reads: 0, now: [], remote: [] });
+const worker = { stage: { rev: 0, show: null, preview: null, cmds: [] }, watch: true, reads: 0, now: [], remote: [], offer: null, answers: [] };
+const resetWorker = () => Object.assign(worker, { stage: { rev: 0, show: null, preview: null, cmds: [] }, watch: true, reads: 0, now: [], remote: [], offer: null, answers: [] });
 let server;
 let base;
 let browser;
@@ -48,6 +48,8 @@ before(async () => {
         if (p === '/v1/classroom/stage') { worker.reads += 1; send(200, { stage: worker.stage, watch: worker.watch, serverNow: Date.now() }); return; }
         if (p === '/v1/classroom/now') { worker.now.push(body.now); send(200, { ok: true, watch: worker.watch }); return; }
         if (p === '/v1/classroom/remote') { worker.remote.push(body); worker.stage = { ...worker.stage, rev: worker.stage.rev + 1, show: body.action === 'back' ? null : worker.stage.show }; send(200, { ok: true }); return; }
+        if (p === '/v1/classroom/signal' && req.method === 'GET') { send(200, { signal: worker.offer, id: url.searchParams.get('id') }); return; }
+        if (p === '/v1/classroom/signal' && req.method === 'POST') { worker.answers.push(body.signal); send(200, { ok: true }); return; }
         if (p.startsWith('/v1/classroom/files/')) { send(200, PNG, 'image/png'); return; }
         send(404, { error: 'no' });
       });
@@ -97,6 +99,18 @@ async function open(query, { pollMs = 150 } = {}) {
       end() { this.state = 0; this.opts.events.onStateChange({ data: 0 }); }
     }
     window.classroomYouTube = { Player };
+    // A stand-in WebRTC connection: it answers an offer and can be handed a stream.
+    window.__rtc = { made: [] };
+    window.RTCPeerConnection = class {
+      constructor() { this.l = {}; this.iceGatheringState = 'complete'; this.closed = false; window.__rtc.made.push(this); }
+      addEventListener(t, f) { (this.l[t] ||= []).push(f); }
+      removeEventListener() {}
+      async setRemoteDescription(d) { this.remote = d; }
+      async createAnswer() { return { type: 'answer', sdp: 'v=0\r\nanswer' }; }
+      async setLocalDescription(d) { this.localDescription = d; }
+      close() { this.closed = true; }
+      deliver() { for (const f of this.l.track || []) f({ streams: [new MediaStream()] }); }
+    };
     window.__pdf = { rendered: [] };
     window.classroomPdfLib = {
       getDocument: () => ({ promise: Promise.resolve({ numPages: 3, getPage: async (n) => ({ getViewport: ({ scale }) => ({ width: 600 * scale, height: 800 * scale }), render: () => { window.__pdf.rendered.push(n); return { promise: Promise.resolve() }; } }) }) }),
@@ -109,6 +123,7 @@ async function open(query, { pollMs = 150 } = {}) {
 const show = (button, at = Date.now(), page = 1) => { worker.stage = { ...worker.stage, rev: worker.stage.rev + 1, show: { button, at, page } }; };
 const TEXT = { id: 'btext001', kind: 'text', title: 'Verse', heading: 'Memory verse', text: 'Love one another.\nJohn 13:34', look: 'page' };
 const VIDEO = { id: 'bvideo01', kind: 'video', title: 'Sparky Song', youtube: 'dQw4w9WgXcQ', start: 5 };
+const SCREEN = { id: 'bscreen001', kind: 'screen', title: 'Shared screen' };
 const CLUB_NIGHT = '?now=2026-10-14T23:10:00Z'; // Sparks Large Group Time
 
 describe('the Sparks remote on the classroom screen', { skip: SKIP }, () => {
@@ -212,6 +227,37 @@ describe('the Sparks remote on the classroom screen', { skip: SKIP }, () => {
     await frame.evaluate(() => window.postMessage({ post: { type: 'awana-display:sync-doorbell', what: 'classroom', rev: 2 } }, location.origin));
     await page.waitForFunction(() => document.getElementById('sparky-fly').classList.contains('is-flying'), null, { timeout: 2000 });
     assert.ok(worker.reads > reads);
+    await page.close();
+  });
+
+  // Owner 2026-11-08: "Screen sharing would be super cool."
+  it('a shared screen: answers the offer once, shows the stream, no welcome over it, and Back lets it go', async () => {
+    const page = await open(CLUB_NIGHT);
+    await page.waitForFunction(() => document.documentElement.dataset.phase === 'sparks');
+    show(SCREEN);
+    await page.waitForSelector('#show:not([hidden]) .cr-show-screen', { state: 'attached' });
+    assert.equal(await page.locator('#show .cr-show-missing').textContent(), 'Waiting for the shared screen…');
+    worker.offer = { type: 'offer', id: SCREEN.id, sdp: 'v=0\r\noffer' };
+    await page.waitForFunction(() => window.__rtc.made.length === 1);
+    await page.waitForTimeout(700); // several more reads and retries: still one answer
+    assert.deepEqual(worker.answers, [{ type: 'answer', id: SCREEN.id, sdp: 'v=0\r\nanswer' }]);
+    assert.equal(await page.evaluate(() => window.__rtc.made[0].remote.sdp), 'v=0\r\noffer');
+    await page.evaluate(() => window.__rtc.made[0].deliver());
+    await page.waitForSelector('#show video.cr-show-screen:not([hidden])');
+    assert.equal(await page.evaluate(() => document.querySelector('.cr-show-screen').srcObject instanceof MediaStream), true);
+    // It reports as a shared screen, and a welcome never lands over it.
+    const frame = page.frame({ url: /\/lobby\/\?club=sparks/ });
+    await frame.evaluate((m) => window.postMessage({ post: m }, location.origin), { type: 'awana-display:checkin', id: 'm1', firstName: 'Micah', club: 'Sparks' });
+    await page.waitForTimeout(500);
+    assert.equal(await page.isHidden('#welcome-sparks'), true);
+    assert.equal(worker.now.at(-1).view, 'screen');
+    assert.equal(await page.evaluate(() => document.documentElement.dataset.show), 'screen');
+    // The pen button is still there to black it out.
+    assert.equal(await page.isHidden('#pen-btn'), false);
+    // Back: the connection closes and the video goes.
+    worker.stage = { ...worker.stage, rev: worker.stage.rev + 1, show: null };
+    await page.waitForFunction(() => window.__rtc.made[0].closed === true);
+    await page.waitForSelector('.cr-show-screen', { state: 'detached' });
     await page.close();
   });
 

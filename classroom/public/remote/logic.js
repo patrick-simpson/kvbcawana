@@ -17,8 +17,10 @@ const VIEW_WORDS = {
   sparks: 'Sparks Large Group Time',
   lobby: 'The lobby screen',
   board: 'The black board (a pen is up)',
+  waiting: 'A shared screen is starting',
+  screen: 'A shared screen',
 };
-const KIND_WORDS = { video: 'Video', image: 'Picture', pdf: 'PDF', text: 'Text' };
+const KIND_WORDS = { video: 'Video', image: 'Picture', pdf: 'PDF', text: 'Text', screen: 'Shared screen' };
 
 /**
  * What the "On the classroom TV" card says.

@@ -53,7 +53,7 @@ const reset = () => Object.assign(W, {
   rev: 1,
   buttons: { videos: [{ id: 'bvideo01', title: 'Sparky Song', youtube: 'dQw4w9WgXcQ', start: 0 }], items: [{ id: 'btext001', kind: 'text', title: 'Verse', text: 'Hi', look: 'page' }, { id: 'bpdf0001', kind: 'pdf', title: 'Handbook', file: 'fabcdefghijkl0001', type: 'application/pdf' }] },
   stage: { rev: 0, show: null, preview: null, cmds: [] },
-  now: null, presses: [], puts: [], parts: [], stale: false,
+  now: null, presses: [], puts: [], parts: [], stale: false, signals: [], answer: null,
 });
 let server; let base; let browser;
 
@@ -71,8 +71,11 @@ before(async () => {
         const p = url.pathname.slice(4);
         const body = req.headers['content-type'] === 'application/json' && raw.length ? JSON.parse(raw) : null;
         if (p === '/v1/classroom/remote/state') { send(200, { buttons: W.buttons, rev: W.rev, stage: W.stage, now: W.now, screenOnline: true, serverNow: Date.now(), watchMs: 30000 }); return; }
+        if (p === '/v1/classroom/signal' && req.method === 'POST') { W.signals.push(body.signal); send(200, { ok: true }); return; }
+        if (p === '/v1/classroom/signal' && req.method === 'GET') { send(200, { signal: W.answer, id: url.searchParams.get('id') }); return; }
         if (p === '/v1/classroom/remote') {
           W.presses.push(body);
+          if (body.action === 'screen') { const b = { id: 'bscreen001', kind: 'screen', title: body.data.title }; W.stage = { ...W.stage, rev: W.stage.rev + 1, show: { button: b, at: Date.now(), page: 1 } }; send(200, { ok: true, screenOnline: true, button: b.id }); return; }
           if (body.action === 'show') { const b = [...W.buttons.videos.map((v) => ({ ...v, kind: 'video' })), ...W.buttons.items].find((x) => x.id === body.data.button); W.stage = { ...W.stage, rev: W.stage.rev + 1, show: { button: b, at: Date.now(), page: 1 } }; }
           if (body.action === 'back') W.stage = { ...W.stage, rev: W.stage.rev + 1, show: null };
           send(200, { ok: true, screenOnline: true });
@@ -103,14 +106,37 @@ before(async () => {
 });
 after(async () => { await browser?.close(); server?.close(); });
 
-async function open(size = { width: 390, height: 844 }) {
+async function open(size = { width: 390, height: 844 }, { share = false } = {}) {
   reset();
   const page = await browser.newPage({ viewport: size, hasTouch: true });
-  await page.addInitScript(({ api, session }) => {
+  await page.addInitScript(({ api, session, share: sharable }) => {
+    // A phone's browser has no screen picker; the page must leave the tile out.
+    if (!sharable) Object.defineProperty(navigator.mediaDevices, 'getDisplayMedia', { value: undefined, configurable: true });
+    if (sharable) {
+      // A stand-in screen picker and WebRTC connection: the picture itself never goes anywhere here.
+      window.__share = { tracks: [], asked: [], pcs: [] };
+      navigator.mediaDevices.getDisplayMedia = async (opts) => {
+        window.__share.asked.push(opts);
+        const track = { kind: 'video', l: {}, stopped: false, addEventListener(t, f) { (this.l[t] ||= []).push(f); }, stop() { this.stopped = true; } };
+        window.__share.tracks.push(track);
+        return { getTracks: () => [track], getVideoTracks: () => [track] };
+      };
+      window.RTCPeerConnection = class {
+        constructor() { this.l = {}; this.iceGatheringState = 'complete'; this.connectionState = 'new'; this.closed = false; window.__share.pcs.push(this); }
+        addEventListener(t, f) { (this.l[t] ||= []).push(f); }
+        removeEventListener() {}
+        addTrack() {}
+        getSenders() { return []; }
+        async createOffer() { return { type: 'offer', sdp: 'v=0\r\noffer' }; }
+        async setLocalDescription(d) { this.localDescription = d; }
+        async setRemoteDescription(d) { this.remote = d; this.connectionState = 'connected'; for (const f of this.l.connectionstatechange || []) f(); }
+        close() { this.closed = true; }
+      };
+    }
     localStorage.setItem('awanaSyncSession.v1', session);
     window.sparksRemoteBase = api;
     window.sparksRemoteTuning = { pollMs: 200, holdMs: 300 };
-  }, { api: `${base}/api`, session: SESSION });
+  }, { api: `${base}/api`, session: SESSION, share });
   await page.goto(`${base}/classroom/remote/`);
   await page.waitForSelector('#remote:not([hidden]) .tile');
   return page;
@@ -120,7 +146,7 @@ describe('the Sparks remote page', { skip: SKIP }, () => {
   it('shows the shared buttons; a tap puts one up; the right controls appear; Back takes it down', async () => {
     const page = await open();
     // The fixed Sparks screen tile (owner 2026-11-04) first, then the shared buttons.
-    assert.deepEqual(await page.$$eval('.tile', (ts) => ts.map((t) => [t.dataset.kind, t.firstChild.textContent])), [['look', 'Sparks screen'], ['video', 'Sparky Song'], ['text', 'Verse'], ['pdf', 'Handbook']]);
+    assert.deepEqual(await page.$$eval('.tile:not([hidden])', (ts) => ts.map((t) => [t.dataset.kind, t.firstChild.textContent])), [['look', 'Sparks screen'], ['video', 'Sparky Song'], ['text', 'Verse'], ['pdf', 'Handbook']]);
     assert.equal(await page.isHidden('#btn-back'), true);
     await page.click('.tile[data-button="bvideo01"]');
     await page.waitForSelector('#video:not([hidden])');
@@ -179,6 +205,42 @@ describe('the Sparks remote page', { skip: SKIP }, () => {
     const saved = W.puts.at(-1);
     assert.equal(saved.buttons.items.at(-1).text, 'Line up!');
     assert.equal(saved.buttons.items.at(-1).look, 'board');
+    await page.close();
+  });
+
+  // Owner 2026-11-08: "Screen sharing would be super cool."
+  it('Share my screen is hidden where the browser cannot share (a phone)', async () => {
+    const page = await open();
+    await page.waitForFunction(() => document.querySelectorAll('.tile').length > 1);
+    assert.equal(await page.isHidden('#tile-share'), true);
+    await page.close();
+  });
+
+  it('Share my screen: the press, the offer, the answer, Stop; and the browser\'s own Stop ends it too', async () => {
+    const page = await open({ width: 1280, height: 720 }, { share: true });
+    assert.equal(await page.isVisible('#tile-share'), true);
+    await page.click('#tile-share');
+    await page.waitForSelector('#sharing:not([hidden])');
+    assert.deepEqual(await page.evaluate(() => window.__share.asked), [{ video: { frameRate: 30 }, audio: true }]);
+    await page.waitForFunction(() => document.getElementById('sharing-note').textContent.startsWith('Waiting for the TV'));
+    assert.deepEqual(W.presses[0], { action: 'screen', data: { title: 'Shared screen' } });
+    assert.deepEqual(W.signals, [{ type: 'offer', id: 'bscreen001', sdp: 'v=0\r\noffer' }]);
+    // The TV answers: it is sharing.
+    W.answer = { type: 'answer', id: 'bscreen001', sdp: 'v=0\r\nanswer' };
+    await page.waitForFunction(() => document.getElementById('sharing-note').textContent.startsWith('Sharing your screen'));
+    assert.equal(await page.evaluate(() => window.__share.pcs[0].remote.sdp), 'v=0\r\nanswer');
+    assert.equal(await page.isDisabled('#tile-share'), true);
+    // Stop: tracks stop, the connection closes, Back goes up.
+    await page.click('#btn-stop-share');
+    await page.waitForSelector('#sharing', { state: 'hidden' });
+    assert.equal(await page.evaluate(() => window.__share.tracks[0].stopped && window.__share.pcs[0].closed), true);
+    assert.deepEqual(W.presses.at(-1), { action: 'back' });
+    // Again, ended by the browser's own "Stop sharing".
+    await page.click('#tile-share');
+    await page.waitForFunction(() => window.__share.pcs.length === 2 && document.getElementById('sharing-note').textContent.startsWith('Sharing your screen'));
+    await page.evaluate(() => { for (const f of window.__share.tracks[1].l.ended) f(); });
+    await page.waitForSelector('#sharing', { state: 'hidden' });
+    assert.deepEqual(W.presses.at(-1), { action: 'back' });
     await page.close();
   });
 

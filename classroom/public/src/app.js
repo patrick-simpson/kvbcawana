@@ -339,7 +339,9 @@ function maybeChalk(dateKey) {
 /* ── Welcomes: one card per club, for the clubs of the moment ──── */
 let welcomes = L.emptyWelcomes();
 // No welcome over a video the remote put up (owner 2026-10-18); over a picture or text, yes.
-const welcomingNow = () => (stageApi && stageApi.showing() === 'video' ? [] : L.welcomesUp(welcomes, clubs, now().getTime()));
+// A remote video or a shared screen: nobody is welcomed (no card, no ding) over it.
+const isMediaShow = () => Boolean(stageApi && ['video', 'screen'].includes(stageApi.showing()));
+const welcomingNow = () => (stageApi && isMediaShow() ? [] : L.welcomesUp(welcomes, clubs, now().getTime()));
 function drawWelcomes() {
   const up = welcomingNow();
   for (const [club, el] of Object.entries(welcomeEls)) {
@@ -403,7 +405,7 @@ window.addEventListener('message', (event) => {
   if (!frame || event.source !== frame.contentWindow || event.origin !== window.location.origin) return;
   const d = event.data;
   if (!d || typeof d !== 'object' || d.type !== CHECKIN_MESSAGE) return;
-  if (stageApi && stageApi.showing() === 'video') return;
+  if (stageApi && isMediaShow()) return;
   const r = L.welcomeFor(welcomes, d, clubs, now().getTime());
   if (!r.ding) return;
   welcomes = r.state;

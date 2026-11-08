@@ -20,6 +20,12 @@
 //   YouTube's (owner accepted). Pictures and PDFs come from the Worker (it
 //   copied every link), read with the session into a blob URL; PDFs are drawn
 //   by pdf.js (cdnjs, loaded the first time a PDF shows).
+// - A shared screen (owner 2026-11-08: "Screen sharing would be super cool"):
+//   the remote's laptop offers its screen through the Worker
+//   (/v1/classroom/signal, memory only); this page fetches the offer, answers it
+//   ONCE (shared/screenShare.js answerShare) and shows the stream full screen in
+//   a <video>. The picture goes laptop to TV over the church network, not
+//   through the Worker. Back, or another button, closes the connection.
 
 const SESSION_KEY = 'awanaSyncSession.v1';
 const SESSION_RE = /^v1\.\d+\.\d+\.[A-Za-z0-9_-]{20,}$/;
@@ -30,7 +36,8 @@ const YT_API = 'https://www.youtube.com/iframe_api';
 // the poll is only its safety net, and keeps the remote's "the TV is on" (the
 // Worker's CLASSROOM_ONLINE_MS, 45 s) true. Every 5 s around the clock was most of
 // the account's free daily requests (2026-11-03), so 30 s.
-const TUNING = { pollMs: 30000, reportVideoMs: 10000, swoopMs: 1100, swapAtMs: 500, timeoutMs: 8000 };
+const TUNING = { pollMs: 30000, reportVideoMs: 10000, swoopMs: 1100, swapAtMs: 500, timeoutMs: 8000, offerMs: 1500, offerWaitMs: 60000 };
+const V = new URL(import.meta.url).search; // the build stamp, carried to the modules this loads
 const tuning = () => Object.assign({}, TUNING, window.classroomStageTuning || {});
 
 /**
@@ -56,6 +63,7 @@ export async function createStage(deps) {
   let player = null; // the YouTube player
   let playerReady = false;
   let blobUrl = '';
+  let share = null; // the shared screen on show: { id, pc, video, answered, timer, until }
   let lastReport = '';
   let reportTimer = 0;
   let busy = Promise.resolve();
@@ -111,6 +119,8 @@ export async function createStage(deps) {
       const was = showKey;
       showKey = key;
       busy = busy.then(() => change(next.show, Boolean(was))).catch(() => {});
+    } else if (next.show && next.show.button.kind === 'screen') {
+      wantOffer(); // a doorbell or a read: the offer may have come since
     } else if (next.show && next.show.button.kind === 'pdf' && next.show.page !== shownPage) {
       busy = busy.then(() => drawPdfPage(next.show.page, true)).catch(() => {});
     }
@@ -156,11 +166,13 @@ export async function createStage(deps) {
       else if (b.kind === 'text') drawText(b);
       else if (b.kind === 'image') drawImage(prepared);
       else if (b.kind === 'pdf') { shownPage = 0; openPdf(b.file, prepared, show.page); }
+      else if (b.kind === 'screen') openShare(b);
     }, !show);
   }
   const root = () => deps.root;
 
   function clear() {
+    endShare();
     if (player) { try { player.destroy(); } catch { /* gone */ } }
     player = null;
     playerReady = false;
@@ -284,6 +296,74 @@ export async function createStage(deps) {
     report();
   }
 
+  /* ── A shared screen ── */
+  function openShare(b) {
+    layer.classList.add('cr-show--screen');
+    const video = document.createElement('video');
+    video.className = 'cr-show-screen';
+    video.autoplay = true;
+    video.playsInline = true;
+    video.hidden = true;
+    const wait = document.createElement('p');
+    wait.className = 'cr-show-missing';
+    wait.textContent = 'Waiting for the shared screen…';
+    layer.append(video, wait);
+    share = { id: b.id, pc: null, video, wait, answered: '', busy: false, timer: 0, until: Date.now() + tuning().offerWaitMs };
+    wantOffer();
+  }
+
+  /** Looks for the remote's offer now, and again until it is answered (the doorbell makes it sooner). */
+  async function wantOffer() {
+    const s = share;
+    if (!s || s.answered || s.busy) return;
+    s.busy = true;
+    try {
+      const r = await request(`/v1/classroom/signal?type=offer&id=${encodeURIComponent(s.id)}`);
+      const sig = r.ok && r.body ? R.sanitizeSignal(r.body.signal) : null;
+      if (share !== s) return;
+      // Never answer the same offer twice (a second answer would be refused by the laptop anyway).
+      if (sig && sig.type === 'offer' && sig.id === s.id && sig.sdp !== s.answered) {
+        s.answered = sig.sdp;
+        const lib = await import(`./shared/screenShare.js${V}`);
+        const pc = await lib.answerShare({
+          offerSdp: sig.sdp,
+          sendAnswer: async (sdp) => {
+            const a = await request('/v1/classroom/signal', { method: 'POST', body: { signal: { type: 'answer', id: s.id, sdp } } });
+            if (!a.ok) throw new Error('answer refused');
+          },
+          onStream: (stream) => {
+            if (share !== s) return;
+            s.video.srcObject = stream;
+            s.video.muted = false;
+            s.video.hidden = false;
+            s.wait.remove();
+            // Sound first; a browser that refuses unmuted autoplay still gets the picture.
+            s.video.play().catch(() => { s.video.muted = true; s.video.play().catch(() => {}); });
+            report(true);
+          },
+          onState: () => report(),
+        });
+        if (share !== s) { try { pc.close(); } catch { /* closed */ } return; }
+        s.pc = pc;
+        return;
+      }
+    } catch {
+      if (share === s) s.answered = ''; // try the next offer
+    } finally {
+      s.busy = false;
+    }
+    if (share === s && !s.answered && Date.now() < s.until) s.timer = window.setTimeout(wantOffer, tuning().offerMs);
+  }
+
+  function endShare() {
+    const s = share;
+    share = null;
+    if (!s) return;
+    clearTimeout(s.timer);
+    if (s.pc) { try { s.pc.close(); } catch { /* closed */ } }
+    s.video.srcObject = null;
+  }
+
   /* ── YouTube ── */
   function ytApi() {
     if (window.classroomYouTube) return Promise.resolve(window.classroomYouTube);
@@ -395,6 +475,7 @@ export async function createStage(deps) {
     const b = stage.show && stage.show.button;
     const out = { view: b ? b.kind : sc.board ? 'board' : sc.phase || 'off' };
     if (b) { out.button = b.id; out.title = b.title; }
+    if (b && b.kind === 'screen' && !(share && !share.video.hidden)) out.view = 'waiting'; // not on screen yet
     if (b && b.kind === 'pdf' && pdfPages) { out.page = shownPage || 1; out.pages = pdfPages; }
     if (b && b.kind === 'video' && player && playerReady) {
       try { out.video = { t: player.getCurrentTime(), d: player.getDuration(), paused: player.getPlayerState() !== 1, muted: player.isMuted(), volume: player.getVolume() }; } catch { /* not yet */ }
@@ -439,8 +520,9 @@ export async function createStage(deps) {
     previewLook,
     /** What the remote has up ('' = nothing). */
     showing: () => (stage.show ? stage.show.button.kind : ''),
-    /** A remote video is playing (or buffering) now: the one thing the opening ceremony never covers. */
+    /** A remote video is playing (or buffering) now, or a shared screen is live: the things the opening ceremony never covers. */
     videoPlaying: () => {
+      if (stage.show && stage.show.button.kind === 'screen') return Boolean(share && !share.video.hidden);
       if (!stage.show || stage.show.button.kind !== 'video' || !player || !playerReady) return false;
       try { const s = player.getPlayerState(); return s === 1 || s === 3; } catch { return false; }
     },
