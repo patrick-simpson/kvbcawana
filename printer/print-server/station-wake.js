@@ -22,7 +22,21 @@ const SIGNED_OUT_MS = 30 * 1000;
 /** The live channel's address for this station. @param {string} base the sync URL @param {string} session @param {string} stationId */
 function wakeUrl(base, session, stationId) {
   const root = String(base || '').replace(/\/+$/, '').replace(/^http(s?):\/\//i, (m, s) => `ws${s}://`);
-  return `${root}/v1/live?session=${encodeURIComponent(session)}&station=${encodeURIComponent(stationId)}`;
+  const station = stationId ? `&station=${encodeURIComponent(stationId)}` : '';   // none: a computer's own bell (no print rings)
+  return `${root}/v1/live?session=${encodeURIComponent(session)}${station}`;
+}
+
+/**
+ * Is this socket message the ring for THIS computer's screen (an action waits
+ * for it: the presentation controls' show-presentation, owner 2026-11-08)?
+ * @param {unknown} data @param {string} id this computer's screen id (roles.json deviceId)
+ */
+function isScreenRing(data, id) {
+  if (!id || typeof data !== 'string' || data === 'pong') return false;
+  try {
+    const f = JSON.parse(data);
+    return !!f && f.e === 'changed' && !!f.d && f.d.what === 'screen-action' && f.d.id === id;
+  } catch { return false; }
 }
 
 /** Is this socket message the ring? @param {unknown} data */
@@ -37,6 +51,7 @@ function isWake(data) {
 /**
  * @param {{ signedIn: () => ({ base: string, session: string } | null), stationId: () => string,
  *   onWake: () => void, log?: (m: string) => void, WebSocketImpl?: any,
+ *   match?: (data: unknown) => boolean, tag?: string,
  *   setTimeoutFn?: typeof setTimeout, clearTimeoutFn?: typeof clearTimeout, now?: () => number }} o
  */
 function startStationWake(o) {
@@ -44,7 +59,9 @@ function startStationWake(o) {
   const setT = o.setTimeoutFn || setTimeout;
   const clearT = o.clearTimeoutFn || clearTimeout;
   const now = o.now || Date.now;
-  const log = o.log || (() => {});
+  const tag = o.tag || '[jobs]';
+  const log = o.log ? (m) => o.log(String(m).replace(/^\[jobs\]/, tag)) : (() => {});
+  const matches = typeof o.match === 'function' ? o.match : isWake;
   let stopped = false;
   let ws = null;
   let retryTimer = null;
@@ -88,7 +105,7 @@ function startStationWake(o) {
     sock.onmessage = (ev) => {
       if (ws !== sock) return;
       lastRx = now();
-      if (isWake(ev && ev.data)) { stats.rings += 1; try { o.onWake(); } catch (e) { log(`[jobs] wake-up: ${e && e.message}`); } }
+      if (matches(ev && ev.data)) { stats.rings += 1; try { o.onWake(); } catch (e) { log(`[jobs] wake-up: ${e && e.message}`); } }
     };
     sock.onclose = () => drop(sock);
     sock.onerror = () => drop(sock);
@@ -106,4 +123,4 @@ function startStationWake(o) {
   };
 }
 
-module.exports = { startStationWake, wakeUrl, isWake, PING_MS, SILENT_MS, RETRY_MIN_MS, RETRY_MAX_MS };
+module.exports = { startStationWake, wakeUrl, isWake, isScreenRing, PING_MS, SILENT_MS, RETRY_MIN_MS, RETRY_MAX_MS };

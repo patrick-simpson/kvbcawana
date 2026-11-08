@@ -62,6 +62,13 @@ function fakeWs() {
       === 'wss://awana.kvbchurch.org/api/v1/live?session=v1.1.2.abc&station=dev-0123456789abcdef', sw.wakeUrl('https://awana.kvbchurch.org/api/', 'v1.1.2.abc', 'dev-0123456789abcdef'));
     check('http becomes ws', sw.wakeUrl('http://127.0.0.1:8787', 's', 'id12345678').startsWith('ws://127.0.0.1:8787/v1/live?'));
     check('the ring is a ring', sw.isWake('{"e":"changed","d":{"what":"print"}}') === true);
+    // A computer's own bell (owner 2026-11-08: the presentation controls' show-presentation).
+    check('no station id: no station parameter (a computer\'s bell, not a station)',
+      sw.wakeUrl('https://awana.kvbchurch.org/api', 's', '') === 'wss://awana.kvbchurch.org/api/v1/live?session=s');
+    check('a screen ring for THIS id is its ring', sw.isScreenRing('{"e":"changed","d":{"what":"screen-action","id":"pc_1","action":"show-presentation"}}', 'pc_1') === true);
+    check('another id, another doorbell, a print ring or junk is not',
+      !sw.isScreenRing('{"e":"changed","d":{"what":"screen-action","id":"pc_2"}}', 'pc_1') && !sw.isScreenRing('{"e":"changed","d":{"what":"print"}}', 'pc_1')
+      && !sw.isScreenRing('pong', 'pc_1') && !sw.isScreenRing('{', 'pc_1') && !sw.isScreenRing('{"e":"changed","d":{"what":"screen-action","id":""}}', ''));
     check('another doorbell, a frame, pong and junk are not',
       !sw.isWake('{"e":"changed","d":{"what":"calendar"}}') && !sw.isWake('{"e":"tally","d":{}}') && !sw.isWake('pong') && !sw.isWake('{') && !sw.isWake(null));
   }

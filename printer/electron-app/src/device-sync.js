@@ -48,6 +48,14 @@ const { appReportMoved } = require('./update-progress');
 
 const KIND = 'computer';
 const FILE = 'device-sync.json';
+/**
+ * The actions this computer takes from afar (lobby/src/lib/syncSpecs.js
+ * SCREEN_ACTIONS.computer; worker/src/routes.md 10.8): queued by the Worker and
+ * handed over in the next hello's answer, each once. show-presentation (owner
+ * 2026-11-08): the presentation controls' "Show on the lobby computer".
+ */
+const ACTIONS = Object.freeze(['show-presentation']);
+
 /** A hello this often (the Worker calls a screen online for 3 minutes after one). */
 const HELLO_MS = 2 * 60 * 1000;
 // Outside the club evening (owner 2026-11-03: Wednesday 3:30-10 pm Eastern,
@@ -163,6 +171,7 @@ function writeStore(userData, store) {
  *   busy: () => boolean,                        the print server is printing or has a label waiting
  *   report?: () => object | null,               this app's {app: {version, update}} for the hello (update-progress.js)
  *   logTail?: () => string[] | null,            the display log's newest lines, scrubbed (log-tail.js)
+ *   onAction?: (action: string) => void,        an action from afar, handed over in a hello's answer (ACTIONS)
  *   now?: () => number,
  *   onStatus?: (status: object) => void,
  *   onSignedOut?: (session: {url: string, session: string}) => void,
@@ -273,7 +282,19 @@ async function createDeviceSync(deps) {
     lastHelloAt = clock();
     const res = await deps.request(s.url, deps.protocol.SCREEN_HELLO_PATH, { method: 'POST', body, session: s.session });
     if (res && res.ok && report) lastReport = report;
+    if (res && res.ok) runActions(res.body && res.body.actions);
     return res;
+  }
+
+  /** Each allowlisted action in a hello's answer, in order (the Worker hands each over once). */
+  function runActions(list) {
+    if (!Array.isArray(list) || !deps.onAction) return;
+    for (const item of list.slice(0, 5)) {
+      const action = item && typeof item.action === 'string' ? item.action : '';
+      if (!ACTIONS.includes(action)) continue;
+      log('[device] action from afar:', action);
+      try { deps.onAction(action); } catch (e) { log('[device] action failed:', e && e.message); }
+    }
   }
 
   /** The display log's tail, when it changed since the Worker last took it. */
@@ -437,12 +458,17 @@ async function createDeviceSync(deps) {
       if (soon) timers.clearTimeout(soon);
       soon = unref(timers.setTimeout(() => { soon = null; tick(); }, PUSH_DEBOUNCE_MS));
     },
+    /** The live channel rang this computer's id (an action waits): a round now. */
+    wake() {
+      if (!running || status.state === 'signed-out') return Promise.resolve();
+      return tick();
+    },
     status: () => ({ ...status }),
     isRunning: () => running,
   };
 }
 
 module.exports = {
-  KIND, FILE, HELLO_MS, QUIET_HELLO_MS, PUSH_DEBOUNCE_MS, IDLE_CHECK_MS, REPORT_GAP_MS, SPEC,
+  ACTIONS, KIND, FILE, HELLO_MS, QUIET_HELLO_MS, PUSH_DEBOUNCE_MS, IDLE_CHECK_MS, REPORT_GAP_MS, SPEC,
   cleanSettings, reconcileComputer, screenName, createDeviceSync,
 };

@@ -198,7 +198,7 @@ describe('a screen\'s own settings', () => {
       .toEqual({});
   });
 
-  it('a KVBC Awana computer (v9) registers with its roles and display hours, and takes no actions', async () => {
+  it('a KVBC Awana computer (v9) registers with its roles and display hours, and takes no other screen\'s actions', async () => {
     const s = setup();
     await s.signIn();
     const PC = 'pc_dddddddddddddddddddd';
@@ -210,6 +210,19 @@ describe('a screen\'s own settings', () => {
     expect(res.body.settings).toEqual({ printRole: true, displayRole: false, displayFrom: '17:00' });
     expect((await s.call('POST', `/v1/screens/${PC}/action`, { action: 'reset-tally' })).status).toBe(400);
     expect((await s.call('GET', '/v1/screens')).body.screens.map((x) => x.kind)).toEqual(['computer']);
+  });
+
+  it('show-presentation (owner 2026-11-08): a computer\'s one action waits for its next hello and rings its id', async () => {
+    const s = setup();
+    await s.signIn();
+    const PC = 'pc_ffffffffffffffffffff';
+    await s.call('POST', '/v1/screens/hello', { id: PC, kind: 'computer', name: 'Lobby computer' });
+    const res = await s.call('POST', `/v1/screens/${PC}/action`, { action: 'show-presentation', data: { screen: 'lobby' } });
+    expect(res.body).toEqual({ ok: true, delivered: false, queued: true });
+    expect(s.frames.map((f) => f.d)).toEqual([{ what: 'screen-action', id: PC, action: 'show-presentation', at: expect.any(String) }]);
+    const hi = await s.call('POST', '/v1/screens/hello', { id: PC, kind: 'computer' });
+    expect(hi.body.actions).toEqual([{ action: 'show-presentation', at: expect.any(String) }]);
+    expect((await s.call('POST', '/v1/screens/hello', { id: PC, kind: 'computer' })).body.actions).toEqual([]);
   });
 
   it('a computer holding a print-off says so in its hello, and the list shows it until a hello without one', async () => {

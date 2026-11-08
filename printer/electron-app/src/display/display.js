@@ -680,6 +680,27 @@ function createDisplay(opts) {
     loadConfigScreen();
   }
 
+  /**
+   * Shows a screen now, from afar (owner 2026-11-08: the presentation controls'
+   * "Show on the lobby computer"; device-sync's show-presentation). Another
+   * screen is switched as if chosen by hand; the same screen already up is left
+   * alone (its page, and the deck opened in it, are not reloaded); the same screen
+   * put away (closed by hand, the tray's Hide) comes back.
+   * @param {string} id
+   */
+  function showScreen(id) {
+    if (!running) loadState();
+    // A Hide (or a Show) from the tray is let go, as Resume schedule does: the
+    // presentation is up whenever it is the chosen screen and nothing hides it.
+    if (state.overrides !== NO_OVERRIDES) { state.overrides = NO_OVERRIDES; saveState(); }
+    blackDismissed = false;
+    if (settingsForScreen(state.settings, id).screen !== state.settings.screen) { setScreen(id); return 'switched'; }
+    if (lobby) return 'already';
+    log('screen shown from afar', id);
+    evaluate();
+    return 'shown';
+  }
+
   /** New hours apply at once: the screen opens or closes on the next evaluate. */
   function setHours(h) {
     const next = normalizeSettings({ ...state.settings, hours: h });
@@ -1083,7 +1104,7 @@ function createDisplay(opts) {
   return {
     start, stop, isRunning: () => running,
     menuItems, statusLine, requestShow, openConfigurator, openChooser,
-    prepareInstall, cancelInstall, beforeQuit, configure, info, log,
+    prepareInstall, cancelInstall, beforeQuit, configure, showScreen, info, log,
   };
 }
 

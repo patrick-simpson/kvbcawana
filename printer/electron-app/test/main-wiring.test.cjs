@@ -104,3 +104,25 @@ describe('a second launch', () => {
     assert.match(main, /app\.on\('second-instance', \(event, argv\) => \{\n(?:  \/\/.*\n)+  if \(Array\.isArray\(argv\) && argv\.includes\('--autostart'\)\) return;/);
   });
 });
+
+describe('show-presentation from afar (owner 2026-11-08: the presentation controls\' button)', () => {
+  it('only with the display role, through display.showScreen', () => {
+    assert.match(main, /onAction: \(action\) => \{\n      if \(action !== 'show-presentation'\) return;\n      if \(!roles\.display \|\| !display\)/);
+    assert.match(main, /display\.showScreen\('presentation'\)/);
+  });
+
+  it('the bell: this computer\'s own screen ring wakes device-sync; no station id; stopped on quit', () => {
+    assert.match(main, /match: \(data\) => wake\.isScreenRing\(data, roles\.deviceId\)/);
+    assert.match(main, /stationId: \(\) => '',/);
+    assert.match(main, /onWake: \(\) => \{ if \(deviceSync\) deviceSync\.wake\(\); \}/);
+    assert.match(main, /if \(screenBell\) screenBell\.stop\(\);/);
+  });
+
+  it('showScreen lets a tray Hide go, switches another screen as if chosen, and never reloads the same screen up', () => {
+    const fn = display.slice(display.indexOf('function showScreen(id)'), display.indexOf('/** New hours apply at once'));
+    assert.match(fn, /state\.overrides = NO_OVERRIDES/);
+    assert.match(fn, /blackDismissed = false/);
+    assert.match(fn, /setScreen\(id\); return 'switched';/);
+    assert.match(fn, /if \(lobby\) return 'already';/);
+  });
+});

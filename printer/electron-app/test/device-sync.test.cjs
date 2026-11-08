@@ -28,7 +28,8 @@ function fakeWorker() {
       if (!r) r = w.screens[body.id] = { id: body.id, kind: body.kind, name: body.name };
       r.pendingRoleChange = body.pendingRoleChange || null;
       if (body.status) r.status = body.status;
-      return { ok: true, status: 200, body: { screen: { ...r }, settings: w.settings[body.id] || null } };
+      const actions = w.queue ? w.queue.splice(0) : undefined;   // queued actions, each handed over once (routes.md 10.8)
+      return { ok: true, status: 200, body: { screen: { ...r }, settings: w.settings[body.id] || null, ...(actions ? { actions } : {}) } };
     }
     if (m && m[2] === 'settings' && method === 'GET') return { ok: true, status: 200, body: { screen: w.screens[m[1]], settings: w.settings[m[1]] || null } };
     if (m && m[2] === 'settings' && method === 'PUT') {
@@ -69,7 +70,7 @@ function fakeTimers() {
 }
 
 /** A computer: roles, hours, a print server that can be busy, main.js's apply. */
-async function computer({ worker = fakeWorker(), print = true, display = false, name = 'Check-in laptop', signedIn = true, report, logTail, clubEvening } = {}) {
+async function computer({ worker = fakeWorker(), print = true, display = false, name = 'Check-in laptop', signedIn = true, report, logTail, clubEvening, onAction } = {}) {
   const dir = tmp();
   const pc = {
     dir, worker, timers: fakeTimers(), busy: false, applied: [], statuses: [], signedOutWith: [],
@@ -106,6 +107,7 @@ async function computer({ worker = fakeWorker(), print = true, display = false, 
     report,
     logTail,
     clubEvening,
+    onAction,
     now: () => pc.clock,
   });
   pc.clock = Date.parse('2026-10-12T15:00:00Z');
@@ -460,5 +462,41 @@ describe('main.js wiring', () => {
   it('a local change is sent up: applyRoles and the display\'s Settings window nudge it', () => {
     assert.match(main, /refreshTray\(\);\n  if \(deviceSync\) deviceSync\.nudge\(\);/);
     assert.match(main, /onChange: \(\) => \{ refreshTray\(\); if \(deviceSync\) deviceSync\.nudge\(\); \}/);
+  });
+});
+
+
+describe('actions from afar (owner 2026-11-08: show-presentation)', () => {
+  it('the allowlist is SCREEN_ACTIONS.computer, and a computer\'s actions are queued (lobby/src/lib/syncSpecs.js)', async () => {
+    const { SCREEN_ACTIONS, SCREEN_ACTION_QUEUED_KINDS } = await import('../../../lobby/src/lib/syncSpecs.js');
+    assert.deepEqual([...ds.ACTIONS], [...SCREEN_ACTIONS.computer]);
+    assert.ok(SCREEN_ACTION_QUEUED_KINDS.includes('computer'));
+  });
+
+  it('a hello\'s answer hands an action over: run once, in order; junk and other kinds\' actions are not', async () => {
+    const ran = [];
+    const pc = await computer({ display: true, onAction: (a) => ran.push(a) });
+    pc.worker.queue = [{ action: 'show-presentation', at: 'x' }, { action: 'reset-tally' }, { action: 42 }, null];
+    await pc.sync.start();
+    assert.deepEqual(ran, ['show-presentation']);
+    await pc.sync.start();
+    assert.deepEqual(ran, ['show-presentation'], 'handed over once');
+  });
+
+  it('wake() (the live channel rang its id) says hello at once; never while signed out', async () => {
+    const ran = [];
+    const pc = await computer({ display: true, onAction: (a) => ran.push(a) });
+    await pc.sync.start();
+    const before = pc.worker.calls.length;
+    pc.worker.queue = [{ action: 'show-presentation', at: 'y' }];
+    await pc.sync.wake();
+    assert.ok(pc.worker.calls.length > before, 'a round ran');
+    assert.deepEqual(ran, ['show-presentation']);
+    pc.worker.token = 'other';
+    await pc.sync.start();   // 401: signed out
+    const n = pc.worker.calls.length;
+    pc.sync.wake();
+    await new Promise((r) => setImmediate(r));
+    assert.equal(pc.worker.calls.length, n);
   });
 });

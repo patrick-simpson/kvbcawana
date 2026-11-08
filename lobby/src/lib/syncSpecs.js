@@ -155,14 +155,19 @@ export const SCREEN_ACTIONS = {
   // jump to game time): the countdown, held until the next Next.
   projector: Object.freeze(['select', 'resume', 'slide-next', 'slide-prev', 'backup', 'backup-end', 'slide-go', 'to-countdown']),
   journey: Object.freeze(['start-downloads', 'pause-downloads', 'resume-downloads', 'stop-downloads', 'delete-downloads']),
-  computer: Object.freeze([]),
+  // show-presentation (owner 2026-11-08: "add a button on the remote to push the
+  // slideshow on the lobby computer at any time"): the presentation controls
+  // (site/presentation/) switch a KVBC Awana computer's display to its
+  // Presentation screen. Queued like Journey's (the app has no page up on a
+  // Sunday afternoon); the app's own socket hears the ring and collects it at once.
+  computer: Object.freeze(['show-presentation']),
 };
 
 /** The opening-ceremony remote's backup screens: a flag beside its pledge, or the verse. */
 export const PROJECTOR_BACKUPS = Object.freeze(['us-flag', 'awana-flag', 'verse']);
 
 /** The kinds whose actions wait in the Worker for the screen's next hello (no live channel of their own). */
-export const SCREEN_ACTION_QUEUED_KINDS = Object.freeze(/** @type {readonly ScreenKind[]} */ (['journey']));
+export const SCREEN_ACTION_QUEUED_KINDS = Object.freeze(/** @type {readonly ScreenKind[]} */ (['journey', 'computer']));
 /** How many actions may wait for one screen; one more is refused. */
 export const SCREEN_ACTION_QUEUE_MAX = 5;
 /** An action not collected within this long is dropped (a press an hour late is worse than none). */

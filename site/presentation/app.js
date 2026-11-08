@@ -20,7 +20,7 @@
 // enough for the TV window. Every screen follows ONE slide on the sync
 // Worker (POST /v1/presentation/go, polled), so a phone drives the TV too.
 
-import { builtWords, clampSlide, deckOutline, followingNow, frameHtml, keyStep, modeOf, msToNextEdge, notesHere, tapStep } from './logic.js';
+import { builtWords, clampSlide, deckOutline, followingNow, frameHtml, keyStep, lobbyTargets, modeOf, msToNextEdge, notesHere, pushWords, tapStep } from './logic.js';
 
 const SYNC_INDEX = new URL('/lobby/shared/sync.json', location.href).href;
 const SESSION_KEY = 'awanaSyncSession.v1';
@@ -443,11 +443,62 @@ function onKey(e) {
   if (typeof step === 'number') stepBy(step); else move(step);
 }
 
+// ── "Show on lobby computer" ───────────────────────────────────────────────
+// Owner 2026-11-08: one press switches the lobby computer (KVBC Awana's display)
+// to its Presentation screen, at any time (a press is the presenter's own; this
+// is no poll, so it is not held to the Sunday window). Which computer is kept
+// for this page only.
+
+/** @type {{id: string, name: string, online: boolean}|null} */
+let pushTarget = null;
+
+/** The presenter picks a computer. @param {{id: string, name: string, online: boolean}[]} choices */
+function choose(choices) {
+  return new Promise((resolve) => {
+    const dlg = $('pick');
+    const list = $('pick-list');
+    list.replaceChildren();
+    const done = (v) => { dlg.close(); resolve(v); };
+    for (const c of choices) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = c.name;
+      const small = document.createElement('small');
+      small.textContent = c.online ? 'Online now' : 'Not heard from lately';
+      b.append(small);
+      b.addEventListener('click', () => done(c));
+      list.append(b);
+    }
+    $('pick-cancel').onclick = () => done(null);
+    dlg.onclose = () => resolve(null);
+    if (typeof dlg.showModal === 'function') dlg.showModal(); else done(choices[0] || null);
+  });
+}
+
+async function pushLobby() {
+  if (!session()) { status('Open the deck first (sign in).'); return; }
+  let t = pushTarget;
+  if (!t) {
+    status('Finding the lobby computer…');
+    const res = await request('/v1/screens');
+    if (!res.ok) { status(pushWords(res, 'The lobby computer')); return; }
+    const { pick, choices } = lobbyTargets(res.body?.screens);
+    if (!choices.length) { status('No KVBC Awana computer is on the service yet.'); return; }
+    t = pick || await choose(choices);
+    if (!t) { status(''); return; }
+  }
+  status(`Sending to ${t.name}…`);
+  const res = await request(`/v1/screens/${encodeURIComponent(t.id)}/action`, { method: 'POST', body: { action: 'show-presentation' } });
+  pushTarget = res.ok ? t : res.status === 404 ? null : t;
+  status(pushWords(res, t.name));
+}
+
 // ── start ──────────────────────────────────────────────────────────────────
 
 async function start() {
   $('signin').addEventListener('submit', signIn);
   $('lock').addEventListener('click', lock);
+  $('push-lobby').addEventListener('click', () => { pushLobby().catch(() => status('Could not send it. Try again.')); });
   $('back').addEventListener('click', () => stepBy(-1));
   $('next').addEventListener('click', () => stepBy(1));
   // The lobby computer's Settings window is controls only: its TV is the other window.

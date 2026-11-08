@@ -161,3 +161,31 @@ export function msToNextEdge(d = new Date()) {
   const edges = [FOLLOW_WINDOW.from, FOLLOW_WINDOW.until, ...FOLLOW_EXTRA.flatMap((w) => [w.from, w.until])].map((e) => ((e - mins + 1440) % 1440 || 1440) * 60000 - secs);
   return Math.max(1000, Math.min(60 * 60 * 1000, ...edges));
 }
+
+// "Show on lobby computer" (owner 2026-11-08: "add a button on the remote to push
+// the slideshow on the lobby computer at any time"): the press goes to one KVBC
+// Awana computer (POST /v1/screens/<id>/action {action: 'show-presentation'},
+// worker/src/routes.md 10.8), which switches its display to the Presentation
+// screen. The computer named like "lobby" is taken when there is exactly one;
+// otherwise the presenter picks (remembered for this page only, never stored).
+/**
+ * @param {unknown} screens GET /v1/screens' list
+ * @returns {{ pick: {id: string, name: string, online: boolean}|null, choices: {id: string, name: string, online: boolean}[] }}
+ */
+export function lobbyTargets(screens) {
+  const pcs = (Array.isArray(screens) ? screens : [])
+    .filter((s) => s && s.kind === 'computer' && typeof s.id === 'string' && s.id)
+    .map((s) => ({ id: s.id, name: typeof s.name === 'string' && s.name.trim() ? s.name.trim().slice(0, 60) : 'Computer', online: s.online === true }));
+  const lobby = pcs.filter((s) => /lobby/i.test(s.name));
+  return { pick: lobby.length === 1 ? lobby[0] : null, choices: [...lobby, ...pcs.filter((s) => !lobby.includes(s))] };
+}
+
+/** What the status line says after the press. @param {{ok: boolean, status: number}} res @param {string} name */
+export function pushWords(res, name) {
+  if (res.ok) return `Sent: ${name} switches to the slideshow in a few seconds.`;
+  if (res.status === 401) return 'Signed out: open the deck again, then try once more.';
+  if (res.status === 404) return `${name} is not on the service any more. Tap again to pick.`;
+  if (res.status === 429) return `${name} has presses waiting already. It takes them as it comes online.`;
+  if (res.status === 0) return 'Could not reach the service. Check the internet and try again.';
+  return `${name} did not take it (HTTP ${res.status}).`;
+}

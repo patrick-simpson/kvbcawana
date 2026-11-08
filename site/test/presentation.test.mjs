@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { FRAME_HELPER, builtWords, clampSlide, deckOutline, followingNow, frameHtml, keyStep, modeOf, msToNextEdge, notesHere, tapStep } from '../presentation/logic.js';
+import { FRAME_HELPER, builtWords, clampSlide, deckOutline, followingNow, frameHtml, keyStep, lobbyTargets, modeOf, msToNextEdge, notesHere, pushWords, tapStep } from '../presentation/logic.js';
 
 const SITE = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const page = readFileSync(path.join(SITE, 'presentation', 'index.html'), 'utf8');
@@ -133,4 +133,24 @@ test('today only (owner 2026-11-08): it also follows 4-7 PM Eastern on 2026-11-0
   assert.equal(followingNow(et('2026-11-09T01:59:00Z')), true, '8:59 PM (the Sunday window still)');
   assert.equal(followingNow(et('2026-11-15T21:30:00Z')), false, 'next Sunday 4:30 PM: not again');
   assert.equal(msToNextEdge(et('2026-11-08T20:30:00Z')), 30 * 60 * 1000, 'opens at 4');
+});
+
+
+test('"Show on lobby computer" (owner 2026-11-08): the lobby-named computer, else a pick; one action, at any time', () => {
+  const list = [
+    { id: 'tv1', kind: 'lobby', name: 'Lobby TV', online: true },
+    { id: 'pc1', kind: 'computer', name: 'Check-in laptop', online: true },
+    { id: 'pc2', kind: 'computer', name: 'Lobby computer', online: false },
+  ];
+  const t = lobbyTargets(list);
+  assert.deepEqual(t.pick, { id: 'pc2', name: 'Lobby computer', online: false });
+  assert.deepEqual(t.choices.map((c) => c.id), ['pc2', 'pc1'], 'computers only, the lobby one first');
+  assert.equal(lobbyTargets([...list, { id: 'pc3', kind: 'computer', name: 'lobby 2' }]).pick, null, 'two lobby computers: the presenter picks');
+  assert.deepEqual(lobbyTargets(null), { pick: null, choices: [] });
+  assert.match(pushWords({ ok: true, status: 200 }, 'Lobby computer'), /^Sent: Lobby computer switches to the slideshow/);
+  assert.match(pushWords({ ok: false, status: 401 }, 'x'), /Signed out/);
+  assert.match(pushWords({ ok: false, status: 0 }, 'x'), /Could not reach/);
+  assert.match(app, /\/v1\/screens\/\$\{encodeURIComponent\(t\.id\)\}\/action`, \{ method: 'POST', body: \{ action: 'show-presentation' \} \}/);
+  assert.doesNotMatch(app.slice(app.indexOf('async function pushLobby'), app.indexOf('// ── start')), /followingNow|store\.set/,
+    'a press at any time, and nothing of it goes to storage');
 });

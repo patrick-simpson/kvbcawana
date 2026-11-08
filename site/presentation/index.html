@@ -87,6 +87,12 @@
   .count { min-width: 5.5em; text-align: center; font: 400 26px/1 var(--brand-font-display); font-variant-numeric: tabular-nums; }
   .count small { display: block; margin-top: 4px; font: 400 12px/1 var(--brand-font-label); letter-spacing: .1em; color: var(--dim); }
   .status { font-size: 14px; color: var(--dim); }
+  #pick { border: 1px solid var(--rule); border-radius: 12px; background: var(--desk); color: inherit; padding: 18px 20px; min-width: min(360px, calc(100vw - 32px)); }
+  #pick::backdrop { background: rgba(0, 0, 0, .6); }
+  #pick h2 { margin: 0 0 12px; font: 400 18px/1.2 var(--brand-font-label); letter-spacing: .06em; text-transform: uppercase; }
+  #pick-list { display: grid; gap: 8px; margin-bottom: 12px; }
+  #pick-list button { text-align: left; padding: 12px 14px; font-size: 16px; }
+  #pick-list small { display: block; color: var(--dim); font-size: 13px; }
 
   @media (max-width: 900px) {
     .bar { flex-wrap: wrap; padding: 10px 16px; } .bar img { width: 200px; min-width: 0; }
@@ -142,6 +148,7 @@
     <span class="built" id="built"></span>
     <div class="right">
       <span class="live" id="live" data-on="">Connecting</span>
+      <button type="button" id="push-lobby">Show on lobby computer</button>
       <button type="button" id="lock">Lock</button>
     </div>
   </header>
@@ -180,6 +187,12 @@
     </div>
   </footer>
 </section>
+
+<dialog id="pick" aria-labelledby="pick-title">
+  <h2 id="pick-title">Which computer is in the lobby?</h2>
+  <div id="pick-list"></div>
+  <button type="button" id="pick-cancel">Cancel</button>
+</dialog>
 
 <script type="module" src="./app.js"></script>
 </body>

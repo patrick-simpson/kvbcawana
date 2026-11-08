@@ -1343,6 +1343,7 @@ for its next hello.
 | `POST /v1/screens/<id>/action` (a `journey` screen) | session | `{action}`: `start-downloads` \| `pause-downloads` \| `resume-downloads` \| `stop-downloads` \| `delete-downloads` (`SCREEN_ACTIONS.journey`; `data` dropped) | `{ok, delivered: false, queued: true}`; 400 for anything else; 429 when `SCREEN_ACTION_QUEUE_MAX` (5) already wait |
 | `POST /v1/screens/hello` (a `journey` screen) | session | as 10.7 | as 10.7 plus `actions: [{action, at}]`: everything queued since its last hello, in order, each ONCE (the queue key is deleted as it is read); `[]` when none. Other kinds' answers have no `actions` field |
 | `GET /v1/journey` | session | | `{journey: {savedAt, settings} \| null}` (the room document alone, without the deck `/v1/state` carries) |
+| `POST /v1/screens/<id>/action` (a `computer` screen) | session | `{action: 'show-presentation'}` (owner 2026-11-08; `SCREEN_ACTIONS.computer`; `data` dropped): the presentation controls switch a KVBC Awana computer's display to its Presentation screen | as the `journey` row: queued, rung as `screen-action` with its id (the app's own socket hears it and hellos at once), handed over in the computer's next hello `actions` |
 
 - Storage: `screenq:<id>` `{items: [{action, at}]}`, at most 5 items, one key
   per kiosk, written by the action, deleted by the next hello (or when the

@@ -1,4 +1,9 @@
-﻿## [10.7.2] - 2026-11-03
+﻿## [10.8.0] - 2026-11-08
+The presentation controls can put the slideshow up on the lobby computer.
+
+**Show on lobby computer.** awana.kvbchurch.org/presentation has a new "Show on lobby computer" button (owner: "add a button on the remote to push the slideshow on the lobby computer at any time"). One press switches the lobby computer's display to its Presentation screen, at any hour, even if it was hidden from the tray; if the slideshow is already up, nothing reloads. The computer hears the press within a few seconds: with the display role on, the app keeps one connection open to the check-in service, which rings it when a press is waiting, and its next check-in collects it (a dropped connection only means it waits for the next check-in, 2 to 15 minutes). A computer without the display role ignores it. The deck still opens with the church passphrase on that computer, as before (typed once in the KVBC Awana Settings window).
+
+## [10.7.2] - 2026-11-03
 Between club nights the app checks in far less often.
 
 **Club evening only.** Outside the club evening (Wednesday 3:30 to 10:00 pm Eastern) a print station now asks for labels every 5 minutes (was 45 seconds), and every computer reports to awana.kvbchurch.org/settings every 15 minutes (was 2). Labels still print at once at any hour: the check-in service rings the station the moment one is ready. On the club evening nothing changes. What you may notice outside it: /settings can show a computer as Off or a little out of date, a change made there can take up to 15 minutes to reach a computer, and on a test day /checkin may say the printer has not been seen (it still prints). Why: the owner asked that these checks "really happen Wednesday evenings when it would matter"; the church's free Cloudflare plan is shared with the camp's phone alerts.
