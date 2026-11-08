@@ -1,4 +1,9 @@
-﻿## [10.8.0] - 2026-11-08
+﻿## [10.9.0] - 2026-11-08
+Cast: anyone can present on the lobby TV from their laptop.
+
+**Cast (screen sharing).** Right-click the KVBC Awana icon in the taskbar and tick "Cast (screen sharing)" (owner: "It should be allowed to be enabled by right clicking on the icon in the task bar"). The TV shows a six-digit code in the church's own look. A presenter opens awana.kvbchurch.org/cast, types the code (no passphrase), and can share their screen live, play a YouTube video, show text, show pictures, or show a PDF or Google Slides (PowerPoint: save as PDF, or share the screen). Untick it to go back to the screen that was up before; the code stops working and everything a presenter put up is deleted. A screen share goes straight from the laptop to this computer over the church network (nothing passes through the internet), so this computer now answers with its real local address instead of a hidden name: with the church's UniFi rule, a laptop on the guest Wi-Fi can reach this one computer and nothing else.
+
+## [10.8.0] - 2026-11-08
 The presentation controls can put the slideshow up on the lobby computer.
 
 **Show on lobby computer.** awana.kvbchurch.org/presentation has a new "Show on lobby computer" button (owner: "add a button on the remote to push the slideshow on the lobby computer at any time"). One press switches the lobby computer's display to its Presentation screen, at any hour, even if it was hidden from the tray; if the slideshow is already up, nothing reloads. The computer hears the press within a few seconds: with the display role on, the app keeps one connection open to the check-in service, which rings it when a press is waiting, and its next check-in collects it (a dropped connection only means it waits for the next check-in, 2 to 15 minutes). A computer without the display role ignores it. The deck still opens with the church passphrase on that computer, as before (typed once in the KVBC Awana Settings window).

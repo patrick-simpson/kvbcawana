@@ -106,6 +106,17 @@ describe('Cast: the code, the token, the room', () => {
     expect((await s.call('POST', '/v1/cast/join', { code }, { auth: '' })).body.reason).toBe('off');
   });
 
+  it('the screen can take an ended video down itself (Back only)', async () => {
+    const s = await setup();
+    const { code } = (await s.call('POST', '/v1/cast/open', {})).body;
+    const { token } = (await s.call('POST', '/v1/cast/join', { code }, { auth: '' })).body;
+    await s.call('POST', '/v1/cast/press', { action: 'item', data: { item: { id: 'bplaceholder', kind: 'video', youtube: 'dQw4w9WgXcQ' } } }, { auth: '', cast: token });
+    expect((await s.call('GET', '/v1/cast/screen')).body.stage.show.button.kind).toBe('video');
+    expect((await s.call('POST', '/v1/cast/screen/back', {})).status).toBe(200);
+    expect((await s.call('GET', '/v1/cast/screen')).body.stage.show).toBeNull();
+    expect((await s.call('POST', '/v1/cast/screen/back', {}, { auth: '' })).status).toBe(401);
+  });
+
   it('a file must be this room\'s finished file to go up', async () => {
     const s = await setup();
     const { code } = (await s.call('POST', '/v1/cast/open', {})).body;

@@ -15,6 +15,7 @@ const ALLOWED = [
   '/classroom/', '/classroom/remote/', // owner 2026-10-18: the Sparks remote is on the links page
   '/lobby/projector-remote.html', // the opening ceremony remote (phone: Next and Back for the projector's slides)
   '/lobby/scoreboard.html', // the game time scoreboard (phone: four teams' scores and the stopwatch on the projector)
+  '/cast/', // owner 2026-11-08: Cast, present on the lobby TV with the code it shows
   '/settings', '/logo/',
   '/tools/print/', // owner 2026-10-28: the letterhead maker; renamed the Print tool 2026-11-05
   '/download/kvbc-awana', '/help', '/capabilities.html', '/release-notes/printer.md',

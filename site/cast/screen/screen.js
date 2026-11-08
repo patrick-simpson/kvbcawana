@@ -340,9 +340,16 @@ async function playVideo(b) {
     playerVars: { autoplay: 1, controls: 0, rel: 0, modestbranding: 1, playsinline: 1, iv_load_policy: 3, fs: 0, disablekb: 1, start: b.start || 0, origin: location.origin },
     events: {
       onReady: (e) => { playerReady = true; try { e.target.unMute(); e.target.playVideo(); } catch { /* blocked */ } report(); },
-      // Ended: the presenter takes it down (only a presenter may press); until then the
-      // TV rests on black rather than YouTube's end screen.
-      onStateChange: (e) => { if (e.data === 0) { const f = layer.querySelector('iframe'); if (f) f.style.visibility = 'hidden'; } report(); },
+      // Ended: black at once (never YouTube's end screen), then the TV takes it down itself
+      // (POST /v1/cast/screen/back) and the code comes back, like the classroom's video.
+      onStateChange: (e) => {
+        if (e.data === 0) {
+          const f = layer.querySelector('iframe');
+          if (f) f.style.visibility = 'hidden';
+          request('/v1/cast/screen/back', { method: 'POST', body: {} }).catch(() => {});
+        }
+        report();
+      },
     },
   });
 }

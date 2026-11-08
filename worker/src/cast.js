@@ -150,6 +150,8 @@ export function mountCast(registry, core) {
   registry.add('POST', '/v1/cast/screen/now', 'session', async ({ body }) => c().engine.putNow(await body()));
   registry.add('GET', '/v1/cast/screen/signal', 'session', async () => c().engine.readSignal('offer', null));
   registry.add('POST', '/v1/cast/screen/signal', 'session', async ({ body }) => c().engine.putSignal(await body()));
+  // A video that ended: the screen takes it down itself (only Back: never another press).
+  registry.add('POST', '/v1/cast/screen/back', 'session', async () => c().engine.press('cast-screen', { action: 'back' }));
   // A presenter (the code's token).
   registry.add('POST', '/v1/cast/join', 'public', async ({ body }) => c().join(await body()));
   registry.add('GET', '/v1/cast/state', 'public', presenter(async () => c().engine.remoteState()));

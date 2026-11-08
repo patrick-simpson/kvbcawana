@@ -1706,6 +1706,7 @@ each good for `TOKEN_TTL_MS` (8 h).
 | `POST /v1/cast/screen/now` | session | `{now}` | as `POST /v1/classroom/now` (views add `screen`, `waiting`) |
 | `GET /v1/cast/screen/signal` | session | | `{signal: {type: 'offer', id, sdp} \| null, id}`: the share's offer |
 | `POST /v1/cast/screen/signal` | session | `{signal: {type: 'answer', id, sdp}}` | `{ok}`; 409 `no-offer`, `ended` |
+| `POST /v1/cast/screen/back` | session | `{}` | as a presenter's Back (a video that ended takes itself down) |
 | `POST /v1/cast/join` | public | `{code}` (spaces ignored) | `{ok, token, ttlMs}`; 403 `wrong-code` / `off`; 429 `locked` |
 | `GET /v1/cast/state` | public + token | | as `GET /v1/classroom/remote/state` (reading it is watching) |
 | `POST /v1/cast/press` | public + token | as `POST /v1/classroom/remote`; `item {item}` puts a video, text, picture or PDF up directly (its file a finished file of this room, else 400 `file-missing`), `screen {title?}` puts a shared screen up | as 10.13 plus `button` (the new stage button's id) for `item`/`screen` |
