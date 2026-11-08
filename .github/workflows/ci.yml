@@ -336,6 +336,25 @@ jobs:
       - run: node --check letterhead-print.mjs
       - run: npm test
 
+  cast-convert:
+    # Cast's PowerPoint job (scripts/cast/convert.mjs, run by cast-convert.yml):
+    # opening the upload, the presentation check, the stand-in Worker. No package.
+    # The real LibreOffice test skips here (no soffice on the runner; the job
+    # itself installs it); run it locally where soffice is installed.
+    name: Cast PowerPoint script
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    defaults:
+      run:
+        working-directory: scripts/cast
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --check convert.mjs
+      - run: node --test test/*.test.mjs
+
   printer:
     name: Club Label Printer
     needs: changes

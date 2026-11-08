@@ -1,0 +1,60 @@
+name: Cast - turn a PowerPoint into slides
+
+# Owner 2026-11-08: "Support pptx upload and show a preview on the phone screen"
+# (the exact copy, about a minute). The sync Worker starts this job for a presenter
+# on awana.kvbchurch.org/cast (worker/src/cast.js, routes.md 10.18) with ONE input,
+# job = <id>.<key>: the PowerPoint was scrambled in the presenter's browser; the job
+# reads it from the Worker with the machine token (HANDBOOK_TOKEN), opens it with the
+# key, LibreOffice Impress makes the PDF, and the PDF goes back to the Worker as a
+# file of the Cast room (scripts/cast/convert.mjs). The Worker deletes the scrambled
+# upload once the job answers. Not meant to be run by hand.
+#
+# The key is a dispatch input, so it shows on this run's page (the print tool's
+# accepted trade): the ciphertext also needs the machine token, and is gone once
+# this job has run. The log names sizes and status codes only.
+
+on:
+  workflow_dispatch:
+    inputs:
+      job:
+        description: 'Filled in by the sync Worker (<id>.<key>)'
+        type: string
+        required: true
+
+permissions: {}
+
+concurrency:
+  group: cast-convert
+  cancel-in-progress: false
+
+jobs:
+  convert:
+    name: PowerPoint to PDF
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Hide the key from the log
+        env:
+          JOB: ${{ inputs.job }}
+        run: echo "::add-mask::${JOB#*.}"
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          sparse-checkout: scripts/cast
+      # Impress only, and the faces PowerPoint decks name most: Carlito/Caladea are
+      # metric twins of Calibri/Cambria, Liberation of Arial/Times/Courier, so text
+      # wraps where PowerPoint wraps it.
+      - name: Install LibreOffice
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends \
+            libreoffice-impress libreoffice-core \
+            fonts-crosextra-carlito fonts-crosextra-caladea fonts-liberation fonts-dejavu-core fonts-noto-core > /dev/null
+          soffice --version
+      - name: Make the slides
+        working-directory: scripts/cast
+        env:
+          JOB: ${{ inputs.job }}
+          SITE_ORIGIN: ${{ vars.SITE_ORIGIN || 'https://awana.kvbchurch.org' }}
+          PRINT_FETCH_TOKEN: ${{ secrets.HANDBOOK_TOKEN }}
+        run: node convert.mjs
