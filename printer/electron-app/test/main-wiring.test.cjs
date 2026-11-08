@@ -143,6 +143,10 @@ describe('Cast from the tray (owner 2026-11-08: "enabled by right clicking on th
 
   it('turning Cast off closes the room with this computer\'s own sign-in', () => {
     assert.match(main, /onCast: \(on\) => \{/);
+    // "Show Cast code" (owner 2026-11-08): only while Cast is up; main.js resets the room.
+    assert.match(display, /\{ label: 'Show Cast code', enabled: state\.settings\.screen === 'cast', click: castReset \}/);
+    assert.match(main, /onCastReset: \(\) => \{/);
+    assert.match(main, /'\/v1\/cast\/reset', \{ method: 'POST', body: \{\}, session: sess\.session \}/);
     assert.match(main, /syncClient\.syncRequest\(sess\.url, '\/v1\/cast\/close', \{ method: 'POST'/);
   });
 

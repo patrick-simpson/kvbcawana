@@ -1421,6 +1421,15 @@ app.whenReady().then(async () => {
         .then((r) => console.log('[cast] room closed:', r && r.status))
         .catch((e) => console.log('[cast] could not close the room:', e && e.message));
     },
+    // The tray's "Show Cast code" (owner 2026-11-08): everything down, nobody connected,
+    // the same code on the TV (routes.md 10.18 POST /v1/cast/reset).
+    onCastReset: () => {
+      const sess = deviceSession();
+      if (!sess || !syncClient) return;
+      syncClient.syncRequest(sess.url, '/v1/cast/reset', { method: 'POST', body: {}, session: sess.session })
+        .then((r) => console.log('[cast] room reset:', r && r.status))
+        .catch((e) => console.log('[cast] could not reset the room:', e && e.message));
+    },
     // The classroom screen's /settings preview (display/classroom-preview.js;
     // worker/src/routes.md 10.13), asked with this computer's own sign-in.
     classroomStage: async () => {

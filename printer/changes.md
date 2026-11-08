@@ -1,4 +1,9 @@
-﻿## [10.9.0] - 2026-11-08
+﻿## [10.10.0] - 2026-11-08
+Cast: "Show Cast code" in the tray.
+
+**Show Cast code.** While Cast is on, right-click the KVBC Awana icon and choose "Show Cast code" (owner: "Add a display code button"). Whatever a presenter put up comes down, whoever is connected is let go, and the TV shows the same code again, ready for the next person. Cast now lets one phone or laptop present at a time; a presenter frees the room with Disconnect or Display code on their own page, or after 30 quiet minutes, and this item does it from the lobby computer. The Cast screen also gained a QR code beside the code, a note that a laptop must join the KVBC_Guest Wi-Fi to share its screen, and plays uploaded videos and public Facebook videos (those come from the website and need no update).
+
+## [10.9.0] - 2026-11-08
 Cast: anyone can present on the lobby TV from their laptop.
 
 **Cast (screen sharing).** Right-click the KVBC Awana icon in the taskbar and tick "Cast (screen sharing)" (owner: "It should be allowed to be enabled by right clicking on the icon in the task bar"). The TV shows a six-digit code in the church's own look. A presenter opens awana.kvbchurch.org/cast, types the code (no passphrase), and can share their screen live, play a YouTube video, show text, show pictures, or show a PDF or Google Slides (PowerPoint: save as PDF, or share the screen). Untick it to go back to the screen that was up before; the code stops working and everything a presenter put up is deleted. A screen share goes straight from the laptop to this computer over the church network (nothing passes through the internet), so this computer now answers with its real local address instead of a hidden name: with the church's UniFi rule, a laptop on the guest Wi-Fi can reach this one computer and nothing else.

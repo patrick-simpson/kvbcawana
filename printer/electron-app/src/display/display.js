@@ -723,6 +723,17 @@ function createDisplay(opts) {
     if (opts.onCast) { try { opts.onCast(false); } catch { /* best effort */ } }
   }
 
+  /**
+   * "Show Cast code" (owner 2026-11-08: "Add a display code button", in the tray too):
+   * while Cast is up, main.js resets the room (POST /v1/cast/reset): whatever is up comes
+   * down, whoever is connected is let go, the TV shows the SAME code again.
+   */
+  function castReset() {
+    if (state.settings.screen !== 'cast') return;
+    log('cast: show the code (room reset)');
+    if (opts.onCastReset) { try { opts.onCastReset(); } catch { /* best effort */ } }
+  }
+
   /** New hours apply at once: the screen opens or closes on the next evaluate. */
   function setHours(h) {
     const next = normalizeSettings({ ...state.settings, hours: h });
@@ -939,6 +950,7 @@ function createDisplay(opts) {
       },
       // Cast (owner 2026-11-08: "enabled by right clicking on the icon in the task bar").
       { label: 'Cast (screen sharing)', type: 'checkbox', checked: state.settings.screen === 'cast', click: () => (state.settings.screen === 'cast' ? castOff() : castOn()) },
+      { label: 'Show Cast code', enabled: state.settings.screen === 'cast', click: castReset },
       { label: 'Show now (for 3 hours)', enabled: !scheduledNow(t), click: requestShow },
       { label: 'Hide until the next club night', enabled: visible, click: () => { state.overrides = hide(state.overrides, currentWindow()); blackDismissed = true; saveState(); evaluate(); } },
       { label: 'Resume schedule', enabled: overridden, click: () => { state.overrides = NO_OVERRIDES; saveState(); evaluate(); } },
@@ -1128,7 +1140,7 @@ function createDisplay(opts) {
   return {
     start, stop, isRunning: () => running,
     menuItems, statusLine, requestShow, openConfigurator, openChooser,
-    prepareInstall, cancelInstall, beforeQuit, configure, showScreen, castOn, castOff, info, log,
+    prepareInstall, cancelInstall, beforeQuit, configure, showScreen, castOn, castOff, castReset, info, log,
   };
 }
 
