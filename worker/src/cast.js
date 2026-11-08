@@ -33,7 +33,8 @@
 // the presenter leaves (POST /v1/cast/leave, the page's Disconnect and "Display
 // code"), goes quiet for PRESENTER_IDLE_MS, or the lobby computer's tray "Show Cast
 // code" resets the room (POST /v1/cast/reset: everything down, nobody connected, the
-// SAME code). When a token was last used is memory only (a write every poll would
+// SAME code), or its "Disconnect the presenter" lets them go and leaves the TV as it is
+// (POST /v1/cast/kick). When a token was last used is memory only (a write every poll would
 // spend the free plan's storage writes); after a restart it counts from the join.
 //
 // YouTube search (owner 2026-11-08): GET /v1/cast/youtube?q= asks the YouTube Data
@@ -215,6 +216,19 @@ export class Cast {
     await this.storage.put(ROOM_KEY, { ...room, tokens: [] });
     this.seen.clear();
     return json({ ok: true, code: room.code });
+  }
+
+  /**
+   * POST /v1/cast/kick (the lobby computer's tray "Disconnect the presenter", owner
+   * 2026-11-08: "an option that you can click on the desktop that lets you disconnect a
+   * device"): whoever is connected is let go; what is on the TV stays.
+   */
+  async kick() {
+    const room = await this.roomDoc();
+    const had = room.tokens.length;
+    await this.storage.put(ROOM_KEY, { ...room, tokens: [] });
+    this.seen.clear();
+    return json({ ok: true, disconnected: had > 0 });
   }
 
   /** GET /v1/cast/youtube?q= (the presenter): YouTube's videos for the words. @param {string | null} q */
@@ -430,6 +444,7 @@ export function mountCast(registry, core) {
   registry.add('POST', '/v1/cast/screen/back', 'session', async () => c().engine.press('cast-screen', { action: 'back' }));
   // A presenter (the code's token).
   registry.add('POST', '/v1/cast/reset', 'session', async () => c().reset());
+  registry.add('POST', '/v1/cast/kick', 'session', async () => c().kick());
   registry.add('POST', '/v1/cast/join', 'public', async ({ body }) => c().join(await body()));
   registry.add('POST', '/v1/cast/leave', 'public', presenter(async ({ body }, who) => c().leave(who, await body())));
   registry.add('GET', '/v1/cast/youtube', 'public', presenter(async ({ url }) => c().youtube(url.searchParams.get('q'))));

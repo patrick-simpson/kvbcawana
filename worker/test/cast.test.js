@@ -436,4 +436,15 @@ describe('one presenter, leave, reset, YouTube search, Facebook and uploaded vid
     const out = sanitizeButtons({ items: [clip(1), clip(2), clip(3), clip(4), { id: 'bfacebook1', kind: 'facebook', href: 'https://fb.watch/abc/' }] });
     expect(out.items.map((i) => i.kind)).toEqual(['clip', 'clip', 'clip']);
   });
+
+  it('the tray\'s Disconnect the presenter lets them go and leaves the TV as it is', async () => {
+    const s = await room();
+    const a = (await s.join()).body.token;
+    await s.call('POST', '/v1/cast/press', { action: 'item', data: { item: { id: 'bplaceholder', kind: 'text', text: 'Welcome' } } }, { auth: '', cast: a });
+    expect((await s.call('POST', '/v1/cast/kick', {}, { auth: '' })).status).toBe(401);
+    expect((await s.call('POST', '/v1/cast/kick', {})).body).toEqual({ ok: true, disconnected: true });
+    expect((await s.call('GET', '/v1/cast/state', undefined, { auth: '', cast: a })).status).toBe(401);
+    expect((await s.call('GET', '/v1/cast/screen')).body.stage.show).not.toBeNull();
+    expect((await s.join()).status).toBe(200);
+  });
 });

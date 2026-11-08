@@ -1708,6 +1708,7 @@ each good for `TOKEN_TTL_MS` (8 h).
 | `POST /v1/cast/screen/signal` | session | `{signal: {type: 'answer', id, sdp}}` | `{ok}`; 409 `no-offer`, `ended` |
 | `POST /v1/cast/screen/back` | session | `{}` | as a presenter's Back (a video that ended takes itself down) |
 | `POST /v1/cast/reset` | session (KVBC Awana's tray "Show Cast code") | `{}` | `{ok, code}`: everything down, every file gone, nobody connected, the SAME code |
+| `POST /v1/cast/kick` | session (KVBC Awana's tray "Disconnect the presenter") | `{}` | `{ok, disconnected}`: whoever is connected is let go; what is on the TV stays |
 | `POST /v1/cast/join` | public | `{code}` (spaces ignored) | `{ok, token, ttlMs}`; 403 `wrong-code` / `off`; 429 `locked`; 409 `busy` (another presenter's token is live and was used within `PRESENTER_IDLE_MS` 30 min: ONE presenter at a time, owner 2026-11-08) |
 | `POST /v1/cast/leave` | public + token | `{takeDown?: true}` | `{ok}`: this presenter's token is dropped (the room is free); `takeDown` puts the TV back to its code first (the page's "Display code") |
 | `GET /v1/cast/youtube?q=` | public + token | | `{ok, results: [{youtube, title, channel, seconds}]}` (at most 8; YouTube Data API with secret `YOUTUBE_API_KEY`, safe search strict, embeddable only; kept 10 min; `YOUTUBE_PER_HOUR` 60); 503 `not-configured`, 502 `youtube`, 429 `too-many` |

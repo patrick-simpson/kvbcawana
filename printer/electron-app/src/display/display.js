@@ -734,6 +734,17 @@ function createDisplay(opts) {
     if (opts.onCastReset) { try { opts.onCastReset(); } catch { /* best effort */ } }
   }
 
+  /**
+   * "Disconnect the presenter" (owner 2026-11-08: "an option that you can click on the
+   * desktop that lets you disconnect a device"): main.js lets whoever is connected go
+   * (POST /v1/cast/kick); what is on the TV stays, and the next person can join.
+   */
+  function castKick() {
+    if (state.settings.screen !== 'cast') return;
+    log('cast: disconnect the presenter');
+    if (opts.onCastKick) { try { opts.onCastKick(); } catch { /* best effort */ } }
+  }
+
   /** New hours apply at once: the screen opens or closes on the next evaluate. */
   function setHours(h) {
     const next = normalizeSettings({ ...state.settings, hours: h });
@@ -951,6 +962,7 @@ function createDisplay(opts) {
       // Cast (owner 2026-11-08: "enabled by right clicking on the icon in the task bar").
       { label: 'Cast (screen sharing)', type: 'checkbox', checked: state.settings.screen === 'cast', click: () => (state.settings.screen === 'cast' ? castOff() : castOn()) },
       { label: 'Show Cast code', enabled: state.settings.screen === 'cast', click: castReset },
+      { label: 'Disconnect the presenter', enabled: state.settings.screen === 'cast', click: castKick },
       { label: 'Show now (for 3 hours)', enabled: !scheduledNow(t), click: requestShow },
       { label: 'Hide until the next club night', enabled: visible, click: () => { state.overrides = hide(state.overrides, currentWindow()); blackDismissed = true; saveState(); evaluate(); } },
       { label: 'Resume schedule', enabled: overridden, click: () => { state.overrides = NO_OVERRIDES; saveState(); evaluate(); } },
@@ -1140,7 +1152,7 @@ function createDisplay(opts) {
   return {
     start, stop, isRunning: () => running,
     menuItems, statusLine, requestShow, openConfigurator, openChooser,
-    prepareInstall, cancelInstall, beforeQuit, configure, showScreen, castOn, castOff, castReset, info, log,
+    prepareInstall, cancelInstall, beforeQuit, configure, showScreen, castOn, castOff, castReset, castKick, info, log,
   };
 }
 

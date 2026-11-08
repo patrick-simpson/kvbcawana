@@ -1430,6 +1430,15 @@ app.whenReady().then(async () => {
         .then((r) => console.log('[cast] room reset:', r && r.status))
         .catch((e) => console.log('[cast] could not reset the room:', e && e.message));
     },
+    // The tray's "Disconnect the presenter" (owner 2026-11-08): the phone or laptop is
+    // let go, what is on the TV stays (routes.md 10.18 POST /v1/cast/kick).
+    onCastKick: () => {
+      const sess = deviceSession();
+      if (!sess || !syncClient) return;
+      syncClient.syncRequest(sess.url, '/v1/cast/kick', { method: 'POST', body: {}, session: sess.session })
+        .then((r) => console.log('[cast] presenter disconnected:', r && r.status))
+        .catch((e) => console.log('[cast] could not disconnect the presenter:', e && e.message));
+    },
     // The classroom screen's /settings preview (display/classroom-preview.js;
     // worker/src/routes.md 10.13), asked with this computer's own sign-in.
     classroomStage: async () => {

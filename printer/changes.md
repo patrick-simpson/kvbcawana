@@ -1,4 +1,9 @@
-﻿## [10.10.0] - 2026-11-08
+﻿## [10.11.0] - 2026-11-08
+Cast: "Disconnect the presenter" in the tray.
+
+**Disconnect the presenter.** While Cast is on, right-click the KVBC Awana icon and choose "Disconnect the presenter" (owner: "an option that you can click on the desktop that lets you disconnect a device"). The phone or laptop that is presenting is let go at once (its page says it is no longer connected) and the next person can type the code; whatever is on the TV stays up. "Show Cast code" still does both: takes everything down and lets the presenter go.
+
+## [10.10.0] - 2026-11-08
 Cast: "Show Cast code" in the tray.
 
 **Show Cast code.** While Cast is on, right-click the KVBC Awana icon and choose "Show Cast code" (owner: "Add a display code button"). Whatever a presenter put up comes down, whoever is connected is let go, and the TV shows the same code again, ready for the next person. Cast now lets one phone or laptop present at a time; a presenter frees the room with Disconnect or Display code on their own page, or after 30 quiet minutes, and this item does it from the lobby computer. The Cast screen also gained a QR code beside the code, a note that a laptop must join the KVBC_Guest Wi-Fi to share its screen, and plays uploaded videos and public Facebook videos (those come from the website and need no update).
