@@ -1707,7 +1707,10 @@ each good for `TOKEN_TTL_MS` (8 h).
 | `GET /v1/cast/screen/signal` | session | | `{signal: {type: 'offer', id, sdp} \| null, id}`: the share's offer |
 | `POST /v1/cast/screen/signal` | session | `{signal: {type: 'answer', id, sdp}}` | `{ok}`; 409 `no-offer`, `ended` |
 | `POST /v1/cast/screen/back` | session | `{}` | as a presenter's Back (a video that ended takes itself down) |
-| `POST /v1/cast/join` | public | `{code}` (spaces ignored) | `{ok, token, ttlMs}`; 403 `wrong-code` / `off`; 429 `locked` |
+| `POST /v1/cast/reset` | session (KVBC Awana's tray "Show Cast code") | `{}` | `{ok, code}`: everything down, every file gone, nobody connected, the SAME code |
+| `POST /v1/cast/join` | public | `{code}` (spaces ignored) | `{ok, token, ttlMs}`; 403 `wrong-code` / `off`; 429 `locked`; 409 `busy` (another presenter's token is live and was used within `PRESENTER_IDLE_MS` 30 min: ONE presenter at a time, owner 2026-11-08) |
+| `POST /v1/cast/leave` | public + token | `{takeDown?: true}` | `{ok}`: this presenter's token is dropped (the room is free); `takeDown` puts the TV back to its code first (the page's "Display code") |
+| `GET /v1/cast/youtube?q=` | public + token | | `{ok, results: [{youtube, title, channel, seconds}]}` (at most 8; YouTube Data API with secret `YOUTUBE_API_KEY`, safe search strict, embeddable only; kept 10 min; `YOUTUBE_PER_HOUR` 60); 503 `not-configured`, 502 `youtube`, 429 `too-many` |
 | `GET /v1/cast/state` | public + token | | as `GET /v1/classroom/remote/state` (reading it is watching) |
 | `POST /v1/cast/press` | public + token | as `POST /v1/classroom/remote`; `item {item}` puts a video, text, picture or PDF up directly (its file a finished file of this room, else 400 `file-missing`), `screen {title?}` puts a shared screen up | as 10.13 plus `button` (the new stage button's id) for `item`/`screen` |
 | `POST /v1/cast/files`, `PUT /v1/cast/files/:id/:n`, `POST /v1/cast/files/:id/done` | public + token | as 10.13 (a `{url}` copy too: a Google Slides/Docs link is copied as its PDF export) | as 10.13 |
@@ -1730,6 +1733,14 @@ ciphertext is deleted once the job answers, records after `CONVERT_TTL_MS` (1 h)
 job's public log (the print tool's accepted trade, 10.16): the ciphertext also needs the machine
 token and is gone once the job ran. `page {to}` (a press) jumps straight to a page (the phone's
 slide strip; `page {step}` still steps).
+
+Videos (owner 2026-11-08, both rooms): an uploaded video is a `clip` item (MP4, MOV or WebM, at most
+`CLASSROOM_CLIP_MAX_BYTES` 200 MB), uploaded through the same file routes in requests of
+`CLASSROOM_CLIP_PART_BYTES` (ten 96 KiB parts each; the start answers `partBytes`), stored as 96 KiB
+parts like any file; any video type matches any video box when finished (an iPhone .mov). A public
+Facebook video is a `facebook` item `{href}` (Cast only; `facebookVideoFrom` takes Facebook's
+"Copy link" forms). `video` presses work on `video`, `clip` and `facebook` (`CLASSROOM_PLAYABLE_KINDS`).
+The Sparks list holds at most `CLASSROOM_CLIPS_MAX` 3 clips and no Facebook.
 
 Screen shares in the classroom too (signed in): `POST /v1/classroom/remote {action: 'screen'}`,
 `POST /v1/classroom/signal {signal}` (the remote's offer, the TV's answer), `GET

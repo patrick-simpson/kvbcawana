@@ -27,11 +27,14 @@ import {
   CLASSROOM_FILE_MAX_BYTES,
   CLASSROOM_FILE_PART_BYTES,
   CLASSROOM_FILE_TYPES,
+  CLASSROOM_PLAYABLE_KINDS,
   CLASSROOM_PREVIEW_MS,
   CLASSROOM_HOLD_MS,
   CLASSROOM_WATCH_MS,
+  fileLimits,
   fileLinkFrom,
   filesOf,
+  isClipType,
   isFileId,
   kindOfType,
   oneLine,
@@ -74,6 +77,9 @@ export function sniffType(b) {
   if (b.length >= 8 && b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47) return 'image/png';
   if (b.length >= 6 && b[0] === 0x47 && b[1] === 0x49 && b[2] === 0x46 && b[3] === 0x38) return 'image/gif';
   if (b.length >= 12 && b[0] === 0x52 && b[1] === 0x49 && b[2] === 0x46 && b[3] === 0x46 && b[8] === 0x57 && b[9] === 0x45 && b[10] === 0x42 && b[11] === 0x50) return 'image/webp';
+  // A video: an MP4/MOV 'ftyp' box ('qt  ' brand = QuickTime), or WebM's EBML header.
+  if (b.length >= 12 && b[4] === 0x66 && b[5] === 0x74 && b[6] === 0x79 && b[7] === 0x70) return b[8] === 0x71 && b[9] === 0x74 ? 'video/quicktime' : 'video/mp4';
+  if (b.length >= 4 && b[0] === 0x1a && b[1] === 0x45 && b[2] === 0xdf && b[3] === 0xa3) return 'video/webm';
   return '';
 }
 
@@ -158,12 +164,16 @@ export class Classroom {
     if (typeof body?.url === 'string') return this.importFile(body.url, body.name);
     const type = body?.type;
     const bytes = body?.bytes;
-    if (!CLASSROOM_FILE_TYPES.includes(type)) return fail('Only a picture (JPEG, PNG, GIF, WebP) or a PDF can go on the screen.', 400, { reason: 'type' });
+    if (!CLASSROOM_FILE_TYPES.includes(type) && !isClipType(type)) return fail('Only a picture (JPEG, PNG, GIF, WebP), a PDF or a video (MP4, MOV, WebM) can go on the screen.', 400, { reason: 'type' });
     if (!Number.isInteger(bytes) || bytes < 1) return fail('That file is empty.', 400, { reason: 'empty' });
-    if (bytes > CLASSROOM_FILE_MAX_BYTES) return fail('That file is too big (20 MB at most).', 413, { reason: 'too-big' });
-    const meta = { id: newId('f', 16), type, bytes, parts: partsFor(bytes), next: 0, name: oneLine(body?.name, 80), done: false, at: this.now() };
+    const { max, partBytes } = fileLimits(type);
+    if (bytes > max) return fail(isClipType(type) ? 'That video is too big (200 MB at most).' : 'That file is too big (20 MB at most).', 413, { reason: 'too-big' });
+    // `parts` = stored 96 KiB parts; `reqBytes`/`reqs` = the upload's requests (a clip
+    // sends ten parts a request; a picture or PDF one).
+    const reqs = Math.max(1, Math.ceil(bytes / partBytes));
+    const meta = { id: newId('f', 16), type, bytes, parts: partsFor(bytes), reqBytes: partBytes, reqs, next: 0, name: oneLine(body?.name, 80), done: false, at: this.now() };
     await this.storage.put(this.room.filePrefix + meta.id, meta);
-    return json({ ok: true, id: meta.id, parts: meta.parts, partBytes: CLASSROOM_FILE_PART_BYTES });
+    return json({ ok: true, id: meta.id, parts: reqs, partBytes });
   }
 
   /** PUT /v1/classroom/files/:id/:n with the part's bytes. @param {string} id @param {string} n @param {Request} request */
@@ -173,11 +183,16 @@ export class Classroom {
     if (!meta || meta.done) return fail('There is no upload by that name.', 404);
     // Parts arrive in order (the remote sends one at a time); a repeat of the
     // last one (its answer was lost) is taken again.
-    if (!Number.isInteger(i) || i < 0 || i >= meta.parts || i > meta.next || i < meta.next - 1) return fail('That part is out of order.', 409, { reason: 'order', next: meta.next });
+    const reqBytes = meta.reqBytes || CLASSROOM_FILE_PART_BYTES;
+    const reqs = meta.reqs || meta.parts;
+    if (!Number.isInteger(i) || i < 0 || i >= reqs || i > meta.next || i < meta.next - 1) return fail('That part is out of order.', 409, { reason: 'order', next: meta.next });
     const buf = new Uint8Array(await request.arrayBuffer());
-    const want = i === meta.parts - 1 ? meta.bytes - i * CLASSROOM_FILE_PART_BYTES : CLASSROOM_FILE_PART_BYTES;
+    const want = i === reqs - 1 ? meta.bytes - i * reqBytes : reqBytes;
     if (buf.length !== want) return fail('That part is the wrong size.', 400, { reason: 'size' });
-    await this.storage.put(`${this.room.partPrefix}${id}:${i}`, buf);
+    const per = reqBytes / CLASSROOM_FILE_PART_BYTES;
+    for (let j = 0; j * CLASSROOM_FILE_PART_BYTES < buf.length; j += 1) {
+      await this.storage.put(`${this.room.partPrefix}${id}:${i * per + j}`, buf.slice(j * CLASSROOM_FILE_PART_BYTES, (j + 1) * CLASSROOM_FILE_PART_BYTES));
+    }
     if (i === meta.next) await this.storage.put(this.room.filePrefix + id, { ...meta, next: i + 1 });
     return json({ ok: true, next: Math.max(meta.next, i + 1) });
   }
@@ -187,11 +202,13 @@ export class Classroom {
     const meta = isFileId(id) ? await this.storage.get(this.room.filePrefix + id) : null;
     if (!meta) return fail('There is no upload by that name.', 404);
     if (meta.done) return json({ ok: true, id, type: meta.type, bytes: meta.bytes, kind: kindOfType(meta.type) });
-    if (meta.next !== meta.parts) return fail('Part of the file did not arrive. Try again.', 400, { reason: 'parts', next: meta.next });
+    if (meta.next !== (meta.reqs || meta.parts)) return fail('Part of the file did not arrive. Try again.', 400, { reason: 'parts', next: meta.next });
     const first = await this.storage.get(`${this.room.partPrefix}${id}:0`);
-    if (sniffType(new Uint8Array(first)) !== meta.type) {
+    const sniffed = sniffType(new Uint8Array(first));
+    // A video's box says MP4 or QuickTime loosely (an iPhone .mov, an .mp4 from a Mac): any video type for any video.
+    if (sniffed !== meta.type && !(isClipType(sniffed) && isClipType(meta.type))) {
       await this.deleteFile(meta);
-      return fail('That file is not the picture or PDF it says it is.', 400, { reason: 'type' });
+      return fail('That file is not the picture, PDF or video it says it is.', 400, { reason: 'type' });
     }
     await this.storage.put(this.room.filePrefix + id, { ...meta, done: true });
     return json({ ok: true, id, type: meta.type, bytes: meta.bytes, kind: kindOfType(meta.type) });
@@ -320,7 +337,7 @@ export class Classroom {
       // Back to the schedule: whatever the remote put up goes, a held look too.
       case 'back': next = { ...stage, show: null, preview: stage.preview?.held ? null : stage.preview, cmds }; this.rtc = null; break;
       case 'video':
-        if (stage.show?.button?.kind !== 'video') return fail('No video is on the screen.', 409, { reason: 'no-video' });
+        if (!CLASSROOM_PLAYABLE_KINDS.includes(stage.show?.button?.kind)) return fail('No video is on the screen.', 409, { reason: 'no-video' });
         next = { ...stage, cmds: cmd('video', p.data) };
         break;
       case 'page': {

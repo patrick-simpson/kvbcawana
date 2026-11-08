@@ -565,11 +565,14 @@ jobs:
           # The letterhead page's print buttons (routes.md 10.16): a fine-grained GitHub
           # token that can only run this repo's Actions. Optional, like the others.
           PRINT_DISPATCH_TOKEN: ${{ secrets.PRINT_DISPATCH_TOKEN }}
+          # Cast's YouTube search (routes.md 10.18): a YouTube Data API key (Google
+          # Cloud, restricted to the YouTube Data API v3). Optional, like the others.
+          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
         run: |
           node -e '
             const names = ["INITIAL_PASSPHRASE",
               "TWOTIMTWO_USERNAME", "TWOTIMTWO_PASSWORD", "TWOTIMTWO_HOST"];
-            const optional = ["HANDBOOK_TOKEN", "PRESENTATION_TOKEN", "PRINT_DISPATCH_TOKEN"];
+            const optional = ["HANDBOOK_TOKEN", "PRESENTATION_TOKEN", "PRINT_DISPATCH_TOKEN", "YOUTUBE_API_KEY"];
             const out = {};
             for (const n of [...names, ...optional]) if (process.env[n]) out[n] = process.env[n];
             const missing = names.filter((n) => !out[n]);

@@ -26,6 +26,12 @@
 // laptop's SCREEN, shared live (`screen`): the picture goes laptop to TV over the
 // church network (WebRTC); the Worker only passes the offer and the answer
 // (sanitizeSignal), never the picture.
+//
+// Owner 2026-11-08, later: "support Facebook video" (Cast: kind `facebook`, a public
+// video's link played by Facebook's own embedded player) and "Add videos option for
+// both sparks and this" (kind `clip`: a video FILE uploaded like a picture, up to
+// CLASSROOM_CLIP_MAX_BYTES, sent in CLASSROOM_CLIP_PART_BYTES requests). Both take the
+// same video presses as a YouTube video.
 
 export const CLASSROOM_VIDEOS_MAX = 4;
 export const CLASSROOM_ITEMS_MAX = 8;
@@ -36,6 +42,13 @@ export const CLASSROOM_TEXT_MAX = 400;
 export const CLASSROOM_FILE_MAX_BYTES = 20 * 1024 * 1024;
 export const CLASSROOM_FILE_PART_BYTES = 96 * 1024;
 export const CLASSROOM_FILE_TYPES = Object.freeze(['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'application/pdf']);
+/** An uploaded video (a clip): these types, at most this big, sent in requests of PART bytes. */
+export const CLASSROOM_CLIP_TYPES = Object.freeze(['video/mp4', 'video/quicktime', 'video/webm']);
+export const CLASSROOM_CLIP_MAX_BYTES = 200 * 1024 * 1024;
+/** Ten file parts a request (the Worker stores each 96 KiB part under its own key). */
+export const CLASSROOM_CLIP_PART_BYTES = 10 * CLASSROOM_FILE_PART_BYTES;
+/** Clips in the Sparks remote's button list at once (each one stays stored while it is a button). */
+export const CLASSROOM_CLIPS_MAX = 3;
 /** The looks /settings can preview on the TV, and for how long (owner: one minute). */
 export const CLASSROOM_LOOKS = Object.freeze(['cubbies', 'sparks', 'lobby']);
 export const CLASSROOM_PREVIEW_MS = 60 * 1000;
@@ -55,14 +68,16 @@ export const CLASSROOM_WATCH_MS = 30 * 1000;
 export const CLASSROOM_SEEK_S = 10;
 export const CLASSROOM_VOLUME_STEP_PCT = 10;
 export const CLASSROOM_TEXT_LOOKS = Object.freeze(['page', 'board']);
-export const CLASSROOM_ITEM_KINDS = Object.freeze(['image', 'pdf', 'text']);
+export const CLASSROOM_ITEM_KINDS = Object.freeze(['image', 'pdf', 'text', 'clip', 'facebook']);
+/** The kinds a video press works on: YouTube, an uploaded clip, a Facebook video. */
+export const CLASSROOM_PLAYABLE_KINDS = Object.freeze(['video', 'clip', 'facebook']);
 /** Everything a remote (or /settings) may ask. */
 export const CLASSROOM_ACTIONS = Object.freeze(['show', 'back', 'video', 'page', 'preview', 'preview-end', 'sparky', 'item', 'screen']);
 /** A screen share's offer or answer (SDP text) is at most this long. */
 export const CLASSROOM_SIGNAL_MAX = 24000;
 export const CLASSROOM_VIDEO_OPS = Object.freeze(['toggle', 'play', 'pause', 'seek', 'volume', 'mute', 'unmute']);
 /** What the screen can be showing (its report's `view`). */
-export const CLASSROOM_VIEWS = Object.freeze(['off', 'cubbies', 'black', 'sparks', 'lobby', 'board', 'video', 'image', 'pdf', 'text', 'screen', 'waiting']);
+export const CLASSROOM_VIEWS = Object.freeze(['off', 'cubbies', 'black', 'sparks', 'lobby', 'board', 'video', 'image', 'pdf', 'text', 'screen', 'waiting', 'clip', 'facebook']);
 
 const BUTTON_ID_RE = /^b[a-z0-9]{6,20}$/;
 const FILE_ID_RE = /^f[a-z0-9]{12,24}$/;
@@ -152,10 +167,46 @@ export function fileLinkFrom(text) {
   return u.href;
 }
 
+/**
+ * A Facebook video's link, as Facebook's embedded player takes it, or ''. Public
+ * videos only (the player shows nothing for a private one). Takes what "Copy link"
+ * gives: facebook.com/<page>/videos/<id>, /watch?v=<id>, /reel/<id>,
+ * /share/v/<code>, /share/r/<code>, fb.watch/<code>; m. and web. hosts too.
+ * @param {unknown} text
+ */
+export function facebookVideoFrom(text) {
+  const s = oneLine(text, 600);
+  let u;
+  try { u = new URL(/^[a-z]+:\/\//i.test(s) ? s : `https://${s}`); } catch { return ''; }
+  if (u.username || u.password) return '';
+  const host = u.hostname.toLowerCase().replace(/^(www|m|web|mbasic)\./, '');
+  const parts = u.pathname.split('/').filter(Boolean);
+  const ok = (p) => /^[A-Za-z0-9._-]{1,80}$/.test(p || '');
+  if (host === 'fb.watch') return ok(parts[0]) ? `https://fb.watch/${parts[0]}/` : '';
+  if (host !== 'facebook.com') return '';
+  if (parts[0] === 'watch') { const v = u.searchParams.get('v'); return v && /^\d{5,25}$/.test(v) ? `https://www.facebook.com/watch/?v=${v}` : ''; }
+  if (parts[0] === 'reel' && /^\d{5,25}$/.test(parts[1] || '')) return `https://www.facebook.com/reel/${parts[1]}`;
+  if (parts[0] === 'share' && (parts[1] === 'v' || parts[1] === 'r') && ok(parts[2])) return `https://www.facebook.com/share/${parts[1]}/${parts[2]}/`;
+  const vi = parts.indexOf('videos');
+  if (vi >= 1 && ok(parts[0]) && /^\d{5,25}$/.test(parts[vi + 1] || '')) return `https://www.facebook.com/${parts[0]}/videos/${parts[vi + 1]}/`;
+  return '';
+}
+
+/** An uploaded video's type. @param {unknown} type */
+export const isClipType = (type) => typeof type === 'string' && CLASSROOM_CLIP_TYPES.includes(type);
+
 /** The kind of item a stored file makes. @param {unknown} type */
 export function kindOfType(type) {
   if (type === 'application/pdf') return 'pdf';
+  if (isClipType(type)) return 'clip';
   return typeof type === 'string' && CLASSROOM_FILE_TYPES.includes(type) ? 'image' : '';
+}
+
+/** The largest file of a type, and the size of each upload request. @param {unknown} type */
+export function fileLimits(type) {
+  return isClipType(type)
+    ? { max: CLASSROOM_CLIP_MAX_BYTES, partBytes: CLASSROOM_CLIP_PART_BYTES }
+    : { max: CLASSROOM_FILE_MAX_BYTES, partBytes: CLASSROOM_FILE_PART_BYTES };
 }
 
 /**
@@ -185,8 +236,13 @@ export function sanitizeItem(v) {
     const look = CLASSROOM_TEXT_LOOKS.includes(v.look) ? v.look : 'page';
     return { id: v.id, kind: 'text', title: oneLine(v.title, CLASSROOM_TITLE_MAX) || oneLine(text, CLASSROOM_TITLE_MAX), text, ...(heading ? { heading } : {}), look };
   }
+  if (v.kind === 'facebook') {
+    const href = facebookVideoFrom(v.href);
+    return href ? { id: v.id, kind: 'facebook', title: oneLine(v.title, CLASSROOM_TITLE_MAX) || 'Facebook video', href } : null;
+  }
   if (!isFileId(v.file) || kindOfType(v.type) !== v.kind) return null;
-  return { id: v.id, kind: v.kind, title: oneLine(v.title, CLASSROOM_TITLE_MAX) || (v.kind === 'pdf' ? 'PDF' : 'Picture'), file: v.file, type: v.type };
+  const fallback = { pdf: 'PDF', clip: 'Video' }[v.kind] || 'Picture';
+  return { id: v.id, kind: v.kind, title: oneLine(v.title, CLASSROOM_TITLE_MAX) || fallback, file: v.file, type: v.type };
 }
 
 /**
@@ -197,7 +253,11 @@ export function sanitizeButtons(v) {
   const seen = new Set();
   const keep = (b) => { if (!b || seen.has(b.id)) return false; seen.add(b.id); return true; };
   const videos = (isObj(v) && Array.isArray(v.videos) ? v.videos : []).map(sanitizeVideo).filter(keep).slice(0, CLASSROOM_VIDEOS_MAX);
-  const items = (isObj(v) && Array.isArray(v.items) ? v.items : []).map(sanitizeItem).filter(keep).slice(0, CLASSROOM_ITEMS_MAX);
+  let clips = 0;
+  const items = (isObj(v) && Array.isArray(v.items) ? v.items : []).map(sanitizeItem)
+    // The Sparks list: no Facebook (the classroom TV has no Facebook player), at most CLIPS_MAX clips.
+    .filter((b) => b && b.kind !== 'facebook' && (b.kind !== 'clip' || (clips += 1) <= CLASSROOM_CLIPS_MAX))
+    .filter(keep).slice(0, CLASSROOM_ITEMS_MAX);
   return { videos: /** @type {NonNullable<ReturnType<typeof sanitizeVideo>>[]} */ (videos), items: /** @type {NonNullable<ReturnType<typeof sanitizeItem>>[]} */ (items) };
 }
 

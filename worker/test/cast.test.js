@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { SyncCore } from '../src/sync.js';
 import { JOIN_FAILS_MAX, TOKEN_TTL_MS } from '../src/cast.js';
 import { memoryStore, signInV2 } from './helpers.js';
-import { CLASSROOM_FILE_PART_BYTES, fileLinkFrom, sanitizeClassroomPress, sanitizeSignal } from '../../shared/classroomRemote.js';
+import { CLASSROOM_CLIP_PART_BYTES, CLASSROOM_FILE_PART_BYTES, fileLinkFrom, sanitizeButtons, sanitizeClassroomPress, sanitizeSignal } from '../../shared/classroomRemote.js';
 
 // Cast (src/routes.md 10.18, owner 2026-11-08): the lobby computer's AirServer-like
 // screen opens a room and shows a code; a presenter joins with the code alone and puts
@@ -297,5 +297,143 @@ describe('PowerPoint into slides', () => {
     // A new code clears every conversion.
     await s.call('POST', '/v1/cast/open', {});
     expect((await s.raw('GET', `/v1/cast/convert/${id}/job`, undefined, s.machine)).status).toBe(404);
+  });
+});
+
+// Owner 2026-11-08, later: one presenter at a time (refuse the second), Display code
+// (leave with the TV back to its code) and the tray's reset, YouTube search, a Facebook
+// video, an uploaded video (a clip, sent ten parts a request).
+describe('one presenter, leave, reset, YouTube search, Facebook and uploaded videos', () => {
+  async function room(env = { YOUTUBE_API_KEY: 'yt-key' }) {
+    let t = Date.parse('2026-11-08T21:00:00Z');
+    const asked = [];
+    const core = new SyncCore({
+      storage: memoryStore(),
+      env: { INITIAL_PASSPHRASE: 'kennebec', ...env },
+      now: () => t,
+      fetchFn: async (url) => {
+        const u = String(url);
+        asked.push(u);
+        if (u.startsWith('https://www.googleapis.com/youtube/v3/search')) {
+          return Response.json({ items: [
+            { id: { videoId: 'dQw4w9WgXcQ' }, snippet: { title: 'Jesus Loves Me &amp; You', channelTitle: 'Kids Church' } },
+            { id: { videoId: 'bad' }, snippet: { title: 'x' } },
+          ] });
+        }
+        if (u.startsWith('https://www.googleapis.com/youtube/v3/videos')) return Response.json({ items: [{ id: 'dQw4w9WgXcQ', contentDetails: { duration: 'PT3M33S' } }] });
+        throw new Error(`unexpected fetch ${u}`);
+      },
+      broadcast: () => 1,
+      liveScreens: () => new Set(),
+    });
+    const session = (await signInV2(core)).body.session;
+    const raw = (method, path, body, { auth = session, cast = '' } = {}) => core.handle(new Request(`https://sync.test${path}`, {
+      method,
+      headers: { 'Content-Type': body instanceof Uint8Array ? 'application/octet-stream' : 'application/json', ...(auth ? { Authorization: `Bearer ${auth}` } : {}), ...(cast ? { 'X-Cast-Token': cast } : {}) },
+      body: body === undefined ? undefined : (body instanceof Uint8Array ? body : JSON.stringify(body)),
+    }), '10.0.0.9');
+    const call = async (...a) => { const res = await raw(...a); return { status: res.status, body: await res.json() }; };
+    const { code } = (await call('POST', '/v1/cast/open', {})).body;
+    const join = async () => call('POST', '/v1/cast/join', { code }, { auth: '' });
+    return { core, raw, call, code, join, asked, tick: (ms) => { t += ms; } };
+  }
+
+  it('a second phone is refused while the first presents; Disconnect or 30 quiet minutes frees the room', async () => {
+    const s = await room();
+    const first = await s.join();
+    expect(first.status).toBe(200);
+    const second = await s.join();
+    expect(second.status).toBe(409);
+    expect(second.body.reason).toBe('busy');
+    // Using the page keeps the room.
+    s.tick(25 * 60 * 1000);
+    await s.call('GET', '/v1/cast/state', undefined, { auth: '', cast: first.body.token });
+    s.tick(25 * 60 * 1000);
+    expect((await s.join()).status).toBe(409);
+    // Disconnect frees it at once.
+    expect((await s.call('POST', '/v1/cast/leave', {}, { auth: '', cast: first.body.token })).status).toBe(200);
+    const third = await s.join();
+    expect(third.status).toBe(200);
+    expect((await s.call('GET', '/v1/cast/state', undefined, { auth: '', cast: first.body.token })).status).toBe(401);
+    // Quiet for 30 minutes: the next one may join, and the quiet one is out.
+    s.tick(31 * 60 * 1000);
+    const fourth = await s.join();
+    expect(fourth.status).toBe(200);
+    expect((await s.call('GET', '/v1/cast/state', undefined, { auth: '', cast: third.body.token })).status).toBe(401);
+  });
+
+  it('Display code takes the TV back to its code and frees the room; the tray reset does it from the lobby computer', async () => {
+    const s = await room();
+    const a = (await s.join()).body.token;
+    await s.call('POST', '/v1/cast/press', { action: 'item', data: { item: { id: 'bplaceholder', kind: 'text', text: 'Welcome' } } }, { auth: '', cast: a });
+    expect((await s.call('GET', '/v1/cast/screen')).body.stage.show).not.toBeNull();
+    await s.call('POST', '/v1/cast/leave', { takeDown: true }, { auth: '', cast: a });
+    expect((await s.call('GET', '/v1/cast/screen')).body.stage.show).toBeNull();
+    const b = (await s.join()).body.token;
+    await s.call('POST', '/v1/cast/press', { action: 'item', data: { item: { id: 'bplaceholder', kind: 'text', text: 'Hello' } } }, { auth: '', cast: b });
+    // The tray: needs the computer's sign-in; same code, nothing up, nobody connected.
+    expect((await s.call('POST', '/v1/cast/reset', {}, { auth: '' })).status).toBe(401);
+    const reset = await s.call('POST', '/v1/cast/reset', {});
+    expect(reset.body).toEqual({ ok: true, code: s.code });
+    const screen = (await s.call('GET', '/v1/cast/screen')).body;
+    expect(screen.stage.show).toBeNull();
+    expect(screen.code).toBe(s.code);
+    expect((await s.call('GET', '/v1/cast/state', undefined, { auth: '', cast: b })).status).toBe(401);
+    expect((await s.join()).status).toBe(200);
+  });
+
+  it('YouTube search: safe, embeddable, lengths, kept a while; not set up says so', async () => {
+    const s = await room();
+    const t = (await s.join()).body.token;
+    const r = await s.call('GET', '/v1/cast/youtube?q=jesus%20loves%20me', undefined, { auth: '', cast: t });
+    expect(r.body.results).toEqual([{ youtube: 'dQw4w9WgXcQ', title: 'Jesus Loves Me & You', channel: 'Kids Church', seconds: 213 }]);
+    expect(s.asked[0]).toContain('safeSearch=strict');
+    expect(s.asked[0]).toContain('videoEmbeddable=true');
+    await s.call('GET', '/v1/cast/youtube?q=Jesus%20Loves%20Me', undefined, { auth: '', cast: t });
+    expect(s.asked).toHaveLength(2);
+    expect((await s.call('GET', '/v1/cast/youtube?q=x', undefined, { auth: '' })).status).toBe(401);
+    const none = await room({});
+    const t2 = (await none.join()).body.token;
+    expect((await none.call('GET', '/v1/cast/youtube?q=x', undefined, { auth: '', cast: t2 })).body.reason).toBe('not-configured');
+  });
+
+  it('a Facebook video goes up and takes the video presses; a non-Facebook link is refused', async () => {
+    const s = await room();
+    const t = (await s.join()).body.token;
+    const up = await s.call('POST', '/v1/cast/press', { action: 'item', data: { item: { id: 'bplaceholder', kind: 'facebook', href: 'https://m.facebook.com/watch/?v=123456789', title: 'Sunday' } } }, { auth: '', cast: t });
+    expect(up.status).toBe(200);
+    const shown = (await s.call('GET', '/v1/cast/screen')).body.stage.show.button;
+    expect(shown).toMatchObject({ kind: 'facebook', href: 'https://www.facebook.com/watch/?v=123456789', title: 'Sunday' });
+    expect((await s.call('POST', '/v1/cast/press', { action: 'video', data: { op: 'toggle' } }, { auth: '', cast: t })).status).toBe(200);
+    expect((await s.call('POST', '/v1/cast/press', { action: 'item', data: { item: { id: 'bplaceholder', kind: 'facebook', href: 'https://evil.example/videos/123456' } } }, { auth: '', cast: t })).status).toBe(400);
+  });
+
+  it('an uploaded video: ten parts a request, read back whole, played with the video presses', { timeout: 20000 }, async () => {
+    const s = await room();
+    const t = (await s.join()).body.token;
+    const size = 2 * CLASSROOM_CLIP_PART_BYTES + 12345;
+    const clip = new Uint8Array(size);
+    for (let i = 0; i < size; i += 1) clip[i] = (i * 7 + 3) & 255;
+    clip.set([0, 0, 0, 0x20, 0x66, 0x74, 0x79, 0x70, 0x71, 0x74, 0x20, 0x20]); // an iPhone .mov's ftyp box
+    const start = await s.call('POST', '/v1/cast/files', { type: 'video/mp4', bytes: size, name: 'Skit.mov' }, { auth: '', cast: t });
+    expect(start.body).toMatchObject({ parts: 3, partBytes: CLASSROOM_CLIP_PART_BYTES });
+    for (let n = 0; n < 3; n += 1) expect((await s.call('PUT', `/v1/cast/files/${start.body.id}/${n}`, clip.subarray(n * CLASSROOM_CLIP_PART_BYTES, (n + 1) * CLASSROOM_CLIP_PART_BYTES), { auth: '', cast: t })).status).toBe(200);
+    const done = await s.call('POST', `/v1/cast/files/${start.body.id}/done`, {}, { auth: '', cast: t });
+    expect(done.body).toMatchObject({ kind: 'clip', type: 'video/mp4', bytes: size });
+    const back = await s.raw('GET', `/v1/cast/screen/files/${start.body.id}`);
+    expect(Buffer.from(await back.arrayBuffer()).equals(Buffer.from(clip))).toBe(true);
+    await s.call('POST', '/v1/cast/press', { action: 'item', data: { item: { id: 'bplaceholder', kind: 'clip', file: start.body.id, type: 'video/mp4', title: 'Skit' } } }, { auth: '', cast: t });
+    expect((await s.call('POST', '/v1/cast/press', { action: 'video', data: { op: 'seek', by: 10 } }, { auth: '', cast: t })).status).toBe(200);
+    // Too big, or a video that is not one.
+    expect((await s.call('POST', '/v1/cast/files', { type: 'video/mp4', bytes: 201 * 1024 * 1024 }, { auth: '', cast: t })).body.reason).toBe('too-big');
+    const fake = await s.call('POST', '/v1/cast/files', { type: 'video/mp4', bytes: 10 }, { auth: '', cast: t });
+    await s.call('PUT', `/v1/cast/files/${fake.body.id}/0`, new Uint8Array(10), { auth: '', cast: t });
+    expect((await s.call('POST', `/v1/cast/files/${fake.body.id}/done`, {}, { auth: '', cast: t })).body.reason).toBe('type');
+  });
+
+  it('the Sparks list takes at most three clips and no Facebook', () => {
+    const clip = (n) => ({ id: `bclip${n}abc`, kind: 'clip', file: `fclipfileabc${n}`, type: 'video/mp4' });
+    const out = sanitizeButtons({ items: [clip(1), clip(2), clip(3), clip(4), { id: 'bfacebook1', kind: 'facebook', href: 'https://fb.watch/abc/' }] });
+    expect(out.items.map((i) => i.kind)).toEqual(['clip', 'clip', 'clip']);
   });
 });

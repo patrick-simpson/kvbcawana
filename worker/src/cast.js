@@ -27,6 +27,20 @@
 // ciphertext is deleted once the job answers, whatever happened; anything left over
 // goes with the room (a new code, Cast off) or after CONVERT_TTL_MS.
 //
+// ONE presenter at a time (owner 2026-11-08: "only one phone should connect at a
+// time"; picked: refuse the second): a join while another presenter's token is live
+// and was used within PRESENTER_IDLE_MS is refused 409 `busy`. The slot frees when
+// the presenter leaves (POST /v1/cast/leave, the page's Disconnect and "Display
+// code"), goes quiet for PRESENTER_IDLE_MS, or the lobby computer's tray "Show Cast
+// code" resets the room (POST /v1/cast/reset: everything down, nobody connected, the
+// SAME code). When a token was last used is memory only (a write every poll would
+// spend the free plan's storage writes); after a restart it counts from the join.
+//
+// YouTube search (owner 2026-11-08): GET /v1/cast/youtube?q= asks the YouTube Data
+// API with the Worker secret YOUTUBE_API_KEY (free: 100 units a search, 10,000 a day),
+// safe search strict, embeddable videos only; answers kept 10 minutes; at most
+// YOUTUBE_PER_HOUR searches an hour. Without the secret: 503 `not-configured`.
+//
 // A wrong code is refused; more than JOIN_FAILS_MAX wrong codes within
 // JOIN_WINDOW_MS refuses every join for the rest of that window (a million codes
 // cannot be walked). Tokens are stored hashed (SHA-256), at most TOKENS_MAX, each
@@ -42,6 +56,11 @@ export const TOKENS_MAX = 20;
 export const JOIN_FAILS_MAX = 20;
 export const JOIN_WINDOW_MS = 10 * 60 * 1000;
 export const CODE_DIGITS = 6;
+/** A presenter quiet this long no longer holds the room (the next one may join). */
+export const PRESENTER_IDLE_MS = 30 * 60 * 1000;
+export const YOUTUBE_PER_HOUR = 60;
+export const YOUTUBE_RESULTS = 8;
+const YOUTUBE_CACHE_MS = 10 * 60 * 1000;
 const TOKEN_RE = /^t[a-z0-9]{24,40}$/;
 
 /** The largest PowerPoint (bytes) the presenter may send to be turned into slides. */
@@ -68,6 +87,18 @@ async function hashOf(token) {
   return [...d].map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
+/** ISO 8601 duration (PT1H2M3S) in seconds, 0 when not one. @param {unknown} v */
+export function isoSeconds(v) {
+  const m = /^P(?:(\d+)D)?T?(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?$/.exec(String(v || ''));
+  if (!m) return 0;
+  return (Number(m[1] || 0) * 86400) + (Number(m[2] || 0) * 3600) + (Number(m[3] || 0) * 60) + Number(m[4] || 0);
+}
+
+/** The few HTML entities YouTube's titles carry, as text. @param {string} s */
+function decodeEntities(s) {
+  return s.replace(/&(amp|lt|gt|quot|#39|#x27|apos);/g, (_, e) => ({ amp: '&', lt: '<', gt: '>', quot: '"', '#39': "'", '#x27': "'", apos: "'" })[e]);
+}
+
 /** A fresh six-digit code (never starting with 0, so it reads as six digits). */
 export function newCode() {
   const n = crypto.getRandomValues(new Uint32Array(1))[0] % 900000;
@@ -76,11 +107,19 @@ export function newCode() {
 
 export class Cast {
   /**
-   * @param {{ storage: any, now: () => number, ring: (payload: Record<string, unknown>) => void, fetchFn?: typeof fetch, prints?: () => any }} deps
+   * @param {{ storage: any, now: () => number, ring: (payload: Record<string, unknown>) => void, fetchFn?: typeof fetch, prints?: () => any, env?: () => Record<string, any> }} deps
    */
-  constructor({ storage, now, ring, fetchFn, prints }) {
+  constructor({ storage, now, ring, fetchFn, prints, env }) {
     this.storage = storage;
     this.now = now;
+    this.env = env || (() => ({}));
+    this.fetchFn = fetchFn || ((u, i) => fetch(u, i));
+    /** When each presenter token was last used (hash -> ms), memory only. @type {Map<string, number>} */
+    this.seen = new Map();
+    /** YouTube searches this hour, and answers kept a while. */
+    this.searches = { n: 0, since: 0 };
+    /** @type {Map<string, { at: number, body: any }>} */
+    this.searchCache = new Map();
     /** The print tool's GitHub dispatch and machine token (prints.js). */
     this.prints = prints || (() => null);
     /** Conversions started this hour: { n, since }. */
@@ -137,9 +176,14 @@ export class Cast {
       this.fails.n += 1;
       return fail(room.code ? 'That code is not the one on the TV. Check it and try again.' : 'Cast is not turned on. Turn it on from the lobby computer, then use the code it shows.', 403, { reason: room.code ? 'wrong-code' : 'off' });
     }
+    // One presenter at a time: someone live and not idle holds the room.
+    const busy = room.tokens.some((x) => t - x.at <= TOKEN_TTL_MS && t - (this.seen.get(x.hash) ?? x.at) <= PRESENTER_IDLE_MS);
+    if (busy) return fail('Someone else is presenting right now. When they tap Disconnect or Display code, try again.', 409, { reason: 'busy' });
     const token = newId('t', 28);
-    const tokens = [...room.tokens.filter((x) => t - x.at <= TOKEN_TTL_MS), { hash: await hashOf(token), at: t }].slice(-TOKENS_MAX);
-    await this.storage.put(ROOM_KEY, { ...room, tokens });
+    const hash = await hashOf(token);
+    this.seen.clear();
+    this.seen.set(hash, t);
+    await this.storage.put(ROOM_KEY, { ...room, tokens: [{ hash, at: t }] });
     return json({ ok: true, token, ttlMs: TOKEN_TTL_MS });
   }
 
@@ -151,7 +195,73 @@ export class Cast {
     if (!room.code) return null;
     const hash = await hashOf(raw);
     const hit = room.tokens.find((x) => x.hash === hash && this.now() - x.at <= TOKEN_TTL_MS);
+    if (hit) this.seen.set(hash, this.now());
     return hit ? hash : null;
+  }
+
+  /** POST /v1/cast/leave {takeDown?} (the presenter): free the room; with takeDown, the TV back to its code. @param {string} who @param {any} body */
+  async leave(who, body) {
+    if (body?.takeDown === true) await this.engine.press('cast-presenter', { action: 'back' });
+    const room = await this.roomDoc();
+    await this.storage.put(ROOM_KEY, { ...room, tokens: room.tokens.filter((x) => x.hash !== who) });
+    this.seen.delete(who);
+    return json({ ok: true });
+  }
+
+  /** POST /v1/cast/reset (the lobby computer's tray "Show Cast code"): everything down, nobody connected, the same code. */
+  async reset() {
+    await this.clear();
+    const room = await this.roomDoc();
+    await this.storage.put(ROOM_KEY, { ...room, tokens: [] });
+    this.seen.clear();
+    return json({ ok: true, code: room.code });
+  }
+
+  /** GET /v1/cast/youtube?q= (the presenter): YouTube's videos for the words. @param {string | null} q */
+  async youtube(q) {
+    const key = String(this.env()?.YOUTUBE_API_KEY || '');
+    if (!key) return fail('YouTube search is not set up yet. Paste a link instead.', 503, { reason: 'not-configured' });
+    const words = String(q || '').replace(/\s+/g, ' ').trim().slice(0, 100);
+    if (!words) return fail('Type something to search for.', 400, { reason: 'empty' });
+    const t = this.now();
+    const cacheKey = words.toLowerCase();
+    const hit = this.searchCache.get(cacheKey);
+    if (hit && t - hit.at <= YOUTUBE_CACHE_MS) return json(hit.body);
+    if (t - this.searches.since > 60 * 60 * 1000) this.searches = { n: 0, since: t };
+    if (this.searches.n >= YOUTUBE_PER_HOUR) return fail('That is a lot of searches this hour. Paste a link instead.', 429, { reason: 'too-many' });
+    this.searches.n += 1;
+    const api = 'https://www.googleapis.com/youtube/v3';
+    const get = async (/** @type {string} */ url) => {
+      const res = await this.fetchFn(url, { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(10000) });
+      return res.ok ? res.json() : Promise.reject(res.status);
+    };
+    let found;
+    try {
+      found = await get(`${api}/search?part=snippet&type=video&videoEmbeddable=true&safeSearch=strict&maxResults=${YOUTUBE_RESULTS}&q=${encodeURIComponent(words)}&key=${encodeURIComponent(key)}`);
+    } catch (status) {
+      return fail(status === 403 ? 'YouTube search is resting for today (its free daily limit). Paste a link instead.' : 'YouTube did not answer. Try again, or paste a link.', 502, { reason: 'youtube', status: Number(status) || 0 });
+    }
+    const items = (Array.isArray(found?.items) ? found.items : [])
+      .map((/** @type {any} */ i) => ({ id: String(i?.id?.videoId || ''), title: String(i?.snippet?.title || ''), channel: String(i?.snippet?.channelTitle || '') }))
+      .filter((v) => /^[A-Za-z0-9_-]{11}$/.test(v.id));
+    // Lengths (1 unit for all of them); a failure here just leaves them out.
+    let lengths = new Map();
+    if (items.length) {
+      try {
+        const d = await get(`${api}/videos?part=contentDetails&id=${items.map((v) => v.id).join(',')}&key=${encodeURIComponent(key)}`);
+        lengths = new Map((d?.items || []).map((/** @type {any} */ v) => [v.id, isoSeconds(v?.contentDetails?.duration)]));
+      } catch { /* no lengths */ }
+    }
+    const results = items.map((v) => ({
+      youtube: v.id,
+      title: decodeEntities(v.title).slice(0, 120),
+      channel: decodeEntities(v.channel).slice(0, 80),
+      seconds: lengths.get(v.id) || 0,
+    }));
+    const body = { ok: true, results };
+    this.searchCache.set(cacheKey, { at: t, body });
+    if (this.searchCache.size > 100) this.searchCache.delete(this.searchCache.keys().next().value);
+    return json(body);
   }
 
   /** GET /v1/cast/screen (the Cast screen): its code and the stage. */
@@ -319,7 +429,10 @@ export function mountCast(registry, core) {
   // A video that ended: the screen takes it down itself (only Back: never another press).
   registry.add('POST', '/v1/cast/screen/back', 'session', async () => c().engine.press('cast-screen', { action: 'back' }));
   // A presenter (the code's token).
+  registry.add('POST', '/v1/cast/reset', 'session', async () => c().reset());
   registry.add('POST', '/v1/cast/join', 'public', async ({ body }) => c().join(await body()));
+  registry.add('POST', '/v1/cast/leave', 'public', presenter(async ({ body }, who) => c().leave(who, await body())));
+  registry.add('GET', '/v1/cast/youtube', 'public', presenter(async ({ url }) => c().youtube(url.searchParams.get('q'))));
   registry.add('GET', '/v1/cast/state', 'public', presenter(async () => c().engine.remoteState()));
   registry.add('POST', '/v1/cast/press', 'public', presenter(async ({ body }, who) => c().engine.press(who, await body())));
   registry.add('POST', '/v1/cast/files', 'public', presenter(async ({ body }) => c().engine.startFile(await body())));
