@@ -55,7 +55,7 @@ export const JOURNEY_MODULES = ['sync-protocol.js', 'cloud-crypto.js', 'clubNigh
 // What each app holds a copy of. Paths are repo-relative.
 export const COPIES = {
   journey: { kit: 'journey/public/brand', modules: 'journey/public/src/shared' },
-  classroom: { kit: 'classroom/public/brand', modules: 'classroom/public/src/shared', moduleList: ['clubNight.js', 'transitionGap.js', 'classroomRemote.js', 'sync-protocol.js', 'cloud-crypto.js'] },
+  classroom: { kit: 'classroom/public/brand', modules: 'classroom/public/src/shared', moduleList: ['clubNight.js', 'transitionGap.js', 'classroomRemote.js', 'sync-protocol.js', 'cloud-crypto.js', 'screenShare.js'] },
   printer: { kit: 'printer/print-server/public/brand', committed: true },
 };
 
