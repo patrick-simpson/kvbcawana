@@ -90,9 +90,17 @@ test('passphrase v2 only; the key stays in memory; the deck is opened here', () 
   // notes are written only where notesHere says so
   assert.match(app, /\$\('notes-wrap'\)\.hidden = !notesOn;\n  if \(notesOn\) \{/);
   assert.match(page, /id="notes-wrap" hidden/);
-  // nothing but the session goes to storage: never the passphrase, the key or the deck
-  for (const m of app.matchAll(/store\.set\(([^,]+),/g)) assert.equal(m[1], 'SESSION_KEY');
-  assert.ok(!/sessionStorage|indexedDB/.test(app));
+  // nothing but the session and the slide number goes to localStorage: never the passphrase, the key or the deck
+  for (const m of app.matchAll(/store\.set\(([^,]+),/g)) assert.ok(['SESSION_KEY', 'SLIDE_KEY'].includes(m[1]), m[1]);
+  assert.ok(!/sessionStorage/.test(app));
+  // The lobby computer only (owner 2026-11-08: "stop asking for the passcode after you've already asked"):
+  // the non-extractable key kept in the KVBC Awana app's own IndexedDB; Lock and a passphrase change forget it.
+  assert.match(app, /const IN_APP = \/\\bElectron\\\/\/\.test\(navigator\.userAgent\);/);
+  assert.match(app, /async run\(fn\) \{\n    if \(!IN_APP\) return null;/);
+  assert.equal((app.match(/indexedDB\./g) || []).length, 1, 'IndexedDB is opened in one place, behind IN_APP');
+  assert.match(app, /await savedKey\.put\(priv, key\.pub\);/);
+  assert.match(app, /function lock\(\) \{\n  ring = null;\n  savedKey\.forget\(\);/);
+  assert.match(app, /function signedOut\(words\) \{\n  closeLive\(\);\n  savedKey\.forget\(\);/);
   assert.ok(!/console\.(log|info)/.test(app), 'logs nothing');
 });
 

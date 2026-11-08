@@ -19,6 +19,16 @@
 // so on the lobby computer the passphrase typed in the Settings window is
 // enough for the TV window. Every screen follows ONE slide on the sync
 // Worker (POST /v1/presentation/go, polled), so a phone drives the TV too.
+//
+// The lobby computer (owner 2026-11-08: "On the computer that has the program
+// installed, stop asking for the passcode after you've already asked for it ...
+// when the app relaunches it just kicks me out of the slide that I'm in"): in the
+// KVBC Awana app ONLY (IN_APP, its Electron user agent) the opened key is kept in
+// that app's own IndexedDB (savedKey): the non-extractable CryptoKey itself, which
+// can be used there and never read out, beside the public key. A relaunch opens
+// the deck with it, no passphrase. Lock, or a passphrase change (401), forgets it.
+// Every browser else keeps the key in memory only, as before. The slide on show is
+// remembered per deck (SLIDE_KEY, a number), so a reload lands back on it.
 
 import { builtWords, clampSlide, deckOutline, followingNow, frameHtml, keyStep, lobbyTargets, modeOf, msToNextEdge, notesHere, pushWords, tapStep } from './logic.js';
 
@@ -26,6 +36,9 @@ const SYNC_INDEX = new URL('/lobby/shared/sync.json', location.href).href;
 const SESSION_KEY = 'awanaSyncSession.v1';
 const SESSION_RE = /^v1\.\d+\.\d+\.[A-Za-z0-9_-]{20,}$/;
 const CHANNEL = 'awana-presentation';
+const SLIDE_KEY = 'awanaPresentationSlide.v1';
+/** The KVBC Awana app (its window loads this page in Electron). */
+const IN_APP = /\bElectron\//.test(navigator.userAgent);
 const STAGE_W = 1600;
 // The slide is PUSHED (2026-11-03): the Worker rings the live channel's doorbell,
 // `changed {what: 'presentation'}`, on every slide change and new deck, and the
@@ -39,6 +52,44 @@ const store = {
   get(k) { try { return localStorage.getItem(k); } catch { return null; } },
   set(k, v) { try { if (v == null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch { /* private window */ } },
 };
+
+/**
+ * The lobby computer's saved key (IN_APP only): IndexedDB 'awanaPresentationKey',
+ * one record {privateKey (non-extractable CryptoKey), pub}. Every call fails soft.
+ */
+const savedKey = {
+  db() {
+    return new Promise((ok) => {
+      try {
+        const req = indexedDB.open('awanaPresentationKey', 1);
+        req.onupgradeneeded = () => req.result.createObjectStore('k');
+        req.onsuccess = () => ok(req.result);
+        req.onerror = () => ok(null);
+      } catch { ok(null); }
+    });
+  },
+  async run(fn) {
+    if (!IN_APP) return null;
+    const db = await savedKey.db();
+    if (!db) return null;
+    return new Promise((ok) => {
+      try {
+        const tx = db.transaction('k', 'readwrite');
+        const req = fn(tx.objectStore('k'));
+        tx.oncomplete = () => { db.close(); ok(req && 'result' in req ? req.result : null); };
+        tx.onerror = tx.onabort = () => { db.close(); ok(null); };
+      } catch { db.close(); ok(null); }
+    });
+  },
+  get() { return savedKey.run((st) => st.get('ring')); },
+  put(privateKey, pub) { return savedKey.run((st) => st.put({ privateKey, pub }, 'ring')); },
+  forget() { return savedKey.run((st) => st.delete('ring')); },
+};
+
+/** The slide last on show for a deck, or null. @param {number} rev */
+function savedSlide(rev) {
+  try { const d = JSON.parse(store.get(SLIDE_KEY) || 'null'); return d && d.rev === rev && Number.isInteger(d.index) ? d.index : null; } catch { return null; }
+}
 
 let mode = modeOf(location.search);
 /** The presenter view switched itself to the TV ("Show on this screen"). */
@@ -100,6 +151,7 @@ function render() {
     if (mode === 'tv') show('wait');
     return;
   }
+  store.set(SLIDE_KEY, JSON.stringify({ rev: deck.rev, index }));
   if (mode === 'tv') { show('tv'); drawTv(); return; }
   show('desk');
   drawDesk();
@@ -196,7 +248,10 @@ function adopt(html, rev, builtAt, { tell = true } = {}) {
     live: URL.createObjectURL(new Blob([frameHtml(html)], { type: 'text/html' })),
     still: URL.createObjectURL(new Blob([frameHtml(html, { still: true })], { type: 'text/html' })),
   };
+  const first = !deck;
   deck = { html, rev, builtAt, outline: deckOutline(html), urls };
+  // A reload: back on the slide this computer was showing (the Worker's slide wins when it is followed).
+  if (first && index === 0 && savedSlide(rev) !== null) index = savedSlide(rev);
   index = clampSlide(index, count());
   if (old) setTimeout(() => { URL.revokeObjectURL(old.live); URL.revokeObjectURL(old.still); }, 5000);
   if (tell) bc?.postMessage({ type: 'deck', html, rev, builtAt, index });
@@ -237,6 +292,7 @@ function gateNote(words) {
 
 function signedOut(words) {
   closeLive();
+  savedKey.forget();
   store.set(SESSION_KEY, null);
   memorySession = '';
   if (deck) { setLive(false, 'Signed out'); status(words); return; }
@@ -275,6 +331,8 @@ async function signIn(event) {
     const priv = await cc.unwrapPrivateKey(key.wrapped, typed, key.pub);
     if (!priv) { note.textContent = 'That passphrase did not open the deck.'; return; }
     ring = await cc.keyRing(priv, key.pub);
+    // The lobby computer keeps it (the key itself, unreadable), so a relaunch never asks again.
+    await savedKey.put(priv, key.pub);
     input.value = '';
     note.textContent = 'Opening the deck…';
     await loadDeck();
@@ -287,6 +345,7 @@ async function signIn(event) {
 
 function lock() {
   ring = null;
+  savedKey.forget();
   if (deck) { URL.revokeObjectURL(deck.urls.live); URL.revokeObjectURL(deck.urls.still); }
   deck = null;
   for (const id of ['tv-frame', 'now-frame', 'next-frame']) { $(id).removeAttribute('src'); delete $(id).dataset.url; }
@@ -549,6 +608,17 @@ async function start() {
 
   // Give another window of this browser a moment to hand its open deck over.
   await new Promise((r) => setTimeout(r, bc ? tuning.helloWaitMs : 0));
+  // The lobby computer: open the deck with the key it kept (no passphrase after a relaunch).
+  if (!deck && IN_APP && session() && base) {
+    const saved = await savedKey.get();
+    if (saved && saved.privateKey && saved.pub) {
+      try {
+        const cc = await import('./shared/cloud-crypto.js');
+        ring = await cc.keyRing(saved.privateKey, saved.pub);
+        await loadDeck();
+      } catch { ring = null; }
+    }
+  }
   if (!deck) {
     if (mode === 'tv') { show('wait'); quiet(); } else { show('gate'); $('passphrase').focus(); }
     if (!base) $('signin-note').textContent = 'The sync service is not reachable right now. Reload in a minute.';
