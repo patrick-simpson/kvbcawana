@@ -112,15 +112,25 @@ test('the slide is pushed: the page listens for the doorbell and only polls slow
 
 test('it follows other devices Sunday 5-9 PM Eastern only, and makes no calls outside it (owner 2026-11-03)', () => {
   const et = (iso) => new Date(iso);   // UTC instants; EST is UTC-5 in November, EDT UTC-4 in October
-  assert.equal(followingNow(et('2026-11-08T22:00:00Z')), true, 'Sunday 5:00 PM EST');
-  assert.equal(followingNow(et('2026-11-09T01:59:00Z')), true, 'Sunday 8:59 PM EST');
-  assert.equal(followingNow(et('2026-11-09T02:00:00Z')), false, 'Sunday 9:00 PM EST');
-  assert.equal(followingNow(et('2026-11-08T21:59:00Z')), false, 'Sunday 4:59 PM EST');
+  assert.equal(followingNow(et('2026-11-15T22:00:00Z')), true, 'Sunday 5:00 PM EST');
+  assert.equal(followingNow(et('2026-11-16T01:59:00Z')), true, 'Sunday 8:59 PM EST');
+  assert.equal(followingNow(et('2026-11-16T02:00:00Z')), false, 'Sunday 9:00 PM EST');
+  assert.equal(followingNow(et('2026-11-15T21:59:00Z')), false, 'Sunday 4:59 PM EST');
   assert.equal(followingNow(et('2026-11-04T23:00:00Z')), false, 'Wednesday 6 PM');
   assert.equal(followingNow(et('2026-10-25T21:30:00Z')), true, 'Sunday 5:30 PM EDT');
-  assert.equal(msToNextEdge(et('2026-11-08T21:30:00Z')), 30 * 60 * 1000, 'opens in half an hour');
-  assert.equal(msToNextEdge(et('2026-11-08T23:00:00Z')), 60 * 60 * 1000, 'never sleeps more than an hour');
+  assert.equal(msToNextEdge(et('2026-11-15T21:30:00Z')), 30 * 60 * 1000, 'opens in half an hour');
+  assert.equal(msToNextEdge(et('2026-11-15T23:00:00Z')), 60 * 60 * 1000, 'never sleeps more than an hour');
   assert.match(app, /if \(!followingNow\(\)\) \{ closeLive\(\);/, 'the poll stops and the socket closes outside it');
   assert.match(app, /!session\(\) \|\| !followingNow\(\)\) return;/, 'a press outside it is not sent');
   assert.match(app, /liveSock \|\| !session\(\) \|\| !followingNow\(\)/, 'no socket outside it');
+});
+
+test('today only (owner 2026-11-08): it also follows 4-7 PM Eastern on 2026-11-08', () => {
+  const et = (iso) => new Date(iso);
+  assert.equal(followingNow(et('2026-11-08T20:59:00Z')), false, '3:59 PM');
+  assert.equal(followingNow(et('2026-11-08T21:00:00Z')), true, '4:00 PM');
+  assert.equal(followingNow(et('2026-11-08T21:59:00Z')), true, '4:59 PM (the extra window)');
+  assert.equal(followingNow(et('2026-11-09T01:59:00Z')), true, '8:59 PM (the Sunday window still)');
+  assert.equal(followingNow(et('2026-11-15T21:30:00Z')), false, 'next Sunday 4:30 PM: not again');
+  assert.equal(msToNextEdge(et('2026-11-08T20:30:00Z')), 30 * 60 * 1000, 'opens at 4');
 });

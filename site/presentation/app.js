@@ -403,7 +403,7 @@ async function poll() {
   if (!session() || !base) { closeLive(); setLive(null, deck ? 'This screen only' : 'Not signed in'); schedulePoll(); return; }
   // Off the air (outside Sunday 5-9 PM Eastern, logic.js followingNow): no calls at
   // all; the next look is at the window's edge (or within the hour).
-  if (!followingNow()) { closeLive(); setLive(null, 'Follows other devices Sunday 5–9 PM'); schedulePoll(msToNextEdge()); return; }
+  if (!followingNow()) { closeLive(); setLive(null, 'Follows other devices Sunday 5–9 PM (today also 4–7 PM)'); schedulePoll(msToNextEdge()); return; }
   if (!liveSock && !liveRetryTimer) openLive();
   polling = true;
   try {
