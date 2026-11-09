@@ -23,12 +23,12 @@
         <h1 class="pr-shout">Sign in</h1>
         <p>Type the church passphrase to run the game time projector from this phone.</p>
         <form id="signin-form" autocomplete="off">
-          <label for="passphrase" class="pr-label">Passphrase</label>
-          <input id="passphrase" type="password" autocomplete="current-password" autocapitalize="none" spellcheck="false" enterkeyhint="go" />
+          <label for="passphrase" class="pr-label">Church passphrase</label>
+          <input id="passphrase" type="password" autocomplete="current-password" autocapitalize="none" spellcheck="false" enterkeyhint="go" aria-describedby="signin-note" />
+          <p id="signin-note" class="pr-note" role="status" aria-live="polite"></p>
           <button id="signin-btn" type="submit" class="pr-btn pr-btn--hot">Sign in</button>
         </form>
-        <p id="signin-note" class="pr-note" role="status"></p>
-        <p class="pr-fine">The passphrase is never saved on this phone; only the sign-in is.</p>
+        <p class="pr-fine">Same passphrase as on the screens. It is never saved on this phone; only the sign-in is.</p>
       </section>
 
       <section id="remote" hidden>
