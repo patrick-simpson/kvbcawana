@@ -1685,6 +1685,7 @@ function fsWanted() {
   try { return window.matchMedia('(hover: hover) and (pointer: fine)').matches; } catch (e) { return false; }
 }
 function enterFull() {
+  if (window.self !== window.top || window.__SHOWCASE__) return;   // framed (the home page's demo): never take over the visitor's screen
   if (fsElement() || !fsWanted()) return;
   var root = document.documentElement;
   try {
