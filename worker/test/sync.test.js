@@ -5,6 +5,7 @@ import {
   GLOBAL_MIN_NETS,
   GUESSES_IN_FLIGHT_MAX,
   IP_LOCK_MS,
+  SESSION_IDLE_DAYS,
   IP_MAX_FAILS,
   SyncCore,
   buildDeck,
@@ -495,3 +496,69 @@ describe('requests', () => {
   });
 });
 
+
+// Rolling sessions (security review 2026-11-09): a session not used for
+// SESSION_IDLE_DAYS is refused; every use keeps it, written at most once a day.
+describe('rolling sessions', () => {
+  const DAY = 24 * 60 * 60 * 1000;
+  it('a session in daily use never expires; one left idle past the limit is refused', async () => {
+    const s = setup();
+    const { body } = await s.login();
+    const kept = body.session;
+    s.tick(1000);
+    const idle = (await s.login()).body.session;
+    for (let d = 0; d < 200; d += 1) {
+      s.tick(DAY);
+      expect((await s.call('GET', '/v1/state', undefined, kept)).status).toBe(200);
+    }
+    expect((await s.call('GET', '/v1/state', undefined, idle)).status).toBe(401);
+    // The live socket's check is the same one.
+    expect(await s.core.sessionValid(kept)).toBe(true);
+    expect(await s.core.sessionValid(idle)).toBe(false);
+  });
+
+  it('used just inside the limit it lives on; a day past it, no', async () => {
+    const s = setup();
+    const token = (await s.login()).body.session;
+    s.tick(SESSION_IDLE_DAYS * DAY);
+    expect(await s.core.sessionValid(token)).toBe(true);
+    s.tick((SESSION_IDLE_DAYS + 1) * DAY);
+    expect(await s.core.sessionValid(token)).toBe(false);
+  });
+
+  it('writes its stamp at most once a day', async () => {
+    const s = setup();
+    const token = (await s.login()).body.session;
+    const puts = [];
+    const put = s.storage.put;
+    s.storage.put = async (k, v) => { if (typeof k === 'string' && k.startsWith('sess:')) puts.push(k); return put(k, v); };
+    for (let i = 0; i < 20; i += 1) await s.core.sessionValid(token);
+    expect(puts).toHaveLength(0);
+    s.tick(DAY);
+    for (let i = 0; i < 20; i += 1) await s.core.sessionValid(token);
+    expect(puts).toHaveLength(1);
+    // A restarted object (no cache) reads the stamp instead of writing again.
+    s.core.sessionDays.clear();
+    await s.core.sessionValid(token);
+    expect(puts).toHaveLength(1);
+  });
+
+  it('a token from before the rule (no stamp) is let in and stamped while the rule is young', async () => {
+    const s = setup();
+    const token = (await s.login()).body.session;
+    // Forget every stamp, as for a token minted before this rule existed.
+    for (const k of [...s.storage.map.keys()]) if (k.startsWith('sess:') && k !== 'sess:since') s.storage.map.delete(k);
+    s.core.sessionDays.clear();
+    s.tick(10 * DAY);
+    expect(await s.core.sessionValid(token)).toBe(true);
+    s.tick((SESSION_IDLE_DAYS - 1) * DAY);
+    expect(await s.core.sessionValid(token)).toBe(true);   // stamped 10 days in
+    // Another unstamped token, once the rule is older than the limit: refused.
+    s.tick(1000);
+    const late = (await s.login()).body.session;
+    for (const k of [...s.storage.map.keys()]) if (k.startsWith('sess:') && k !== 'sess:since') s.storage.map.delete(k);
+    s.core.sessionDays.clear();
+    s.tick(5 * DAY);
+    expect(await s.core.sessionValid(late)).toBe(false);
+  });
+});

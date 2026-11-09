@@ -101,7 +101,8 @@ anywhere a stranger could copy it and guess offline:
   get no more tries than one at a time (and at most 20 are checked at once).
 
 A screen already signed in is never affected; a lock only delays setting up a
-new one.
+new one. A sign-in that goes unused for 60 days ends (a screen or computer left
+off that long asks for the passphrase again); one in use never does.
 
 ## What it stores
 

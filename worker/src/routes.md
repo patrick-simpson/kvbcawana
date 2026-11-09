@@ -34,7 +34,10 @@ here and keep its shape; a change of shape is a change to this file first.
 - **Auth levels.**
   - `public`: no session.
   - `session`: `Authorization: Bearer <session>` from `POST /v1/login`
-    (today's tokens, epoch-bound: a passphrase change signs everyone out).
+    (today's tokens, epoch-bound: a passphrase change signs everyone out;
+    ROLLING: a session not used for `SESSION_IDLE_DAYS` 60 days is refused 401,
+    every use keeps it, stamped at most once a day under `sess:<hash>`, so a
+    screen, station or live socket in use is never signed out).
   - `station`: `session` plus `X-Station: <stationId>` naming a registered
     station. No pairing step (owner): any computer signed in with the
     passphrase may register one. The Worker does not prove key possession; a

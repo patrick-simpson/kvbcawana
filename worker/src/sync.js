@@ -31,7 +31,8 @@
 // addresses in an hour lock logins for everyone for GLOBAL_LOCK_MS, but only when
 // they came from at least GLOBAL_MIN_NETS different networks (an IPv4 address, an
 // IPv6 /64: netOf), so one person cannot lock the church out. A screen
-// already signed in never needs to log in again, so a lock only ever delays
+// already signed in never needs to log in again while it is used (sessions roll:
+// SESSION_IDLE_DAYS unused ends one), so a lock only ever delays
 // setting up a new one. (The old design sealed the keys under the passphrase
 // on a public channel, where a short word could be guessed offline in
 // seconds; that is the hole this closes.)
@@ -100,6 +101,15 @@ export const GLOBAL_LOCK_MS = 60 * 60 * 1000;
  * does. An IPv6 /64 counts as one network, as it does for the per-address limit.
  */
 export const GLOBAL_MIN_NETS = 10;
+/**
+ * Sessions are ROLLING (security review 2026-11-09): one not used for this many days
+ * is refused (the screen asks for the passphrase again). Every use counts, written at
+ * most once a day (`sess:<hash>` = {day}), so a screen, station or socket in use never
+ * notices. A token from before this rule has no stamp: it is let in and stamped while
+ * the rule is younger than this (`sess:since`), so nothing signed in is dropped at deploy.
+ */
+export const SESSION_IDLE_DAYS = 60;
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 /**
  * Guesses being checked at once (memory only). A guess is counted the moment it
@@ -185,6 +195,10 @@ export class SyncCore {
     /** Guesses (logins, passphrase changes) being checked right now, per address and all together. @type {Map<string, number>} */
     this.guessing = new Map();
     this.guessingAll = 0;
+    /** Each session's last-used day as stored (signature -> day), a cache. @type {Map<string, number>} */
+    this.sessionDays = new Map();
+    /** @type {number | null} */
+    this.rollingDay = null;
     // The runtime switches (switches.js, routes.md 10.2): every module gets the
     // EFFECTIVE env (wrangler.toml's values are the defaults, a stored switch
     // overrides one), so their existing env reads need no edit.
@@ -534,7 +548,64 @@ export class SyncCore {
   /** @param {number} epoch */
   async mintSession(epoch) {
     const body = sessionBody(epoch, this.now());
-    return `${body}.${toBase64Url(await hmac(fromBase64(await this.secret()) || new Uint8Array(0), body))}`;
+    const sig = toBase64Url(await hmac(fromBase64(await this.secret()) || new Uint8Array(0), body));
+    await this.stampSession(sig, Math.floor(this.now() / DAY_MS));
+    return `${body}.${sig}`;
+  }
+
+  /** Where a session's last-used day is kept: a hash of its signature, never the token. @param {string} sig */
+  async sessionKey(sig) {
+    const d = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(sig)));
+    return `sess:${[...d.slice(0, 16)].map((b) => b.toString(16).padStart(2, '0')).join('')}`;
+  }
+
+  /** @param {string} sig @param {number} day */
+  async stampSession(sig, day) {
+    await this.storage.put(await this.sessionKey(sig), { day });
+    this.sessionDays.set(sig, day);
+    while (this.sessionDays.size > 500) this.sessionDays.delete(/** @type {string} */ (this.sessionDays.keys().next().value));
+  }
+
+  /** The day the rolling rule started here (written once). */
+  async rollingSince() {
+    if (this.rollingDay == null) {
+      const d = await this.storage.get('sess:since');
+      if (Number.isInteger(d?.day)) this.rollingDay = d.day;
+      else {
+        this.rollingDay = Math.floor(this.now() / DAY_MS);
+        await this.storage.put('sess:since', { day: this.rollingDay });
+      }
+    }
+    return this.rollingDay;
+  }
+
+  /** A genuine session still in use (rolling, SESSION_IDLE_DAYS); stamps today. @param {string} sig */
+  async sessionFresh(sig) {
+    const today = Math.floor(this.now() / DAY_MS);
+    let last = this.sessionDays.get(sig);
+    if (last === undefined) {
+      const rec = await this.storage.get(await this.sessionKey(sig));
+      if (Number.isInteger(rec?.day)) last = rec.day;
+    }
+    if (last === undefined) {
+      if (today - (await this.rollingSince()) > SESSION_IDLE_DAYS) return false;
+    } else if (today - last > SESSION_IDLE_DAYS) return false;
+    if (last !== today) await this.stampSession(sig, today);
+    return true;
+  }
+
+  /** Forget last-used stamps past the idle limit (the scheduled run). */
+  async pruneSessions() {
+    if (!this.storage.list) return 0;
+    const today = Math.floor(this.now() / DAY_MS);
+    let dropped = 0;
+    for (const [key, v] of await this.storage.list({ prefix: 'sess:', limit: 1000 })) {
+      if (key === 'sess:since' || !Number.isInteger(v?.day) || today - v.day <= SESSION_IDLE_DAYS) continue;
+      await this.storage.delete(key);
+      dropped += 1;
+    }
+    for (const [sig, day] of this.sessionDays) if (today - day > SESSION_IDLE_DAYS) this.sessionDays.delete(sig);
+    return dropped;
   }
 
   /** The session token read by session.js parseSession (the one parser). @param {Request} request @returns {Promise<boolean>} */
@@ -544,7 +615,8 @@ export class SyncCore {
     const auth = await this.storage.get('auth');
     if (!auth || session.epoch !== auth.epoch) return false;
     const expect = toBase64Url(await hmac(fromBase64(await this.secret()) || new Uint8Array(0), session.signed));
-    return safeEqual(expect, session.sig);
+    if (!safeEqual(expect, session.sig)) return false;
+    return this.sessionFresh(session.sig);
   }
 
   /**
@@ -1201,6 +1273,7 @@ export class SyncCore {
     await this.switches.load();
     await this.forgetRelay();
     await this.pruneFails();
+    await this.pruneSessions();
     // Keeps the watcher's alarm set (it sets its own after each run; this is
     // the safety net if one was ever lost).
     await this.watcher.arm();
