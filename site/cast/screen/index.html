@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
 <title>Cast · Kennebec Valley Baptist Church</title>
-<link rel="preload" href="/cast/church/fonts/Jost-Variable.ttf" as="font" type="font/ttf" crossorigin>
-<link rel="stylesheet" href="/cast/church/church.css">
+<link rel="preload" href="../church/fonts/Jost-Variable.ttf" as="font" type="font/ttf" crossorigin>
+<link rel="stylesheet" href="../church/church.css">
 <style>
   /* The Cast screen (owner 2026-11-08; worker/src/routes.md 10.18): what KVBC Awana
      shows on the lobby TV while Cast is on. Waiting = the code on the church's cream;
@@ -49,7 +49,7 @@
   .card.calm .go { max-width: 48ch; }
   body.configure { cursor: auto; overflow: auto; background: var(--cream); --u: min(1.6vw, 2.4vh); }
   body.configure .card { --c-bg: var(--cream); --c-text: var(--charcoal); --c-muted: var(--muted); --c-rule: var(--rule); }
-  body.configure .card .logo { content: url('/cast/church/kvbc-logo.png'); }
+  body.configure .card .logo { content: url('../church/kvbc-logo.png'); }
   body.configure .card { position: static; min-height: 100vh; padding: 32px 28px; }
 
   /* ── something up ── */
@@ -100,7 +100,7 @@
 <body>
   <!-- Waiting: the code (or, signed out / configure mode, a calm note) -->
   <section class="layer card code-hidden" id="card">
-    <img class="logo" src="/cast/church/kvbc-logo-white.png" alt="Kennebec Valley Baptist Church" width="1302" height="277">
+    <img class="logo" src="../church/kvbc-logo-white.png" alt="Kennebec Valley Baptist Church" width="1302" height="277">
     <div class="middle">
       <div>
         <h1 id="card-title">Present on this screen</h1>
@@ -114,6 +114,6 @@
   </section>
   <!-- Something a presenter put up -->
   <section class="layer" id="show" hidden></section>
-  <script type="module" src="/cast/screen/screen.js"></script>
+  <script type="module" src="screen.js"></script>
 </body>
 </html>

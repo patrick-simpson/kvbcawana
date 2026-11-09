@@ -322,3 +322,23 @@ test('every animation is inside the motion-allowed block; one shared motion lang
   assert.match(screen, /canvas\.classList\.add\('is-next'\);/);
   assert.match(app, /function closePanel\(panel\)/);
 });
+
+// The pages work wherever they are served (owner 2026-11-09: Cast moves to its own
+// address, cast.kvbchurch.org, presenter at / and the TV at /screen/; the old
+// awana.kvbchurch.org/cast/ copy keeps working meanwhile): every path of their own is
+// relative, and the Worker is the page's own origin's /api.
+test('the pages name their own files relatively and call their own origin\'s /api', () => {
+  for (const [name, src] of [['index.html', page], ['screen/index.html', screenPage], ['app.js', app], ['screen.js', screen], ['preview.js', previewJs], ['church.css', css]]) {
+    const own = src.replace(/\/v1\/cast\//g, '');
+    assert.ok(!/["'(]\/cast\//.test(own), `${name} names an absolute /cast/ path`);
+    assert.ok(!/\/lobby\/shared\/sync\.json/.test(src), `${name} reads the lobby's sync.json`);
+  }
+  assert.match(app, /from '\.\/shared\/classroomRemote\.js'/);
+  assert.match(app, /from '\.\/logic\.js'/);
+  assert.match(screen, /from '\.\.\/shared\/screenShare\.js'/);
+  assert.match(page, /src="app\.js"/);
+  assert.match(screenPage, /src="screen\.js"/);
+  assert.match(screenPage, /href="\.\.\/church\/church\.css"/);
+  assert.match(css, /url\('fonts\/Jost-Variable\.ttf'\)/);
+  for (const src of [app, screen]) assert.match(src, /if \(!base && location\.protocol === 'https:'\) base = `\$\{location\.origin\}\/api`;/);
+});

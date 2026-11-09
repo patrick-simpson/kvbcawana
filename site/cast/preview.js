@@ -12,7 +12,7 @@
 // when scrolled into view; the big slides keep a few drawn pages so Next is instant.
 // No pdf.js (offline, blocked): Back/Next and the slide number still work.
 
-import { slideView } from '/cast/logic.js';
+import { slideView } from './logic.js';
 
 const PDFJS = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/';
 // Fingerprints of the exact files (subresource integrity, owner 2026-11-09: refuse an

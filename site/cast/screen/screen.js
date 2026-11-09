@@ -36,12 +36,11 @@
 //
 // The Sparks remote's classroom TV (classroom/public/src/stage.js) is the model.
 
-import * as R from '/cast/shared/classroomRemote.js';
-import { CONNECT_WAIT_MS, answerShare } from '/cast/shared/screenShare.js';
+import * as R from '../shared/classroomRemote.js';
+import { CONNECT_WAIT_MS, answerShare } from '../shared/screenShare.js';
 
 const SESSION_KEY = 'awanaSyncSession.v1';
 const SESSION_RE = /^v1\.\d+\.\d+\.[A-Za-z0-9_-]{20,}$/;
-const SYNC_INDEX = new URL('/lobby/shared/sync.json', location.href).href;
 const PDFJS = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/';
 const YT_API = 'https://www.youtube.com/iframe_api';
 const QR_LIB = 'https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js';
@@ -749,15 +748,10 @@ async function start() {
     return;
   }
   drawCode();
-  try {
-    if (typeof window.castBase === 'string') base = window.castBase;
-    else {
-      const res = await fetch(SYNC_INDEX, { cache: 'no-store' });
-      const d = res.ok ? await res.json() : null;
-      const url = d && typeof d.url === 'string' ? d.url.trim().replace(/\/+$/, '') : '';
-      if (/^https:\/\/[^\s?#]+$/.test(url)) base = url;
-    }
-  } catch { /* falls back below */ }
+  // The Worker is this site's own /api (awana.kvbchurch.org/cast/ and
+  // cast.kvbchurch.org alike: each site answers /api through the sync service), so
+  // the page asks nothing first. A test may name another (window.castBase).
+  if (typeof window.castBase === 'string') base = window.castBase;
   if (!base && location.protocol === 'https:') base = `${location.origin}/api`;
   if (!session()) { signedOut(); }
   else { await openRoom(); openLive(); }

@@ -29,17 +29,16 @@
 //   minutes with no touch (the free plan's daily requests).
 // worker/src/routes.md 10.18.
 
-import * as R from '/cast/shared/classroomRemote.js';
-import { CONNECT_WAIT_MS, canShareScreen, startSharing } from '/cast/shared/screenShare.js';
+import * as R from './shared/classroomRemote.js';
+import { CONNECT_WAIT_MS, canShareScreen, startSharing } from './shared/screenShare.js';
 import {
   TOKEN_KEY, TOKEN_RE, captureWords, cleanCode, codeReady, errorWords, filePress, fileProblem, formatCode,
   joinWords, linkToCopy, shareWords, size, textPress, titleFromName, tvWords, videoPress,
   CONVERT_GIVE_UP_MS, CONVERT_POLL_MS, SLIDES_ACCEPT, convertWords, slidesChoice,
   clock, codeFromHash, facebookPress, resultPress,
-} from '/cast/logic.js';
-import { createPreview } from '/cast/preview.js';
+} from './logic.js';
+import { createPreview } from './preview.js';
 
-const SYNC_INDEX = new URL('/lobby/shared/sync.json', location.href).href;
 const TUNING = Object.assign({ pollMs: 2000, idleMs: 30 * 60 * 1000, timeoutMs: 12000, failuresBeforeWarning: 2 }, window.castTuning || {});
 
 const $ = (id) => /** @type {any} */ (document.getElementById(id));
@@ -681,16 +680,10 @@ async function start() {
   window.addEventListener('online', () => { if (tokenStore.get()) poll(); });
   window.addEventListener('pagehide', () => { if (shareId) endShareHere(); });
 
-  try {
-    if (typeof window.castBase === 'string') base = window.castBase;
-    else {
-      const res = await fetch(SYNC_INDEX, { cache: 'no-store' });
-      const d = res.ok ? await res.json() : null;
-      const url = d && typeof d.url === 'string' ? d.url.trim().replace(/\/+$/, '') : '';
-      if (/^https:\/\/[^\s?#]+$/.test(url)) base = url;
-    }
-  } catch { /* the code step says so */ }
-  // The Worker is this site's /api: same origin whatever sync.json said.
+  // The Worker is this site's own /api (awana.kvbchurch.org/cast/ and
+  // cast.kvbchurch.org alike: each site answers /api through the sync service), so
+  // the page asks nothing first. A test may name another (window.castBase).
+  if (typeof window.castBase === 'string') base = window.castBase;
   if (!base && location.protocol === 'https:') base = `${location.origin}/api`;
 
   // The TV's QR code: /cast/#code=123456. The code leaves the address bar at once.
