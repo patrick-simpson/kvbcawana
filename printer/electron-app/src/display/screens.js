@@ -18,8 +18,13 @@
 // Cast (owner 2026-11-08: the lobby computer "kind of like an air server"; "It should
 // be allowed to be enabled by right clicking on the icon in the task bar"): the tray's
 // "Cast (screen sharing)" switch puts it up (site/cast/screen/: a code on the TV,
-// presenters on awana.kvbchurch.org/cast) and back to the screen before. `toggle`:
+// presenters on cast.kvbchurch.org) and back to the screen before. `toggle`:
 // it is not one of the Screen menu's choices or the wizard's (display.js castOn/castOff).
+// Since 11.0.0 (owner 2026-11-09) Cast is on its OWN site, https://cast.kvbchurch.org,
+// the TV page at /screen/: its `dir` is that absolute address (never the lobby's site),
+// so its window may navigate within exactly that origin and folder (isScreenPage), and
+// only its window gets the sign-in bridge (castHostAllowed, static/display/cast-preload.cjs):
+// localStorage does not cross origins, so the app hands its own sign-in to that page.
 'use strict';
 
 /** @typedef {'lobby' | 'projector' | 'journey' | 'classroom' | 'cast'} ScreenId */
@@ -35,7 +40,7 @@ const SCREENS = {
     defaults: { hours: { start: '16:00', end: '20:00' }, shutdownAt: '20:00' },
   },
   cast: {
-    id: 'cast', name: 'Cast (screen sharing)', short: 'Cast', dir: '../cast/screen/', page: '', background: '#F6F2EA',
+    id: 'cast', name: 'Cast (screen sharing)', short: 'Cast', dir: 'https://cast.kvbchurch.org/screen/', page: '', background: '#F6F2EA',
     always: true, toggle: true,
   },
 };
@@ -81,7 +86,26 @@ function isScreenPage(url, base) {
   } catch { return false; }
 }
 
+/** Cast's own site (owner 2026-11-09). */
+const CAST_ORIGIN = 'https://cast.kvbchurch.org';
+
+/**
+ * Whether an IPC call may have the computer's sign-in (the Cast TV page's bridge): it
+ * must come from the Cast screen's own window, from that window's TOP frame (never an
+ * iframe: a YouTube or Facebook player, anything a presenter put up), and that frame
+ * must be showing a page of exactly https://cast.kvbchurch.org inside the TV folder.
+ *
+ * @param {{ fromCastWindow: boolean, isTopFrame: boolean, frameUrl: unknown }} o
+ */
+function castHostAllowed({ fromCastWindow, isTopFrame, frameUrl }) {
+  if (fromCastWindow !== true || isTopFrame !== true) return false;
+  try {
+    const u = new URL(String(frameUrl));
+    return u.origin === CAST_ORIGIN && u.pathname.startsWith('/screen/');
+  } catch { return false; }
+}
+
 /** The screens someone chooses from (the Screen menu, the wizard): not the Cast switch. */
 const CHOOSABLE = Object.freeze(Object.values(SCREENS).filter((x) => !x.toggle));
 
-module.exports = { SCREENS, CHOOSABLE, DEFAULT_SCREEN, screenFor, screenUrls, isScreenPage };
+module.exports = { SCREENS, CHOOSABLE, DEFAULT_SCREEN, CAST_ORIGIN, screenFor, screenUrls, isScreenPage, castHostAllowed };

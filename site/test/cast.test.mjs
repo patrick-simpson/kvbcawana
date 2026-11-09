@@ -359,3 +359,19 @@ test('the TV sends people to the presenter page beside it: cast.kvbchurch.org on
   assert.match(screen, /presenters go to \$\{addressWords\(presenterUrl\(location\.href\)\)\} and type it/);
   assert.ok(!/awana\.kvbchurch\.org\/cast/.test(screen + screenPage), 'the TV never names the old address');
 });
+
+// Owner 2026-11-09: "The lobby computer's KVBC Awana app must sign the new TV page in BY
+// ITSELF" (localStorage does not cross origins). The app's bridge is
+// printer/electron-app/static/display/cast-preload.cjs; a plain browser has none.
+test('the TV page asks KVBC Awana for its sign-in when its slot is empty, and once more after a 401', () => {
+  assert.match(screen, /const host = window\.awanaCastHost;\n  if \(!host \|\| typeof host\.session !== 'function'\) return false;/);
+  assert.match(screen, /if \(!SESSION_RE\.test\(s\)\) return false;\n  try \{ localStorage\.setItem\(SESSION_KEY, s\); \}/);
+  assert.match(screen, /if \(!session\(\)\) await sessionFromHost\(\);\n  if \(!session\(\)\) \{ signedOut\(\); \}/);
+  // A 401 asks once; only a DIFFERENT sign-in starts the page again (never a loop).
+  assert.match(screen, /if \(!hostAskedAfter401\) \{\n    hostAskedAfter401 = true;\n    const before = session\(\);\n    if \(await sessionFromHost\(\) && session\(\) !== before\) \{ location\.reload\(\); return; \}\n  \}\n  signedOut\(\);/);
+  assert.equal((screen.match(/r\.status === 401\) \{ refused\(\); return; \}/g) || []).length, 2);
+  assert.ok(!/r\.status === 401\) \{ signedOut\(\)/.test(screen));
+  // Configure mode (the app's Settings window) returns before any of it.
+  const start = screen.slice(screen.indexOf('async function start()'));
+  assert.ok(start.indexOf('if (CONFIGURE)') < start.indexOf('sessionFromHost()'));
+});

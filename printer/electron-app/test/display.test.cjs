@@ -206,7 +206,7 @@ describe('display/displays', () => {
 
 describe('display/screens', () => {
   // Moved from lobby/desktop/src/screens.test.js (KVBC Awana v9); vitest -> node:test.
-  const { SCREENS, CHOOSABLE, isScreenPage, screenFor, screenUrls } = require('../src/display/screens');
+  const { SCREENS, CHOOSABLE, CAST_ORIGIN, isScreenPage, screenFor, screenUrls, castHostAllowed } = require('../src/display/screens');
 
   const SITE = 'https://awana.kvbchurch.org/lobby/';
 
@@ -224,10 +224,41 @@ describe('display/screens', () => {
     });
 
     it('Cast (owner 2026-11-08) is the tray switch, up whenever on, never one of the Screen menu\'s choices', () => {
-      expect(screenUrls(SITE, 'cast').page).toBe('https://awana.kvbchurch.org/cast/screen/');
-      expect(screenUrls(SITE, 'cast').configure).toBe('https://awana.kvbchurch.org/cast/screen/?configure=1');
+      // Cast's own site since 11.0.0 (owner 2026-11-09), whatever the lobby's site is.
+      expect(screenUrls(SITE, 'cast').page).toBe('https://cast.kvbchurch.org/screen/');
+      expect(screenUrls(SITE, 'cast').configure).toBe('https://cast.kvbchurch.org/screen/?configure=1');
+      expect(screenUrls('http://localhost:5173/lobby/', 'cast').page).toBe('https://cast.kvbchurch.org/screen/');
       expect(SCREENS.cast.always).toBe(true);
       expect(CHOOSABLE.map((x) => x.id)).toEqual(['lobby', 'projector', 'journey', 'classroom']);
+    });
+
+    it('the Cast window stays inside https://cast.kvbchurch.org/screen/ and no other screen may go there', () => {
+      const cast = screenUrls(SITE, 'cast').base;
+      expect(cast).toBe('https://cast.kvbchurch.org/screen/');
+      expect(isScreenPage('https://cast.kvbchurch.org/screen/?configure=1', cast)).toBe(true);
+      expect(isScreenPage('https://cast.kvbchurch.org/', cast)).toBe(false);
+      expect(isScreenPage('https://awana.kvbchurch.org/cast/screen/', cast)).toBe(false);
+      expect(isScreenPage('https://cast.kvbchurch.org.evil.example/screen/', cast)).toBe(false);
+      expect(isScreenPage('http://cast.kvbchurch.org/screen/', cast)).toBe(false);
+      for (const id of ['lobby', 'projector', 'journey', 'classroom']) {
+        expect(isScreenPage('https://cast.kvbchurch.org/screen/', screenUrls(SITE, id).base)).toBe(false);
+      }
+    });
+
+    it('the sign-in bridge answers only the Cast window\'s top frame on Cast\'s own TV page', () => {
+      expect(CAST_ORIGIN).toBe('https://cast.kvbchurch.org');
+      const ok = { fromCastWindow: true, isTopFrame: true, frameUrl: 'https://cast.kvbchurch.org/screen/' };
+      expect(castHostAllowed(ok)).toBe(true);
+      expect(castHostAllowed({ ...ok, frameUrl: 'https://cast.kvbchurch.org/screen/?x=1#y' })).toBe(true);
+      expect(castHostAllowed({ ...ok, fromCastWindow: false })).toBe(false);
+      expect(castHostAllowed({ ...ok, isTopFrame: false })).toBe(false);
+      expect(castHostAllowed({ ...ok, frameUrl: 'https://cast.kvbchurch.org/' })).toBe(false);
+      expect(castHostAllowed({ ...ok, frameUrl: 'https://kvbc-cast.pages.dev/screen/' })).toBe(false);
+      expect(castHostAllowed({ ...ok, frameUrl: 'https://awana.kvbchurch.org/cast/screen/' })).toBe(false);
+      expect(castHostAllowed({ ...ok, frameUrl: 'https://cast.kvbchurch.org.evil.example/screen/' })).toBe(false);
+      expect(castHostAllowed({ ...ok, frameUrl: 'https://www.youtube-nocookie.com/embed/x' })).toBe(false);
+      expect(castHostAllowed({ ...ok, frameUrl: 'not a url' })).toBe(false);
+      expect(castHostAllowed({ ...ok, frameUrl: undefined })).toBe(false);
     });
 
     it('gives each a configure-mode page', () => {

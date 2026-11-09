@@ -151,6 +151,33 @@ describe('show-presentation is gone (owner 2026-11-09: the presentation is over;
   });
 });
 
+describe('Cast on its own site signs in with the computer\'s own sign-in (11.0.0, owner 2026-11-09)', () => {
+  const castPreload = fs.readFileSync(path.join(__dirname, '..', 'static', 'display', 'cast-preload.cjs'), 'utf8');
+  it('only the Cast screen\'s window gets the bridge, sandboxed and isolated like every window', () => {
+    assert.match(display, /\.\.\.\(urls\(\)\.screen\.id === 'cast' \? \{ preload: staticFile\('cast-preload\.cjs'\) \} : \{\}\),/);
+    const open = display.slice(display.indexOf('function openLobby()'), display.indexOf('const wc = lobby.webContents;'));
+    assert.match(open, /contextIsolation: true,\n\s*sandbox: true,\n\s*nodeIntegration: false,/);
+    assert.equal((display.match(/staticFile\('cast-preload\.cjs'\)/g) || []).length, 1);
+  });
+  it('the preload exposes one call, on Cast\'s own origin only', () => {
+    assert.match(castPreload, /if \(window\.location\.origin === 'https:\/\/cast\.kvbchurch\.org'\) \{/);
+    assert.match(castPreload, /contextBridge\.exposeInMainWorld\('awanaCastHost', \{\n\s*session: \(\) => ipcRenderer\.invoke\('cast:session'\),\n\s*\}\);/);
+    assert.equal((castPreload.match(/ipcRenderer\./g) || []).length, 1);
+  });
+  it('the main process checks the sender: the Cast window, its top frame, Cast\'s TV page', () => {
+    const fn = display.slice(display.indexOf('function castSession(event)'), display.indexOf('function wireIpc()'));
+    assert.match(fn, /event\.sender === lobby\.webContents && urls\(\)\.screen\.id === 'cast'/);
+    assert.match(fn, /isTopFrame: Boolean\(frame && !frame\.parent\)/);
+    assert.match(fn, /frameUrl: frame \? frame\.url : ''/);
+    assert.match(fn, /if \(!allowed\) \{[^}]*return null; \}/);
+    assert.match(display, /ipcMain\.handle\('cast:session', \(event\) => castSession\(event\)\);/);
+    assert.match(display, /const IPC_HANDLES = \[[^\]]*'cast:session'/);
+  });
+  it('main.js hands over the bare session string of this computer\'s own sign-in', () => {
+    assert.match(main, /castSession: \(\) => \{\n\s*const sess = deviceSession\(\);\n\s*return sess && syncClient && syncClient\.isValidSession\(sess\.session\) \? sess\.session : null;\n\s*\},/);
+  });
+});
+
 describe('Cast from the tray (owner 2026-11-08: "enabled by right clicking on the icon in the task bar")', () => {
   it('a checkbox in the display\'s tray items turns Cast on and off', () => {
     assert.match(display, /label: 'Cast \(screen sharing\)', type: 'checkbox', checked: state\.settings\.screen === 'cast', click: \(\) => \(state\.settings\.screen === 'cast' \? castOff\(\) : castOn\(\)\)/);

@@ -27,7 +27,7 @@ const path = require('path');
 const { clubNightToday, displayWindow, nextClubNight } = require('./clubNight');
 const { NO_OVERRIDES, decideVisibility, hide, showNow, tidy } = require('./visibility');
 const { findDisplay, rememberDisplay } = require('./displays');
-const { CHOOSABLE, isScreenPage, screenUrls } = require('./screens');
+const { CHOOSABLE, castHostAllowed, isScreenPage, screenUrls } = require('./screens');
 const { hoursMinutes, moveToFourPm, normalizeSettings, parseTime, settingsForScreen } = require('./settings');
 const { shutdownDeadline, shutdownStep } = require('./shutdown');
 const { createPenWatch } = require('./pen-watch');
@@ -40,7 +40,7 @@ const RETRY_LOAD_MS = 30 * 1000;
 const CURSOR_IDLE_MS = 3000;
 // What the volunteer calls the monitor it goes on, in titles and the tray.
 const WHERE = { lobby: 'the lobby TV', projector: 'the projector', journey: 'the Journey screen', classroom: 'the downstairs classroom screen' };
-const IPC_HANDLES = ['configure:get', 'configure:set'];
+const IPC_HANDLES = ['configure:get', 'configure:set', 'cast:session'];
 const IPC_EVENTS = ['card:cancel', 'chooser:choose', 'chooser:cancel', 'configure:choose-monitor', 'configure:reload-screen',
   'configure:reload-settings', 'configure:open-log', 'configure:cancel-shutdown'];
 
@@ -50,6 +50,7 @@ const IPC_EVENTS = ['card:cancel', 'chooser:choose', 'chooser:cancel', 'configur
  *   quietStart: boolean, smoke?: boolean,
  *   getAutostart: () => boolean, setAutostart: (on: boolean) => void,
  *   onChange: () => void,
+ *   castSession?: () => string | null,
  * }} opts
  */
 function createDisplay(opts) {
@@ -316,6 +317,10 @@ function createDisplay(opts) {
         backgroundThrottling: false,
         autoplayPolicy: 'no-user-gesture-required',
         spellcheck: false,
+        // The Cast screen alone (11.0.0): its page on cast.kvbchurch.org asks for this
+        // computer's sign-in through one bridge (castSession below). No other screen
+        // gets a preload. A screen change closes this window and opens a new one.
+        ...(urls().screen.id === 'cast' ? { preload: staticFile('cast-preload.cjs') } : {}),
       },
     });
     const wc = lobby.webContents;
@@ -876,8 +881,31 @@ function createDisplay(opts) {
     if (typeof patch.autostart === 'boolean') opts.setAutostart(patch.autostart);
   }
 
+  /**
+   * The Cast TV page's bridge (static/display/cast-preload.cjs, 11.0.0): this computer's
+   * sign-in, the bare session string the page keeps in its own awanaSyncSession.v1 slot
+   * on cast.kvbchurch.org. Only for the Cast screen's own window, from its top frame,
+   * showing https://cast.kvbchurch.org/screen/ (castHostAllowed); anything else gets null.
+   * @param {Electron.IpcMainInvokeEvent} event
+   */
+  function castSession(event) {
+    const frame = event.senderFrame;
+    const allowed = castHostAllowed({
+      fromCastWindow: Boolean(lobby && !lobby.isDestroyed() && event.sender === lobby.webContents && urls().screen.id === 'cast'),
+      isTopFrame: Boolean(frame && !frame.parent),
+      frameUrl: frame ? frame.url : '',
+    });
+    if (!allowed) { log('cast: sign-in refused to', frame ? frame.url : '(no frame)'); return null; }
+    let s = null;
+    try { s = opts.castSession ? opts.castSession() : null; } catch { s = null; }
+    if (typeof s !== 'string' || !s) { log('cast: no sign-in to hand over'); return null; }
+    log('cast: sign-in handed to the Cast page');
+    return s;
+  }
+
   function wireIpc() {
     ipcMain.on('card:cancel', cancelShutdown);
+    ipcMain.handle('cast:session', (event) => castSession(event));
     ipcMain.on('chooser:choose', (event) => {
       const picked = choosers.get(event.sender.id);
       if (picked) chooseDisplay(picked.display);

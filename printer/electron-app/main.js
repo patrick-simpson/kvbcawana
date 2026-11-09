@@ -1520,6 +1520,13 @@ app.whenReady().then(async () => {
     },
     // The tray's "Disconnect the presenter" (owner 2026-11-08): the phone or laptop is
     // let go, what is on the TV stays (routes.md 10.18 POST /v1/cast/kick).
+    // Cast's own site (11.0.0, owner 2026-11-09): the TV page on cast.kvbchurch.org cannot
+    // read the lobby's sign-in (another origin), so the display hands it this computer's
+    // own (display.js castSession checks the caller first), the bare session string.
+    castSession: () => {
+      const sess = deviceSession();
+      return sess && syncClient && syncClient.isValidSession(sess.session) ? sess.session : null;
+    },
     onCastKick: () => {
       const sess = deviceSession();
       if (!sess || !syncClient) return;

@@ -205,7 +205,7 @@ function hideCode() {
 
 async function openRoom() {
   const r = await request('/v1/cast/open', { method: 'POST', body: {} });
-  if (r.status === 401) { signedOut(); return; }
+  if (r.status === 401) { refused(); return; }
   if (!r.ok || !r.body || !/^\d{6}$/.test(r.body.code || '')) {
     openRetryMs = Math.min(T.retryMaxMs, openRetryMs ? openRetryMs * 2 : T.openRetryMinMs);
     setTimeout(openRoom, openRetryMs);
@@ -217,6 +217,37 @@ async function openRoom() {
   read();
 }
 
+/* ── Signed in by KVBC Awana (owner 2026-11-09) ──
+   This page lives on cast.kvbchurch.org, and the lobby's sign-in (awanaSyncSession.v1 on
+   awana.kvbchurch.org) does not cross origins. In KVBC Awana's Cast window a tiny bridge
+   (printer/electron-app/static/display/cast-preload.cjs) hands over the computer's own
+   sign-in: asked when this site's slot is empty, and once more after a 401 (the app may
+   hold a newer one, after a passphrase change). It is kept in this site's own slot and
+   read from there like any screen's. A plain browser has no bridge: the calm card. */
+
+let hostAskedAfter401 = false;
+
+/** The computer's sign-in from KVBC Awana, kept in this site's slot. @returns {Promise<boolean>} */
+async function sessionFromHost() {
+  const host = window.awanaCastHost;
+  if (!host || typeof host.session !== 'function') return false;
+  let s = '';
+  try { s = String((await host.session()) || '').trim(); } catch { return false; }
+  if (!SESSION_RE.test(s)) return false;
+  try { localStorage.setItem(SESSION_KEY, s); } catch { return false; }
+  return session() === s;
+}
+
+/** A 401: ask the app once for a newer sign-in (then start again with it), else the calm card. */
+async function refused() {
+  if (!hostAskedAfter401) {
+    hostAskedAfter401 = true;
+    const before = session();
+    if (await sessionFromHost() && session() !== before) { location.reload(); return; }
+  }
+  signedOut();
+}
+
 function signedOut() {
   calm('This screen needs to be signed in', 'Sign the lobby computer in from KVBC Awana’s Settings, then Cast will show a code here.');
   closeLive();
@@ -225,7 +256,7 @@ function signedOut() {
 async function read() {
   if (closed) return;
   const r = await request('/v1/cast/screen');
-  if (r.status === 401) { signedOut(); return; }
+  if (r.status === 401) { refused(); return; }
   if (!r.ok || !r.body) return;
   if (typeof r.body.serverNow === 'number') skew = r.body.serverNow - Date.now();
   watch = r.body.watch === true;
@@ -755,6 +786,7 @@ async function start() {
   // the page asks nothing first. A test may name another (window.castBase).
   if (typeof window.castBase === 'string') base = window.castBase;
   if (!base && location.protocol === 'https:') base = `${location.origin}/api`;
+  if (!session()) await sessionFromHost();
   if (!session()) { signedOut(); }
   else { await openRoom(); openLive(); }
 
