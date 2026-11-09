@@ -5,6 +5,8 @@
 
 import { BODY_MAX, SyncCore, json } from './sync.js';
 import { isScreenId } from '../../lobby/src/lib/syncSpecs.js';
+import { CLASSROOM_CLIP_PART_BYTES, CLASSROOM_FILE_MAX_BYTES } from '../../shared/classroomRemote.js';
+import { IMPORT_BODY_MAX, ROWS_BODY_MAX } from './history.js';
 
 /** A live socket opened by a registered screen carries this tag (screens.js). */
 const SCREEN_TAG = 'screen:';
@@ -22,6 +24,58 @@ const ALLOWED_ORIGINS = [
   'https://kvbcawana.pages.dev',
 ];
 const LOCAL_ORIGIN = /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/;
+
+/**
+ * The few routes that take more than BODY_MAX, each with its own cap (bytes). Every
+ * other route keeps BODY_MAX. The route code checks the exact size again.
+ *   file parts: a picture/PDF part is 96 KiB, a video clip's request is ten of them
+ *     (CLASSROOM_CLIP_PART_BYTES), sent as raw bytes (site/cast/app.js,
+ *     classroom/public/remote/remote.js);
+ *   the converted PowerPoint: the whole PDF in one PUT (scripts/cast/convert.mjs,
+ *     PDF_MAX = CLASSROOM_FILE_MAX_BYTES, which storeBytes takes at most);
+ *   history rows and the laptop's import (history.js's own caps).
+ * @type {{ method: string, path: RegExp, max: number }[]}
+ */
+export const BODY_CAPS = [
+  { method: 'PUT', path: /^\/v1\/(classroom|cast)\/files\/[^/]+\/\d+$/, max: CLASSROOM_CLIP_PART_BYTES },
+  { method: 'PUT', path: /^\/v1\/cast\/convert\/[^/]+\/result$/, max: CLASSROOM_FILE_MAX_BYTES },
+  { method: 'POST', path: /^\/v1\/history\/rows$/, max: ROWS_BODY_MAX },
+  { method: 'POST', path: /^\/v1\/history\/import$/, max: IMPORT_BODY_MAX },
+];
+
+/** The most a request to this route may send (bytes). @param {string} method @param {string} pathname */
+export function bodyCapFor(method, pathname) {
+  const hit = BODY_CAPS.find((c) => c.method === method && c.path.test(pathname));
+  return hit ? hit.max : BODY_MAX;
+}
+
+/**
+ * The body, read piece by piece and given up the moment it passes `max` (a chunked
+ * body has no Content-Length to refuse up front). Null = too big.
+ * @param {Request} request @param {number} max
+ * @returns {Promise<Uint8Array | null>}
+ */
+export async function readCapped(request, max) {
+  if (!request.body) return new Uint8Array(0);
+  const reader = request.body.getReader();
+  /** @type {Uint8Array[]} */
+  const chunks = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > max) {
+      try { await reader.cancel(); } catch { /* already gone */ }
+      return null;
+    }
+    chunks.push(value);
+  }
+  const out = new Uint8Array(total);
+  let at = 0;
+  for (const c of chunks) { out.set(c, at); at += c.byteLength; }
+  return out;
+}
 
 /** @param {string|null} origin */
 export function allowedOrigin(origin) {
@@ -187,17 +241,22 @@ export default {
     // A socket upgrade goes straight through: its 101 cannot be re-wrapped,
     // and it carries no CORS (the session in its query string is the lock).
     if (url.pathname === '/v1/live') return store(env).fetch(request);
-    // Refuse a body too big to save BEFORE buffering it (the login route is
-    // public, and a body was read whole before any size check).
+    // Refuse a body too big for its route BEFORE buffering it (the login route is
+    // public), and stop reading one that passes the cap with no Content-Length.
+    const tooBig = () => withCors(json({ error: 'That is too big to save.', reason: 'too-big' }, 413), origin);
+    const cap = bodyCapFor(request.method, url.pathname);
     const declared = Number(request.headers.get('Content-Length'));
-    if (Number.isFinite(declared) && declared > BODY_MAX) return withCors(json({ error: 'That is too big to save.' }, 413), origin);
+    if (Number.isFinite(declared) && declared > cap) return tooBig();
     const headers = new Headers(request.headers);
     headers.set('x-client-ip', request.headers.get('CF-Connecting-IP') || 'unknown');
-    const forwarded = new Request(request.url, {
-      method: request.method,
-      headers,
-      body: request.method === 'GET' || request.method === 'HEAD' ? undefined : await request.arrayBuffer(),
-    });
+    let body;
+    if (request.method !== 'GET' && request.method !== 'HEAD') {
+      body = await readCapped(request, cap);
+      if (!body) return tooBig();
+      headers.delete('Transfer-Encoding');
+      headers.delete('Content-Length');
+    }
+    const forwarded = new Request(request.url, { method: request.method, headers, body });
     return withCors(await store(env).fetch(forwarded), origin);
   },
 

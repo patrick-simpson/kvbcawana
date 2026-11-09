@@ -24,7 +24,13 @@ here and keep its shape; a change of shape is a change to this file first.
   completed books and the award slips (`stationfeeds.js`, section 4).
 - **Paths.** The site serves the Worker under `/api`, so `GET /v1/x` here is
   `https://awana.kvbchurch.org/api/v1/x`. Bodies are JSON; `BODY_MAX` (128 KB)
-  holds unless a route says otherwise.
+  holds unless a route says otherwise. The entry point (`src/index.js`
+  `BODY_CAPS`) enforces each route's cap BEFORE the Durable Object sees the body,
+  by Content-Length and, for a chunked body, by counting bytes as they arrive
+  (413 `too-big`): file parts `PUT /v1/(classroom|cast)/files/:id/:n` 960 KiB (a
+  clip's ten parts), `PUT /v1/cast/convert/:id/result` 20 MB (the whole PDF),
+  `POST /v1/history/rows` 256 KB, `POST /v1/history/import` 1 MB; everything else
+  128 KB. A new route that takes more needs a row there.
 - **Auth levels.**
   - `public`: no session.
   - `session`: `Authorization: Bearer <session>` from `POST /v1/login`
