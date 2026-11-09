@@ -400,6 +400,44 @@ writeFileSync(path.join(OUT, '_routes.json'), `${JSON.stringify({
 writeFileSync(path.join(ROOT, 'site', 'lib', 'large-files.generated.js'),
   `// Written by site/build.mjs for build ${BUILD_ID}; not committed.\nexport const LARGE_FILES = ${JSON.stringify(largeFiles, null, 2)};\nexport const LARGE_PREFIXES = ${JSON.stringify(VIDEO_PREFIXES, null, 2)};\n`);
 
+// Cast's own site (owner 2026-11-09): https://cast.kvbchurch.org, the Cloudflare Pages
+// project kvbc-cast (site/cast-site/, which holds its wrangler.toml and its one Function,
+// /api through the SYNC binding, like this site's). The same Cast files as /cast/ above,
+// at its ROOT: the presenter page at /, the TV page at /screen/, church/ and shared/
+// beside them (their paths are relative, so nothing in them changes). Its own _headers
+// (noindex, the security headers, the TV policy on /screen/* with the copy's own
+// inline-script fingerprints and Cast's origin), robots.txt, and a _routes.json that lets
+// only /api invoke the Function, so its static files cost no requests.
+const CAST_ORIGIN = 'https://cast.kvbchurch.org';
+const CAST_OUT = path.join(ROOT, 'site', 'dist-cast');
+rmSync(CAST_OUT, { recursive: true, force: true });
+cpSync(path.join(OUT, 'cast'), CAST_OUT, { recursive: true });
+writeFileSync(path.join(CAST_OUT, 'robots.txt'), 'User-agent: *\nDisallow: /\n');
+const CAST_TV_CSP = tvPagePolicy({
+  origin: CAST_ORIGIN,
+  facebook: true,
+  scriptHashes: [...new Set(builtPages(path.join(CAST_OUT, 'screen')).flatMap((f) => inlineScriptHashes(readFileSync(f, 'utf8'), sha256b64)))],
+});
+writeFileSync(path.join(CAST_OUT, '_headers'), [
+  '/*',
+  '  X-Robots-Tag: noindex, nofollow',
+  ...SITE_HEADERS,
+  '/*.html',
+  '  Cache-Control: no-cache',
+  '/',
+  '  Cache-Control: no-cache',
+  '/screen/*',
+  '  Cache-Control: no-cache',
+  `  Content-Security-Policy: ${CAST_TV_CSP}`,
+  '',
+].join('\n'));
+// An old link typed onto the new host (cast.kvbchurch.org/cast/...) lands on the page it meant.
+writeFileSync(path.join(CAST_OUT, '_redirects'), ['/cast / 301', '/cast/* /:splat 301', ''].join('\n'));
+writeFileSync(path.join(CAST_OUT, '_routes.json'), `${JSON.stringify({ version: 1, include: ['/api', '/api/*'], exclude: [] }, null, 2)}\n`);
+for (const must of ['index.html', 'app.js', 'logic.js', 'preview.js', 'shared/classroomRemote.js', 'shared/screenShare.js', 'screen/index.html', 'screen/screen.js', 'church/church.css', 'church/kvbc-logo.png', 'church/kvbc-logo-white.png', 'church/fonts/Jost-Variable.ttf', '_headers', '_routes.json', '_redirects', 'robots.txt']) {
+  if (!existsSync(path.join(CAST_OUT, must))) throw new Error(`the Cast site build is missing ${must}`);
+}
+
 for (const must of ['index.html', 'lobby/index.html', 'lobby/countdown.html', 'lobby/settings.html', 'lobby/projector-remote.html', 'lobby/scoreboard.html', 'journey/index.html', 'journey/remote/index.html', 'classroom/index.html', 'classroom/version.json', 'classroom/src/logic.js', 'classroom/src/stage.js', 'classroom/src/shared/classroomRemote.js', 'classroom/src/shared/screenShare.js', 'classroom/remote/index.html', 'classroom/remote/remote.js', 'journey/remote/remote.js', 'journey/src/shared/journeyRemote.js', 'lobby/shared/sync.json', 'checkin/index.html', 'checkin/ym/index.html', 'checkin/desk-transport.js', 'checkin/cloud-crypto.js', 'checkin/clubs.js', 'checkin/brand/fonts.css', 'links/index.html', 'logo/index.html', 'tools/handbook-form/index.html', 'tools/print/index.html', 'tools/print/shared/letterhead.js', 'tools/tally/index.html', 'presentation/index.html', 'presentation/app.js', 'presentation/shared/cloud-crypto.js', 'cast/index.html', 'cast/app.js', 'cast/logic.js', 'cast/preview.js', 'cast/shared/classroomRemote.js', 'cast/shared/screenShare.js', 'cast/screen/index.html', 'cast/screen/screen.js', 'cast/church/church.css', 'cast/church/kvbc-logo.png', 'cast/church/fonts/Jost-Variable.ttf', 'classic.html', 'robots.txt', 'lobby/showcase.html', 'lobby/countdown-showcase.html', 'lobby/settings-showcase.html', 'journey/showcase.html', 'journey/remote/showcase.html', 'checkin/showcase.html']) {
   if (!existsSync(path.join(OUT, must))) throw new Error(`site build is missing ${must}`);
 }

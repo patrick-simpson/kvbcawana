@@ -1,0 +1,15 @@
+# Cast's own site: https://cast.kvbchurch.org (Cloudflare Pages project kvbc-cast,
+# kvbc-cast.pages.dev; owner 2026-11-09). The presenter page at /, the TV page at
+# /screen/. Built by site/build.mjs into site/dist-cast and published by the deploy job
+# in .github/workflows/ci.yml with `wrangler pages deploy ../dist-cast` run from THIS
+# folder, so this file's binding and functions/ are the ones used. /api/* is the sync
+# Worker (worker/, Worker name awana-sync) through a service binding, exactly like the
+# main site (site/wrangler.toml): the pages call their own origin. Only /api invokes a
+# Function (dist-cast/_routes.json); every other file is plain static, free of requests.
+name = "kvbc-cast"
+pages_build_output_dir = "../dist-cast"
+compatibility_date = "2026-09-01"
+
+[[services]]
+binding = "SYNC"
+service = "awana-sync"

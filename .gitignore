@@ -1,5 +1,7 @@
 node_modules
 site/dist
+site/dist-cast
+site/cast-site/.wrangler
 site/.wrangler
 site/lib/large-files.generated.js
 # Sync Worker
