@@ -1,4 +1,25 @@
-﻿## [10.13.0] - 2026-11-09
+﻿## [10.14.0] - 2026-11-09
+Security fixes for the check-in laptop and the display computers.
+
+**Printer names can no longer run commands.** A printer name used to be written into the small script Windows uses to print a label. A name with a curly quote in it could break out of that script and run a command on the laptop. Now the name is handed over separately and never written into the script, and every printer name (in a print job, in the settings, in the saved settings and in the history) must look like a printer name: letters (accented ones too), numbers, spaces and - _ . ( ) # , \ / : only. Ordinary names such as "Brother QL-820NWB" or "Star TSP100 Cutter (TSP143)" are unaffected.
+
+**Only this computer can talk to the print server.** A web page could trick the browser into reaching the print server under another web address and read its settings, including the sign-in. The print server now answers only requests addressed to 127.0.0.1 or localhost. The settings page, the app and the label station already use those addresses.
+
+**The sign-in is kept encrypted.** The print server's sign-in and the key that hides children's names on the screens were saved as plain text in the app's settings file. They are now kept encrypted with Windows data protection, like the setup wizard's sign-in. The first start of this version moves them out of the old file by itself; nothing to do.
+
+**Print jobs cannot make the laptop fetch web addresses.** A print job's club picture could be any web address, and the laptop would fetch it. Now only a picture sent with the job itself is used. Nothing sends an address today (the six clubs always print their official mark), so labels look the same.
+
+**Display screens cannot save files.** A page shown on a screen could save a file to the Downloads folder without asking. Now only the Display settings window can save, and only its own settings, slides and History exports. Screens also can no longer open files from the computer.
+
+**A locked-down status window.** The print server's status window now stays on its own page, opens no other windows, and its buttons answer only that window.
+
+**A safer repair download.** When the app repairs a broken update, the installer is now saved in a private folder under a random name, checked against the update feed as it arrives and again right before it opens, and removed afterwards.
+
+**Less in the display log.** The display log that /settings can show now hides sign-ins and keys written in any form, not only "session=...".
+
+**Updated building blocks.** Libraries with published security fixes were updated (no changes in how the app works).
+
+## [10.13.0] - 2026-11-09
 The presentation screen is gone.
 
 **No more Presentation screen.** The congregation presentation is over (owner: "I want that gone"), so the display no longer offers "Presentation" as a screen, and the presentation page's "Show on lobby computer" button no longer reaches this computer. A computer that had Presentation chosen shows the lobby signage instead. The small always-open connection the app kept for that button is closed too, so the lobby computer uses a little less of the free plan. Cast is unchanged.
