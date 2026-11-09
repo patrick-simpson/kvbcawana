@@ -86,6 +86,22 @@ export function exportFilter(dpi) {
 }
 
 /**
+ * The ONLY environment LibreOffice gets: what it needs to find itself, its
+ * fonts, a locale and a temp folder. Never the job's secrets (PRINT_FETCH_TOKEN
+ * and whatever else the workflow sets): a hostile presentation runs inside
+ * LibreOffice, so nothing it could read is handed to it.
+ * @param {Record<string, string | undefined>} [from]
+ */
+export function sofficeEnv(from = process.env) {
+  /** @type {Record<string, string>} */
+  const env = {};
+  for (const k of SOFFICE_ENV_KEYS) if (typeof from[k] === 'string') env[k] = /** @type {string} */ (from[k]);
+  return env;
+}
+const SOFFICE_ENV_KEYS = ['PATH', 'HOME', 'LANG', 'LANGUAGE', 'LC_ALL', 'LC_CTYPE', 'TMPDIR', 'TMP', 'TEMP',
+  'FONTCONFIG_FILE', 'FONTCONFIG_PATH', 'SAL_USE_VCLPLUGIN', 'SystemRoot', 'windir'];
+
+/**
  * LibreOffice: the presentation in `dir/in.<ext>` to a PDF; its bytes.
  * @param {string} dir @param {string} file @param {number} dpi
  */
@@ -94,7 +110,7 @@ export function soffice(dir, file, dpi) {
     execFile('soffice', [
       '--headless', '--norestore', '--nolockcheck', `-env:UserInstallation=file://${join(dir, 'profile')}`,
       '--convert-to', exportFilter(dpi), '--outdir', join(dir, 'out'), file,
-    ], { timeout: CONVERT_TIMEOUT_MS, maxBuffer: 1024 * 1024 }, async (err) => {
+    ], { timeout: CONVERT_TIMEOUT_MS, maxBuffer: 1024 * 1024, env: sofficeEnv() }, async (err) => {
       if (err) { reject(new Failure('convert', `LibreOffice stopped (${err.killed ? 'took too long' : `exit ${err.code}`}).`)); return; }
       try {
         const out = (await readdir(join(dir, 'out'))).find((f) => f.endsWith('.pdf'));

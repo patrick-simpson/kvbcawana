@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { PDF_MAX, exportFilter, openUpload, parseJob, presentationKind, run, toPdf } from '../convert.mjs';
+import { PDF_MAX, exportFilter, openUpload, parseJob, presentationKind, run, sofficeEnv, toPdf } from '../convert.mjs';
 
 const SAMPLE = new Uint8Array(readFileSync(fileURLToPath(new URL('./sample.pptx', import.meta.url))));
 const PDF = Uint8Array.from(Buffer.from('%PDF-1.7\n% test\n'));
@@ -95,4 +95,10 @@ test('LibreOffice really makes a three-page PDF of sample.pptx', { skip: haveSof
   const text = Buffer.from(pdf).toString('latin1');
   assert.ok(text.startsWith('%PDF-'));
   assert.equal((text.match(/\/Type\s*\/Page[^s]/g) || []).length, 3);
+});
+
+test('LibreOffice gets only PATH, HOME, locale and temp: never the job token', () => {
+  const env = sofficeEnv({ PATH: '/usr/bin', HOME: '/home/runner', LANG: 'C.UTF-8', TMPDIR: '/tmp',
+    PRINT_FETCH_TOKEN: 'secret', GITHUB_TOKEN: 'gh', ACTIONS_RUNTIME_TOKEN: 'rt', JOB: 'x.y', SITE_ORIGIN: 'https://e' });
+  assert.deepEqual(env, { PATH: '/usr/bin', HOME: '/home/runner', LANG: 'C.UTF-8', TMPDIR: '/tmp' });
 });
