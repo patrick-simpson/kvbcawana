@@ -47,14 +47,14 @@ export const SCORE_SETUPS = Object.freeze({
 export const SCORE_SETUP_IDS = Object.freeze(Object.keys(SCORE_SETUPS));
 /**
  * The four team colours, from the brand kit (shared/brand/tokens.json): the
- * plate, its hard-offset shade, and the ink drawn on it (yellow takes the kit's
- * ink; white on sun fails contrast).
+ * plate, its hard-offset shade, and the ink drawn on it (yellow and green take
+ * the kit's ink; white on sun or on green fails contrast).
  */
 export const SCORE_TEAM_COLORS = Object.freeze({
   blue: Object.freeze({ fill: '#4C72B8', deep: '#2F4F8A', ink: '#FFFFFF' }),
   red: Object.freeze({ fill: '#F04A4B', deep: '#B82B32', ink: '#FFFFFF' }),
   yellow: Object.freeze({ fill: '#FCB614', deep: '#C97A08', ink: '#231F20' }),
-  green: Object.freeze({ fill: '#58BD79', deep: '#2F8A4E', ink: '#FFFFFF' }),
+  green: Object.freeze({ fill: '#58BD79', deep: '#2F8A4E', ink: '#231F20' }),
   // Boys vs Girls: the blue and the red (the kit has no pink).
   boys: Object.freeze({ fill: '#4C72B8', deep: '#2F4F8A', ink: '#FFFFFF' }),
   girls: Object.freeze({ fill: '#F04A4B', deep: '#B82B32', ink: '#FFFFFF' }),

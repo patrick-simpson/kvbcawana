@@ -103,7 +103,7 @@ form { display: grid; gap: 10px; margin-top: 14px; }
 .sb-team[data-team='blue'] { --c: #4C72B8; --d: #2F4F8A; --i: #fff; }
 .sb-team[data-team='red'] { --c: #F04A4B; --d: #B82B32; --i: #fff; }
 .sb-team[data-team='yellow'] { --c: #FCB614; --d: #C97A08; --i: #231F20; }
-.sb-team[data-team='green'] { --c: #58BD79; --d: #2F8A4E; --i: #fff; }
+.sb-team[data-team='green'] { --c: #58BD79; --d: #2F8A4E; --i: #231F20; }
 .sb-team[data-team='boys'] { --c: #4C72B8; --d: #2F4F8A; --i: #fff; }
 .sb-team[data-team='girls'] { --c: #F04A4B; --d: #B82B32; --i: #fff; }
 .sb-team[data-team='leaders'] { --c: #231F20; --d: #000; --i: #fff; }
