@@ -4,196 +4,32 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex, nofollow">
-<title>Presentation · KVBC Awana</title>
-<link rel="stylesheet" href="/lobby/shared/brand/tokens.css">
+<title>Presentation · Finished</title>
 <link rel="stylesheet" href="/lobby/shared/brand/fonts.css">
+<!-- The congregation presentation (owner 2026-11-01), ARCHIVED 2026-11-09 (owner: "The
+     presentation is over ... I don't want to delete anything, but I don't want the page
+     using any resources anymore or triggering anything"): a static note, no script, no
+     request to the sync service, no live channel. Its two old scripts stay beside it,
+     unloaded; the sealed deck stays in the Worker's storage (routes.md 10.14). -->
 <style>
-  /* The presentation (owner 2026-11-01; CLAUDE.md "Presentation"): the
-     congregation deck on the lobby TV, slide controls everywhere else.
-     Flat like the kit: hard offsets, no blur, no gradient. */
-  @font-face { font-family: 'Figtree'; font-weight: 300 900; src: url('/lobby/shared/brand/fonts/figtree-latin-wght-normal.woff2') format('woff2'); }
-  :root {
-    --ink: var(--brand-ink, #231F20); --paper: #f6f4ef; --hot: #CF4518; --blue: var(--brand-blue, #0072BC);
-    --desk: #17181c; --desk-2: #22242a; --desk-3: #2e3138; --rule: #3a3d45; --dim: #a9adb7; --text: #f3f1ec;
+  :root { --ink: #231F20; --paper: #FFFFFF; --bg: #F6F4EF; --blue: #0072BC; color-scheme: light; }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) { --ink: #F3F1EC; --paper: #22242A; --bg: #17181C; color-scheme: dark; }
   }
+  :root[data-theme="dark"] { --ink: #F3F1EC; --paper: #22242A; --bg: #17181C; color-scheme: dark; }
   * { box-sizing: border-box; }
-  html, body { margin: 0; height: 100%; }
-  body { background: var(--desk); color: var(--text); font: 400 16px/1.45 var(--brand-font-body); -webkit-font-smoothing: antialiased; }
-  button { font: 400 16px/1 var(--brand-font-label); letter-spacing: .06em; text-transform: uppercase; border: 0; border-radius: 10px; padding: 12px 16px; cursor: pointer; color: var(--text); background: var(--desk-3); }
-  button:focus-visible { outline: 3px solid #fff; outline-offset: 2px; }
-  button:active { translate: 0 2px; }
-  button:disabled { opacity: .45; cursor: default; translate: none; }
-  [hidden] { display: none !important; }
-
-  /* ── sign-in (paper card, the site's own look) ── */
-  #gate { min-height: 100%; display: grid; place-items: center; padding: 24px 16px; background: var(--paper); color: var(--ink); }
-  #gate .card { width: 100%; max-width: 440px; background: #fff; border-radius: 16px; padding: 28px; box-shadow: 4px 4px 0 var(--ink); }
-  #gate img { width: 260px; height: auto; display: block; margin-bottom: 18px; }
-  #gate h1 { margin: 0 0 6px; font: 400 30px/1.05 var(--brand-font-display); text-transform: uppercase; color: var(--blue); }
-  #gate p { margin: 0 0 4px; font-size: 15px; }
-  #gate input { width: 100%; font: inherit; padding: 12px; border: 2px solid var(--ink); border-radius: 10px; margin: 14px 0 12px; background: #fff; color: var(--ink); }
-  #gate button { background: var(--hot); color: #fff; box-shadow: 3px 3px 0 var(--ink); width: 100%; font-size: 18px; padding: 14px; }
-  #gate .note { min-height: 1.5em; margin-top: 12px; font-size: 14px; color: #9b2c10; }
-  #gate .small { margin-top: 14px; font-size: 13px; color: #5d5a55; }
-
-  /* ── the TV ── */
-  #tv { position: fixed; inset: 0; background: #000; }
-  #tv iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; pointer-events: none; }
-  #tv .tap { position: absolute; inset: 0; cursor: pointer; }
-  #tv.quiet .tap { cursor: none; }
-  #tv .hint { position: absolute; left: 50%; bottom: 28px; translate: -50% 0; padding: 10px 18px; border-radius: 999px; background: var(--ink); color: #fff; font: 400 18px/1 var(--brand-font-label); letter-spacing: .06em; text-transform: uppercase; box-shadow: 3px 3px 0 var(--hot); pointer-events: none; }
-  #wait { position: fixed; inset: 0; display: grid; place-items: center; text-align: center; background: #000; color: #fff; padding: 24px; }
-  #wait img { width: min(520px, 70vw); min-width: 260px; height: auto; display: block; margin: 0 auto 28px; }
-  #wait h2 { margin: 0 0 10px; font: 400 clamp(26px, 3.4vw, 46px)/1.05 var(--brand-font-display); text-transform: uppercase; }
-  #wait p { margin: 0 auto; max-width: 36em; color: #c9c6c0; font-size: clamp(15px, 1.3vw, 20px); }
-  #wait button { margin-top: 22px; background: var(--hot); color: #fff; }
-
-  /* ── the presenter view ── */
-  #desk { height: 100vh; height: 100dvh; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; }
-  .bar { display: flex; align-items: center; gap: 14px; padding: 10px 18px; border-bottom: 1px solid var(--rule); background: var(--desk); }
-  .bar img { width: 260px; height: auto; display: block; }
-  .bar h1 { margin: 0; font: 400 15px/1 var(--brand-font-label); letter-spacing: .1em; text-transform: uppercase; color: var(--dim); }
-  .bar .built { font-size: 13px; color: var(--dim); }
-  .bar .right { margin-left: auto; display: flex; align-items: center; gap: 10px; }
-  .bar button { padding: 8px 12px; font-size: 14px; }
-  .live { display: inline-flex; align-items: center; gap: 8px; font: 400 14px/1 var(--brand-font-label); letter-spacing: .08em; text-transform: uppercase; color: var(--dim); }
-  .live::before { content: ''; width: 10px; height: 10px; border-radius: 50%; background: #6c707a; }
-  .live[data-on='1'] { color: #9fe0b0; } .live[data-on='1']::before { background: #3fbf6a; }
-  .live[data-on='0'] { color: #ffb199; } .live[data-on='0']::before { background: var(--hot); }
-
-  .room { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(300px, 1fr); gap: 18px; padding: 18px; min-height: 0; overflow: hidden; }
-  .label { margin: 0 0 8px; font: 400 13px/1 var(--brand-font-label); letter-spacing: .1em; text-transform: uppercase; color: var(--dim); }
-  .screen { position: relative; width: 100%; aspect-ratio: 16 / 9; background: #000; border-radius: 8px; overflow: hidden; outline: 1px solid var(--rule); }
-  .screen iframe { position: absolute; top: 0; left: 0; width: 1600px; height: 900px; border: 0; transform-origin: 0 0; pointer-events: none; }
-  .screen .end { position: absolute; inset: 0; display: grid; place-items: center; color: var(--dim); font: 400 18px/1 var(--brand-font-label); letter-spacing: .08em; text-transform: uppercase; }
-  .now-title { margin: 12px 0 0; font: 400 clamp(18px, 1.6vw, 24px)/1.15 var(--brand-font-display); color: var(--text); }
-  .side { display: flex; flex-direction: column; gap: 16px; min-height: 0; }
-  /* Speaker notes show on a phone only (owner 2026-11-01): logic.js notesHere. */
-  .side .list-wrap { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
-  .notes { flex: 1 1 auto; min-height: 0; overflow: auto; background: var(--desk-2); border-radius: 8px; padding: 14px 16px; font-size: clamp(15px, 1.1vw, 19px); line-height: 1.5; white-space: pre-wrap; }
-  .notes.empty { color: var(--dim); font-style: italic; }
-  .list { position: relative; flex: 1 1 auto; min-height: 0; overflow: auto; margin: 0; padding: 0; list-style: none; border-top: 1px solid var(--rule); }
-  .list li button { width: 100%; text-align: left; display: grid; grid-template-columns: 2.4em 1fr; gap: 6px; padding: 9px 6px; border-radius: 0; background: transparent; border-bottom: 1px solid var(--rule); font: 400 15px/1.3 var(--brand-font-body); letter-spacing: 0; text-transform: none; color: var(--text); }
-  .list li button span { color: var(--dim); font-variant-numeric: tabular-nums; }
-  .list li button[aria-current='true'] { background: var(--desk-3); box-shadow: inset 4px 0 0 var(--hot); }
-
-  .pad { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 14px; padding: 14px 18px calc(14px + env(safe-area-inset-bottom)); border-top: 1px solid var(--rule); background: var(--desk); }
-  .pad .left { display: flex; gap: 10px; align-items: center; }
-  .pad .mid { display: flex; gap: 12px; align-items: center; }
-  .pad .right { display: flex; gap: 10px; justify-content: flex-end; align-items: center; }
-  .go { min-width: 150px; min-height: 64px; font-size: 22px; }
-  .go.next { background: var(--hot); color: #fff; box-shadow: 3px 3px 0 #000; }
-  .go.back { background: var(--desk-3); box-shadow: 3px 3px 0 #000; }
-  .count { min-width: 5.5em; text-align: center; font: 400 26px/1 var(--brand-font-display); font-variant-numeric: tabular-nums; }
-  .count small { display: block; margin-top: 4px; font: 400 12px/1 var(--brand-font-label); letter-spacing: .1em; color: var(--dim); }
-  .status { font-size: 14px; color: var(--dim); }
-  #pick { border: 1px solid var(--rule); border-radius: 12px; background: var(--desk); color: inherit; padding: 18px 20px; min-width: min(360px, calc(100vw - 32px)); }
-  #pick::backdrop { background: rgba(0, 0, 0, .6); }
-  #pick h2 { margin: 0 0 12px; font: 400 18px/1.2 var(--brand-font-label); letter-spacing: .06em; text-transform: uppercase; }
-  #pick-list { display: grid; gap: 8px; margin-bottom: 12px; }
-  #pick-list button { text-align: left; padding: 12px 14px; font-size: 16px; }
-  #pick-list small { display: block; color: var(--dim); font-size: 13px; }
-
-  @media (max-width: 900px) {
-    .bar { flex-wrap: wrap; padding: 10px 16px; } .bar img { width: 200px; min-width: 0; }
-    .bar .built { display: none; }
-    #desk { height: auto; min-height: 100%; }
-    .room { grid-template-columns: 1fr; padding: 12px 16px; overflow: visible; }
-    .notes { min-height: 120px; }
-    .side .next-wrap { display: none; }
-    .list { max-height: none; }
-    .pad { grid-template-columns: 1fr 1fr; padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); position: sticky; bottom: 0; }
-    .pad .mid { grid-column: 1 / -1; order: -1; justify-content: center; }
-    .pad .right .tvbtn, .pad .left { display: none; }
-    .go { width: 100%; min-width: 0; min-height: 72px; }
-  }
+  body { margin: 0; min-height: 100svh; display: grid; place-items: center; padding: 24px 16px; background: var(--bg); color: var(--ink); font: 400 1.05rem/1.5 'Figtree', system-ui, sans-serif; }
+  main { max-width: 420px; padding: 24px 22px; border-radius: 16px; background: var(--paper); border: 3px solid var(--ink); box-shadow: 6px 6px 0 var(--blue); text-align: center; }
+  h1 { margin: 0 0 8px; font: 400 2rem/1.05 'Paytone One', system-ui, sans-serif; }
+  p { margin: 8px 0 0; }
+  a { color: inherit; font-weight: 700; }
 </style>
 </head>
 <body>
-
-<section id="gate" hidden>
-  <div class="card">
-    <img src="/lobby/shared/brand/logos/kvbc-awana-two-line-ink.svg" alt="Kennebec Valley Baptist Church Awana Clubs">
-    <h1>Presentation</h1>
-    <p id="gate-why">Type the church passphrase to open the deck. It is sealed, so only the passphrase opens it, on this device.</p>
-    <form id="signin" autocomplete="off">
-      <label for="passphrase" class="small">Passphrase</label>
-      <input id="passphrase" type="password" autocomplete="current-password" spellcheck="false" autocapitalize="off" enterkeyhint="go">
-      <button type="submit" id="signin-btn">Open the deck</button>
-      <div class="note" id="signin-note" role="status" aria-live="polite"></div>
-    </form>
-    <p class="small" id="gate-tv" hidden>On the lobby computer, typing it in the KVBC Awana Settings window is enough: the TV picks the deck up from there.</p>
-  </div>
-</section>
-
-<section id="wait" hidden>
-  <div>
-    <img src="/lobby/shared/brand/logos/kvbc-awana-full-white.svg" alt="Kennebec Valley Baptist Church Awana Clubs">
-    <h2 id="wait-title">Waiting for the presenter</h2>
-    <p id="wait-note">Open the deck in KVBC Awana's Settings window, or on a laptop or phone at awana.kvbchurch.org/presentation.</p>
-    <button type="button" id="wait-signin">Type the passphrase here</button>
-  </div>
-</section>
-
-<section id="tv" hidden>
-  <iframe id="tv-frame" title="Presentation" tabindex="-1"></iframe>
-  <div class="tap" id="tv-tap" aria-label="Click to go full screen; the left and right edges change slides"></div>
-  <div class="hint" id="tv-hint">Click for full screen</div>
-</section>
-
-<section id="desk" hidden>
-  <header class="bar">
-    <img src="/lobby/shared/brand/logos/kvbc-awana-two-line-white.svg" alt="Kennebec Valley Baptist Church Awana Clubs">
-    <h1 id="deck-title">Presentation</h1>
-    <span class="built" id="built"></span>
-    <div class="right">
-      <span class="live" id="live" data-on="">Connecting</span>
-      <button type="button" id="push-lobby">Show on lobby computer</button>
-      <button type="button" id="lock">Lock</button>
-    </div>
-  </header>
-  <main class="room">
-    <div>
-      <p class="label">On the screen</p>
-      <div class="screen" id="now-screen"><iframe id="now-frame" title="The slide on the screen" tabindex="-1"></iframe></div>
-      <p class="now-title" id="now-title"></p>
-    </div>
-    <div class="side">
-      <div class="next-wrap">
-        <p class="label">Next</p>
-        <div class="screen" id="next-screen"><iframe id="next-frame" title="The next slide" tabindex="-1"></iframe><div class="end" id="next-end" hidden>End of the deck</div></div>
-      </div>
-      <div class="notes-wrap" id="notes-wrap" hidden>
-        <p class="label">Speaker notes</p>
-        <div class="notes" id="notes"></div>
-      </div>
-      <div class="list-wrap">
-        <p class="label">All slides</p>
-        <ol class="list" id="list"></ol>
-      </div>
-    </div>
-  </main>
-  <footer class="pad">
-    <div class="left">
-    </div>
-    <div class="mid">
-      <button type="button" class="go back" id="back">Back</button>
-      <div class="count" id="count">– / –<small>slide</small></div>
-      <button type="button" class="go next" id="next">Next</button>
-    </div>
-    <div class="right">
-      <span class="status" id="status" role="status" aria-live="polite"></span>
-      <button type="button" class="tvbtn" id="present-here">Show on this screen</button>
-    </div>
-  </footer>
-</section>
-
-<dialog id="pick" aria-labelledby="pick-title">
-  <h2 id="pick-title">Which computer is in the lobby?</h2>
-  <div id="pick-list"></div>
-  <button type="button" id="pick-cancel">Cancel</button>
-</dialog>
-
-<script type="module" src="./app.js"></script>
+<main>
+  <h1>The presentation is over</h1>
+  <p>Thanks for watching. This page is archived.</p>
+  <p><a href="/links/">Back to the links page</a></p>
+</main>
 </body>
 </html>

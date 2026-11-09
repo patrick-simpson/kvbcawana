@@ -1,4 +1,5 @@
-// /presentation (site/presentation/, owner 2026-11-01; CLAUDE.md "Presentation",
+// /presentation (site/presentation/, owner 2026-11-01; ARCHIVED 2026-11-09: index.html is a
+// static note, app.js and logic.js kept unloaded and still checked here; CLAUDE.md "Presentation",
 // worker/src/routes.md 10.14): the sealed congregation deck on the lobby TV, slide
 // controls everywhere else. The rules are pure (logic.js); the page signs in with
 // passphrase v2 only, keeps the history key in memory, and opens the deck itself.
@@ -76,10 +77,12 @@ test('the TV is ?screen=tv; everything else is the presenter view', () => {
   assert.equal(modeOf(''), 'presenter');
 });
 
-test('the page skips search engines and loads nothing from another host', () => {
+test('ARCHIVED 2026-11-09: the page is a static note: no script, no call, nothing from another host', () => {
   assert.match(page, /<meta name="robots" content="noindex, nofollow">/);
   assert.ok(!/(src|href)="https?:\/\//i.test(page), 'no absolute asset URL');
-  assert.match(page, /<script type="module" src="\.\/app\.js"><\/script>/);
+  assert.ok(!/<script/i.test(page), 'no script at all');
+  assert.ok(!/\/v1\/|\/api\/|app\.js/.test(page), 'no call to the sync service, app.js never loaded');
+  assert.match(page, /The presentation is over/);
 });
 
 test('passphrase v2 only; the key stays in memory; the deck is opened here', () => {
@@ -89,7 +92,6 @@ test('passphrase v2 only; the key stays in memory; the deck is opened here', () 
   assert.match(app, /'awanaSyncSession\.v1'/);
   // notes are written only where notesHere says so
   assert.match(app, /\$\('notes-wrap'\)\.hidden = !notesOn;\n  if \(notesOn\) \{/);
-  assert.match(page, /id="notes-wrap" hidden/);
   // nothing but the session and the slide number goes to localStorage: never the passphrase, the key or the deck
   for (const m of app.matchAll(/store\.set\(([^,]+),/g)) assert.ok(['SESSION_KEY', 'SLIDE_KEY'].includes(m[1]), m[1]);
   assert.ok(!/sessionStorage/.test(app));
