@@ -52,6 +52,18 @@ export const LEAD = 0.7;
 
 const LOGO = parseChurchLogo(fullSvg);
 const MARKS = { puggles, cubbies, sparks, tnt, trek, journey };
+/**
+ * Each mark's width in --u, sized by VISUAL WEIGHT so the six read as equals
+ * (finding 5, 2026-11-09: one shared 5u x 13u box left the long, thin marks
+ * small). Measured in Chromium at 1080p (u = 19.2 px), painted white pixels
+ * of the old box: Puggles 2718, Cubbies 3569, Sparks 4165, T&T 4006, Trek 5093,
+ * Journey 4290, but the wide marks were capped at 13u wide, so their letters
+ * stood only 34 to 62 px tall against Puggles' 88. Widths below give about
+ * 4600 to 5200 painted px each (Puggles 11.8u, T&T 5.9u, the wide four 13 to
+ * 15.4u), a little extra for thin JOURNEY. Scale only: never distorted,
+ * recoloured or redrawn. Row = 90.7u with 3u gaps, inside the 94u max.
+ */
+const MARK_WIDTH_U = { puggles: 11.8, cubbies: 15.4, sparks: 14.2, tnt: 5.9, trek: 13.2, journey: 15.2 };
 const WORD = 'WELCOME';
 const color = (i) => KIT_CLUBS[CLUB_ORDER[i % CLUB_ORDER.length]].primary;
 
@@ -150,7 +162,7 @@ export const GrandWelcomeClassic = ({ now, hold = 0 }) => {
         </svg>
         <div className="pj-grand__marks" aria-hidden="true">
           {CLUB_ORDER.map((id, i) => (
-            <motion.img key={id} src={MARKS[id]} alt="" className="pj-grand__mark" {...m(markPop(lead + BEATS.marks + i * BEATS.markGap))} />
+            <motion.img key={id} src={MARKS[id]} alt="" className="pj-grand__mark" style={{ '--mark-w': MARK_WIDTH_U[id] }} {...m(markPop(lead + BEATS.marks + i * BEATS.markGap))} />
           ))}
         </div>
       </div>

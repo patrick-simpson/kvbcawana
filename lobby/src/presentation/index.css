@@ -434,19 +434,19 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: calc(3.6 * var(--u));
+  gap: calc(3 * var(--u));
   margin-top: calc(3.6 * var(--u));
-  max-width: calc(90 * var(--u));
+  max-width: calc(94 * var(--u));
 }
-/* Each mark fits a box (the marks run from square T&T to long JOURNEY), so
-   the six together stay inside the frame; whole and unstretched. */
+/* Each mark has its own width (--mark-w, in u, from MARK_WIDTH_U in
+   GrandWelcomeClassic.jsx: sized by visual weight, so thin JOURNEY is as
+   readable as square T&T); height follows, whole and unstretched. */
 .pj-grand__mark {
   display: block;
   flex: 0 1 auto;
   min-width: 0;
-  width: auto;
-  height: calc(5 * var(--u));
-  max-width: calc(13 * var(--u));
+  width: calc(var(--mark-w, 13) * var(--u));
+  height: auto;
   object-fit: contain;
 }
 /* The grand welcome film (views/GrandWelcome.jsx; owner 2026-11-01,
@@ -1841,7 +1841,7 @@
   .pj-grand__to { font-size: calc(6 * var(--u)); }
   .pj-grand__logo { width: calc(88 * var(--u)); }
   .pj-grand__marks { flex-wrap: wrap; max-width: calc(80 * var(--u)); gap: calc(5 * var(--u)); }
-  .pj-grand__mark { height: calc(11 * var(--u)); }
+  .pj-grand__mark { width: calc(var(--mark-w, 13) * 1.2 * var(--u)); }
   /* The grand welcome film stays 16:9, letterboxed in a tall frame. */
 
   /* ── The ceremony remote's backups: the flag over its pledge ── */
