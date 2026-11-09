@@ -573,7 +573,10 @@ jobs:
       # The feed file (+ the printer's blockmap) are the electron-updater feed
       # inputs. Not "Latest": the apps read the feed on the site instead.
       - name: Publish the release
-        uses: softprops/action-gh-release@v2
+        # A third-party action running with contents: write, so pinned to a
+        # commit: v2.6.2, what the v2 tag pointed at on 2026-11-09. Move it on
+        # deliberately, by SHA, never back to a tag.
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
         with:
           tag_name: ${{ inputs.tag-prefix }}${{ inputs.version }}
           name: ${{ inputs.release-name-prefix }}${{ inputs.version }}
