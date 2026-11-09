@@ -15,8 +15,9 @@
 // the ciphertext in PRINT_PART_CHARS pieces of base64; "send" hands the job the
 // upload's id and the key as ONE dispatch input (`pdf_job` = `<id>.<key>`). The
 // key passes through here in memory only, on its way to GitHub, and is never
-// stored. The job reads the ciphertext with the machine token (HANDBOOK_TOKEN,
-// the handbook job's) and deletes it once it has it. ONE upload at a time (a new
+// stored. The job reads the ciphertext with the machine token (PRINT_FETCH_TOKEN
+// when that secret is set, else HANDBOOK_TOKEN, the handbook job's) and deletes it
+// once it has it. ONE upload at a time (a new
 // one replaces it); anything left over is deleted after PRINT_TTL_MS.
 //
 // Storage:
@@ -71,9 +72,21 @@ export class Prints {
 
   configured() { return Boolean(this.env()?.PRINT_DISPATCH_TOKEN); }
 
-  /** The print job's machine token (HANDBOOK_TOKEN). @param {Request} request */
-  machineOk(request) {
-    const token = String(this.env()?.HANDBOOK_TOKEN || '');
+  /**
+   * A job's machine token for its routes (security review 2026-11-09): the PDF fetch
+   * and delete take PRINT_FETCH_TOKEN, Cast's converter CAST_CONVERT_TOKEN, each ONLY
+   * that token once its secret is set; while it is not, HANDBOOK_TOKEN as before.
+   * @param {'print' | 'cast'} scope
+   */
+  machineToken(scope) {
+    const e = this.env() || {};
+    const own = scope === 'cast' ? e.CAST_CONVERT_TOKEN : e.PRINT_FETCH_TOKEN;
+    return String(own || e.HANDBOOK_TOKEN || '');
+  }
+
+  /** The job's machine token on this request. @param {Request} request @param {'print' | 'cast'} [scope] */
+  machineOk(request, scope = 'print') {
+    const token = this.machineToken(scope);
     const m = /^Bearer\s+(.+)$/i.exec(request.headers.get('Authorization') || '');
     return Boolean(token && m && safeEqual(m[1].trim(), token));
   }

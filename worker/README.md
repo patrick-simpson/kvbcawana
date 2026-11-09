@@ -180,6 +180,17 @@ so the Worker needs a GitHub token that may start this repo's jobs and nothing e
 
 When it expires, the page says GitHub refused the token: make a new one the same way.
 
+The Worker starts only three workflow files with it (`letterhead-print.yml`,
+`handbook-print.yml`, `cast-convert.yml`); any other is refused.
+
+Optional, separate machine tokens: the print job reads and deletes the uploaded PDF,
+and Cast's PowerPoint job reads its upload and sends the slides back, with
+`HANDBOOK_TOKEN` today. Two optional Worker secrets split them: `PRINT_FETCH_TOKEN`
+(the PDF routes) and `CAST_CONVERT_TOKEN` (the converter's routes). When one is set,
+ONLY it works on its routes; when it is not, `HANDBOOK_TOKEN` does, as before. Each
+needs the same value as a GitHub secret, pushed by ci.yml and handed to the job by
+its workflow, and the Worker deployed with it before the workflow uses it.
+
 ## Developing
 
 ```sh

@@ -1646,8 +1646,10 @@ The PDF is scrambled IN THE BROWSER (AES-256-GCM, a fresh key; base64 of IV + ci
 and stored as `prints:part:<id>:<n>` pieces of 96 KiB (`prints:up` the record, ONE upload
 at a time, deleted after an hour unprinted). "Send" passes `pdf_job: <id>.<key>` and
 `copies` to the job; the key is never stored here. The job reads the ciphertext with the
-machine token `HANDBOOK_TOKEN`, opens it, mails it (copies as pages of ONE PDF) and deletes
-it. A send is marked BEFORE the dispatch, so a second tap never prints twice; a refused
+machine token (`PRINT_FETCH_TOKEN` when that optional secret is set, and then ONLY it;
+else `HANDBOOK_TOKEN`), opens it, mails it (copies as pages of ONE PDF) and deletes
+it. The dispatch starts only `DISPATCH_WORKFLOWS` (letterhead-print.yml,
+handbook-print.yml, cast-convert.yml); any other file is refused before GitHub is asked. A send is marked BEFORE the dispatch, so a second tap never prints twice; a refused
 dispatch can be tried again. The handbook button: one print per 2 minutes.
 
 | Route | Auth | Body | Answer |
@@ -1729,11 +1731,11 @@ each good for `TOKEN_TTL_MS` (8 h).
 | `GET /v1/cast/ice?id=` | public + token | id = the screen share now up | `{ok, iceServers, relay, reason?}`: Cloudflare STUN always; TURN credentials (worker/src/turn.js) when the secrets `CF_TURN_KEY_ID` + `CF_TURN_API_TOKEN` are set, one set per share for both ends (never a second for the same share), `TURN_TTL_S` 2 h, revoked at Cloudflare when the share ends or is replaced and when the Cast presenter leaves or is disconnected; at most `TURN_SHARES_PER_HOUR` 4 shares an hour per starter (the share's Cast token or classroom session, whoever asks); `reason` `not-configured` / `month-cap` / `too-many` / `cloudflare` with STUN only; 409 `ended` for another share |
 | `GET /v1/cast/screen/ice?id=` | session (the Cast screen) | | as above |
 | `GET /v1/cast/files/:id` | public + token | | the room's file (as 10.13): the phone's preview of the slides on the TV |
-| `POST /v1/cast/convert` | public + token | `{bytes, name}` (bytes = the SCRAMBLED PowerPoint's: 12-byte IV + AES-256-GCM ciphertext; at most `CONVERT_MAX_BYTES` 40 MB + 28) | `{ok, id, parts, partBytes}` (96 KiB); 503 `not-configured` (no `PRINT_DISPATCH_TOKEN` or `HANDBOOK_TOKEN`), 413 `too-big`, 413 `room-full` (no room left for the slides' PDF, as files), 429 `busy` (`CONVERT_PENDING_MAX` 3 waiting), 429 `too-many` (`CAST_CONVERTS_PER_HOUR` 6 per token an hour, or the room's byte allowance) |
+| `POST /v1/cast/convert` | public + token | `{bytes, name}` (bytes = the SCRAMBLED PowerPoint's: 12-byte IV + AES-256-GCM ciphertext; at most `CONVERT_MAX_BYTES` 40 MB + 28) | `{ok, id, parts, partBytes}` (96 KiB); 503 `not-configured` (no `PRINT_DISPATCH_TOKEN`, or neither `CAST_CONVERT_TOKEN` nor `HANDBOOK_TOKEN`), 413 `too-big`, 413 `room-full` (no room left for the slides' PDF, as files), 429 `busy` (`CONVERT_PENDING_MAX` 3 waiting), 429 `too-many` (`CAST_CONVERTS_PER_HOUR` 6 per token an hour, or the room's byte allowance) |
 | `PUT /v1/cast/convert/:id/:n` | public + token | the part's bytes, in order | `{ok, next}`; 404 `no-upload`, 409 `order`, 400 `size` |
 | `POST /v1/cast/convert/:id/start` | public + token | `{key}` (43 chars base64url) | `{ok, status: 'converting'}`: starts GitHub `cast-convert.yml` with input `job` = `<id>.<key>` (the key in memory only); marked before the dispatch (a second tap starts nothing); 502 `dispatch` (left `uploading`, try again), 429 `too-many` (`CONVERT_PER_HOUR` 10 a room) |
 | `GET /v1/cast/convert/:id` | public + token | | `{ok, status: uploading\|converting\|done\|failed, file?, error?}`: `file` = a finished PDF file of the room (put it up with `item`); `error` one of `CONVERT_FAILS` (`type`, `too-big`, `convert`, `key`) |
-| `GET /v1/cast/convert/:id/job` | machine (`HANDBOOK_TOKEN`) | | the ciphertext's bytes |
+| `GET /v1/cast/convert/:id/job` | machine (`CAST_CONVERT_TOKEN` when that optional secret is set, and then ONLY it; else `HANDBOOK_TOKEN`; the same for `result` and `failed`) | | the ciphertext's bytes |
 | `PUT /v1/cast/convert/:id/result` | machine | the PDF's bytes (20 MB at most) | `{ok, id}`: kept as a file of the room, status `done`; not a PDF: 400 `type`, status `failed` |
 | `POST /v1/cast/convert/:id/failed` | machine | `{reason}` | `{ok}`: status `failed` |
 

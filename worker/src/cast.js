@@ -21,7 +21,7 @@
 // a fresh key) and uploads the ciphertext here in parts (castconv:<id>,
 // castconvpart:<id>:<n>); "start" hands the GitHub job cast-convert.yml the id and the
 // key as ONE dispatch input (the print tool's way, prints.js: the key passes through
-// in memory only). The job reads the ciphertext with the machine token (HANDBOOK_TOKEN),
+// in memory only). The job reads the ciphertext with the machine token (CAST_CONVERT_TOKEN when set, else HANDBOOK_TOKEN),
 // turns it into a PDF with LibreOffice, and sends the PDF back: it becomes an ordinary
 // file of the room, and the presenter's page (polling the status) puts it up. The
 // ciphertext is deleted once the job answers, whatever happened; anything left over
@@ -416,7 +416,7 @@ export class Cast {
   /** Ready to convert: the print tool's dispatch token and the job's machine token are set. */
   convertReady() {
     const p = this.prints();
-    return Boolean(p && p.configured() && p.env()?.HANDBOOK_TOKEN);
+    return Boolean(p && p.configured() && p.machineToken('cast'));
   }
 
   /** A conversion's record (deleted when past its time). @param {string} id */
@@ -589,11 +589,12 @@ export function mountCast(registry, core) {
   registry.add('GET', '/v1/cast/signal', 'public', presenter(async ({ url }) => c().engine.readSignal('answer', url.searchParams.get('id'))));
   // The phone's preview of the slides on the TV: the room's own file.
   registry.add('GET', '/v1/cast/files/:id', 'public', presenter(async ({ params }) => c().engine.readFile(params.id)));
-  // PowerPoint into slides: the GitHub job's routes (the machine token, HANDBOOK_TOKEN),
+  // PowerPoint into slides: the GitHub job's routes (the machine token: CAST_CONVERT_TOKEN
+  // when set, else HANDBOOK_TOKEN),
   // registered first so `/:id/result` is never taken for a part number...
   const machine = (/** @type {(ctx: any) => Promise<Response>} */ fn) => async (/** @type {any} */ ctx) => {
     const p = core.prints;
-    if (!p || !p.machineOk(ctx.request)) return fail('Not signed in.', 401, { reason: 'signed-out' });
+    if (!p || !p.machineOk(ctx.request, 'cast')) return fail('Not signed in.', 401, { reason: 'signed-out' });
     return fn(ctx);
   };
   registry.add('GET', '/v1/cast/convert/:id/job', 'public', machine(async ({ params }) => c().convertJob(params.id)));

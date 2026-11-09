@@ -148,3 +148,39 @@ describe('the GitHub dispatch only starts its own workflows', () => {
     expect(asked).toHaveLength(3);
   });
 });
+
+describe('separate machine tokens for the print and PowerPoint jobs (optional secrets)', () => {
+  const req = (token) => new Request('https://sync.test/x', { headers: { Authorization: `Bearer ${token}` } });
+  const make = (env) => new Prints({ storage: new Map(), now: () => 0, env: () => env, fetchFn: async () => new Response(null, { status: 204 }) });
+
+  it('without them, HANDBOOK_TOKEN works on both, as before', () => {
+    const p = make({ HANDBOOK_TOKEN: 'hb' });
+    expect(p.machineOk(req('hb'))).toBe(true);
+    expect(p.machineOk(req('hb'), 'cast')).toBe(true);
+    expect(p.machineOk(req('nope'))).toBe(false);
+  });
+
+  it('once set, only that token works on its routes', () => {
+    const p = make({ HANDBOOK_TOKEN: 'hb', PRINT_FETCH_TOKEN: 'pf', CAST_CONVERT_TOKEN: 'cc' });
+    expect(p.machineOk(req('pf'))).toBe(true);
+    expect(p.machineOk(req('hb'))).toBe(false);
+    expect(p.machineOk(req('cc'))).toBe(false);
+    expect(p.machineOk(req('cc'), 'cast')).toBe(true);
+    expect(p.machineOk(req('hb'), 'cast')).toBe(false);
+    expect(p.machineOk(req('pf'), 'cast')).toBe(false);
+  });
+
+  it('the PowerPoint job is set up with its own token alone', async () => {
+    const core = new SyncCore({
+      storage: memoryStore(),
+      env: { INITIAL_PASSPHRASE: 'kennebec', PRINT_DISPATCH_TOKEN: 'gh', CAST_CONVERT_TOKEN: 'cc', HANDBOOK_TOKEN: 'hb' },
+      now: () => Date.parse('2026-11-08T21:00:00Z'),
+      broadcast: () => 1,
+      liveScreens: () => new Set(),
+    });
+    expect(core.cast.convertReady()).toBe(true);
+    const job = (token) => core.handle(new Request('https://sync.test/v1/cast/convert/cabcdefghijklmnop/job', { headers: { Authorization: `Bearer ${token}` } }), '10.0.0.9');
+    expect((await job('cc')).status).toBe(404);   // let in; there is no such upload
+    expect((await job('hb')).status).toBe(401);
+  });
+});
