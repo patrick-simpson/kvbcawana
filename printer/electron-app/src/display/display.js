@@ -28,6 +28,7 @@ const { clubNightToday, displayWindow, nextClubNight } = require('./clubNight');
 const { NO_OVERRIDES, decideVisibility, hide, showNow, tidy } = require('./visibility');
 const { findDisplay, rememberDisplay } = require('./displays');
 const { CHOOSABLE, castHostAllowed, isScreenPage, screenUrls } = require('./screens');
+const { createCastDesk } = require('./cast-desk');
 const { hoursMinutes, moveToFourPm, normalizeSettings, parseTime, settingsForScreen } = require('./settings');
 const { shutdownDeadline, shutdownStep } = require('./shutdown');
 const { createPenWatch } = require('./pen-watch');
@@ -122,6 +123,16 @@ function createDisplay(opts) {
   const pageUrl = () => urls().page;
   const isSitePage = (url) => isScreenPage(url, urls().base);
   const where = () => WHERE[urls().screen.id];
+
+  // The Cast desk (11.0.0, owner 2026-11-09): KVBC Awana's back-of-house "Cast control"
+  // window, up only while Cast is on and only with two or more monitors, on the primary
+  // one unless the Cast TV is there (cast-desk.js). The TV's monitor is the screen's own.
+  const castDesk = createCastDesk({
+    BrowserWindow, screen, shell, log,
+    preload: staticFile('cast-preload.cjs'),
+    iconPath: opts.iconPath,
+    tvDisplayId: () => target().display.id,
+  });
 
   let running = false;
   // The downstairs classroom's black board: SMART Ink's toolbar coming up (a
@@ -678,6 +689,8 @@ function createDisplay(opts) {
     state.settings = next;
     saveState();
     log('screen chosen', next.screen);
+    // Cast on or off (the tray switch, or another screen chosen while it was up): its desk follows.
+    castDesk.set(next.screen === 'cast');
     blackDismissed = false; // a screen chosen by hand comes up (Cast, the classroom's black)
     if (wasUp) closeLobby();
     evaluate();
@@ -892,6 +905,7 @@ function createDisplay(opts) {
     const frame = event.senderFrame;
     const allowed = castHostAllowed({
       fromCastWindow: Boolean(lobby && !lobby.isDestroyed() && event.sender === lobby.webContents && urls().screen.id === 'cast'),
+      fromDeskWindow: castDesk.isWindow(event.sender) && urls().screen.id === 'cast',
       isTopFrame: Boolean(frame && !frame.parent),
       frameUrl: frame ? frame.url : '',
     });
@@ -1030,6 +1044,7 @@ function createDisplay(opts) {
   const onDisplaysChanged = (ev) => () => {
     log('displays changed', ev);
     place();
+    castDesk.refresh();
     if (!state.display && screen.getAllDisplays().length > 1 && !choosers.size) openChooser();
   };
   const screenListeners = ['display-added', 'display-removed', 'display-metrics-changed'].map((ev) => [ev, onDisplaysChanged(ev)]);
@@ -1144,6 +1159,8 @@ function createDisplay(opts) {
     if (!SMOKE && !state.display && screen.getAllDisplays().length > 1) openChooser();
 
     for (const [ev, fn] of screenListeners) screen.on(ev, fn);
+    // Cast left on when the app last stopped: its desk comes back with it.
+    if (!SMOKE) castDesk.set(state.settings.screen === 'cast');
     powerMonitor.on('resume', onResume);
     powerMonitor.on('unlock-screen', onUnlock);
   }
@@ -1154,6 +1171,7 @@ function createDisplay(opts) {
     log('stop');
     stopWarning('display turned off');
     closeChoosers();
+    castDesk.set(false);
     closeLobby();
     if (config && !config.isDestroyed()) config.destroy();
     config = null;

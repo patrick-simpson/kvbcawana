@@ -157,7 +157,8 @@ describe('Cast on its own site signs in with the computer\'s own sign-in (11.0.0
     assert.match(display, /\.\.\.\(urls\(\)\.screen\.id === 'cast' \? \{ preload: staticFile\('cast-preload\.cjs'\) \} : \{\}\),/);
     const open = display.slice(display.indexOf('function openLobby()'), display.indexOf('const wc = lobby.webContents;'));
     assert.match(open, /contextIsolation: true,\n\s*sandbox: true,\n\s*nodeIntegration: false,/);
-    assert.equal((display.match(/staticFile\('cast-preload\.cjs'\)/g) || []).length, 1);
+    // Two windows carry the bridge: the Cast screen and the Cast desk (cast-desk.js).
+    assert.equal((display.match(/staticFile\('cast-preload\.cjs'\)/g) || []).length, 2);
   });
   it('the preload exposes one call, on Cast\'s own origin only', () => {
     assert.match(castPreload, /if \(window\.location\.origin === 'https:\/\/cast\.kvbchurch\.org'\) \{/);
@@ -175,6 +176,22 @@ describe('Cast on its own site signs in with the computer\'s own sign-in (11.0.0
   });
   it('main.js hands over the bare session string of this computer\'s own sign-in', () => {
     assert.match(main, /castSession: \(\) => \{\n\s*const sess = deviceSession\(\);\n\s*return sess && syncClient && syncClient\.isValidSession\(sess\.session\) \? sess\.session : null;\n\s*\},/);
+  });
+});
+
+describe('the Cast desk follows Cast (11.0.0, owner 2026-11-09: a back-of-house window on the other monitor)', () => {
+  it('Cast on or off (the tray, or another screen chosen) opens or closes it; display changes re-place it; it comes back with the app', () => {
+    const set = display.slice(display.indexOf('function setScreen(id)'), display.indexOf('function showScreen(id)'));
+    assert.match(set, /castDesk\.set\(next\.screen === 'cast'\);/);
+    assert.match(display, /log\('displays changed', ev\);\n\s*place\(\);\n\s*castDesk\.refresh\(\);/);
+    assert.match(display, /if \(!SMOKE\) castDesk\.set\(state\.settings\.screen === 'cast'\);/);
+    const stop = display.slice(display.indexOf('function stop()'), display.indexOf('function prepareInstall()'));
+    assert.match(stop, /castDesk\.set\(false\);/);
+  });
+  it('the TV\'s monitor is the screen\'s own; the desk gets the Cast bridge; the bridge also answers the desk window, only on /desk/', () => {
+    assert.match(display, /tvDisplayId: \(\) => target\(\)\.display\.id,/);
+    assert.match(display, /preload: staticFile\('cast-preload\.cjs'\),\n\s*iconPath: opts\.iconPath,/);
+    assert.match(display, /fromDeskWindow: castDesk\.isWindow\(event\.sender\) && urls\(\)\.screen\.id === 'cast',/);
   });
 });
 

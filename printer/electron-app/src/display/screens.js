@@ -90,18 +90,21 @@ function isScreenPage(url, base) {
 const CAST_ORIGIN = 'https://cast.kvbchurch.org';
 
 /**
- * Whether an IPC call may have the computer's sign-in (the Cast TV page's bridge): it
- * must come from the Cast screen's own window, from that window's TOP frame (never an
- * iframe: a YouTube or Facebook player, anything a presenter put up), and that frame
- * must be showing a page of exactly https://cast.kvbchurch.org inside the TV folder.
+ * Whether an IPC call may have the computer's sign-in (the Cast pages' bridge): it must
+ * come from that window's TOP frame (never an iframe: a YouTube or Facebook player,
+ * anything a presenter put up), showing a page of exactly https://cast.kvbchurch.org,
+ * and the window decides the folder: the Cast screen's own window only the TV page
+ * (/screen/), the Cast desk's window (11.0.0, cast-desk.js) only the desk (/desk/).
+ * Anything else, including the TV page in the desk's window or the reverse, is refused.
  *
- * @param {{ fromCastWindow: boolean, isTopFrame: boolean, frameUrl: unknown }} o
+ * @param {{ fromCastWindow: boolean, fromDeskWindow?: boolean, isTopFrame: boolean, frameUrl: unknown }} o
  */
-function castHostAllowed({ fromCastWindow, isTopFrame, frameUrl }) {
-  if (fromCastWindow !== true || isTopFrame !== true) return false;
+function castHostAllowed({ fromCastWindow, fromDeskWindow = false, isTopFrame, frameUrl }) {
+  if (isTopFrame !== true || (fromCastWindow === true) === (fromDeskWindow === true)) return false;
   try {
     const u = new URL(String(frameUrl));
-    return u.origin === CAST_ORIGIN && u.pathname.startsWith('/screen/');
+    if (u.origin !== CAST_ORIGIN) return false;
+    return u.pathname.startsWith(fromCastWindow === true ? '/screen/' : '/desk/');
   } catch { return false; }
 }
 
