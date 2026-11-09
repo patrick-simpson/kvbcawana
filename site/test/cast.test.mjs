@@ -115,6 +115,9 @@ test('the "On the TV now" line', () => {
   assert.equal(tvWords({ stage: pdf, now: R.sanitizeClassroomNow({ view: 'pdf', button: 'babcdefgh', page: 2, pages: 9 }), screenOnline: true }).sub, 'Page 2 of 9');
   const share = R.sanitizeStage({ show: { button: { id: 'babcdefgh', kind: 'screen', title: 'Dan' }, at: 1 } });
   assert.equal(tvWords({ stage: share, now: null, screenOnline: true }).main, 'On the TV now: a shared screen');
+  // The desk heads the panel "On the TV now" itself: just what is up.
+  assert.equal(tvWords({ stage: share, now: null, screenOnline: true }, { short: true }).main, 'A shared screen');
+  assert.equal(tvWords({ stage, now, screenOnline: true }, { short: true }).main, 'A YouTube video: Welcome');
 });
 
 test('the presenter\'s token lives in sessionStorage only, and every call carries it', () => {

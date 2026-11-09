@@ -9,7 +9,8 @@
 //   conn.refused(w)  a 401: the page decides what that means (the presenter asks for
 //                    the code again; the desk asks the app for a newer sign-in)
 //   conn.onState(b)  every good state answer, for the page's own extras (the desk's code)
-//   conn.nav         true = the choices are a navigation pane (one always open)
+//   conn.nav         true = the choices are a navigation pane (one always open) and the
+//                    page already heads "On the TV now" (so the line says just what is up)
 // The pages keep their own markup and look; the element ids are the same.
 //
 // - Things to show: the laptop's screen, live (WebRTC laptop to TV, shared/screenShare.js;
@@ -129,7 +130,7 @@ export function createControls(conn) {
     const offline = failures >= TUNING.failuresBeforeWarning;
     const w = offline
       ? { main: 'Not reaching the TV right now.', sub: navigator.onLine === false ? 'This device is offline.' : 'Trying again…', online: false }
-      : tvWords(state);
+      : tvWords(state, { short: conn.nav === true });
     // Slides: the preview says which slide (no second "Page 2 of 9" line above it).
     if (!offline && w.online && state.stage.show && state.stage.show.button.kind === 'pdf') w.sub = '';
     setText($('tv-main'), w.main);

@@ -197,11 +197,13 @@ export function errorWords(status, body) {
 const KIND_WORDS = { video: 'a YouTube video', clip: 'a video', facebook: 'a Facebook video', image: 'a picture', pdf: 'slides', text: 'text', screen: 'a shared screen' };
 
 /**
- * The "On the TV now" line.
+ * The "On the TV now" line. `short` leaves off the "On the TV now: " lead-in, for a page
+ * that already has "On the TV now" as the heading above it (the desk).
  * @param {{ stage: any, now: any, screenOnline: boolean }} s
+ * @param {{ short?: boolean }} [opts]
  * @returns {{ main: string, sub: string, online: boolean }}
  */
-export function tvWords({ stage, now, screenOnline }) {
+export function tvWords({ stage, now, screenOnline }, opts = {}) {
   const shown = stage && stage.show ? stage.show.button : null;
   if (!shown) {
     return screenOnline
@@ -215,7 +217,9 @@ export function tvWords({ stage, now, screenOnline }) {
   else if (shown.kind === 'pdf') sub = `Page ${stage.show.page}`;
   if (!screenOnline) sub = 'Waiting for the TV to pick it up.';
   const title = shown.kind === 'screen' || !shown.title ? '' : `: ${shown.title}`;
-  return { main: `On the TV now: ${KIND_WORDS[shown.kind] || 'something'}${title}`, sub, online: screenOnline };
+  const what = KIND_WORDS[shown.kind] || 'something';
+  const main = opts.short ? `${what.charAt(0).toUpperCase()}${what.slice(1)}${title}` : `On the TV now: ${what}${title}`;
+  return { main, sub, online: screenOnline };
 }
 
 /** The screen share's state in words. @param {string} state @param {string} [error] */

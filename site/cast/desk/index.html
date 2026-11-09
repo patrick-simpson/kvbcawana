@@ -81,13 +81,13 @@
      stay a sane length; the right column is "On the TV now", always in view. */
   #desk { display: grid; grid-template-rows: auto 1fr; height: 100%; }
   .top { display: flex; align-items: center; gap: 12px; padding: 12px 20px; }
-  .top p { color: var(--text-2); }
   .cols { display: grid; grid-template-columns: 208px minmax(0, 720px) minmax(320px, 560px); justify-content: start; gap: 16px; padding: 0 20px 20px; min-height: 0; }
   .choices { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
   .choice { width: 100%; justify-content: flex-start; gap: 12px; border: 0; background: transparent; min-height: 36px; padding: 8px 12px; position: relative; text-align: left; }
   .choice:hover { background: var(--subtle); }
   .choice[aria-current="page"] { background: var(--nav-sel); font-weight: 600; }
   .choice[aria-current="page"]::before { content: ''; position: absolute; left: 0; top: 10px; bottom: 10px; width: 3px; border-radius: 2px; background: var(--accent); }
+  .icon { flex: none; fill: none; stroke: currentColor; stroke-width: 1.25; stroke-linecap: round; stroke-linejoin: round; }
   .choice b { font-weight: 400; }
   .choice[aria-current="page"] b { font-weight: 600; }
   .choice span { display: none; }
@@ -101,6 +101,7 @@
   .hero { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 24px; align-items: center; padding: 20px 24px; }
   .hero-words { display: grid; gap: 4px; align-content: center; min-width: 0; }
   .hero .label { color: var(--text-2); }
+  .hero .label, #tv-h { display: flex; align-items: center; gap: 8px; }
   #desk-code { font: 600 clamp(52px, 3.55vw, 80px)/1.1 var(--font-display); letter-spacing: .08em; word-spacing: .22em; font-variant-numeric: tabular-nums; white-space: nowrap; margin: 4px 0; }
   .hero-help { color: var(--text-2); }
   #desk-qr-box { margin: 0; display: grid; justify-items: center; gap: 8px; }
@@ -198,24 +199,23 @@
 <div id="desk" hidden>
   <header class="top">
     <h1>Cast control</h1>
-    <p>Everything a presenter can do, from this computer. A phone can present at the same time; the last thing sent wins.</p>
   </header>
   <div class="cols">
     <nav aria-label="What to show">
       <ul class="choices">
-        <li><button class="choice" type="button" aria-expanded="true" aria-current="page" aria-controls="p-video"><b>YouTube</b><span>Search, or paste a link.</span></button></li>
-        <li><button class="choice" type="button" aria-expanded="false" aria-controls="p-fb"><b>Facebook video</b><span>A public video.</span></button></li>
-        <li><button class="choice" type="button" aria-expanded="false" aria-controls="p-pdf"><b>Slides</b><span>PowerPoint, PDF, Google Slides.</span></button></li>
-        <li><button class="choice" type="button" aria-expanded="false" aria-controls="p-pics"><b>Pictures</b><span>Pictures from this computer.</span></button></li>
-        <li><button class="choice" type="button" aria-expanded="false" aria-controls="p-clip"><b>Video file</b><span>A video from this computer.</span></button></li>
-        <li><button class="choice" type="button" aria-expanded="false" aria-controls="p-text"><b>Text</b><span>A verse or an announcement.</span></button></li>
+        <li><button class="choice" type="button" aria-expanded="true" aria-current="page" aria-controls="p-video"><svg class="icon" viewBox="0 0 20 20" width="20" height="20" aria-hidden="true" focusable="false"><rect x="2.5" y="4" width="15" height="12" rx="3"/><path d="M8.5 7.6v4.8l4-2.4z"/></svg><b>YouTube</b><span>Search, or paste a link.</span></button></li>
+        <li><button class="choice" type="button" aria-expanded="false" aria-controls="p-fb"><svg class="icon" viewBox="0 0 20 20" width="20" height="20" aria-hidden="true" focusable="false"><rect x="2.5" y="5.5" width="10.5" height="9" rx="2"/><path d="M13 9l4.5-2.5v7L13 11z"/></svg><b>Facebook video</b><span>A public video.</span></button></li>
+        <li><button class="choice" type="button" aria-expanded="false" aria-controls="p-pdf"><svg class="icon" viewBox="0 0 20 20" width="20" height="20" aria-hidden="true" focusable="false"><path d="M3 4h14M4.5 4v8.5a1 1 0 001 1h9a1 1 0 001-1V4"/><path d="M10 13.5v3M7.5 16.5h5"/></svg><b>Slides</b><span>PowerPoint, PDF, Google Slides.</span></button></li>
+        <li><button class="choice" type="button" aria-expanded="false" aria-controls="p-pics"><svg class="icon" viewBox="0 0 20 20" width="20" height="20" aria-hidden="true" focusable="false"><rect x="3" y="3.5" width="14" height="13" rx="2.5"/><circle cx="7.5" cy="8" r="1.3"/><path d="M3.5 14l4-3.8 3 2.8 2.5-2.2 3.5 3.4"/></svg><b>Pictures</b><span>Pictures from this computer.</span></button></li>
+        <li><button class="choice" type="button" aria-expanded="false" aria-controls="p-clip"><svg class="icon" viewBox="0 0 20 20" width="20" height="20" aria-hidden="true" focusable="false"><path d="M5.5 2.5h6l4 4v9a2 2 0 01-2 2h-8a2 2 0 01-2-2v-11a2 2 0 012-2z"/><path d="M11.5 2.5v4h4"/><path d="M8.3 9.8v4l3.2-2z"/></svg><b>Video file</b><span>A video from this computer.</span></button></li>
+        <li><button class="choice" type="button" aria-expanded="false" aria-controls="p-text"><svg class="icon" viewBox="0 0 20 20" width="20" height="20" aria-hidden="true" focusable="false"><path d="M3.5 5.5h13M3.5 9.5h13M3.5 13.5h8"/></svg><b>Text</b><span>A verse or an announcement.</span></button></li>
       </ul>
     </nav>
 
     <div class="center">
       <section class="card hero" aria-labelledby="code-h">
         <div class="hero-words">
-          <h2 id="code-h" class="label">Connection code</h2>
+          <h2 id="code-h" class="label"><svg class="icon" viewBox="0 0 20 20" width="20" height="20" aria-hidden="true" focusable="false"><rect x="3" y="3" width="5" height="5" rx="1"/><rect x="12" y="3" width="5" height="5" rx="1"/><rect x="3" y="12" width="5" height="5" rx="1"/><path d="M12 12h2v2h-2zM15.5 15.5H17V17h-1.5z"/></svg><span>Connection code</span></h2>
           <p id="desk-code" aria-label="No code yet">— — —</p>
           <p class="hero-help">Scan the QR code, or go to the address and type the code.</p>
           <p id="desk-presenter" data-on="false" role="status">No presenter is connected.</p>
@@ -309,7 +309,7 @@
 
     <aside class="side">
       <section class="card" id="tv" data-online="false" aria-live="polite" aria-labelledby="tv-h">
-        <h2 id="tv-h" class="label">On the TV now</h2>
+        <h2 id="tv-h" class="label"><svg class="icon" viewBox="0 0 20 20" width="20" height="20" aria-hidden="true" focusable="false"><rect x="2.5" y="3.5" width="15" height="10" rx="2"/><path d="M7 16.5h6M10 13.5v3"/></svg><span>On the TV now</span></h2>
         <p class="tv-main"><span class="dot" aria-hidden="true"></span><span id="tv-main">Connecting…</span></p>
         <p class="tv-sub" id="tv-sub"></p>
         <div class="controls" id="ctl-video" hidden>
