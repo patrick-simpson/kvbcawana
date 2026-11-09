@@ -24,10 +24,17 @@
   button.hot { background: var(--hot); color: #fff; }
   button:disabled { opacity: .5; cursor: default; }
   header.bar button { padding: 8px 12px; font-size: 14px; }
-  #signin { max-width: 440px; margin: 64px auto; padding: 28px; background: #fff; border-radius: 16px; box-shadow: 4px 4px 0 var(--ink); }
-  #signin h2 { margin: 0 0 8px; font: 400 28px/1.1 var(--brand-font-display); }
-  #signin input { width: 100%; font: inherit; padding: 12px; border: 2px solid var(--ink); border-radius: 10px; margin: 12px 0; }
-  #signin .note { min-height: 1.5em; font-size: 14px; color: var(--brand-sparks-deep); }
+  /* The sign-in card: the same pattern as the phone remotes (centred, 26rem, 16px gutters, labelled field, full-width button). */
+  #signin { display: grid; gap: 10px; width: calc(100% - 32px); max-width: 26rem; margin: 40px auto; padding: 24px 20px; background: #fff; border-radius: 16px; box-shadow: 4px 4px 0 var(--ink); }
+  #signin[hidden] { display: none; }
+  #signin h2 { margin: 0; font: 400 28px/1.1 var(--brand-font-display); }
+  #signin p { margin: 0; }
+  #signin label { font: 400 19px/1.1 var(--brand-font-label); letter-spacing: .06em; text-transform: uppercase; color: var(--brand-blue); margin-top: 6px; }
+  #signin input { width: 100%; min-height: 48px; font: inherit; font-size: 17px; padding: 10px 12px; border: 2px solid var(--ink); border-radius: 10px; }
+  #signin input:focus-visible, #signin button:focus-visible { outline: 3px solid var(--brand-blue); outline-offset: 2px; }
+  #signin button { width: 100%; min-height: 48px; }
+  #signin .note { min-height: 1.5em; font-size: 15px; font-weight: 600; color: var(--brand-sparks-deep); }
+  #signin .fine { font-size: 14px; color: #4a4a4a; }
   main { display: grid; grid-template-columns: minmax(320px, 1fr) minmax(320px, 1.15fr); gap: 24px; padding: 24px; max-width: 1500px; margin: 0 auto; }
   .col h2 { margin: 0 0 10px; font: 400 15px/1 var(--brand-font-label); letter-spacing: .08em; text-transform: uppercase; }
   textarea { width: 100%; height: 62vh; min-height: 360px; resize: vertical; font: 400 15px/1.5 ui-monospace, Menlo, Consolas, monospace; padding: 14px; border: 2px solid var(--ink); border-radius: 12px; background: #fff; color: var(--ink); }
@@ -90,10 +97,12 @@
 
 <form id="signin" hidden>
   <h2>Sign in</h2>
-  <p>Type the church passphrase to make a letter.</p>
-  <input id="passphrase" type="password" autocomplete="current-password" aria-label="Church passphrase">
+  <p>Type the church passphrase to use the print tool.</p>
+  <label for="passphrase">Church passphrase</label>
+  <input id="passphrase" type="password" autocomplete="current-password" aria-describedby="signin-note">
+  <p class="note" id="signin-note" role="status" aria-live="polite"></p>
   <button class="hot" id="signin-btn" type="submit">Sign in</button>
-  <p class="note" id="signin-note" role="status"></p>
+  <p class="fine">Same passphrase as on the screens. It is never saved on this device; only the sign-in is.</p>
 </form>
 
 <nav class="tabs" id="tabs" role="tablist" hidden>
