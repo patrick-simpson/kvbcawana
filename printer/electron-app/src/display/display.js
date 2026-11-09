@@ -935,45 +935,67 @@ function createDisplay(opts) {
     pushConfigState();
   }
 
-  /** The display's part of the tray menu (Electron MenuItem templates). */
-  function menuItems() {
-    if (!running) return [];
+  /**
+   * The display's part of the tray menu, in groups (owner 2026-11-08: the menu
+   * was messy; main.js lays the groups out): `status` is the one short line,
+   * `warnings` stay top-level, `settingsItem` is top-level, `screen` and `cast`
+   * are the contents of the "Screen" and "Cast" submenus.
+   */
+  function menuGroups() {
+    if (!running) return null;
     const t = now();
     const win = displayWindow(t, sources, hours());
     const { visible } = decideVisibility(win, state.overrides, t.getTime());
     const overridden = state.overrides.manualUntil > t.getTime() || state.overrides.hiddenForWindow != null;
-    const items = [{ label: `Display: ${statusLine()}`, enabled: false }];
+    const warnings = [];
     if (lobby && placedAs === 'windowed') {
       const w = where();
-      items.push({ label: state.display ? `${w[0].toUpperCase()}${w.slice(1)} not found: showing in a window` : `No monitor chosen for ${w} yet`, enabled: false });
+      warnings.push({ label: state.display ? `${w[0].toUpperCase()}${w.slice(1)} not found: showing in a window` : `No monitor chosen for ${w} yet`, enabled: false });
     }
     if (warning) {
-      items.push({ label: `Shutting down at ${fmtTime(warning.deadline)}`, enabled: false });
-      items.push({ label: 'Cancel tonight’s shutdown', click: cancelShutdown });
+      warnings.push({ label: `Shutting down at ${fmtTime(warning.deadline)}`, enabled: false });
+      warnings.push({ label: 'Cancel tonight’s shutdown', click: cancelShutdown });
     }
-    items.push(
-      { label: 'Display settings...', click: openConfigurator },
-      {
-        label: 'Screen',
-        submenu: CHOOSABLE.map(({ id, name }) => ({
+    return {
+      status: `Showing: ${statusLine()}`,
+      warnings,
+      settingsItem: { label: 'Display settings...', click: openConfigurator },
+      screen: [
+        ...CHOOSABLE.map(({ id, name }) => ({
           label: name, type: 'radio', checked: state.settings.screen === id, click: () => setScreen(id),
         })),
-      },
-      // Cast (owner 2026-11-08: "enabled by right clicking on the icon in the task bar").
-      { label: 'Cast (screen sharing)', type: 'checkbox', checked: state.settings.screen === 'cast', click: () => (state.settings.screen === 'cast' ? castOff() : castOn()) },
-      { label: 'Show Cast code', enabled: state.settings.screen === 'cast', click: castReset },
-      { label: 'Disconnect the presenter', enabled: state.settings.screen === 'cast', click: castKick },
-      { label: 'Show now (for 3 hours)', enabled: !scheduledNow(t), click: requestShow },
-      { label: 'Hide until the next club night', enabled: visible, click: () => { state.overrides = hide(state.overrides, currentWindow()); blackDismissed = true; saveState(); evaluate(); } },
-      { label: 'Resume schedule', enabled: overridden, click: () => { state.overrides = NO_OVERRIDES; saveState(); evaluate(); } },
-      setupMode
-        ? { label: `Back to ${where()}`, click: () => { setupMode = false; placedAs = null; place(true); } }
-        : { label: 'Set up on this screen (in a window)', click: () => { setupMode = true; requestShow(); place(true); } },
-      { label: `Choose ${where()}...`, click: openChooser },
-      { label: 'Reload the screen', enabled: Boolean(lobby), click: () => lobby?.loadURL(pageUrl()) },
-      { label: 'Open the display log', click: () => shell.openPath(logPath) },
-    );
-    return items;
+        { type: 'separator' },
+        { label: 'Show now (for 3 hours)', enabled: !scheduledNow(t), click: requestShow },
+        { label: 'Hide until the next club night', enabled: visible, click: () => { state.overrides = hide(state.overrides, currentWindow()); blackDismissed = true; saveState(); evaluate(); } },
+        { label: 'Resume schedule', enabled: overridden, click: () => { state.overrides = NO_OVERRIDES; saveState(); evaluate(); } },
+        { type: 'separator' },
+        setupMode
+          ? { label: `Back to ${where()}`, click: () => { setupMode = false; placedAs = null; place(true); } }
+          : { label: 'Set up on this screen (in a window)', click: () => { setupMode = true; requestShow(); place(true); } },
+        { label: `Choose ${where()}...`, click: openChooser },
+        { label: 'Reload the screen', enabled: Boolean(lobby), click: () => lobby?.loadURL(pageUrl()) },
+        { label: 'Open the display log', click: () => shell.openPath(logPath) },
+      ],
+      cast: [
+        // Cast (owner 2026-11-08: "enabled by right clicking on the icon in the task bar").
+        { label: 'Cast (screen sharing)', type: 'checkbox', checked: state.settings.screen === 'cast', click: () => (state.settings.screen === 'cast' ? castOff() : castOn()) },
+        { label: 'Show Cast code', enabled: state.settings.screen === 'cast', click: castReset },
+        { label: 'Disconnect the presenter', enabled: state.settings.screen === 'cast', click: castKick },
+      ],
+    };
+  }
+
+  /** The display's items as one flat list (kept for callers that want no submenus). */
+  function menuItems() {
+    const g = menuGroups();
+    if (!g) return [];
+    return [
+      { label: g.status, enabled: false },
+      ...g.warnings,
+      g.settingsItem,
+      { label: 'Screen', submenu: g.screen },
+      ...g.cast,
+    ];
   }
 
   /* ── Start and stop ─────────────────────────────────────────────── */
@@ -1151,7 +1173,7 @@ function createDisplay(opts) {
 
   return {
     start, stop, isRunning: () => running,
-    menuItems, statusLine, requestShow, openConfigurator, openChooser,
+    menuItems, menuGroups, statusLine, requestShow, openConfigurator, openChooser,
     prepareInstall, cancelInstall, beforeQuit, configure, showScreen, castOn, castOff, castReset, castKick, info, log,
   };
 }

@@ -1,4 +1,9 @@
-﻿## [10.11.0] - 2026-11-08
+﻿## [10.12.0] - 2026-11-08
+A tidier taskbar menu.
+
+**The right-click menu, reorganized.** The KVBC Awana icon's menu was one long list (owner: "It seems like it is messy"). It now opens with the computer's name and a short status line (what the screen shows, which printer it prints to), then any warning that needs you, then four groups: **Screen** (choose the screen, show or hide it, set it up, reload, the display log), **Cast** (Cast on or off, Show Cast code, Disconnect the presenter), **Printing** (the printer, the print server, restart, the check-in page, the status window) and **App** (the version, updates, Start with Windows, Set up this computer). Display settings, the settings page and Quit stay one click away. Windows draws this menu itself, so it looks like any other Windows menu. Every item does what it did before.
+
+## [10.11.0] - 2026-11-08
 Cast: "Disconnect the presenter" in the tray.
 
 **Disconnect the presenter.** While Cast is on, right-click the KVBC Awana icon and choose "Disconnect the presenter" (owner: "an option that you can click on the desktop that lets you disconnect a device"). The phone or laptop that is presenting is let go at once (its page says it is no longer connected) and the next person can type the code; whatever is on the TV stays up. "Show Cast code" still does both: takes everything down and lets the presenter go.

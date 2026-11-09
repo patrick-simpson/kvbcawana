@@ -157,3 +157,26 @@ describe('Cast from the tray (owner 2026-11-08: "enabled by right clicking on th
     assert.ok(main.indexOf("appendSwitch('disable-features'") < main.indexOf('app.whenReady()'));
   });
 });
+
+describe('the tray menu is grouped (owner 2026-11-08: "redesign the context menu ... it seems messy")', () => {
+  const tray = main.slice(main.indexOf('function buildTray(config)'), main.indexOf('tray.setContextMenu('));
+
+  it('has the Screen, Cast, Printing and App submenus', () => {
+    assert.match(tray, /\{ label: 'Screen', submenu: groups\.screen \}/);
+    assert.match(tray, /\{ label: 'Cast', submenu: groups\.cast \}/);
+    assert.match(tray, /\{ label: 'Printing', submenu: printing \}/);
+    assert.match(tray, /\{ label: 'App', submenu: appMenu \}/);
+  });
+
+  it('keeps warnings top-level and puts Quit last', () => {
+    assert.ok(tray.indexOf('Print server NOT RUNNING') < tray.indexOf("label: 'Printing'"));
+    assert.ok(tray.indexOf('groups.warnings') < tray.indexOf("label: 'Screen'"));
+    const last = tray.lastIndexOf('template.push(');
+    assert.match(tray.slice(last), /^template\.push\(\{\n\s+label: 'Quit'/);
+  });
+
+  it('the display hands main.js its groups', () => {
+    assert.match(display, /function menuGroups\(\)/);
+    assert.match(display, /\{ label: 'Screen', submenu: g\.screen \}/);
+  });
+});

@@ -452,88 +452,108 @@ function buildTray(config) {
   // Windows cuts a tray tooltip at 127 characters.
   tray.setToolTip(tip.join('\n').slice(0, 127));
 
-  const template = [
-    { label: `${named}  v${app.getVersion()}`, enabled: false },
-  ];
+  // Owner 2026-11-08: the menu was messy. Native Windows menu kept; short
+  // status at the top, warnings stay top-level, the rest in four groups:
+  // Screen, Cast, Printing, App (Quit last).
+  const groups = roles.display && display && display.isRunning() ? display.menuGroups() : null;
+  const stationItems = roles.print ? stationFace.stationMenuItems(stationView()) : [];
+  const stationItem = (item) => (item.action
+    ? { label: item.label, enabled: item.enabled !== false, click: () => stationClick(item.action) }
+    : { label: item.label, enabled: false });
+  const isWarning = (item) => item.label.startsWith('⚠');
+
+  const template = [{ label: named, enabled: false }];
+  const statusLines = [];
+  if (groups) statusLines.push(groups.status);
+  if (roles.print && !failed) statusLines.push(`Printing to ${config.printerName || 'the system default printer'}`);
+  for (const line of statusLines.slice(0, 2)) template.push({ label: line, enabled: false });
+
+  // Warnings, always top-level.
   if (!roles.setupDone) {
     template.push({ label: 'Set up this computer...', click: () => openWizard() });
   }
   if (dev && dev.state === 'signed-out') {
     template.push({ label: '⚠ Signed out of the settings page: sign in again...', click: () => openWizard() });
   }
+  if (failed) {
+    template.push({ label: '⚠ Print server NOT RUNNING — open its status', click: () => createSetupWindow() });
+  }
+  for (const item of stationItems.filter(isWarning)) template.push(stationItem(item));
   if (dev && dev.pending) {
     template.push({ label: 'Print server turns off once the last label prints', enabled: false });
   }
+  if (groups) template.push(...groups.warnings);
+
+  template.push({ type: 'separator' });
+
+  if (groups) {
+    template.push(groups.settingsItem);
+    template.push({ label: 'Screen', submenu: groups.screen });
+    template.push({ label: 'Cast', submenu: groups.cast });
+    template.push({ type: 'separator' });
+  }
 
   if (roles.print) {
-    template.push({ type: 'separator' });
-    template.push(failed
-      ? { label: '⚠ Print server NOT RUNNING — open its status', click: () => createSetupWindow() }
-      : { label: `Printer: ${config.printerName || '(system default)'}`, enabled: false });
-    template.push({ label: `Print server: http://localhost:${PORT}`, enabled: false });
-    for (const item of stationFace.stationMenuItems(stationView())) {
-      template.push(item.action
-        ? { label: item.label, enabled: item.enabled !== false, click: () => stationClick(item.action) }
-        : { label: item.label, enabled: false });
-    }
-    template.push({
-      // The easy button. When the server is down this (re)starts it in one
-      // click; when it's up, it's a harmless restart for "when in doubt".
-      label: failed ? '▶ Start print server' : 'Restart print server',
-      click: () => startServer(currentConfig || loadConfig() || {})
-    });
+    const printing = [
+      { label: `Printer: ${config.printerName || '(system default)'}`, enabled: false },
+      { label: `Print server: http://localhost:${PORT}`, enabled: false },
+      ...stationItems.filter((i) => !isWarning(i)).map(stationItem),
+      {
+        // The easy button. When the server is down this (re)starts it in one
+        // click; when it's up, it's a harmless restart for "when in doubt".
+        label: failed ? '▶ Start print server' : 'Restart print server',
+        click: () => startServer(currentConfig || loadConfig() || {})
+      },
+    ];
     if (config.checkinUrl) {
-      template.push({
+      printing.push({
         label: 'Open Check-in Page',
         click: () => openExternalSafely(config.checkinUrl, 'tray menu')
       });
     }
-    template.push({
-      // Printer, labels, name tags, schedule, diagnostics: all on the one page.
-      label: 'Settings (awana.kvbchurch.org/settings)',
-      click: () => openExternalSafely(SETTINGS_URL, 'tray menu')
-    });
-    template.push({
+    printing.push({
       label: config.printerName ? 'Print server status...' : 'Finish print server setup…',
       click: () => createSetupWindow()
     });
-  }
-
-  if (roles.display && display && display.isRunning()) {
+    template.push({ label: 'Printing', submenu: printing });
+    template.push({
+      // Printer, labels, name tags, schedule, diagnostics: all on the one page.
+      label: 'Settings page...',
+      click: () => openExternalSafely(SETTINGS_URL, 'tray menu')
+    });
     template.push({ type: 'separator' });
-    template.push(...display.menuItems());
   }
 
-  template.push({ type: 'separator' });
-  if (roles.setupDone) template.push({ label: 'Set up this computer...', click: () => openWizard() });
-  template.push({
-    label: 'Start with Windows', type: 'checkbox', checked: autostartOn(), enabled: app.isPackaged,
-    click: (item) => setAutostart(item.checked),
-  });
-
+  const appMenu = [{ label: `Version ${app.getVersion()}`, enabled: false }];
   // Update status: always show exactly where the auto-updater is.
   if (autoUpdater && app.isPackaged) {
-    template.push({ type: 'separator' });
     if (updateState.downloaded) {
       // Automatic now (see scheduleAutoInstall) — this is no longer a click
       // target, just a status line for "yes, it's about to restart itself".
-      template.push({
+      appMenu.push({
         label: 'Update ready, restarting...',
         enabled: false
       });
     } else if (updateState.available) {
-      template.push({ label: updateState.progressLine || `Downloading update v${updateState.available}...`, enabled: false });
+      appMenu.push({ label: updateState.progressLine || `Downloading update v${updateState.available}...`, enabled: false });
     } else if (updateState.error) {
-      template.push({ label: updateState.error, enabled: false });
+      appMenu.push({ label: updateState.error, enabled: false });
     } else if (updateState.checking) {
-      template.push({ label: 'Checking for updates…', enabled: false });
+      appMenu.push({ label: 'Checking for updates…', enabled: false });
     } else {
-      template.push({
+      appMenu.push({
         label: updateState.upToDate ? `✓ Up to date — check again` : 'Check for updates',
         click: () => autoUpdater.checkForUpdates().catch(() => { /* offline */ })
       });
     }
   }
+  appMenu.push({ type: 'separator' });
+  appMenu.push({
+    label: 'Start with Windows', type: 'checkbox', checked: autostartOn(), enabled: app.isPackaged,
+    click: (item) => setAutostart(item.checked),
+  });
+  if (roles.setupDone) appMenu.push({ label: 'Set up this computer...', click: () => openWizard() });
+  template.push({ label: 'App', submenu: appMenu });
 
   template.push({ type: 'separator' });
   template.push({
