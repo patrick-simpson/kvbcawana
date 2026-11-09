@@ -125,11 +125,14 @@ run(`node scripts/stamp-build.mjs ${hashTree(path.join(ROOT, 'classroom', 'publi
 }
 
 // /links: the unlisted volunteer page (site/links/index.html, one static file with no
-// script; not linked from the home page; noindex in _headers below).
+// script; not linked from the home page; noindex in _headers below), and its icon
+// (owner 2026-11-09: the chain link; the tab's SVG, the home screen's PNGs).
 {
   const linksOut = path.join(OUT, 'links');
   mkdirSync(linksOut, { recursive: true });
-  cpSync(path.join(ROOT, 'site', 'links', 'index.html'), path.join(linksOut, 'index.html'));
+  for (const f of ['index.html', 'icon.svg', 'icon-180.png', 'icon-192.png', 'icon-512.png']) {
+    cpSync(path.join(ROOT, 'site', 'links', f), path.join(linksOut, f));
+  }
 }
 
 // /logo: the unlisted logo sheet (site/logo/index.html, one static page; its one script
