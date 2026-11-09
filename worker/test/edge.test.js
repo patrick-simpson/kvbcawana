@@ -1,7 +1,8 @@
 // The entry point (src/index.js): what it lets through to the Durable Object. The
 // other suites call SyncCore directly and so never saw the edge's body cap.
 import { describe, expect, it } from 'vitest';
-import worker, { BODY_CAPS, bodyCapFor, readCapped } from '../src/index.js';
+import worker, { BODY_CAPS, bodyCapFor } from '../src/index.js';
+import { readLimited as readCapped } from '../src/classroom.js';
 import { BODY_MAX } from '../src/sync.js';
 import { CLASSROOM_CLIP_PART_BYTES, CLASSROOM_FILE_MAX_BYTES } from '../../shared/classroomRemote.js';
 import { IMPORT_BODY_MAX, ROWS_BODY_MAX } from '../src/history.js';

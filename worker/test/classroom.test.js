@@ -166,6 +166,40 @@ describe('files (POST/PUT/GET /v1/classroom/files)', () => {
     expect(page.status).toBe(400);
     expect((await s.call('POST', '/v1/classroom/files', { url: 'http://example.org/a.png' })).status).toBe(400);
   });
+
+  it('a copied link: redirects by hand (https only, at most three), and a body with no length stops at 20 MB', async () => {
+    const PDF_BYTES = pdfOf(500);
+    const routes = {
+      'https://a.example/one': () => new Response(null, { status: 302, headers: { location: '/two' } }),
+      'https://a.example/two': () => new Response(null, { status: 307, headers: { location: 'https://b.example/file.pdf' } }),
+      'https://b.example/file.pdf': () => new Response(PDF_BYTES),
+      'https://a.example/plain': () => new Response(null, { status: 302, headers: { location: 'http://b.example/file.pdf' } }),
+      'https://a.example/loop': () => new Response(null, { status: 302, headers: { location: '/loop' } }),
+      // No Content-Length: a stream that would run past 20 MB.
+      'https://a.example/huge': () => {
+        let sent = 0;
+        return new Response(new ReadableStream({ pull(c) { sent += 1024 * 1024; if (sent > 25 * 1024 * 1024) c.close(); else c.enqueue(new Uint8Array(1024 * 1024)); } }));
+      },
+    };
+    const asked = [];
+    const fetchFn = async (url, init) => {
+      asked.push({ url: String(url), redirect: init.redirect });
+      return routes[String(url)]();
+    };
+    const s = await setup({ fetchFn });
+    const ok = await s.call('POST', '/v1/classroom/files', { url: 'https://a.example/one' });
+    expect(ok.status).toBe(200);
+    expect(ok.body.bytes).toBe(500);
+    expect(asked.map((a) => a.url)).toEqual(['https://a.example/one', 'https://a.example/two', 'https://b.example/file.pdf']);
+    expect(asked.every((a) => a.redirect === 'manual')).toBe(true);
+    expect((await s.call('POST', '/v1/classroom/files', { url: 'https://a.example/plain' })).body.reason).toBe('redirects');
+    asked.length = 0;
+    expect((await s.call('POST', '/v1/classroom/files', { url: 'https://a.example/loop' })).body.reason).toBe('redirects');
+    expect(asked.length).toBe(4);
+    const huge = await s.call('POST', '/v1/classroom/files', { url: 'https://a.example/huge' });
+    expect(huge.status).toBe(413);
+    expect(huge.body.reason).toBe('too-big');
+  });
 });
 
 describe('the stage (POST /v1/classroom/remote, GET /v1/classroom/stage)', () => {

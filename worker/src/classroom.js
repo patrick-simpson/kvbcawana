@@ -55,6 +55,36 @@ const PART_PREFIX = 'cpart:';
 export const FILE_PENDING_MS = 60 * 60 * 1000;
 /** A link the Worker copies: give up after this long. */
 const IMPORT_TIMEOUT_MS = 25 * 1000;
+/** Redirects a copied link may take (a Drive or Docs link takes one or two), each to https only. */
+export const IMPORT_REDIRECTS_MAX = 3;
+
+/**
+ * A response's (or request's) body, read piece by piece and given up the moment it
+ * passes `max` (a body with no Content-Length could otherwise fill memory: the entry
+ * point reads every request body with it too). Null = too big.
+ * @param {{ body: ReadableStream<Uint8Array> | null }} res @param {number} max
+ */
+export async function readLimited(res, max) {
+  if (!res.body) return new Uint8Array(0);
+  const reader = res.body.getReader();
+  /** @type {Uint8Array[]} */
+  const chunks = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > max) {
+      try { await reader.cancel(); } catch { /* already gone */ }
+      return null;
+    }
+    chunks.push(value);
+  }
+  const out = new Uint8Array(total);
+  let at = 0;
+  for (const c of chunks) { out.set(c, at); at += c.byteLength; }
+  return out;
+}
 /** The TV counts as on while it read the stage within this long. */
 export const CLASSROOM_ONLINE_MS = 45 * 1000;
 
@@ -221,19 +251,32 @@ export class Classroom {
    */
   async importFile(link, name, opts = {}) {
     const max = Math.min(CLASSROOM_FILE_MAX_BYTES, opts.maxBytes ?? CLASSROOM_FILE_MAX_BYTES);
-    const url = fileLinkFrom(link);
+    let url = fileLinkFrom(link);
     if (!url) return fail('That is not an https link.', 400, { reason: 'link' });
+    const signal = AbortSignal.timeout(IMPORT_TIMEOUT_MS);
     let res;
-    try {
-      res = await this.fetchFn(url, { redirect: 'follow', headers: { Accept: 'image/*,application/pdf' }, signal: AbortSignal.timeout(IMPORT_TIMEOUT_MS) });
-    } catch {
-      return fail('That link did not answer.', 502, { reason: 'unreachable' });
+    // Redirects followed by hand: at most IMPORT_REDIRECTS_MAX, each to https again.
+    for (let hop = 0; ; hop += 1) {
+      try {
+        res = await this.fetchFn(url, { redirect: 'manual', headers: { Accept: 'image/*,application/pdf' }, signal });
+      } catch {
+        return fail('That link did not answer.', 502, { reason: 'unreachable' });
+      }
+      const location = res.status >= 300 && res.status < 400 ? res.headers.get('location') : null;
+      if (!location) break;
+      try { await res.body?.cancel(); } catch { /* nothing to drop */ }
+      if (hop >= IMPORT_REDIRECTS_MAX) return fail('That link sends you on too many times. Use the link to the file itself, or upload it.', 502, { reason: 'redirects' });
+      let next;
+      try { next = new URL(location, url); } catch { return fail('That link sends you somewhere unreadable.', 502, { reason: 'redirects' }); }
+      if (next.protocol !== 'https:' || next.username || next.password) return fail('That link sends you to a page that is not https.', 502, { reason: 'redirects' });
+      url = next.href;
     }
     if (!res.ok) return fail(`That link answered ${res.status}.`, 502, { reason: 'status' });
     const declared = Number(res.headers.get('content-length'));
     if (Number.isFinite(declared) && declared > max) return fail('That file is too big (20 MB at most).', 413, { reason: 'too-big' });
-    const bytes = new Uint8Array(await res.arrayBuffer());
-    if (bytes.length > max) return fail('That file is too big (20 MB at most).', 413, { reason: 'too-big' });
+    let bytes;
+    try { bytes = await readLimited(res, max); } catch { return fail('That link stopped answering.', 502, { reason: 'unreachable' }); }
+    if (!bytes) return fail('That file is too big (20 MB at most).', 413, { reason: 'too-big' });
     const file = await this.storeBytes(bytes, oneLine(name, 80) || oneLine(new URL(url).pathname.split('/').pop(), 80));
     if (!file) return fail('That link is not a picture or a PDF (a web page, perhaps). Use the link to the file itself, or upload it.', 400, { reason: 'type' });
     return json({ ok: true, ...file });

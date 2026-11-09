@@ -7,6 +7,7 @@ import { BODY_MAX, SyncCore, json } from './sync.js';
 import { isScreenId } from '../../lobby/src/lib/syncSpecs.js';
 import { CLASSROOM_CLIP_PART_BYTES, CLASSROOM_FILE_MAX_BYTES } from '../../shared/classroomRemote.js';
 import { IMPORT_BODY_MAX, ROWS_BODY_MAX } from './history.js';
+import { readLimited } from './classroom.js';
 
 /** A live socket opened by a registered screen carries this tag (screens.js). */
 const SCREEN_TAG = 'screen:';
@@ -47,34 +48,6 @@ export const BODY_CAPS = [
 export function bodyCapFor(method, pathname) {
   const hit = BODY_CAPS.find((c) => c.method === method && c.path.test(pathname));
   return hit ? hit.max : BODY_MAX;
-}
-
-/**
- * The body, read piece by piece and given up the moment it passes `max` (a chunked
- * body has no Content-Length to refuse up front). Null = too big.
- * @param {Request} request @param {number} max
- * @returns {Promise<Uint8Array | null>}
- */
-export async function readCapped(request, max) {
-  if (!request.body) return new Uint8Array(0);
-  const reader = request.body.getReader();
-  /** @type {Uint8Array[]} */
-  const chunks = [];
-  let total = 0;
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    total += value.byteLength;
-    if (total > max) {
-      try { await reader.cancel(); } catch { /* already gone */ }
-      return null;
-    }
-    chunks.push(value);
-  }
-  const out = new Uint8Array(total);
-  let at = 0;
-  for (const c of chunks) { out.set(c, at); at += c.byteLength; }
-  return out;
 }
 
 /** @param {string|null} origin */
@@ -251,7 +224,7 @@ export default {
     headers.set('x-client-ip', request.headers.get('CF-Connecting-IP') || 'unknown');
     let body;
     if (request.method !== 'GET' && request.method !== 'HEAD') {
-      body = await readCapped(request, cap);
+      body = await readLimited(request, cap);
       if (!body) return tooBig();
       headers.delete('Transfer-Encoding');
       headers.delete('Content-Length');
