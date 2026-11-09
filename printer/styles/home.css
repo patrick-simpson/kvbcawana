@@ -404,7 +404,9 @@ sup { font-size: .55em; line-height: 0; vertical-align: .9em; }
 .kv-clock__ampm { font: 400 .95rem/1.3 var(--label); letter-spacing: .06em; }
 
 /* ── The night ──────────────────────────────────────────────────────────── */
-.kv-scene { position: relative; padding: clamp(64px, 10vh, 120px) 0; min-height: 100vh; min-height: 100svh; display: flex; align-items: center; }
+/* As tall as its screens, no taller (owner 2026-11-09: the page was twice its
+   ~5,100 px; a scene no longer fills the window by itself). */
+.kv-scene { position: relative; padding: clamp(44px, 6vh, 80px) 0; display: flex; align-items: center; }
 /* Each field starts on a ruler: the night from 6 to 8, its hour in ticks. */
 .kv-scene::before {
   content: ''; position: absolute; left: 0; right: 0; top: 0; height: 12px;
@@ -499,7 +501,7 @@ sup { font-size: .55em; line-height: 0; vertical-align: .9em; }
 .kv-film .kv-reel { border-color: #fff; box-shadow: 14px 14px 0 rgba(0, 0, 0, .5); }
 
 /* ── 8:00: the end of the night ─────────────────────────────────────────── */
-.kv-finale { position: relative; background: #17151c; color: #fff; padding: clamp(64px, 10vh, 120px) 0 clamp(80px, 12vh, 150px); }
+.kv-finale { position: relative; background: #17151c; color: #fff; padding: clamp(48px, 7vh, 88px) 0 clamp(64px, 9vh, 110px); }
 .kv-finale::before { content: ''; position: absolute; left: 0; right: 0; top: 0; height: 12px; background: repeating-linear-gradient(90deg, currentColor 0 2px, transparent 2px 24px); opacity: .22; }
 .kv-finale .kv-scene__time { color: var(--sun); }
 .kv-finale__title { margin-top: 18px; font: 400 clamp(2.2rem, 1.4rem + 3vw, 4.4rem)/1 var(--shout); text-transform: uppercase; text-wrap: balance; }
