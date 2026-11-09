@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { SyncCore } from '../src/sync.js';
-import { CAST_BYTES_MAX, CAST_CONVERTS_PER_HOUR, CAST_FILES_MAX, CAST_FILES_PER_HOUR, JOIN_FAILS_MAX, TOKEN_TTL_MS } from '../src/cast.js';
+import { CAST_BYTES_MAX, CAST_CONVERTS_PER_HOUR, CAST_FILES_MAX, CAST_FILES_PER_HOUR, JOIN_FAILS_MAX, JOIN_NET_FAILS_MAX, TOKEN_TTL_MS } from '../src/cast.js';
 import { memoryStore, signInV2 } from './helpers.js';
 import { CLASSROOM_CLIP_PART_BYTES, CLASSROOM_FILE_PART_BYTES, fileLinkFrom, sanitizeButtons, sanitizeClassroomPress, sanitizeSignal } from '../../shared/classroomRemote.js';
 
@@ -68,14 +68,40 @@ describe('Cast: the code, the token, the room', () => {
     expect((await s.call('GET', '/v1/cast/state', undefined, { auth: '', cast: 'tnotarealtokenatallnotonexx' })).status).toBe(401);
   });
 
-  it('too many wrong codes lock joining for the window', async () => {
+  // Security review 2026-11-09 (deliberately changed from "lock joining for everyone"):
+  // one network is locked, the code rotates after JOIN_FAILS_MAX, the count is stored.
+  it('too many wrong codes lock that network only; enough from anywhere rotate the code', async () => {
     const s = await setup();
     const { code } = (await s.call('POST', '/v1/cast/open', {})).body;
     const wrong = code === '100000' ? '100001' : '100000';
-    for (let i = 0; i < JOIN_FAILS_MAX; i += 1) await s.call('POST', '/v1/cast/join', { code: wrong }, { auth: '' });
-    expect((await s.call('POST', '/v1/cast/join', { code }, { auth: '' })).status).toBe(429);
+    const joinFrom = async (ip, c) => { const r = await s.core.handle(new Request('https://sync.test/v1/cast/join', { method: 'POST', body: JSON.stringify({ code: c }) }), ip); return { status: r.status, body: await r.json() }; };
+    for (let i = 0; i < JOIN_NET_FAILS_MAX; i += 1) expect((await joinFrom('10.5.0.1', wrong)).body.reason).toBe('refused');
+    // That network waits, even with the right code; another network does not.
+    expect((await joinFrom('10.5.0.1', code)).status).toBe(429);
+    // The count lives in storage (a deploy restarting the object does not reset it).
+    expect((await s.core.storage.get('cast:fails')).n).toBe(JOIN_NET_FAILS_MAX);
+    // Wrong codes from other networks up to JOIN_FAILS_MAX: the code changes and the TV is told.
+    s.frames.length = 0;
+    for (let i = JOIN_NET_FAILS_MAX; i < JOIN_FAILS_MAX; i += 1) await joinFrom(`10.6.${i}.1`, wrong);
+    const fresh = (await s.call('GET', '/v1/cast/screen')).body.code;
+    expect(fresh).toMatch(/^[1-9]\d{5}$/);
+    expect(fresh).not.toBe(code);
+    expect(s.frames.some((f) => f.e === 'changed' && f.d?.what === 'cast')).toBe(true);
+    expect((await joinFrom('10.7.0.1', code)).body.reason).toBe('refused');
+    expect((await joinFrom('10.7.0.1', fresh)).status).toBe(200);
+    // After the window the locked network may try again.
     s.tick(11 * 60 * 1000);
+    expect((await joinFrom('10.5.0.1', fresh)).body.reason).toBe('refused');   // right code, but someone presents
+  });
+
+  it('a busy room and a wrong code get the same answer', async () => {
+    const s = await setup();
+    const { code } = (await s.call('POST', '/v1/cast/open', {})).body;
     expect((await s.call('POST', '/v1/cast/join', { code }, { auth: '' })).status).toBe(200);
+    const busy = await s.call('POST', '/v1/cast/join', { code }, { auth: '' });
+    const wrong = await s.call('POST', '/v1/cast/join', { code: code === '100000' ? '100001' : '100000' }, { auth: '' });
+    expect(busy).toEqual(wrong);
+    expect(busy.status).toBe(403);
   });
 
   it('a token lasts its time; a new code (or closing) ends every token and clears the screen and files', async () => {
@@ -356,13 +382,13 @@ describe('one presenter, leave, reset, YouTube search, Facebook and uploaded vid
     const first = await s.join();
     expect(first.status).toBe(200);
     const second = await s.join();
-    expect(second.status).toBe(409);
-    expect(second.body.reason).toBe('busy');
+    expect(second.status).toBe(403);   // the same answer as a wrong code (security review 2026-11-09)
+    expect(second.body.reason).toBe('refused');
     // Using the page keeps the room.
     s.tick(25 * 60 * 1000);
     await s.call('GET', '/v1/cast/state', undefined, { auth: '', cast: first.body.token });
     s.tick(25 * 60 * 1000);
-    expect((await s.join()).status).toBe(409);
+    expect((await s.join()).status).toBe(403);
     // Disconnect frees it at once.
     expect((await s.call('POST', '/v1/cast/leave', {}, { auth: '', cast: first.body.token })).status).toBe(200);
     const third = await s.join();

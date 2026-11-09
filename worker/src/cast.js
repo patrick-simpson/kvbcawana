@@ -42,12 +42,17 @@
 // safe search strict, embeddable videos only; answers kept 10 minutes; at most
 // YOUTUBE_PER_HOUR searches an hour. Without the secret: 503 `not-configured`.
 //
-// A wrong code is refused; more than JOIN_FAILS_MAX wrong codes within
-// JOIN_WINDOW_MS refuses every join for the rest of that window (a million codes
-// cannot be walked). Tokens are stored hashed (SHA-256), at most TOKENS_MAX, each
-// good for TOKEN_TTL_MS.
+// A wrong code is refused (security review 2026-11-09). Wrong codes are counted in
+// storage (`cast:fails`, so a deploy does not reset them): JOIN_NET_FAILS_MAX from one
+// network (sync.js netOf) within JOIN_WINDOW_MS refuse THAT network for the rest of
+// the window; JOIN_FAILS_MAX from anywhere ROTATE the code (the TV reads the new one on
+// the doorbell; whoever is presenting stays connected), so guessing has to start over
+// and nobody can lock joining for everyone. A wrong code and a right code while someone
+// else presents get the SAME answer (403 `refused`), so a busy room never confirms a
+// guess. Tokens are stored hashed (SHA-256), at most TOKENS_MAX, each good for TOKEN_TTL_MS.
 
 import { Classroom, newId } from './classroom.js';
+import { netOf } from './netof.js';
 import { fail, json } from './http.js';
 import { CLASSROOM_CLIP_MAX_BYTES, CLASSROOM_FILE_MAX_BYTES, CLASSROOM_FILE_TYPES, fileLimits, isClipType } from '../../shared/classroomRemote.js';
 
@@ -75,7 +80,11 @@ const HOUR_MS = 60 * 60 * 1000;
 export const TOKEN_TTL_MS = 8 * 60 * 60 * 1000;
 export const TOKENS_MAX = 20;
 export const JOIN_FAILS_MAX = 20;
+export const JOIN_NET_FAILS_MAX = 10;
 export const JOIN_WINDOW_MS = 10 * 60 * 1000;
+const FAILS_KEY = 'cast:fails';
+/** Networks remembered in one window's count (a scan from more is still counted overall). */
+const FAILS_NETS_MAX = 200;
 export const CODE_DIGITS = 6;
 /** A presenter quiet this long no longer holds the room (the next one may join). */
 export const PRESENTER_IDLE_MS = 30 * 60 * 1000;
@@ -133,6 +142,7 @@ export class Cast {
   constructor({ storage, now, ring, fetchFn, prints, env }) {
     this.storage = storage;
     this.now = now;
+    this.ring = ring;
     this.env = env || (() => ({}));
     this.fetchFn = fetchFn || ((u, i) => fetch(u, i));
     /** When each presenter token was last used (hash -> ms), memory only. @type {Map<string, number>} */
@@ -149,8 +159,6 @@ export class Cast {
       storage, now, ring, fetchFn,
       room: { what: 'cast', buttonsKey: 'cast:buttons', stageKey: 'cast:stage', filePrefix: 'castmeta:', partPrefix: 'castpart:' },
     });
-    /** @type {{ n: number, since: number }} */
-    this.fails = { n: 0, since: 0 };
     /** Per presenter token this hour (hash -> counts), memory only. @type {Map<string, { since: number, files: number, converts: number }>} */
     this.rates = new Map();
     /** Bytes the room took this hour, whoever sent them. */
@@ -255,20 +263,44 @@ export class Cast {
     return json({ ok: true });
   }
 
-  /** POST /v1/cast/join {code} (a presenter, no sign-in): a token, or refused. @param {any} body */
-  async join(body) {
+  /** This window's wrong codes (stored). @returns {Promise<{ since: number, n: number, nets: Record<string, number> }>} */
+  async failsDoc() {
+    const d = await this.storage.get(FAILS_KEY);
     const t = this.now();
-    if (t - this.fails.since > JOIN_WINDOW_MS) this.fails = { n: 0, since: t };
-    if (this.fails.n >= JOIN_FAILS_MAX) return fail('Too many wrong codes. Wait a few minutes, then try again.', 429, { reason: 'locked', retryAfterMs: JOIN_WINDOW_MS - (t - this.fails.since) });
+    if (!d || t - (Number(d.since) || 0) > JOIN_WINDOW_MS) return { since: t, n: 0, nets: {} };
+    return { since: Number(d.since), n: Number(d.n) || 0, nets: d.nets && typeof d.nets === 'object' ? d.nets : {} };
+  }
+
+  /**
+   * POST /v1/cast/join {code} (a presenter, no sign-in): a token, or refused.
+   * @param {any} body @param {string} [ip]
+   */
+  async join(body, ip = 'unknown') {
+    const t = this.now();
+    const net = netOf(ip);
+    const fails = await this.failsDoc();
+    if ((fails.nets[net] || 0) >= JOIN_NET_FAILS_MAX) return fail('Too many wrong codes. Wait a few minutes, then try again.', 429, { reason: 'locked', retryAfterMs: JOIN_WINDOW_MS - (t - fails.since) });
     const code = typeof body?.code === 'string' ? body.code.replace(/\D/g, '') : '';
     const room = await this.roomDoc();
-    if (!room.code || code.length !== CODE_DIGITS || code !== room.code) {
-      this.fails.n += 1;
-      return fail(room.code ? 'That code is not the one on the TV. Check it and try again.' : 'Cast is not turned on. Turn it on from the lobby computer, then use the code it shows.', 403, { reason: room.code ? 'wrong-code' : 'off' });
+    if (!room.code) return fail('Cast is not turned on. Turn it on from the lobby computer, then use the code it shows.', 403, { reason: 'off' });
+    const refused = () => fail('That code did not connect. Check the code on the TV and try again. If someone else is presenting, wait until they tap Disconnect.', 403, { reason: 'refused' });
+    if (code.length !== CODE_DIGITS || code !== room.code) {
+      const nets = { ...fails.nets };
+      if (net in nets || Object.keys(nets).length < FAILS_NETS_MAX) nets[net] = (nets[net] || 0) + 1;
+      const n = fails.n + 1;
+      if (n >= JOIN_FAILS_MAX) {
+        // Enough guesses at this code: a new one (the TV reads it on the doorbell).
+        await this.storage.put(ROOM_KEY, { ...room, code: newCode(), at: t });
+        await this.storage.put(FAILS_KEY, { since: fails.since, n: 0, nets });
+        this.ring({ what: 'cast', code: true });
+      } else {
+        await this.storage.put(FAILS_KEY, { since: fails.since, n, nets });
+      }
+      return refused();
     }
-    // One presenter at a time: someone live and not idle holds the room.
+    // One presenter at a time: someone live and not idle holds the room (the same answer as a wrong code).
     const busy = room.tokens.some((x) => t - x.at <= TOKEN_TTL_MS && t - (this.seen.get(x.hash) ?? x.at) <= PRESENTER_IDLE_MS);
-    if (busy) return fail('Someone else is presenting right now. When they tap Disconnect or Display code, try again.', 409, { reason: 'busy' });
+    if (busy) return refused();
     const token = newId('t', 28);
     const hash = await hashOf(token);
     this.seen.clear();
@@ -545,7 +577,7 @@ export function mountCast(registry, core) {
   // A presenter (the code's token).
   registry.add('POST', '/v1/cast/reset', 'session', async () => c().reset());
   registry.add('POST', '/v1/cast/kick', 'session', async () => c().kick());
-  registry.add('POST', '/v1/cast/join', 'public', async ({ body }) => c().join(await body()));
+  registry.add('POST', '/v1/cast/join', 'public', async ({ body, ip }) => c().join(await body(), ip));
   registry.add('POST', '/v1/cast/leave', 'public', presenter(async ({ body }, who) => c().leave(who, await body())));
   registry.add('GET', '/v1/cast/youtube', 'public', presenter(async ({ url }) => c().youtube(url.searchParams.get('q'))));
   registry.add('GET', '/v1/cast/state', 'public', presenter(async () => c().engine.remoteState()));

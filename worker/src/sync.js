@@ -83,8 +83,9 @@ import { Notices, mountNotice } from './notice.js';
 import { mountOverview } from './overview.js';
 import { mountHealth } from './health.js';
 import { mountHandbook } from './handbook.js';
+import { netOf } from './netof.js';
 
-export { json };
+export { json, netOf };
 
 export const IP_MAX_FAILS = 5;
 export const IP_LOCK_MS = 15 * 60 * 1000;
@@ -100,22 +101,6 @@ export const GLOBAL_LOCK_MS = 60 * 60 * 1000;
  */
 export const GLOBAL_MIN_NETS = 10;
 
-/**
- * The network a guess is counted against: an IPv4 address as it is, an IPv6 address's
- * /64 (one home or phone is handed a whole /64, so per address would be no limit).
- * @param {string} ip
- */
-export function netOf(ip) {
-  const s = String(ip || '').trim().toLowerCase();
-  if (!s.includes(':')) return s;
-  const mapped = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/.exec(s);
-  if (mapped) return mapped[1];
-  const [head, tail = ''] = s.split('::');
-  const h = head ? head.split(':') : [];
-  const t = tail ? tail.split(':') : [];
-  const groups = s.includes('::') ? [...h, ...Array(Math.max(0, 8 - h.length - t.length)).fill('0'), ...t] : h;
-  return `${groups.slice(0, 4).map((g) => (parseInt(g, 16) || 0).toString(16)).join(':')}::/64`;
-}
 /**
  * Guesses being checked at once (memory only). A guess is counted the moment it
  * arrives, before any await (the body, the verifier's hash), so many wrong logins
