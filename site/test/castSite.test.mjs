@@ -51,10 +51,13 @@ test('the build writes dist-cast with the Cast pages at its root', () => {
   assert.match(build, /origin: CAST_ORIGIN,\n  facebook: true,/);
   assert.match(build, /'\/screen\/\*',\n(?:  '.*',\n)*  `  Content-Security-Policy: \$\{CAST_TV_CSP\}`,/);
   assert.match(build, /include: \['\/api', '\/api\/\*'\], exclude: \[\]/);
+  // The desk (owner 2026-11-09): its own copy and policy.
+  assert.match(build, /for \(const f of \['index\.html', 'desk\.js'\]\) cpSync\(path\.join\(src, 'desk', f\), path\.join\(out, 'desk', f\)\);/);
+  assert.match(build, /'\/desk\/\*',\n(?:  '.*',\n)*  `  Content-Security-Policy: \$\{CAST_DESK_CSP\}`,/);
 });
 
 test('a built Cast site: the pages at / and /screen/, nothing of the main site', { skip: !built && 'site/dist-cast is not built' }, () => {
-  for (const f of ['index.html', 'app.js', 'logic.js', 'preview.js', 'shared/classroomRemote.js', 'shared/screenShare.js', 'screen/index.html', 'screen/screen.js', 'church/church.css', 'church/kvbc-logo.png', 'church/fonts/Jost-Variable.ttf', 'robots.txt']) {
+  for (const f of ['index.html', 'app.js', 'controls.js', 'logic.js', 'preview.js', 'qr.js', 'desk/index.html', 'desk/desk.js', 'shared/classroomRemote.js', 'shared/screenShare.js', 'screen/index.html', 'screen/screen.js', 'church/church.css', 'church/kvbc-logo.png', 'church/fonts/Jost-Variable.ttf', 'robots.txt']) {
     assert.ok(existsSync(path.join(DIST, f)), f);
   }
   for (const f of ['lobby', 'cast', 'journey', 'checkin', 'classroom']) assert.ok(!existsSync(path.join(DIST, f)), `${f} is the main site's`);
@@ -83,4 +86,17 @@ test('a built Cast site: noindex and the security headers everywhere, the TV pol
   // Every inline script of the built TV page is allowed by its fingerprint.
   const sha = (t) => createHash('sha256').update(t, 'utf8').digest('base64');
   for (const h of inlineScriptHashes(readFileSync(path.join(DIST, 'screen', 'index.html'), 'utf8'), sha)) assert.ok(d['script-src'].includes(h), h);
+});
+
+test('a built Cast site: the desk has the script-limiting policy, YouTube thumbnails, no Facebook', { skip: !built && 'site/dist-cast is not built' }, () => {
+  const text = readFileSync(path.join(DIST, '_headers'), 'utf8');
+  const csp = ruleLines(text, '/desk/*').find((l) => l.startsWith('Content-Security-Policy: ')).slice(25);
+  const d = directives(csp);
+  assert.ok(!d['script-src'].includes("'unsafe-inline'") && !d['script-src'].includes("'unsafe-eval'"));
+  assert.deepEqual(d['img-src'], ["'self'", 'data:', 'blob:', 'https://i.ytimg.com']);
+  assert.ok(!d['frame-src'].includes('https://www.facebook.com'));
+  assert.deepEqual(d['connect-src'], ["'self'", 'https://cast.kvbchurch.org', 'wss://cast.kvbchurch.org', 'https://cdnjs.cloudflare.com']);
+  // The TV's own policy names no YouTube thumbnails.
+  const tv = directives(ruleLines(text, '/screen/*').find((l) => l.startsWith('Content-Security-Policy: ')).slice(25));
+  assert.deepEqual(tv['img-src'], ["'self'", 'data:', 'blob:']);
 });

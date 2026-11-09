@@ -200,8 +200,11 @@ rmSync(CAST_OUT, { recursive: true, force: true });
   const out = CAST_OUT;
   mkdirSync(path.join(out, 'shared'), { recursive: true });
   mkdirSync(path.join(out, 'screen'), { recursive: true });
-  for (const f of ['index.html', 'app.js', 'controls.js', 'logic.js', 'preview.js']) cpSync(path.join(src, f), path.join(out, f));
+  mkdirSync(path.join(out, 'desk'), { recursive: true });
+  for (const f of ['index.html', 'app.js', 'controls.js', 'logic.js', 'preview.js', 'qr.js']) cpSync(path.join(src, f), path.join(out, f));
   for (const f of ['index.html', 'screen.js']) cpSync(path.join(src, 'screen', f), path.join(out, 'screen', f));
+  // The lobby computer's Cast control (owner 2026-11-09: KVBC Awana's back-of-house window).
+  for (const f of ['index.html', 'desk.js']) cpSync(path.join(src, 'desk', f), path.join(out, 'desk', f));
   cpSync(path.join(src, 'church'), path.join(out, 'church'), { recursive: true });
   for (const f of ['classroomRemote.js', 'screenShare.js']) cpSync(path.join(ROOT, 'shared', f), path.join(out, 'shared', f));
 }
@@ -419,6 +422,14 @@ const CAST_TV_CSP = tvPagePolicy({
   facebook: true,
   scriptHashes: [...new Set(builtPages(path.join(CAST_OUT, 'screen')).flatMap((f) => inlineScriptHashes(readFileSync(f, 'utf8'), sha256b64)))],
 });
+// The desk (/desk/, KVBC Awana's "Cast control" window) holds the computer's sign-in too:
+// the same script-limiting policy, with YouTube's search thumbnails as pictures and no
+// Facebook player (the desk plays nothing itself).
+const CAST_DESK_CSP = tvPagePolicy({
+  origin: CAST_ORIGIN,
+  images: ['https://i.ytimg.com'],
+  scriptHashes: [...new Set(builtPages(path.join(CAST_OUT, 'desk')).flatMap((f) => inlineScriptHashes(readFileSync(f, 'utf8'), sha256b64)))],
+});
 writeFileSync(path.join(CAST_OUT, '_headers'), [
   '/*',
   '  X-Robots-Tag: noindex, nofollow',
@@ -430,12 +441,15 @@ writeFileSync(path.join(CAST_OUT, '_headers'), [
   '/screen/*',
   '  Cache-Control: no-cache',
   `  Content-Security-Policy: ${CAST_TV_CSP}`,
+  '/desk/*',
+  '  Cache-Control: no-cache',
+  `  Content-Security-Policy: ${CAST_DESK_CSP}`,
   '',
 ].join('\n'));
 // An old link typed onto the new host (cast.kvbchurch.org/cast/...) lands on the page it meant.
 writeFileSync(path.join(CAST_OUT, '_redirects'), ['/cast / 301', '/cast/* /:splat 301', ''].join('\n'));
 writeFileSync(path.join(CAST_OUT, '_routes.json'), `${JSON.stringify({ version: 1, include: ['/api', '/api/*'], exclude: [] }, null, 2)}\n`);
-for (const must of ['index.html', 'app.js', 'logic.js', 'preview.js', 'shared/classroomRemote.js', 'shared/screenShare.js', 'screen/index.html', 'screen/screen.js', 'church/church.css', 'church/kvbc-logo.png', 'church/kvbc-logo-white.png', 'church/fonts/Jost-Variable.ttf', '_headers', '_routes.json', '_redirects', 'robots.txt']) {
+for (const must of ['index.html', 'app.js', 'controls.js', 'logic.js', 'preview.js', 'qr.js', 'shared/classroomRemote.js', 'shared/screenShare.js', 'screen/index.html', 'screen/screen.js', 'desk/index.html', 'desk/desk.js', 'church/church.css', 'church/kvbc-logo.png', 'church/kvbc-logo-white.png', 'church/fonts/Jost-Variable.ttf', '_headers', '_routes.json', '_redirects', 'robots.txt']) {
   if (!existsSync(path.join(CAST_OUT, must))) throw new Error(`the Cast site build is missing ${must}`);
 }
 

@@ -249,7 +249,10 @@ test('the QR link carries the code in the fragment; the page connects with it an
   assert.match(screen, /`\$\{presenterUrl\(location\.href\)\}#code=\$\{d\}`/);
   assert.match(app, /codeFromHash\(location\.hash\)/);
   assert.match(app, /history\.replaceState\(null, '', location\.pathname \+ location\.search\)/);
-  assert.match(screen, /cdnjs\.cloudflare\.com\/ajax\/libs\/qrcode-generator\/1\.4\.4\//);
+  // The QR library is one module, qr.js, shared with the lobby computer's desk.
+  assert.match(read('cast', 'qr.js'), /cdnjs\.cloudflare\.com\/ajax\/libs\/qrcode-generator\/1\.4\.4\//);
+  assert.match(read('cast', 'qr.js'), /sc\.integrity = QR_LIB_SRI;/);
+  assert.match(screen, /import \{ drawQrCode \} from '\.\.\/qr\.js';/);
   assert.match(screenPage, /id="qr"/);
 });
 
@@ -382,4 +385,53 @@ test('the TV page asks KVBC Awana for its sign-in when its slot is empty, and on
   // Configure mode (the app's Settings window) returns before any of it.
   const start = screen.slice(screen.indexOf('async function start()'));
   assert.ok(start.indexOf('if (CONFIGURE)') < start.indexOf('sessionFromHost()'));
+});
+
+// The desk (owner 2026-11-09): KVBC Awana's back-of-house "Cast control" window on the
+// lobby computer, cast.kvbchurch.org/desk/. The presenter page's own code (controls.js),
+// signed in only through the app's bridge, in the Windows 11 look.
+test('the desk reuses the presenter page\'s controls through the desk routes and the computer\'s sign-in', () => {
+  const desk = read('cast', 'desk', 'desk.js');
+  assert.match(desk, /import \{ \$, createControls, setText \} from '\.\.\/controls\.js';/);
+  assert.match(desk, /path: \(p\) => p\.replace\(\/\^\\\/v1\\\/cast\\\/\/, '\/v1\/cast\/desk\/'\),/);
+  assert.match(desk, /headers: \(\) => \(session \? \{ Authorization: `Bearer \$\{session\}` \} : \{\}\),/);
+  assert.match(desk, /nav: true,/);
+  // Never a presenter token, never storage: the sign-in is the app's, in memory.
+  assert.ok(!/X-Cast-Token|sessionStorage|localStorage/.test(desk));
+  assert.ok(!/\/v1\/cast\/join|\/v1\/cast\/leave/.test(desk));
+  // "Disconnect the presenter" is the tray's own route; a 401 asks the app once more.
+  assert.match(desk, /fetch\(`\$\{base\}\/v1\/cast\/kick`, \{ method: 'POST', headers: \{ Authorization: `Bearer \$\{session\}`/);
+  assert.match(desk, /if \(!askedAfter401\) \{\n    askedAfter401 = true;/);
+  // The code and its QR always (the TV's reveal rule does not apply here).
+  assert.ok(!/revealAt|code-hidden|REVEAL/.test(desk));
+  assert.match(desk, /drawQrCode\(\$\('desk-qr'\), `\$\{presenterUrl\(location\.href\)\}#code=\$\{code\}`/);
+  // No bridge (a plain browser): the calm note, nothing else runs.
+  const start = desk.slice(desk.indexOf('async function start()'));
+  assert.match(start, /if \(!session\) \{\n    off\('Open this on the lobby computer'/);
+  assert.ok(start.indexOf('return;') < start.indexOf('ui.wire()'));
+});
+
+test('the desk page: every control the presenter has but the screen share, in the Windows 11 look', () => {
+  const deskPage = read('cast', 'desk', 'index.html');
+  for (const id of ['yt-search-form', 'yt-q', 'yt-results', 'video-form', 'video-link', 'fb-form', 'fb-link', 'text-form', 'text-body', 'pic-input', 'thumbs', 'clip-input', 'clip-show', 'pdf-input', 'pdf-link', 'pdf-copy', 'pdf-show', 'tv', 'tv-main', 'ctl-video', 'ctl-pdf', 'btn-down', 'press-note', 'desk-code', 'desk-qr', 'desk-addr', 'btn-reveal', 'btn-kick', 'desk-off']) {
+    assert.match(deskPage, new RegExp(`id="${id}"`), id);
+  }
+  assert.ok(!/id="btn-share"|getDisplayMedia/.test(deskPage), 'no screen share: it is the TV\'s own computer');
+  assert.match(deskPage, /data-slide="now"/);
+  assert.match(deskPage, /data-slide-strip/);
+  assert.match(deskPage, /<nav aria-label="What to show">/);
+  // Fluent 2 / Windows 11: the system font, the neutral page, the accent, 32 px controls,
+  // 14 px text, focus rings, high contrast, dark mode. Not the church's kit, not Awana's.
+  assert.match(deskPage, /"Segoe UI Variable Text", "Segoe UI Variable", "Segoe UI", system-ui/);
+  assert.match(deskPage, /--page: #F3F3F3; --card: #FFFFFF; --stroke: #E5E5E5;/);
+  assert.match(deskPage, /--accent: #0067C0;/);
+  assert.match(deskPage, /min-height: 32px;/);
+  assert.match(deskPage, /font: 400 14px\/20px var\(--font\);/);
+  assert.match(deskPage, /:focus-visible \{ outline: 2px solid/);
+  assert.match(deskPage, /@media \(forced-colors: active\)/);
+  assert.match(deskPage, /@media \(prefers-color-scheme: dark\)/);
+  assert.ok(!/church\.css|Jost|Almarai|kvbc-logo|shared\/brand|Paytone|Londrina|fonts\.googleapis|@font-face/.test(deskPage));
+  assert.match(deskPage, /<meta name="robots" content="noindex, nofollow">/);
+  assert.match(deskPage, /<script type="module" src="desk\.js"><\/script>/);
+  assert.ok(!/<script>/.test(deskPage), 'no inline script (the policy allows none it does not fingerprint)');
 });

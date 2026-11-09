@@ -1,0 +1,331 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="light dark">
+<title>Cast control</title>
+<!-- The lobby computer's Cast control (owner 2026-11-09): KVBC Awana's back-of-house
+     window on the second monitor while Cast is on. Standard Windows 11 look (Fluent 2),
+     on purpose NOT the church's or Awana's: system font (Segoe UI Variable), Mica-like
+     neutral page, white cards, the Windows accent blue, 32 px controls, 14 px text,
+     focus rings, high contrast (forced-colors) and dark mode follow Windows. desk.js;
+     controls.js is the presenter page's own code. -->
+<style>
+  :root {
+    --page: #F3F3F3; --card: #FFFFFF; --stroke: #E5E5E5; --stroke-strong: #D1D1D1;
+    --text: #1A1A1A; --text-2: #5C5C5C; --accent: #0067C0; --accent-hover: #1975C5; --accent-press: #3183CA; --on-accent: #FFFFFF;
+    --subtle: rgba(0, 0, 0, .04); --subtle-press: rgba(0, 0, 0, .07); --nav-sel: rgba(0, 0, 0, .06);
+    --ok: #0F7B0F; --bad: #C42B1C;
+    --shadow: 0 2px 4px rgba(0, 0, 0, .04), 0 0 2px rgba(0, 0, 0, .06);
+    --font: "Segoe UI Variable Text", "Segoe UI Variable", "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+    --font-display: "Segoe UI Variable Display", "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --page: #202020; --card: #2B2B2B; --stroke: #3A3A3A; --stroke-strong: #4A4A4A;
+      --text: #FFFFFF; --text-2: #C5C5C5; --accent: #4CC2FF; --accent-hover: #47B1E8; --accent-press: #42A1D2; --on-accent: #000000;
+      --subtle: rgba(255, 255, 255, .06); --subtle-press: rgba(255, 255, 255, .04); --nav-sel: rgba(255, 255, 255, .08);
+      --ok: #6CCB5F; --bad: #FF99A4;
+      --shadow: 0 2px 4px rgba(0, 0, 0, .26), 0 0 2px rgba(0, 0, 0, .3);
+      color-scheme: dark;
+    }
+  }
+  *, *::before, *::after { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { margin: 0; height: 100%; }
+  body { background: var(--page); color: var(--text); font: 400 14px/20px var(--font); -webkit-font-smoothing: antialiased; }
+  h1, h2, h3 { margin: 0; font-family: var(--font-display); font-weight: 600; }
+  h1 { font-size: 20px; line-height: 28px; }
+  h2 { font-size: 14px; line-height: 20px; }
+  p { margin: 0; }
+
+  /* Controls: Windows 11 sizes (32 px, 4 px radius). */
+  button, input, textarea, .file-pick { font: inherit; color: inherit; }
+  button, .file-pick {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 32px; padding: 5px 12px;
+    border: 1px solid var(--stroke-strong); border-radius: 4px; background: var(--card); color: var(--text); cursor: default;
+  }
+  button:hover, .file-pick:hover { background: var(--subtle); }
+  button:active, .file-pick:active { background: var(--subtle-press); color: var(--text-2); }
+  button:disabled { color: var(--text-2); opacity: .55; }
+  .primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); font-weight: 600; }
+  .primary:hover { background: var(--accent-hover); }
+  .primary:active { background: var(--accent-press); color: var(--on-accent); }
+  .quiet { background: var(--card); }
+  input[type=text], input[type=url], input[type=search], textarea {
+    width: 100%; min-height: 32px; padding: 5px 10px; border: 1px solid var(--stroke-strong); border-bottom-color: var(--text-2);
+    border-radius: 4px; background: var(--card);
+  }
+  textarea { min-height: 96px; resize: vertical; }
+  input:focus, textarea:focus { outline: none; border-bottom: 2px solid var(--accent); }
+  :focus-visible { outline: 2px solid var(--text); outline-offset: 2px; border-radius: 4px; }
+  label { display: block; margin: 12px 0 4px; }
+  .opt { color: var(--text-2); }
+  .file-pick { position: relative; }
+  .file-pick input { position: absolute; inset: 0; opacity: 0; cursor: default; }
+  .row { display: flex; gap: 8px; }
+  .row input { flex: 1; }
+  .help { margin-top: 8px; color: var(--text-2); font-size: 12px; line-height: 16px; }
+  .note { min-height: 20px; margin-top: 8px; color: var(--text-2); }
+  .note.bad, #share-state.bad { color: var(--bad); }
+  .or { margin: 16px 0 4px; color: var(--text-2); font-size: 12px; }
+  .looks { display: flex; gap: 16px; }
+  .looks label { display: inline-flex; gap: 6px; align-items: center; margin: 0; }
+  .card { background: var(--card); border: 1px solid var(--stroke); border-radius: 8px; box-shadow: var(--shadow); padding: 16px; }
+
+  /* The window: title strip, then navigation | what to show | the code and the TV. */
+  #desk { display: grid; grid-template-rows: auto 1fr; height: 100%; }
+  .top { display: flex; align-items: center; gap: 12px; padding: 12px 20px; }
+  .top p { color: var(--text-2); }
+  .cols { display: grid; grid-template-columns: 200px minmax(0, 1fr) minmax(320px, 400px); gap: 16px; padding: 0 20px 20px; min-height: 0; }
+  .choices { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+  .choice { width: 100%; justify-content: flex-start; gap: 12px; border: 0; background: transparent; min-height: 36px; padding: 8px 12px; position: relative; text-align: left; }
+  .choice:hover { background: var(--subtle); }
+  .choice[aria-current="page"] { background: var(--nav-sel); font-weight: 600; }
+  .choice[aria-current="page"]::before { content: ''; position: absolute; left: 0; top: 10px; bottom: 10px; width: 3px; border-radius: 2px; background: var(--accent); }
+  .choice b { font-weight: 400; }
+  .choice[aria-current="page"] b { font-weight: 600; }
+  .choice span { display: none; }
+  .main { overflow: auto; min-height: 0; }
+  .panel h2 { margin-bottom: 4px; font-size: 20px; line-height: 28px; }
+  .panel > .help:first-of-type { margin-top: 0; }
+  .side { display: flex; flex-direction: column; gap: 16px; overflow: auto; min-height: 0; }
+
+  /* The code: always shown here. */
+  .code-card { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px 16px; align-items: start; }
+  .code-words { display: grid; gap: 4px; }
+  .code-card .label { color: var(--text-2); }
+  #desk-code { font: 600 40px/48px var(--font-display); letter-spacing: .06em; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  #desk-addr { font-weight: 600; }
+  #desk-qr-box { margin: 0; }
+  #desk-qr { display: block; width: 136px; height: 136px; image-rendering: pixelated; border-radius: 4px; }
+  #desk-presenter { color: var(--text-2); }
+  #desk-presenter[data-on="true"] { color: var(--ok); }
+  .code-actions { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 8px; }
+
+  /* On the TV now. */
+  #tv .label, .code-card .label { margin-bottom: 4px; }
+  .tv-main { display: flex; gap: 8px; align-items: center; font-weight: 600; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-2); flex: none; }
+  #tv[data-online="true"] .dot { background: var(--ok); }
+  .tv-sub { color: var(--text-2); margin-top: 2px; }
+  .controls { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  #press-note { margin-top: 12px; }
+
+  /* Search results, pictures, ready files. */
+  .results { list-style: none; margin: 8px 0 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 8px; }
+  .results:empty { display: none; }
+  .result { width: 100%; justify-content: flex-start; gap: 12px; padding: 6px; text-align: left; }
+  .result img { width: 96px; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 4px; flex: none; }
+  .result b { display: block; font-weight: 600; }
+  .result span { color: var(--text-2); font-size: 12px; }
+  .thumbs { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px; margin-top: 12px; }
+  .thumb { aspect-ratio: 4 / 3; padding: 0; overflow: hidden; }
+  .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .thumb[aria-pressed="true"] { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .ready { margin-top: 12px; padding: 8px 12px; border: 1px solid var(--stroke); border-radius: 4px; display: flex; gap: 12px; align-items: center; justify-content: space-between; }
+
+  /* The slides on the TV (preview.js): this one, the next, every slide. */
+  .slides { margin-top: 12px; }
+  .slide-now { position: relative; aspect-ratio: 16 / 9; background: #000; border-radius: 4px; overflow: hidden; }
+  .slide-now canvas, .slide-next canvas { display: block; width: 100%; height: 100%; object-fit: contain; }
+  .slides[data-preview="none"] .slide-now, .slides[data-preview="none"] .slide-next, .slides[data-preview="none"] .strip { display: none; }
+  .slides[data-preview="loading"] .slide-now::after { content: 'Loading the slides…'; position: absolute; inset: 0; display: grid; place-items: center; color: #fff; }
+  .slide-row { display: grid; grid-template-columns: 45% 1fr; gap: 12px; margin-top: 8px; align-items: start; }
+  .slides[data-preview="none"] .slide-row { grid-template-columns: 1fr; }
+  .slide-next canvas { aspect-ratio: 16 / 9; background: var(--subtle); border-radius: 4px; }
+  .slide-cap { display: block; color: var(--text-2); font-size: 12px; margin-bottom: 4px; }
+  .slide-endword { display: none; aspect-ratio: 16 / 9; place-items: center; border: 1px dashed var(--stroke-strong); border-radius: 4px; color: var(--text-2); font-size: 12px; }
+  .slide-next[data-end="true"] canvas { display: none; }
+  .slide-next[data-end="true"] .slide-endword { display: grid; }
+  .slide-buttons { display: grid; gap: 8px; }
+  .slide-label { font-weight: 600; font-variant-numeric: tabular-nums; }
+  .strip { display: flex; gap: 6px; overflow-x: auto; margin-top: 8px; padding-bottom: 6px; }
+  .strip-slide { position: relative; flex: none; width: 96px; padding: 0; overflow: hidden; }
+  .strip-slide canvas { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: contain; }
+  .strip-slide span { position: absolute; left: 3px; bottom: 3px; padding: 0 4px; border-radius: 2px; background: rgba(0, 0, 0, .7); color: #fff; font-size: 11px; }
+  .strip-slide[aria-current="true"] { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+  /* Not in the app: a calm note. */
+  #desk-off { max-width: 520px; margin: 15vh auto 0; }
+  #desk-off h1 { margin-bottom: 8px; }
+  #desk-off p + p { margin-top: 12px; }
+
+  /* Smaller windows: the code and the TV go above. */
+  @media (max-width: 1100px) {
+    .cols { grid-template-columns: 180px minmax(0, 1fr); }
+    .side { grid-column: 1 / -1; grid-row: 1; flex-direction: row; overflow: visible; }
+    .side > .card { flex: 1; }
+  }
+
+  /* High contrast (forced colors): Windows' own colours, every control outlined. */
+  @media (forced-colors: active) {
+    .card, button, .file-pick, input, textarea { border: 1px solid CanvasText; }
+    .primary { background: Highlight; color: HighlightText; forced-color-adjust: none; }
+    .choice[aria-current="page"] { outline: 2px solid Highlight; }
+    .choice[aria-current="page"]::before, .dot { background: CanvasText; forced-color-adjust: none; }
+    :focus-visible { outline: 2px solid Highlight; }
+    #desk-qr { forced-color-adjust: none; }
+  }
+</style>
+</head>
+<body>
+<!-- Not in KVBC Awana: a calm note. -->
+<main id="desk-off" class="card" hidden>
+  <h1 id="desk-off-title">Open this on the lobby computer</h1>
+  <p id="desk-off-words"></p>
+  <p><b id="desk-off-addr">cast.kvbchurch.org</b></p>
+</main>
+
+<div id="desk" hidden>
+  <header class="top">
+    <h1>Cast control</h1>
+    <p>Everything a presenter can do, from this computer. A phone can present at the same time; the last thing sent wins.</p>
+  </header>
+  <div class="cols">
+    <nav aria-label="What to show">
+      <ul class="choices">
+        <li><button class="choice" type="button" aria-expanded="true" aria-current="page" aria-controls="p-video"><b>YouTube</b><span>Search, or paste a link.</span></button></li>
+        <li><button class="choice" type="button" aria-expanded="false" aria-controls="p-fb"><b>Facebook video</b><span>A public video.</span></button></li>
+        <li><button class="choice" type="button" aria-expanded="false" aria-controls="p-pdf"><b>Slides</b><span>PowerPoint, PDF, Google Slides.</span></button></li>
+        <li><button class="choice" type="button" aria-expanded="false" aria-controls="p-pics"><b>Pictures</b><span>Pictures from this computer.</span></button></li>
+        <li><button class="choice" type="button" aria-expanded="false" aria-controls="p-clip"><b>Video file</b><span>A video from this computer.</span></button></li>
+        <li><button class="choice" type="button" aria-expanded="false" aria-controls="p-text"><b>Text</b><span>A verse or an announcement.</span></button></li>
+      </ul>
+    </nav>
+
+    <main class="main">
+      <section class="panel card" id="p-video">
+        <h2>YouTube</h2>
+        <form id="yt-search-form" role="search">
+          <label for="yt-q">Search YouTube</label>
+          <div class="row">
+            <input type="search" id="yt-q" maxlength="100" autocomplete="off" placeholder="A song, a video, a channel">
+            <button class="primary" type="submit">Search</button>
+          </div>
+        </form>
+        <p class="note" id="yt-note" role="status"></p>
+        <ul class="results" id="yt-results" aria-label="Search results"></ul>
+        <div class="or">Or paste a link</div>
+        <form id="video-form">
+          <label for="video-link">YouTube link</label>
+          <input type="url" id="video-link" placeholder="https://youtu.be/…" autocomplete="off">
+          <label for="video-title">Title <span class="opt">(optional)</span></label>
+          <input type="text" id="video-title" maxlength="60">
+          <p class="controls"><button class="primary" type="submit">Play on the TV</button></p>
+          <p class="help">A link with a start time (…?t=90) starts there.</p>
+        </form>
+      </section>
+
+      <section class="panel card" id="p-fb" hidden>
+        <h2>Facebook video</h2>
+        <form id="fb-form">
+          <label for="fb-link">Facebook video link</label>
+          <input type="url" id="fb-link" placeholder="https://www.facebook.com/…/videos/…" autocomplete="off">
+          <label for="fb-title">Title <span class="opt">(optional)</span></label>
+          <input type="text" id="fb-title" maxlength="60">
+          <p class="controls"><button class="primary" type="submit">Play on the TV</button></p>
+          <p class="help">On the video, choose Share, then Copy link. Only public videos play.</p>
+        </form>
+      </section>
+
+      <section class="panel card" id="p-pdf" hidden>
+        <h2>Slides</h2>
+        <p class="controls"><label class="file-pick primary">Choose a PowerPoint or PDF…<input type="file" id="pdf-input"></label></p>
+        <label for="pdf-link">Or a Google Slides link</label>
+        <div class="row">
+          <input type="url" id="pdf-link" placeholder="https://docs.google.com/presentation/…" autocomplete="off">
+          <button class="quiet" type="button" id="pdf-copy">Get it</button>
+        </div>
+        <p class="note" id="pdf-note" role="status"></p>
+        <div class="ready" id="pdf-ready" hidden><span id="pdf-ready-words"></span><button class="primary" type="button" id="pdf-show">Show</button></div>
+        <p class="help">A PowerPoint takes about a minute to turn into slides; a PDF goes up at once. Google Slides must be shared as “Anyone with the link”. Step through the slides under On the TV.</p>
+      </section>
+
+      <section class="panel card" id="p-pics" hidden>
+        <h2>Pictures</h2>
+        <p class="controls"><label class="file-pick primary">Choose pictures…<input type="file" id="pic-input" accept="image/jpeg,image/png,image/gif,image/webp" multiple></label></p>
+        <p class="note" id="pic-note" role="status"></p>
+        <div class="thumbs" id="thumbs"></div>
+      </section>
+
+      <section class="panel card" id="p-clip" hidden>
+        <h2>Video file</h2>
+        <p class="controls"><label class="file-pick primary">Choose a video…<input type="file" id="clip-input" accept="video/mp4,video/quicktime,video/webm,.mp4,.mov,.m4v,.webm"></label></p>
+        <p class="note" id="clip-note" role="status"></p>
+        <div class="ready" id="clip-ready" hidden><span id="clip-ready-words"></span><button class="primary" type="button" id="clip-show">Play</button></div>
+        <p class="help">MP4, MOV or WebM, up to 200 MB.</p>
+      </section>
+
+      <section class="panel card" id="p-text" hidden>
+        <h2>Text</h2>
+        <form id="text-form">
+          <label for="text-heading">Heading <span class="opt">(optional)</span></label>
+          <input type="text" id="text-heading" maxlength="60">
+          <label for="text-body">Text <span class="opt">(up to 8 lines)</span></label>
+          <textarea id="text-body" maxlength="400"></textarea>
+          <label>Look</label>
+          <div class="looks">
+            <label><input type="radio" name="look" value="page" checked> Light page</label>
+            <label><input type="radio" name="look" value="board"> White on dark</label>
+          </div>
+          <p class="controls"><button class="primary" type="submit">Show on the TV</button></p>
+        </form>
+      </section>
+    </main>
+
+    <aside class="side">
+      <section class="card code-card" aria-labelledby="code-h">
+        <div class="code-words">
+          <h2 id="code-h" class="label">Connection code</h2>
+          <p id="desk-code" aria-label="No code yet">— — —</p>
+          <p>Go to <span id="desk-addr">cast.kvbchurch.org</span></p>
+          <p id="desk-presenter" data-on="false" role="status">No presenter is connected.</p>
+        </div>
+        <figure id="desk-qr-box" hidden><canvas id="desk-qr" aria-label="QR code: open the Cast page with this code"></canvas></figure>
+        <div class="code-actions">
+          <button class="quiet" type="button" id="btn-reveal">Show the code on the TV</button>
+          <button class="quiet" type="button" id="btn-kick" disabled>Disconnect the presenter</button>
+        </div>
+      </section>
+
+      <section class="card" id="tv" data-online="false" aria-live="polite" aria-labelledby="tv-h">
+        <h2 id="tv-h" class="label">On the TV now</h2>
+        <p class="tv-main"><span class="dot" aria-hidden="true"></span><span id="tv-main">Connecting…</span></p>
+        <p class="tv-sub" id="tv-sub"></p>
+        <div class="controls" id="ctl-video" hidden>
+          <button class="quiet" type="button" data-op="seek" data-by="-10">Back 10 s</button>
+          <button class="quiet" type="button" data-op="toggle" id="btn-play">Pause</button>
+          <button class="quiet" type="button" data-op="seek" data-by="10">Ahead 10 s</button>
+          <button class="quiet" type="button" data-op="volume" data-step="-1" aria-label="Volume down">Volume −</button>
+          <button class="quiet" type="button" data-op="volume" data-step="1" aria-label="Volume up">Volume +</button>
+          <button class="quiet" type="button" data-op="mute" id="btn-mute">Mute</button>
+        </div>
+        <div class="slides" id="ctl-pdf" data-preview="none" hidden>
+          <div class="slide-now"><canvas data-slide="now" aria-hidden="true"></canvas></div>
+          <div class="slide-row">
+            <div class="slide-next" data-slide-box="next" data-end="false">
+              <span class="slide-cap">Next</span>
+              <canvas data-slide="next" aria-hidden="true"></canvas>
+              <span class="slide-endword">End of the slides</span>
+            </div>
+            <div class="slide-buttons">
+              <p class="slide-label" data-slide-label aria-live="polite">Slide 1</p>
+              <button class="quiet" type="button" data-step="-1">Back</button>
+              <button class="primary" type="button" data-step="1">Next</button>
+            </div>
+          </div>
+          <div class="strip" data-slide-strip aria-label="Every slide"></div>
+        </div>
+        <div class="controls"><button class="quiet" type="button" id="btn-down" hidden>Take it down</button></div>
+        <p class="note" id="press-note" role="status"></p>
+      </section>
+    </aside>
+  </div>
+</div>
+<script type="module" src="desk.js"></script>
+</body>
+</html>

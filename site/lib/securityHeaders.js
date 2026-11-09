@@ -50,18 +50,20 @@ export function inlineScriptHashes(html, sha256b64) {
 
 /**
  * The TV pages' Content-Security-Policy.
- * @param {{ origin: string, scriptHashes?: string[], facebook?: boolean }} o
- *   origin = the site's https origin (where sync.json points the service).
+ * @param {{ origin: string, scriptHashes?: string[], facebook?: boolean, images?: string[] }} o
+ *   origin = the site's https origin (where sync.json points the service); images = other
+ *   https origins pictures may come from (the Cast desk: YouTube's search thumbnails).
  */
-export function tvPagePolicy({ origin, scriptHashes = [], facebook = false }) {
+export function tvPagePolicy({ origin, scriptHashes = [], facebook = false, images = [] }) {
   const u = new URL(origin);
   if (u.protocol !== 'https:' || u.origin !== origin) throw new Error(`tvPagePolicy: origin must be a bare https origin, got ${origin}`);
   for (const h of scriptHashes) if (!/^'sha256-[A-Za-z0-9+/]{43}='$/.test(h)) throw new Error(`tvPagePolicy: bad script hash ${h}`);
+  for (const i of images) if (!/^https:\/\/[a-z0-9.-]+$/.test(i)) throw new Error(`tvPagePolicy: images must be bare https origins, got ${i}`);
   return [
     "default-src 'self'",
     ['script-src', "'self'", CDNJS, 'https://www.youtube.com', ...scriptHashes].join(' '),
     "style-src 'self' 'unsafe-inline'",
-    "img-src 'self' data: blob:",
+    ['img-src', "'self'", 'data:', 'blob:', ...images].join(' '),
     "font-src 'self' data:",
     "media-src 'self' blob:",
     `connect-src 'self' ${u.origin} wss://${u.host} ${CDNJS}`,

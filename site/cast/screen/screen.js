@@ -39,12 +39,12 @@
 import * as R from '../shared/classroomRemote.js';
 import { CONNECT_WAIT_MS, answerShare } from '../shared/screenShare.js';
 import { addressWords, presenterUrl } from '../logic.js';
+import { drawQrCode } from '../qr.js';
 
 const SESSION_KEY = 'awanaSyncSession.v1';
 const SESSION_RE = /^v1\.\d+\.\d+\.[A-Za-z0-9_-]{20,}$/;
 const PDFJS = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/';
 const YT_API = 'https://www.youtube.com/iframe_api';
-const QR_LIB = 'https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js';
 // Fingerprints of the exact files (subresource integrity, owner 2026-11-09: refuse an
 // altered copy if the CDN were ever tampered with). Checked against cdnjs's own
 // published sha512s; change them together with the version above.
@@ -56,7 +56,6 @@ async function pdfWorkerUrl() {
   if (!res.ok) throw new Error('pdf.js worker');
   return URL.createObjectURL(new Blob([await res.text()], { type: 'text/javascript' }));
 }
-const QR_LIB_SRI = 'sha512-ZDSPMa/JM1D+7kdg2x3BsruQ6T/JpJo3jWDWkCZsP+5yVyp1KfESqLI+7RqB5k24F7p2cV7i2YHh/890y6P6Sw==';
 const T = Object.assign({
   pollMs: 30000, reportVideoMs: 10000, timeoutMs: 10000, fadeMs: 450,
   pingMs: 25000, silentMs: 70000, retryMinMs: 2000, retryMaxMs: 60000,
@@ -139,23 +138,6 @@ function drawCode() {
 
 /* ── The QR code: the presenter page with the code in it ── */
 
-let qrLib = null;
-function qrcodeLib() {
-  if (window.castQr) return Promise.resolve(window.castQr);
-  if (!qrLib) {
-    qrLib = new Promise((ok, no) => {
-      const sc = document.createElement('script');
-      sc.src = QR_LIB;
-      sc.integrity = QR_LIB_SRI;
-      sc.crossOrigin = 'anonymous';
-      sc.onload = () => (typeof window.qrcode === 'function' ? ok(window.qrcode) : no(new Error('qr')));
-      sc.onerror = () => { qrLib = null; no(new Error('qr')); };
-      document.head.append(sc);
-    });
-  }
-  return qrLib;
-}
-
 /** Where the QR sends a phone (the code in the fragment: never sent to a server). @param {string} d */
 export function qrUrl(d) {
   return `${presenterUrl(location.href)}#code=${d}`;
@@ -165,22 +147,9 @@ async function drawQr(d) {
   const box = $('qr');
   if (!d) { box.hidden = true; return; }
   try {
-    const qrcode = await qrcodeLib();
-    if (code !== d) return;
-    const q = qrcode(0, 'M');
-    q.addData(qrUrl(d));
-    q.make();
-    const n = q.getModuleCount();
-    const quiet = 2;
-    const canvas = $('qr-canvas');
-    const px = Math.max(4, Math.floor(512 / (n + quiet * 2)));
-    canvas.width = canvas.height = px * (n + quiet * 2);
-    const ctx = canvas.getContext('2d');
     // White on black, like the screen around it (phone cameras read light-on-dark codes).
-    ctx.fillStyle = '#000000';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = '#FFFFFF';
-    for (let r = 0; r < n; r += 1) for (let col = 0; col < n; col += 1) if (q.isDark(r, col)) ctx.fillRect((col + quiet) * px, (r + quiet) * px, px, px);
+    await drawQrCode($('qr-canvas'), qrUrl(d), { dark: '#FFFFFF', light: '#000000' });
+    if (code !== d) return;
     box.hidden = false;
   } catch {
     box.hidden = true;
