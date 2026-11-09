@@ -5,6 +5,7 @@
 
 const lazy = require('./lazy');
 const events  = require('../events');
+const security = require('../security');
 const fs    = require('fs');
 const $config = lazy('./config');
 const $eventBuffer = lazy('./event-buffer');
@@ -29,7 +30,10 @@ app.post('/canary', async (req, res) => {
       firstName: canaryName, lastName: '', clubName: 'Test', testBanner: true,
     });
     pngPath = result.pngPath;
-    const printerName = (req.body && req.body.printerName && String(req.body.printerName).trim()) || $config.PRINTER_NAME;
+    const asked = (req.body && req.body.printerName && String(req.body.printerName).trim()) || '';
+    // The one printer-name rule (security.isSafePrinterName); http.js refuses it first.
+    if (!security.isSafePrinterName(asked)) throw new Error('invalid printer name');
+    const printerName = asked || $config.PRINTER_NAME;
     // Startup chirp (#12): the morning test print announces itself with a
     // two-second motor melody. Failure is swallowed inside — the canary's
     // job is the label and the pipe, never the music.

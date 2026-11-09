@@ -8,6 +8,7 @@ const fs    = require('fs');
 const $config = lazy('./config');
 const $images = lazy('./images');
 const $printing = lazy('./printing');
+const $customPdf = lazy('./custom-pdf');
 
 // What other modules (and server.js) read from this one; live bindings, so cycles are safe.
 Object.defineProperties(exports, {
@@ -90,10 +91,13 @@ function sendRawToPrinter(bytes, printerName) {
 }
 
 async function sendRawToPrinterNow(bytes, printerName) {
+  // The printer name and the file path ride in environment variables read with $env:
+  // (10.14.0), never in the script text; a name outside the one rule is refused.
+  if (!$customPdf.isSafePrinterName(printerName || '')) {
+    throw new Error('Refused: the printer name has characters a printer name never has.');
+  }
   const binPath = $images.tmpFilePath('awana-tune', 'bin');
   fs.writeFileSync(binPath, bytes);
-  const safeBin = binPath.replace(/'/g, "''");
-  const safePrinter = (printerName || '').replace(/'/g, "''");
   const ps = `
 $ErrorActionPreference = 'Stop'
 Add-Type @"
@@ -117,9 +121,9 @@ public class RawPrint {
   [DllImport("winspool.Drv")] public static extern bool WritePrinter(IntPtr h, byte[] bytes, int count, out int written);
 }
 "@
-$bytes = [System.IO.File]::ReadAllBytes('${safeBin}')
+$bytes = [System.IO.File]::ReadAllBytes($env:AWANA_TUNE_FILE)
 $h = [IntPtr]::Zero
-if (-not [RawPrint]::OpenPrinter('${safePrinter}', [ref]$h, [IntPtr]::Zero)) { throw ('OpenPrinter failed for ''${safePrinter}'', Win32 error ' + [Runtime.InteropServices.Marshal]::GetLastWin32Error()) }
+if (-not [RawPrint]::OpenPrinter($env:AWANA_TUNE_PRINTER, [ref]$h, [IntPtr]::Zero)) { throw ('OpenPrinter failed for ''' + $env:AWANA_TUNE_PRINTER + ''', Win32 error ' + [Runtime.InteropServices.Marshal]::GetLastWin32Error()) }
 try {
   $di = New-Object RawPrint+DOCINFOA
   $di.pDocName = 'Club Label Printer tune'
@@ -136,7 +140,10 @@ try {
   const psPath = $images.tmpFilePath('awana-tune', 'ps1');
   try {
     fs.writeFileSync(psPath, ps, 'utf8');
-    await $printing.runPowerShell(['-File', psPath], { timeout: 15000 });
+    await $printing.runPowerShell(['-File', psPath], {
+      timeout: 15000,
+      env: Object.assign({}, process.env, { AWANA_TUNE_PRINTER: String(printerName || ''), AWANA_TUNE_FILE: binPath }),
+    });
   } finally {
     fs.unlink(psPath, () => {});
     fs.unlink(binPath, () => {});

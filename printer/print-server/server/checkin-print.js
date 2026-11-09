@@ -6,6 +6,7 @@
 const lazy = require('./lazy');
 const events  = require('../events');
 const feeds   = require('../feeds');
+const security = require('../security');
 const tonightRules = require('../tonight');
 const {
   REPORT_FRESH_MS, normalizedName, displayClub, splitFullName, historyIdentityKey, reportEntryIdentityKey,
@@ -81,6 +82,10 @@ async function performCheckinPrint(input) {
   // arbitrary name and club.
   const isDemo = demo === true || demo === 'true' || $configRoutes.isRehearsalActive();
 
+  // The one printer-name rule (security.isSafePrinterName) on the job body's printer.
+  if (printerName != null && (typeof printerName !== 'string' || !security.isSafePrinterName(printerName.trim()))) {
+    return { status: 400, body: { error: 'invalid printer name' } };
+  }
   const effectivePrinter = (printerName && printerName.trim()) ? printerName.trim() : $config.PRINTER_NAME;
 
   // Duplicate check-in retry (client timeout/retry, double-tap, overlapping

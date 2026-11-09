@@ -330,7 +330,27 @@ function pruneHistoryByAge(history, retentionDays, now) {
   });
 }
 
+// ── The printer-name rule (the ONE rule every entry and every shell-out shares) ──
+// A printer name is operator data that reaches PowerShell. Since 10.14.0 it never goes
+// INTO script text (it rides in an environment variable read with $env:), and on top of
+// that every entry (job bodies, POST /config, the saved config, history rows) holds it to
+// this allowlist: letters (accented too), digits, space and - _ . ( ) # , \ / : only, at
+// most 128 characters. Quotes of every kind (ASCII and the curly ones PowerShell also
+// treats as quotes), backticks, $ ; | & < > and control characters are refused outright,
+// never escaped. Windows names printers "Brother QL-820NWB", "Star TSP100 Cutter
+// (TSP143)", "\\server\Label Printer": all inside the rule.
+const PRINTER_NAME_MAX = 128;
+const PRINTER_NAME_RE = /^[\p{L}\p{M}\p{N} \-_.()#,\\/:]+$/u;
+function isSafePrinterName(name) {
+  const s = String(name == null ? '' : name);
+  if (!s) return true;                       // empty = "use the default"
+  if (s.length > PRINTER_NAME_MAX) return false;
+  return PRINTER_NAME_RE.test(s);
+}
+
 module.exports = {
+  isSafePrinterName,
+  PRINTER_NAME_MAX,
   hasControlChars,
   stripControlChars,
   isLoopbackAddress,

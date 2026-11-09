@@ -55,9 +55,10 @@ if [ -f "${binDir}/slow" ]; then sleep 1; fi
 f=""
 for a in "$@"; do case "$a" in *.ps1) f="$a";; esac; done
 if [ -n "$f" ] && grep -q 'PrintDocument' "$f" 2>/dev/null; then
-  if grep -q "PrinterName = 'Broken'" "$f"; then echo "printer error" >&2; exit 1; fi
-  name=$(sed -n "s/.*PrinterName = '\\([^']*\\)'.*/\\1/p" "$f" | head -1)
-  echo "job \${name:-default}" >> ${spoolLog}
+  # 10.14.0: the printer name rides in AWANA_LABEL_PRINTER, never in the script.
+  if [ "$AWANA_LABEL_PRINTER" = "Broken" ]; then echo "printer error" >&2; exit 1; fi
+  if [ -n "$AWANA_LABEL_PRINTER" ] && grep -qF "$AWANA_LABEL_PRINTER" "$f"; then echo "name in script" >> ${binDir}/leak.log; fi
+  echo "job \${AWANA_LABEL_PRINTER:-default}" >> ${spoolLog}
 fi
 exit 0
 `, { mode: 0o755 });
@@ -119,6 +120,35 @@ exit 0
 
     r = await post('/config', { backupPrinterName: 'x" ; calc' });
     check('a backup printer name with shell characters is refused', r.status === 400);
+  }
+
+  origLog('label printer: printer names never reach PowerShell script text (10.14.0)');
+  {
+    useConfig({ printerName: 'Fake', backupPrinterName: '' });
+    // U+2019 ends a PowerShell single-quoted string just like ' does.
+    const curly = "Fake’; Start-Process calc.exe; ’";
+    const n = jobs().length;
+    for (const p of ['/print-custom', '/print', '/canary', '/print-award', '/print-oneoff', '/reprint']) {
+      const r = await post(p, { text: 'X', firstName: 'Ava', lastName: 'Stone', clubName: 'Sparks', award: 'A', printerName: curly });
+      check(`${p} refuses a printer name with a curly quote (U+2019)`, r.status === 400, `${r.status} ${JSON.stringify(r.body)}`);
+    }
+    let r = await post('/config', { printerName: curly });
+    check('POST /config refuses a printerName with a curly quote', r.status === 400, String(r.status));
+    r = await post('/config', { backupPrinterName: 'Backup‘x' });
+    check('POST /config refuses a backupPrinterName with a curly quote', r.status === 400, String(r.status));
+    check('nothing printed for any refused name', jobs().length === n, JSON.stringify(jobs().slice(n)));
+    check('the refused name was never saved', !JSON.stringify(JSON.parse(fs.readFileSync(cfgPath, 'utf8'))).includes('’'));
+
+    // A real name with an accented letter prints, and the script never holds it.
+    r = await post('/print-custom', { text: 'Accent', printerName: 'Nyomtató ő' });
+    check('a printer name with ő prints on that printer', r.status === 200 && jobs()[jobs().length - 1] === 'job Nyomtató ő', `${r.status} ${JSON.stringify(jobs().slice(-1))}`);
+    check('and the printer name was in no PowerShell script', !fs.existsSync(path.join(binDir, 'leak.log')));
+
+    // A saved name outside the rule (an old or hand-edited config.json) is never used.
+    server.setPrinterName(curly);
+    r = await post('/print-custom', { text: 'Saved bad' });
+    check('a saved printer name with a curly quote is ignored (default printer)', r.status === 200 && jobs()[jobs().length - 1] === 'job default', JSON.stringify(jobs().slice(-1)));
+    server.setPrinterName('Fake');
   }
 
   origLog('label printer: nothing is left of the receipt-printer trial');

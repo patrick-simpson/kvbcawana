@@ -428,6 +428,45 @@ console.log('isSafePrinterName — a printer name reaches PowerShell, so it is v
   check('ACCEPTS a name with spaces and a dash', isSafePrinterName('HP LaserJet 400 - Office') === true);
   check('ACCEPTS empty, meaning use the default printer', isSafePrinterName('') === true);
   check('ACCEPTS null/undefined as empty', isSafePrinterName(null) === true && isSafePrinterName(undefined) === true);
+  // 10.14.0: an ALLOWLIST. Windows PowerShell also ends a single-quoted string at the
+  // curly quotes U+2018-U+201B, so escaping ASCII ' was never enough.
+  for (const [cp, q] of [['U+2018', '‘'], ['U+2019', '’'], ['U+201A', '‚'], ['U+201B', '‛'], ['U+201C', '“'], ['U+201D', '”']]) {
+    check(`rejects the curly quote ${cp} breakout payload`, isSafePrinterName(`x${q}; Start-Process calc.exe; ${q}y`) === false);
+    check(`rejects a lone ${cp}`, isSafePrinterName(`Bob${q}s printer`) === false);
+  }
+  check('rejects an ampersand', isSafePrinterName('P & L') === false);
+  check('rejects angle brackets', isSafePrinterName('a<b>c') === false);
+  check('rejects a tab', isSafePrinterName('a\tb') === false);
+  check('rejects a dollar sign alone', isSafePrinterName('Cost$aver') === false);
+  check('rejects a line separator', isSafePrinterName('a b') === false);
+  check('ACCEPTS accented letters (ő, é, ñ)', isSafePrinterName('Nyomtató Kőbánya é ñ') === true);
+  check('ACCEPTS a network printer path', isSafePrinterName('\\\\CHURCH-PC\\Label Printer') === true);
+  check('ACCEPTS # , / : _ .', isSafePrinterName('Room #4, Floor 1/2: QL_820.v2') === true);
+  check('ACCEPTS 128 characters, refuses 129', isSafePrinterName('x'.repeat(128)) === true && isSafePrinterName('x'.repeat(129)) === false);
+}
+
+console.log('printer names never go INTO PowerShell script text (10.14.0)');
+{
+  // Every script and -Command the label path runs is fixed text; the printer name and the
+  // image path ride in environment variables. Pinned on the source: no template slot in
+  // a PowerShell string may name a printer or a path.
+  const fsx = require('fs');
+  const pathx = require('path');
+  const srcOf = (f) => fsx.readFileSync(pathx.join(__dirname, '..', 'print-server', 'server', f), 'utf8');
+  const printingSrc = srcOf('printing.js');
+  for (const k of ['LABEL_SCRIPT', 'LABELS_SCRIPT']) {
+    const m = printingSrc.match(new RegExp(`const ${k} = \`([^\`]*(?:\\\\\`[^\`]*)*)\``));
+    check(`printing.js ${k} is fixed text (no \${...} slot)`, m && !m[1].includes('${'), m ? '' : 'script not found');
+    check(`printing.js ${k} reads the printer from $env:AWANA_LABEL_PRINTER`, m && m[1].includes('$env:AWANA_LABEL_PRINTER'));
+  }
+  check('printing.js backup check reads the name from the environment',
+    /Where-Object \{ \$_\.Name -eq \$env:AWANA_BACKUP_PRINTER \}/.test(printingSrc));
+  const tunesSrc = srcOf('tunes.js');
+  const tune = tunesSrc.match(/const ps = `([\s\S]*?)`\.trim\(\);/);
+  check('tunes.js raw-print script is fixed text (no ${...} slot)', tune && !tune[1].includes('${'));
+  for (const [f, src] of [['printing.js', printingSrc], ['tunes.js', tunesSrc]]) {
+    check(`${f}: no ASCII-quote escaping left (the name is never in script text)`, !/replace\(\/'\/g, "''"\)/.test(src));
+  }
 }
 
 console.log('packaging — every print-server module must ship inside the Windows app');

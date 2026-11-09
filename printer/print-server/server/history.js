@@ -114,7 +114,10 @@ function loadHistory() {
   // existing over-long file shrinks on the next run. A fresh array each call,
   // so a caller that unshifts into its copy never edits the cache behind the
   // next caller's back.
-  return security.pruneHistoryByAge(rows, $config.config.historyRetentionDays, Date.now());
+  // The one printer-name rule on the way OUT too (10.14.0): a reprint uses a row's printer,
+  // so a row whose printer is not a printer name (an old or hand-edited file) reads as none.
+  return security.pruneHistoryByAge(rows, $config.config.historyRetentionDays, Date.now())
+    .map((e) => (e && e.printer && !security.isSafePrinterName(e.printer) ? Object.assign({}, e, { printer: '' }) : e));
 }
 
 function saveHistory(entries) {
@@ -248,7 +251,7 @@ function addHistoryEntry(entry) {
     // URL (small) rides along as it always did.
     clubIcon: rememberClubIcon(entry.clubImageData),
     clubImageData: typeof entry.clubImageData === 'string' && !entry.clubImageData.startsWith('data:') ? entry.clubImageData : null,
-    printer: security.sanitizeStoredText(entry.printer || ''),
+    printer: security.isSafePrinterName(entry.printer || '') ? security.sanitizeStoredText(entry.printer || '') : '',
     success: entry.success,
     visitor: !!entry.visitor,
     // Award slips (POST /print-award) are flagged so they never masquerade

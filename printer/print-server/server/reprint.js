@@ -120,7 +120,10 @@ async function reprintRow(entry, printerName, opts = {}) {
   if (entry.isAward || entry.isConnectCard) {
     return { ok: false, name: fullName, error: 'not a check-in label' };
   }
-  const effectivePrinter = (printerName && printerName.trim()) || entry.printer || $config.PRINTER_NAME;
+  // A row's printer is used only when it passes the one printer-name rule.
+  const rowPrinter = $customPdf.isSafePrinterName(entry.printer || '') ? entry.printer : '';
+  const askedPrinter = typeof printerName === 'string' && $customPdf.isSafePrinterName(printerName.trim()) ? printerName.trim() : '';
+  const effectivePrinter = askedPrinter || rowPrinter || $config.PRINTER_NAME;
   const silent = opts.silent === true;
 
   // A one-off name tag reprinted from the print log stays a one-off: the
@@ -393,6 +396,9 @@ app.post('/print-award', async (req, res) => {
   const awardText = String(award == null ? '' : award).trim();
   if (!awardText) return res.status(400).json({ error: 'award is required' });
 
+  if (printerName != null && (typeof printerName !== 'string' || !$customPdf.isSafePrinterName(printerName.trim()))) {
+    return res.status(400).json({ error: 'invalid printer name' });
+  }
   const effectivePrinter = (printerName && printerName.trim()) ? printerName.trim() : $config.PRINTER_NAME;
 
   // Duplicate suppression keyed on name+award (NOT name alone) — a child can

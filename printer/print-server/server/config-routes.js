@@ -309,7 +309,12 @@ app.post('/config', (req, res) => {
   if (refuseChurchManaged(req, res, Object.keys(req.body || {}).filter(k => req.body[k] !== undefined))) return;
   try {
     const next = $config.loadConfigFile();
-    if (printerName !== undefined) next.printerName = printerName;
+    if (printerName !== undefined) {
+      // The one printer-name rule (security.isSafePrinterName): never persisted unsafe.
+      const pn = String(printerName == null ? '' : printerName).trim();
+      if (!$customPdf.isSafePrinterName(pn)) return res.status(400).json({ error: 'printerName contains unsupported characters' });
+      next.printerName = pn;
+    }
     // checkinUrl is handed to shell.openExternal() (Electron), so an unvalidated value was an arbitrary URI aimed at
     // the Windows shell. Same reasoning as worksheetPrinter below: refuse to PERSIST
     // anything unsafe, so it can never be poisoned once and fire later.

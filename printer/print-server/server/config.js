@@ -4,6 +4,7 @@
 // file ran them). Another module's names are reached as $module.name.
 
 const events  = require('../events');
+const security = require('../security');
 const fs    = require('fs');
 const path  = require('path');
 const SERVER_DIR = path.join(__dirname, '..'); // print-server/, where server.js lives
@@ -47,10 +48,20 @@ const PORT         = Number(process.env.AWANA_PORT) || 3456;
 // printer name would be frozen at whatever it was on FIRST load — which is
 // empty when the server now starts before first-time setup. setPrinterName()
 // lets the shell push the newly saved printer into the live module.
-let PRINTER_NAME = process.env.PRINTER_NAME || '';
+let PRINTER_NAME = '';
 function setPrinterName(name) {
-  PRINTER_NAME = (name == null ? '' : String(name)).trim();
+  const s = (name == null ? '' : String(name)).trim();
+  // The one printer-name rule (security.isSafePrinterName): a saved name outside it
+  // (an old or hand-edited config.json) is never used; labels go to the default printer
+  // and /health's printer check says the printer is not set.
+  if (!security.isSafePrinterName(s)) {
+    console.warn('[config] Ignored the saved printer name: it has characters a printer name never has');
+    PRINTER_NAME = '';
+    return;
+  }
+  PRINTER_NAME = s;
 }
+setPrinterName(process.env.PRINTER_NAME || '');
 const SERVER_VERSION = require('../package.json').version;
 
 // ── Writable data directory ───────────────────────────────────────────────────

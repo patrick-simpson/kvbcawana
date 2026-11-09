@@ -27,8 +27,7 @@ const PORT = Number(process.env.AWANA_TEST_PORT || require('./free-port.cjs')())
   const timeLog = path.join(binDir, 'times.log');
   fs.writeFileSync(path.join(binDir, 'powershell'), `#!/bin/sh
 if [ -f "${binDir}/slow" ]; then
-  f=""; for a in "$@"; do case "$a" in *.ps1) f="$a";; esac; done
-  p=$(sed -n "s/.*PrinterName = '\\([^']*\\)'.*/\\1/p" "$f" 2>/dev/null | head -1)
+  p="$AWANA_LABEL_PRINTER"
   echo "start $(date +%s%N) $p" >> ${timeLog}; sleep 0.4; echo "end $(date +%s%N) $p" >> ${timeLog}
 fi
 echo job >> ${jobLog}

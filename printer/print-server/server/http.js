@@ -182,6 +182,25 @@ function isBusy() {
 // extension's /print-pdf worksheets, carried a larger body of its own.)
 app.use(express.json({ limit: '2mb' }));
 
+// ── Printer names at the door (10.14.0) ──────────────────────────────────────
+// Every route that takes a printer name (the job bodies the station leases, POST /config,
+// the test-label and queue tools) is held to the ONE rule here, before any handler sees
+// it: a printerName or backupPrinterName outside security.isSafePrinterName is refused.
+// The routes keep their own checks; printing.js refuses an unsafe name again.
+const PRINTER_NAME_KEYS = ['printerName', 'backupPrinterName'];
+app.use((req, res, next) => {
+  const b = req.body;
+  if (!b || typeof b !== 'object') return next();
+  for (const key of PRINTER_NAME_KEYS) {
+    if (b[key] === undefined || b[key] === null) continue;
+    if (typeof b[key] !== 'string' || !security.isSafePrinterName(b[key].trim())) {
+      console.warn(`[security] Refused ${req.method} ${req.path}: ${key} has characters a printer name never has`);
+      return res.status(400).json({ error: `${key} contains unsupported characters` });
+    }
+  }
+  return next();
+});
+
 // ── The loopback gate ────────────────────────────────────────────────────────
 // Online only (owner, 2026-10-11): this server answers the computer it runs on
 // and nobody else. startListening() binds 127.0.0.1, so no other machine can

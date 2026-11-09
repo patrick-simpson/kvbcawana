@@ -94,22 +94,7 @@ app.post('/print-custom', async (req, res) => {
 });
 
 // ── The printer-name rule ─────────────────────────────────────────────────────
-// A printer name is operator data that reaches a shell. Windows printer names
-// are plain labels ("Brother QL-820NWB", "HP LaserJet (Office)"), so anything
-// carrying quotes, shell metacharacters, or control characters is not a printer
-// name — it is an injection attempt or corrupt config. Refuse it outright
-// rather than try to escape it.
-const PRINTER_NAME_MAX = 120;
-function isSafePrinterName(name) {
-  const s = String(name == null ? '' : name);
-  if (!s) return true;                       // empty = "use the default"
-  if (s.length > PRINTER_NAME_MAX) return false;
-  // eslint-disable-next-line no-control-regex
-  if (/[\x00-\x1f\x7f]/.test(s)) return false;
-  // Parentheses are allowed: Windows names printers "Star TSP100 Cutter
-  // (TSP143)", "... (Copy 1)", "... (redirected 2)", and every place a name
-  // reaches PowerShell it is inside a single-quoted string or an environment
-  // variable, where they are plain characters. A subexpression still needs
-  // the "$" refused here.
-  return !/["'`$;|&<>{}\[\]\\\r\n%]/.test(s);
-}
+// ONE rule, in security.js (isSafePrinterName): an allowlist every entry and every
+// shell-out shares. Re-exported here because the other modules have always asked
+// this one.
+const isSafePrinterName = security.isSafePrinterName;

@@ -134,20 +134,20 @@ function outcomeUnknownBody(e) {
   return e && e.printOutcomeUnknown === true ? { outcomeUnknown: true } : {};
 }
 
-// One label the old way: its own PowerShell, the script written to a temp .ps1.
-async function printImageScript(psPath, imagePath, printerName) {
-  // Escape single quotes in paths/names for PowerShell single-quoted strings
-  const safePath    = imagePath.replace(/'/g, "''");
-  const safePrinter = (printerName || '').replace(/'/g, "''");
-
-  const ps = `
+// The printer name (and the image paths) NEVER go into script text (10.14.0): Windows
+// PowerShell ends a single-quoted string at the curly quotes too (U+2018-U+201B), and a
+// BOM-less UTF-8 .ps1 is read in the ANSI code page, so escaping ASCII ' was not enough.
+// They ride in environment variables the script reads with $env:, exactly as
+// spooler.js does with AWANA_QUEUE_PRINTER; the scripts themselves are fixed text. And a
+// name outside the one rule (security.js isSafePrinterName) is refused before anything runs.
+const LABEL_SCRIPT = `
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Drawing
 $pd = New-Object System.Drawing.Printing.PrintDocument
-${safePrinter ? `$pd.PrinterSettings.PrinterName = '${safePrinter}'` : ''}
+if ($env:AWANA_LABEL_PRINTER) { $pd.PrinterSettings.PrinterName = $env:AWANA_LABEL_PRINTER }
 $pd.DefaultPageSettings.PaperSize = New-Object System.Drawing.Printing.PaperSize("Label", 400, 200)
 $pd.DefaultPageSettings.Margins = New-Object System.Drawing.Printing.Margins(0,0,0,0)
-$pd | Add-Member -NotePropertyName LabelImagePath -NotePropertyValue '${safePath}'
+$pd | Add-Member -NotePropertyName LabelImagePath -NotePropertyValue $env:AWANA_LABEL_IMAGE
 $pd.add_PrintPage({
   param($sender, $e)
   $img = [System.Drawing.Image]::FromFile($sender.LabelImagePath)
@@ -158,12 +158,52 @@ $pd.Print()
 $pd.Dispose()
 `.trim();
 
-  fs.writeFileSync(psPath, ps, 'utf8');
-  const result = await runPowerShell(['-File', psPath], { timeout: 15000 });
+const LABELS_SCRIPT = `
+$ErrorActionPreference = 'Stop'
+Add-Type -AssemblyName System.Drawing
+$pd = New-Object System.Drawing.Printing.PrintDocument
+if ($env:AWANA_LABEL_PRINTER) { $pd.PrinterSettings.PrinterName = $env:AWANA_LABEL_PRINTER }
+$pd.DefaultPageSettings.PaperSize = New-Object System.Drawing.Printing.PaperSize("Label", 400, 200)
+$pd.DefaultPageSettings.Margins = New-Object System.Drawing.Printing.Margins(0,0,0,0)
+$paths = @($env:AWANA_LABEL_IMAGES -split "\`n" | Where-Object { $_ })
+$pd | Add-Member -NotePropertyName LabelImagePaths -NotePropertyValue $paths
+$pd | Add-Member -NotePropertyName LabelIndex -NotePropertyValue 0
+$pd.add_PrintPage({
+  param($sender, $e)
+  $img = [System.Drawing.Image]::FromFile($sender.LabelImagePaths[$sender.LabelIndex])
+  try { $e.Graphics.DrawImage($img, 0, 0, $e.PageBounds.Width, $e.PageBounds.Height) }
+  finally { $img.Dispose() }
+  $sender.LabelIndex = $sender.LabelIndex + 1
+  $e.HasMorePages = $sender.LabelIndex -lt $sender.LabelImagePaths.Count
+})
+$pd.Print()
+$pd.Dispose()
+`.trim();
+
+// A printer name outside the one rule never reaches a PowerShell (a definite refusal:
+// nothing was sent to any printer).
+function assertSafePrinter(printerName) {
+  if (!$customPdf.isSafePrinterName(printerName || '')) {
+    throw new Error('Refused: the printer name has characters a printer name never has.');
+  }
+}
+
+function psEnv(vars) {
+  return Object.assign({}, process.env, vars);
+}
+
+// One label the old way: its own PowerShell, the fixed script written to a temp .ps1.
+async function printImageScript(psPath, imagePath, printerName) {
+  fs.writeFileSync(psPath, LABEL_SCRIPT, 'utf8');
+  const result = await runPowerShell(['-File', psPath], {
+    timeout: 15000,
+    env: psEnv({ AWANA_LABEL_PRINTER: String(printerName || ''), AWANA_LABEL_IMAGE: String(imagePath) }),
+  });
   if (result && result.trim()) console.log('[print] PowerShell:', result.trim());
 }
 
 async function printImageNow(imagePath, printerName) {
+  assertSafePrinter(printerName);
   if ($config.CUPS_BACKEND) return printImageCups(imagePath, printerName);
   let psPath = null;
   try {
@@ -200,37 +240,19 @@ async function printImageNow(imagePath, printerName) {
 // one lp with every file. No retry: half a batch printed twice is worse than
 // a clear failure the operator can press again.
 async function printImagesNow(paths, printerName) {
+  assertSafePrinter(printerName);
   if ($config.CUPS_BACKEND) {
     const id = await cups.cupsPrint(paths, printerName || '', { media: $config.config.cupsMedia });
     console.log('[print] CUPS job', id, `(${paths.length} labels)`);
     return;
   }
-  const list = paths.map((p) => `'${p.replace(/'/g, "''")}'`).join(',');
-  const safePrinter = (printerName || '').replace(/'/g, "''");
-  const ps = `
-$ErrorActionPreference = 'Stop'
-Add-Type -AssemblyName System.Drawing
-$pd = New-Object System.Drawing.Printing.PrintDocument
-${safePrinter ? `$pd.PrinterSettings.PrinterName = '${safePrinter}'` : ''}
-$pd.DefaultPageSettings.PaperSize = New-Object System.Drawing.Printing.PaperSize("Label", 400, 200)
-$pd.DefaultPageSettings.Margins = New-Object System.Drawing.Printing.Margins(0,0,0,0)
-$pd | Add-Member -NotePropertyName LabelImagePaths -NotePropertyValue @(${list})
-$pd | Add-Member -NotePropertyName LabelIndex -NotePropertyValue 0
-$pd.add_PrintPage({
-  param($sender, $e)
-  $img = [System.Drawing.Image]::FromFile($sender.LabelImagePaths[$sender.LabelIndex])
-  try { $e.Graphics.DrawImage($img, 0, 0, $e.PageBounds.Width, $e.PageBounds.Height) }
-  finally { $img.Dispose() }
-  $sender.LabelIndex = $sender.LabelIndex + 1
-  $e.HasMorePages = $sender.LabelIndex -lt $sender.LabelImagePaths.Count
-})
-$pd.Print()
-$pd.Dispose()
-`.trim();
   const psPath = $images.tmpFilePath('awana-print', 'ps1');
   try {
-    fs.writeFileSync(psPath, ps, 'utf8');
-    const result = await runPowerShell(['-File', psPath], { timeout: 15000 + 2000 * paths.length });
+    fs.writeFileSync(psPath, LABELS_SCRIPT, 'utf8');
+    const result = await runPowerShell(['-File', psPath], {
+      timeout: 15000 + 2000 * paths.length,
+      env: psEnv({ AWANA_LABEL_PRINTER: String(printerName || ''), AWANA_LABEL_IMAGES: paths.map(String).join('\n') }),
+    });
     if (result && result.trim()) console.log('[print] PowerShell:', result.trim());
   } finally {
     fs.unlink(psPath, () => {});
@@ -264,10 +286,10 @@ async function fallbackPrinterReady(name) {
   }
   if (process.platform !== 'win32') return true;
   try {
-    const safe = name.replace(/'/g, "''");
+    // The name rides in an environment variable, never in the command text.
     const raw = (await runPowerShell(
-      ['-Command', `Get-CimInstance Win32_Printer | Where-Object { $_.Name -eq '${safe}' } | Select-Object WorkOffline,PrinterStatus | ConvertTo-Json -Compress`],
-      { timeout: 8000 },
+      ['-Command', 'Get-CimInstance Win32_Printer | Where-Object { $_.Name -eq $env:AWANA_BACKUP_PRINTER } | Select-Object WorkOffline,PrinterStatus | ConvertTo-Json -Compress'],
+      { timeout: 8000, env: psEnv({ AWANA_BACKUP_PRINTER: String(name) }) },
     )).trim();
     if (!raw) return false;
     const p = JSON.parse(raw);
@@ -280,7 +302,8 @@ async function fallbackPrinterReady(name) {
 // The backup printer ("If it fails, print on", 6.26.0): set on the dashboard
 // beside the name tag printer, '' for none.
 function backupPrinter() {
-  return String($config.config.backupPrinterName || '').trim();
+  const name = String($config.config.backupPrinterName || '').trim();
+  return $customPdf.isSafePrinterName(name) ? name : '';
 }
 
 // Where labels print, in words, for the settings page (GET /printers).
