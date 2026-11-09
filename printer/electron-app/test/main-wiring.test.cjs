@@ -82,6 +82,35 @@ describe('the repair installer download', () => {
   });
 });
 
+describe('the status window is locked to its own page (10.14.0)', () => {
+  const statusPreload = fs.readFileSync(path.join(__dirname, '..', 'preload.js'), 'utf8');
+  const channels = [...statusPreload.matchAll(/ipcRenderer\.invoke\('([^']+)'/g)].map((m) => m[1]);
+  it('every channel its preload calls is registered through the sender check', () => {
+    assert.ok(channels.length >= 9, channels.join(','));
+    for (const c of channels) {
+      assert.ok(main.includes(`statusHandle('${c}', `), `${c} goes through statusHandle`);
+      assert.ok(!main.includes(`ipcMain.handle('${c}'`), `${c} is not registered without the check`);
+    }
+  });
+  it('the check is the status window\'s own top frame on the app\'s own page', () => {
+    assert.match(main, /event\.sender !== setupWindow\.webContents\) return false;/);
+    assert.match(main, /if \(frame && frame\.parent\) return false;/);
+    assert.match(main, /url\.startsWith\('file:'\) \|\| \(isDev && url\.startsWith\('http:\/\/localhost:5173\/'\)\)/);
+  });
+  it('it cannot navigate, opens no window of its own, and is sandboxed', () => {
+    const i = main.indexOf('function createSetupWindow');
+    const body = main.slice(i, main.indexOf('// ─── Tray', i));
+    assert.match(body, /sandbox: true/);
+    assert.match(body, /swc\.on\('will-navigate', \(event, url\) => \{\n    event\.preventDefault\(\);/);
+    assert.match(body, /swc\.setWindowOpenHandler\(/);
+    assert.match(body, /return \{ action: 'deny' \};/);
+  });
+  it('the preload needs nothing a sandboxed preload lacks', () => {
+    const requires = [...statusPreload.matchAll(/require\('([^']+)'\)/g)].map((m) => m[1]);
+    assert.deepEqual(requires, ['electron']);
+  });
+});
+
 describe('the hidden printer window', () => {
   it('is made again after a crash, and every use goes through getPdfWindow', () => {
     assert.match(main, /function getPdfWindow\(\) \{\n  if \(!pdfWindow \|\| pdfWindow\.isDestroyed\(\)\) createPdfWindow\(\);/);

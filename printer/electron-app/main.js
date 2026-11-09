@@ -397,8 +397,22 @@ function createSetupWindow() {
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
-      nodeIntegration: false
+      nodeIntegration: false,
+      // The preload uses only contextBridge and ipcRenderer, which a sandboxed preload has.
+      sandbox: true
     }
+  });
+
+  // Locked to its own page (10.14.0): the status window never navigates anywhere else
+  // and never opens a window of its own; an https link goes to the system browser.
+  const swc = setupWindow.webContents;
+  swc.on('will-navigate', (event, url) => {
+    event.preventDefault();
+    if (isSafeExternalUrl(url) && /^https:/i.test(url)) shell.openExternal(url);
+  });
+  swc.setWindowOpenHandler(({ url }) => {
+    if (isSafeExternalUrl(url) && /^https:/i.test(url)) shell.openExternal(url);
+    return { action: 'deny' };
   });
 
   if (isDev) {
@@ -890,7 +904,32 @@ async function ensureServerRunning(context) {
 
 // ─── IPC handlers ─────────────────────────────────────────────────────────────
 
-ipcMain.handle('get-printers', async () => {
+// The status window's calls (preload.js) answer the status window alone (10.14.0):
+// the caller must be that window's own top frame, showing the app's own page (file:,
+// or the Vite dev server in development). Anything else (another window, an iframe,
+// a page it was somehow navigated to) gets nothing: get-config carries the sign-in.
+const STATUS_DENIED = {
+  'get-printers': () => [],
+  'get-config': () => null,
+};
+function fromStatusWindow(event) {
+  if (!setupWindow || setupWindow.isDestroyed() || event.sender !== setupWindow.webContents) return false;
+  const frame = event.senderFrame;
+  if (frame && frame.parent) return false;
+  const url = String((frame && frame.url) || event.sender.getURL() || '');
+  return url.startsWith('file:') || (isDev && url.startsWith('http://localhost:5173/'));
+}
+function statusHandle(channel, fn) {
+  ipcMain.handle(channel, (event, ...args) => {
+    if (!fromStatusWindow(event)) {
+      console.warn(`[security] Refused ${channel} from a page that is not the status window`);
+      return (STATUS_DENIED[channel] || (() => ({ ok: false, error: 'not allowed' })))();
+    }
+    return fn(event, ...args);
+  });
+}
+
+statusHandle('get-printers', async () => {
   try {
     // Use Electron's built-in printer enumeration — no subprocess, always works
     const printers = await getPdfWindow().webContents.getPrintersAsync();
@@ -900,9 +939,9 @@ ipcMain.handle('get-printers', async () => {
   }
 });
 
-ipcMain.handle('get-config', () => loadConfig());
+statusHandle('get-config', () => loadConfig());
 
-ipcMain.handle('save-config', (event, rawPatch) => {
+statusHandle('save-config', (event, rawPatch) => {
   // Only the wizard's own keys, of the right type, ever reach config.json.
   const patch = configStore.wizardPatch(rawPatch);
   // Act on the MERGED config, not the renderer's patch — startServer needs the
@@ -923,26 +962,26 @@ ipcMain.handle('save-config', (event, rawPatch) => {
   return { success: true, config };
 });
 
-ipcMain.handle('open-checkin-page', (event, url) => {
+statusHandle('open-checkin-page', (event, url) => {
   // Renderer-supplied URL: same validation, same reason.
   openExternalSafely(url, 'open-checkin-page IPC');
 });
 
-ipcMain.handle('get-server-state', () => ({
+statusHandle('get-server-state', () => ({
   ...serverState,
   version: app.getVersion(),
   update: updateState,
 }));
 
 // The status window's Settings button (and the tray's): the one settings page.
-ipcMain.handle('open-settings', () => openExternalSafely(SETTINGS_URL, 'status window'));
+statusHandle('open-settings', () => openExternalSafely(SETTINGS_URL, 'status window'));
 
-ipcMain.handle('install-update', () => { installUpdateNow(); return { ok: true }; });
+statusHandle('install-update', () => { installUpdateNow(); return { ok: true }; });
 
 // The Settings window's "Start Server" button. Unconditional restart rather
 // than probe-first: the person clicking it believes the server is down, and a
 // restart of a healthy server is cheap and harmless.
-ipcMain.handle('start-server', () => {
+statusHandle('start-server', () => {
   startServer(currentConfig || loadConfig() || {});
   return { ...serverState };
 });
@@ -950,7 +989,7 @@ ipcMain.handle('start-server', () => {
 // Explicit update check with a real answer. checkForUpdates() resolves after
 // the feed is fetched, so the event handlers above have already stamped
 // updateState by the time we return it.
-ipcMain.handle('check-for-updates', async () => {
+statusHandle('check-for-updates', async () => {
   if (!autoUpdater || !app.isPackaged) {
     return { supported: false, ...updateState };
   }
