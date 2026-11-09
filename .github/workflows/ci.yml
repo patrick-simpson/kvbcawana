@@ -128,7 +128,7 @@ jobs:
               esac
               case "$f" in
                 worker/src/*|worker/migrations/*|worker/test/rig.js|worker/test/helpers.js|worker/test/fixtures.js|worker/test/d1stub.js|worker/package.json|worker/package-lock.json|lobby/src/lib/calendarParse.js|lobby/src/lib/envelope.js|lobby/src/lib/settingRules.js|lobby/src/lib/sharedSettings.js|lobby/src/lib/slides.js|lobby/src/lib/syncSpecs.js|shared/journeyRemote.js|shared/text.js|shared/sync-protocol.js|shared/brand/*|shared/cloud-crypto.js|shared/cloud-vectors.json|shared/tonight.js|shared/pickup.js|shared/clubs.js|shared/clubNight.js|shared/schedule.json|shared/churchSettings.js|lobby/src/lib/printServer.js|lobby/src/components/settings/laptop*.jsx|site/build.mjs) printer=true ;;
-                lobby/*|journey/*|classroom/*|site/updates/*|.github/workflows/*) ;;
+                lobby/*|journey/*|classroom/*|site/updates/*|site/cast-site/*|.github/workflows/*) ;;  # site/cast-site: Cast's own Pages project, read by no printer suite
                 *) printer=true ;;
               esac
             done <<< "$files"
@@ -497,6 +497,8 @@ jobs:
             exit 1
           fi
           test -f site/dist/index.html && test -f site/dist/lobby/shared/sync.json && test -f site/lib/large-files.generated.js
+          # Cast's own site (cast.kvbchurch.org, site/cast-site/): the pages at its root.
+          test -f site/dist-cast/index.html && test -f site/dist-cast/screen/index.html && test -f site/dist-cast/_routes.json
           grep -q "\"url\": \"${SITE_ORIGIN%/}/api\"" site/dist/lobby/shared/sync.json || { echo "::error::The built site does not point at $SITE_ORIGIN/api."; exit 1; }
       - name: Did the Worker change?
         # Every deploy of the Worker is a new version, and a new version
@@ -613,4 +615,21 @@ jobs:
           WRANGLER=../worker/node_modules/.bin/wrangler
           $WRANGLER pages project create kvbcawana --production-branch main 2>/dev/null || true
           $WRANGLER pages deploy dist --project-name kvbcawana --branch main --commit-dirty=true
+      - name: Publish Cast's own site (cast.kvbchurch.org)
+        # The second Pages project, kvbc-cast (owner 2026-11-09): Cast's presenter page at
+        # its root and the TV page at /screen/, built into site/dist-cast by the build
+        # above. Published from site/cast-site so its wrangler.toml (the SYNC binding to
+        # the sync Worker) and its functions/ (/api only) are the ones used. The project
+        # is made on the first run; after that "already exists" is fine.
+        if: steps.ready.outputs.ready == 'true'
+        working-directory: site/cast-site
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          WRANGLER=../../worker/node_modules/.bin/wrangler
+          if ! out="$($WRANGLER pages project create kvbc-cast --production-branch main 2>&1)"; then
+            if echo "$out" | grep -qi 'already exists'; then echo "kvbc-cast already exists."; else echo "$out"; echo "::warning::Could not make the kvbc-cast project (above); trying the deploy anyway."; fi
+          fi
+          $WRANGLER pages deploy ../dist-cast --project-name kvbc-cast --branch main --commit-dirty=true
 
