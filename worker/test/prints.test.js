@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { SyncCore } from '../src/sync.js';
-import { PRINT_PART_CHARS, HANDBOOK_GAP_MS, cleanName } from '../src/prints.js';
+import { DISPATCH_WORKFLOWS, PRINT_PART_CHARS, HANDBOOK_GAP_MS, Prints, cleanName } from '../src/prints.js';
+import { CONVERT_WORKFLOW } from '../src/cast.js';
 import { memoryStore, signInV2 } from './helpers.js';
 
 // Print from the letterhead page (src/routes.md 10.16): a scrambled PDF uploaded in
@@ -126,5 +127,24 @@ describe('printing from the letterhead page', () => {
   it('cleans a file name', () => {
     expect(cleanName('Parents Night <b>.pdf')).toBe('Parents Night b');
     expect(cleanName('')).toBe('document');
+  });
+});
+
+describe('the GitHub dispatch only starts its own workflows', () => {
+  it('refuses any workflow file but the print, handbook and PowerPoint jobs, before asking GitHub', async () => {
+    const asked = [];
+    const prints = new Prints({
+      storage: new Map(),
+      now: () => 0,
+      env: () => ({ PRINT_DISPATCH_TOKEN: 'gh' }),
+      fetchFn: async (url) => { asked.push(String(url)); return new Response(null, { status: 204 }); },
+    });
+    for (const wf of ['printer-release.yml', 'delete-release.yml', '../letterhead-print.yml', 'LETTERHEAD-PRINT.yml', 'letterhead-print.yml/../x', '']) {
+      expect(await prints.dispatch(wf, {})).toMatchObject({ ok: false, refused: true });
+    }
+    expect(asked).toEqual([]);
+    for (const wf of DISPATCH_WORKFLOWS) expect((await prints.dispatch(wf, {})).ok).toBe(true);
+    expect(DISPATCH_WORKFLOWS).toEqual(['letterhead-print.yml', 'handbook-print.yml', CONVERT_WORKFLOW]);
+    expect(asked).toHaveLength(3);
   });
 });

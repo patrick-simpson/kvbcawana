@@ -38,6 +38,12 @@ export const HANDBOOK_GAP_MS = 2 * 60 * 1000;
 export const GITHUB_REPO = 'patrick-simpson/kvbcawana';
 export const PDF_WORKFLOW = 'letterhead-print.yml';
 export const HANDBOOK_WORKFLOW = 'handbook-print.yml';
+/**
+ * The ONLY workflows the Worker may start with PRINT_DISPATCH_TOKEN: the print job,
+ * the handbook sheets and Cast's PowerPoint converter (cast.js CONVERT_WORKFLOW).
+ * Anything else (a release, a delete job) is refused before GitHub is asked.
+ */
+export const DISPATCH_WORKFLOWS = Object.freeze([PDF_WORKFLOW, HANDBOOK_WORKFLOW, 'cast-convert.yml']);
 
 const UP_KEY = 'prints:up';
 const partKey = (/** @type {string} */ id, /** @type {number} */ n) => `prints:part:${id}:${n}`;
@@ -74,6 +80,7 @@ export class Prints {
 
   /** Start a GitHub Actions job. @param {string} workflow @param {Record<string, string>} inputs */
   async dispatch(workflow, inputs) {
+    if (!DISPATCH_WORKFLOWS.includes(workflow)) return { ok: false, status: 0, refused: true };
     let res;
     try {
       res = await this.fetchFn(`https://api.github.com/repos/${GITHUB_REPO}/actions/workflows/${workflow}/dispatches`, {
