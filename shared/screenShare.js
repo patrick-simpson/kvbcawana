@@ -7,17 +7,24 @@
 // WebRTC with NO server in the middle for the picture: the presenter's page makes
 // an OFFER, the TV's page an ANSWER, each carried by the sync Worker
 // (/v1/cast/signal, /v1/classroom/signal: memory only), then the picture goes
-// laptop to TV over the church network. No ICE servers (no STUN, no TURN): both
-// are on the church's network; the KVBC Awana app shows its real local address
-// (main.js turns off Chromium's mDNS hiding) and the UniFi rule lets guest Wi-Fi
-// reach that one computer. Non-trickle: each side sends its description once,
-// with every candidate in it (ICE_WAIT_MS at most).
+// laptop to TV. Directly over the church network when it can (the KVBC Awana app
+// shows its real local address: main.js turns off Chromium's mDNS hiding), else
+// through Cloudflare's relay (owner 2026-11-08, after a laptop on the network got a
+// black screen: "Any way to make this work over the Web?"): both ends pass the
+// `iceServers` the Worker hands them (worker/src/turn.js: Cloudflare STUN always,
+// TURN credentials when set up). Non-trickle: each side sends its description once,
+// with every candidate in it (ICE_WAIT_MS at most; relay candidates take a moment).
 
-export const ICE_WAIT_MS = 3000;
+export const ICE_WAIT_MS = 5000;
 export const ANSWER_WAIT_MS = 30000;
 export const ANSWER_POLL_MS = 1000;
-/** Slides and text stay sharp: a high bitrate cap and "detail" over motion. */
-export const MAX_BITRATE = 8_000_000;
+/**
+ * Slides and text stay sharp ("detail" over motion), and the relay stays free: at most
+ * 6 Mbps (~2.7 GB an hour), the figure worker/src/turn.js's monthly cap is built on.
+ */
+export const MAX_BITRATE = 6_000_000;
+/** A share that has not connected this long after the answer has failed: say so, never sit on black. */
+export const CONNECT_WAIT_MS = 20000;
 
 /** Resolves once the connection has every local candidate (or after ms). @param {RTCPeerConnection} pc @param {number} ms */
 export function iceGathered(pc, ms = ICE_WAIT_MS) {
@@ -38,13 +45,14 @@ export function iceGathered(pc, ms = ICE_WAIT_MS) {
  *   readAnswer: () => Promise<string | null>,
  *   onState?: (state: string) => void,
  *   RTC?: typeof RTCPeerConnection,
+ *   iceServers?: RTCIceServer[],
  *   wait?: { answerMs?: number, pollMs?: number, iceMs?: number },
  * }} o
  * @returns {Promise<{ pc: RTCPeerConnection, stop: () => void }>}
  */
 export async function startSharing(o) {
   const RTC = o.RTC || RTCPeerConnection;
-  const pc = new RTC({ iceServers: [] });
+  const pc = new RTC({ iceServers: o.iceServers || [] });
   const onState = o.onState || (() => {});
   pc.addEventListener('connectionstatechange', () => onState(pc.connectionState));
   for (const track of o.stream.getTracks()) {
@@ -66,7 +74,7 @@ export async function startSharing(o) {
     for (;;) {
       const sdp = await o.readAnswer();
       if (sdp) { await pc.setRemoteDescription({ type: 'answer', sdp }); break; }
-      if (Date.now() > until) throw new Error('The TV did not answer. Is Cast on, and is this laptop on the church Wi-Fi?');
+      if (Date.now() > until) throw new Error('The TV did not answer. Is Cast still on? Try Share my screen again.');
       await new Promise((r) => setTimeout(r, o.wait?.pollMs ?? ANSWER_POLL_MS));
     }
   } catch (err) {
@@ -84,13 +92,14 @@ export async function startSharing(o) {
  *   onStream: (stream: MediaStream) => void,
  *   onState?: (state: string) => void,
  *   RTC?: typeof RTCPeerConnection,
+ *   iceServers?: RTCIceServer[],
  *   wait?: { iceMs?: number },
  * }} o
  * @returns {Promise<RTCPeerConnection>}
  */
 export async function answerShare(o) {
   const RTC = o.RTC || RTCPeerConnection;
-  const pc = new RTC({ iceServers: [] });
+  const pc = new RTC({ iceServers: o.iceServers || [] });
   pc.addEventListener('track', (ev) => { if (ev.streams && ev.streams[0]) o.onStream(ev.streams[0]); });
   pc.addEventListener('connectionstatechange', () => (o.onState || (() => {}))(pc.connectionState));
   await pc.setRemoteDescription({ type: 'offer', sdp: o.offerSdp });

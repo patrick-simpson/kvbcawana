@@ -136,7 +136,7 @@ export class Cast {
   /** @returns {Promise<{ code: string | null, at: number, tokens: { hash: string, at: number }[] }>} */
   async roomDoc() {
     const d = await this.storage.get(ROOM_KEY);
-    return { code: typeof d?.code === 'string' ? d.code : null, at: Number(d?.at) || 0, tokens: Array.isArray(d?.tokens) ? d.tokens : [] };
+    return { code: typeof d?.code === 'string' ? d.code : null, at: Number(d?.at) || 0, tokens: Array.isArray(d?.tokens) ? d.tokens : [], revealAt: Number(d?.revealAt) || 0 };
   }
 
   /** The stage back to nothing, every file of the room gone. */
@@ -204,7 +204,8 @@ export class Cast {
   async leave(who, body) {
     if (body?.takeDown === true) await this.engine.press('cast-presenter', { action: 'back' });
     const room = await this.roomDoc();
-    await this.storage.put(ROOM_KEY, { ...room, tokens: room.tokens.filter((x) => x.hash !== who) });
+    // "Display code": the TV shows its code (hidden until asked, owner 2026-11-08).
+    await this.storage.put(ROOM_KEY, { ...room, tokens: room.tokens.filter((x) => x.hash !== who), ...(body?.takeDown === true ? { revealAt: this.now() } : {}) });
     this.seen.delete(who);
     return json({ ok: true });
   }
@@ -213,7 +214,7 @@ export class Cast {
   async reset() {
     await this.clear();
     const room = await this.roomDoc();
-    await this.storage.put(ROOM_KEY, { ...room, tokens: [] });
+    await this.storage.put(ROOM_KEY, { ...room, tokens: [], revealAt: this.now() });
     this.seen.clear();
     return json({ ok: true, code: room.code });
   }
@@ -283,7 +284,7 @@ export class Cast {
     const room = await this.roomDoc();
     const res = await this.engine.readStage(true);
     const body = await res.json();
-    return json({ ...body, code: room.code });
+    return json({ ...body, code: room.code, revealAt: room.revealAt });
   }
 
   /* ── PowerPoint into slides ── */

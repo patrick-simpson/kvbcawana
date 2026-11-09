@@ -28,6 +28,12 @@
   .qr canvas { display: block; width: calc(20 * var(--u)); height: calc(20 * var(--u)); image-rendering: pixelated; }
   .qr figcaption { margin-top: calc(1 * var(--u)); font: 500 calc(1.6 * var(--u))/1.3 var(--heading); letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
   .card .foot b { font-weight: 700; color: var(--charcoal); }
+  /* The code and QR stay hidden until someone clicks the screen (owner 2026-11-08: "the pin
+     should not show up by default until it's clicked on, same with the QR code"). */
+  .reveal { display: none; margin: calc(3.4 * var(--u)) 0 0; padding: calc(2 * var(--u)) calc(3 * var(--u)); border: 2px dashed var(--tan); border-radius: calc(1 * var(--u)); font: 500 calc(3 * var(--u))/1.2 var(--heading); color: var(--muted); width: max-content; }
+  .card.code-hidden .code, .card.code-hidden .qr { display: none !important; }
+  .card.code-hidden .reveal { display: block; }
+  .card.code-hidden { cursor: pointer; }
   .card h1 { font: 500 calc(5 * var(--u))/1.05 var(--heading); letter-spacing: -.01em; margin: 0; }
   .card .go { font: 400 calc(2.5 * var(--u))/1.4 var(--body); color: var(--muted); margin: calc(1.6 * var(--u)) 0 0; }
   .card .go b { font-weight: 700; color: var(--charcoal); }
@@ -64,13 +70,14 @@
 </head>
 <body>
   <!-- Waiting: the code (or, signed out / configure mode, a calm note) -->
-  <section class="layer card" id="card">
+  <section class="layer card code-hidden" id="card">
     <img class="logo" src="/cast/church/kvbc-logo.png" alt="Kennebec Valley Baptist Church" width="1302" height="277">
     <div class="middle">
       <div>
         <h1 id="card-title">Present on this screen</h1>
         <p class="go" id="card-go">Go to <b>awana.kvbchurch.org/cast</b> and enter</p>
         <p class="code is-empty" id="code" aria-label="Code"><span id="code-a">···</span><span id="code-b">···</span></p>
+        <p class="reveal" id="reveal">Click this screen to show the code</p>
       </div>
       <figure class="qr" id="qr" hidden><canvas id="qr-canvas" aria-label="QR code: open the Cast page with this code"></canvas><figcaption>Or scan</figcaption></figure>
     </div>

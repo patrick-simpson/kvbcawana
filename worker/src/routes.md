@@ -1717,6 +1717,8 @@ each good for `TOKEN_TTL_MS` (8 h).
 | `POST /v1/cast/files`, `PUT /v1/cast/files/:id/:n`, `POST /v1/cast/files/:id/done` | public + token | as 10.13 (a `{url}` copy too: a Google Slides/Docs link is copied as its PDF export) | as 10.13 |
 | `POST /v1/cast/signal` | public + token | `{signal: {type: 'offer', id, sdp}}` (id = the screen button's) | `{ok}`; 409 `ended` |
 | `GET /v1/cast/signal?id=` | public + token | | `{signal: {type: 'answer', id, sdp} \| null, id}` |
+| `GET /v1/cast/ice?id=` | public + token | id = the screen share now up | `{ok, iceServers, relay, reason?}`: Cloudflare STUN always; TURN credentials (worker/src/turn.js) when the secrets `CF_TURN_KEY_ID` + `CF_TURN_API_TOKEN` are set, one set per share for both ends, `TURN_TTL_S` 2 h; `reason` `not-configured` / `month-cap` / `cloudflare` with STUN only; 409 `ended` for another share |
+| `GET /v1/cast/screen/ice?id=` | session (the Cast screen) | | as above |
 | `GET /v1/cast/files/:id` | public + token | | the room's file (as 10.13): the phone's preview of the slides on the TV |
 | `POST /v1/cast/convert` | public + token | `{bytes, name}` (bytes = the SCRAMBLED PowerPoint's: 12-byte IV + AES-256-GCM ciphertext; at most `CONVERT_MAX_BYTES` 40 MB + 28) | `{ok, id, parts, partBytes}` (96 KiB); 503 `not-configured` (no `PRINT_DISPATCH_TOKEN` or `HANDBOOK_TOKEN`), 413 `too-big`, 429 `busy` (`CONVERT_PENDING_MAX` 3 waiting) |
 | `PUT /v1/cast/convert/:id/:n` | public + token | the part's bytes, in order | `{ok, next}`; 404 `no-upload`, 409 `order`, 400 `size` |
@@ -1743,8 +1745,17 @@ Facebook video is a `facebook` item `{href}` (Cast only; `facebookVideoFrom` tak
 "Copy link" forms). `video` presses work on `video`, `clip` and `facebook` (`CLASSROOM_PLAYABLE_KINDS`).
 The Sparks list holds at most `CLASSROOM_CLIPS_MAX` 3 clips and no Facebook.
 
+The relay (owner 2026-11-08, after a laptop on the church network got a black screen: "Any way to
+make this work over the Web?"): both ends of a share ask `.../ice` before the offer/answer and pass
+the servers to WebRTC, so the picture goes direct when it can and through Cloudflare Realtime TURN
+when it cannot. Free: Cloudflare's 1,000 GB a month; shares are capped at 6 Mbps and the Worker books
+each share's TTL for both ends against `TURN_HOURS_PER_MONTH` 120 (storage `turn:month`), STUN only
+past it. The TV keeps "Connecting…" up until real picture arrives and goes back to its code when none
+does (never black). `GET /v1/cast/screen` also answers `revealAt`: the last "Show Cast code" (reset)
+or "Display code" (leave `takeDown`), which shows the TV's code (hidden until asked for).
+
 Screen shares in the classroom too (signed in): `POST /v1/classroom/remote {action: 'screen'}`,
 `POST /v1/classroom/signal {signal}` (the remote's offer, the TV's answer), `GET
-/v1/classroom/signal?type=offer|answer&id=`. Signals live in memory only (`SIGNAL_TTL_MS` 2 min for
+/v1/classroom/signal?type=offer|answer&id=`, and `GET /v1/classroom/ice?id=` (the relay, as above). Signals live in memory only (`SIGNAL_TTL_MS` 2 min for
 reading), the picture itself goes laptop to TV over the church network (WebRTC, no TURN server);
 a press of another button, Back, or a new code ends the share.

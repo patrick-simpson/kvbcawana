@@ -23,6 +23,10 @@
 //   presenter page reads the code from it and connects) and says a laptop must join the
 //   KVBC_Guest Wi-Fi to share its screen (owner 2026-11-08). The QR is drawn by
 //   qrcode-generator (cdnjs), flat charcoal on the cream; no QR when it cannot load.
+// - The code and its QR are HIDDEN until asked for (owner 2026-11-08: "the pin should
+//   not show up by default until it's clicked on, same with the QR code"): a click or a
+//   key on this screen, the tray's "Show Cast code" or a presenter's "Display code" (the
+//   Worker's `revealAt`) shows them for REVEAL_MS; anything put up hides them again.
 // - Videos (owner 2026-11-08): an uploaded video (`clip`) read with the session into a
 //   blob and played in a <video>; a public Facebook video in Facebook's own embedded
 //   player (its SDK, connect.facebook.net). One set of controls for YouTube, clips and
@@ -33,7 +37,7 @@
 // The Sparks remote's classroom TV (classroom/public/src/stage.js) is the model.
 
 import * as R from '/cast/shared/classroomRemote.js';
-import { answerShare } from '/cast/shared/screenShare.js';
+import { CONNECT_WAIT_MS, answerShare } from '/cast/shared/screenShare.js';
 
 const SESSION_KEY = 'awanaSyncSession.v1';
 const SESSION_RE = /^v1\.\d+\.\d+\.[A-Za-z0-9_-]{20,}$/;
@@ -48,6 +52,8 @@ const T = Object.assign({
   openRetryMinMs: 5000, signalPollMs: 1500, signalWaitMs: 45000,
 }, window.castScreenTuning || {});
 const CONFIGURE = new URLSearchParams(location.search).get('configure') === '1';
+/** The code shows this long once asked for. */
+const REVEAL_MS = 5 * 60 * 1000;
 
 const $ = (id) => /** @type {any} */ (document.getElementById(id));
 const layer = $('show');
@@ -72,6 +78,8 @@ let signalTimer = 0;
 let lastReport = '';
 let openRetryMs = 0;
 let closed = false;
+let revealTimer = 0;
+let revealSeen = 0; // the Worker's last revealAt this screen has acted on
 
 const session = () => {
   let s = '';
@@ -164,6 +172,20 @@ async function drawQr(d) {
   }
 }
 
+/* ── Showing the code (hidden until asked for) ── */
+
+function reveal() {
+  if (CONFIGURE) return;
+  $('card').classList.remove('code-hidden');
+  clearTimeout(revealTimer);
+  revealTimer = setTimeout(hideCode, REVEAL_MS);
+}
+
+function hideCode() {
+  clearTimeout(revealTimer);
+  $('card').classList.add('code-hidden');
+}
+
 /* ── The room ── */
 
 async function openRoom() {
@@ -195,6 +217,13 @@ async function read() {
   // The room was closed from elsewhere while this screen is up: open a new one.
   if (r.body.code === null && code) { code = null; drawCode(); openRoom(); return; }
   if (typeof r.body.code === 'string' && r.body.code !== code) { code = r.body.code; drawCode(); }
+  // "Show Cast code" (tray) or "Display code" (a presenter): show it, once per ask, if recent.
+  const asked = Number(r.body.revealAt) || 0;
+  if (asked > revealSeen) {
+    const fresh = revealSeen !== 0 || Date.now() + skew - asked < REVEAL_MS;
+    revealSeen = asked;
+    if (fresh) reveal();
+  }
   apply(R.sanitizeStage(r.body.stage));
 }
 
@@ -236,6 +265,7 @@ async function change(show) {
     return;
   }
   $('card').classList.add('is-away');
+  hideCode();
   layer.hidden = false;
   const b = show.button;
   if (b.kind === 'video') playVideo(b);
@@ -560,20 +590,28 @@ async function trySignal() {
     else status('The presenter’s screen did not arrive.', 'They can press Share my screen again.');
     return;
   }
-  const entry = { id, pc: null };
+  const entry = { id, pc: null, shown: false };
   rtc = entry;
+  // The relay's servers for this share (worker/src/turn.js); none = direct only.
+  const ice = await request(`/v1/cast/screen/ice?id=${encodeURIComponent(id)}`);
+  const iceServers = ice.ok && ice.body && Array.isArray(ice.body.iceServers) ? ice.body.iceServers : [];
+  if (rtc !== entry) return;
+  // Never sit on black (owner 2026-11-08: "We got a black screen. That can't happen."):
+  // no picture within CONNECT_WAIT_MS = say so, then back to the code.
+  setTimeout(() => { if (rtc === entry && !entry.shown) shareFailed(entry, 'The presenter\u2019s screen did not arrive.'); }, CONNECT_WAIT_MS + 5000);
   try {
     entry.pc = await answerShare({
+      iceServers,
       offerSdp: sig.sdp,
       sendAnswer: async (sdp) => {
         const a = await request('/v1/cast/screen/signal', { method: 'POST', body: { signal: { type: 'answer', id, sdp } } });
         if (!a.ok) throw new Error('answer refused');
       },
-      onStream: (stream) => { if (rtc === entry) showStream(stream); },
+      onStream: (stream) => { if (rtc === entry) showStream(stream, entry); },
       onState: (st) => {
         if (rtc !== entry) return;
-        if (st === 'failed') status('The presenter’s screen could not reach this TV.', 'The laptop must be on the church Wi-Fi.');
-        if (st === 'disconnected') status('The presenter’s screen paused…');
+        if (st === 'failed') shareFailed(entry, 'The presenter\u2019s screen could not reach this TV.');
+        if (st === 'disconnected') status('The presenter\u2019s screen paused…', 'Waiting for it to come back.');
       },
     });
     if (rtc !== entry) { try { entry.pc.close(); } catch { /* closed */ } }
@@ -582,14 +620,35 @@ async function trySignal() {
   }
 }
 
-function showStream(stream) {
-  layer.querySelector('.status')?.remove();
+/** A share that will not show: words on the TV, then back to the code (never black). */
+function shareFailed(entry, words) {
+  if (rtc !== entry) return;
+  status(words, 'Back to the code in a moment. They can press Share my screen to try again.');
+  const id = entry.id;
+  setTimeout(() => {
+    if (stage.show && stage.show.button.id === id) request('/v1/cast/screen/back', { method: 'POST', body: {} }).catch(() => {});
+  }, 6000);
+}
+
+function showStream(stream, entry) {
   let v = layer.querySelector('video');
   if (!v) {
     v = document.createElement('video');
     v.autoplay = true;
     v.playsInline = true;
-    layer.append(v);
+    // Hidden until real picture arrives: the "Connecting…" words stay up until then.
+    v.style.visibility = 'hidden';
+    const shown = () => {
+      if (!v.videoWidth) return;
+      v.style.visibility = '';
+      layer.querySelector('.status')?.remove();
+      if (entry) entry.shown = true;
+      report(true);
+    };
+    v.addEventListener('loadeddata', shown);
+    v.addEventListener('resize', shown);
+    v.addEventListener('playing', shown);
+    layer.prepend(v);
   }
   v.srcObject = stream;
   // Sound on when the browser allows it (KVBC Awana does); else the picture, muted.
@@ -700,6 +759,9 @@ async function start() {
   if (!session()) { signedOut(); }
   else { await openRoom(); openLive(); }
 
+  // A click or a key on the TV shows the code.
+  document.addEventListener('pointerdown', () => { if (layer.hidden) reveal(); });
+  document.addEventListener('keydown', () => { if (layer.hidden) reveal(); });
   window.addEventListener('storage', (e) => {
     if (e.key !== SESSION_KEY) return;
     if (session() && !code) { location.reload(); }

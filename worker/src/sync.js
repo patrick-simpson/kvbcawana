@@ -54,6 +54,7 @@ import { Screens } from './screens.js';
 import { JourneyRemote, mountJourneyRemote } from './journeyRemote.js';
 import { Classroom, mountClassroom } from './classroom.js';
 import { Cast, mountCast } from './cast.js';
+import { Turn, mountTurn } from './turn.js';
 import { Presentation, mountPresentation } from './presentation.js';
 import { Tally, mountTally } from './tally.js';
 import { Scoreboard, mountScoreboard } from './scoreboard.js';
@@ -271,6 +272,10 @@ export class SyncCore {
       ring: (payload) => { this.broadcast(frameText(DOORBELL_EVENT, payload)); },
     });
     mountCast(this.registry, this);   // /v1/cast/* (routes.md 10.18)
+    // The screen share's relay (turn.js, routes.md 10.18): STUN always, Cloudflare TURN
+    // credentials when its secrets are set, capped inside the free allowance.
+    this.turn = new Turn({ storage: this.storage, now: this.now, env: () => this.rawEnv || {}, fetchFn: this.fetchFn });
+    mountTurn(this.registry, this);   // /v1/cast/ice, /v1/cast/screen/ice, /v1/classroom/ice
     // The presentation (presentation.js, routes.md 10.14): the sealed congregation deck the
     // weekly AwanaReports job sends, and the slide every presentation screen shows.
     this.presentation = new Presentation({

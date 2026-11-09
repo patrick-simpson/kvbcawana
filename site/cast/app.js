@@ -30,7 +30,7 @@
 // worker/src/routes.md 10.18.
 
 import * as R from '/cast/shared/classroomRemote.js';
-import { canShareScreen, startSharing } from '/cast/shared/screenShare.js';
+import { CONNECT_WAIT_MS, canShareScreen, startSharing } from '/cast/shared/screenShare.js';
 import {
   TOKEN_KEY, TOKEN_RE, captureWords, cleanCode, codeReady, errorWords, filePress, fileProblem, formatCode,
   joinWords, linkToCopy, shareWords, size, textPress, titleFromName, tvWords, videoPress,
@@ -540,9 +540,15 @@ async function shareScreen() {
   // The browser's own "Stop sharing" bar ends the track: take it off the TV too.
   for (const t of stream.getVideoTracks()) t.addEventListener('ended', () => { if (shareId === id) stopShare(); });
   setShare('connecting');
+  // The relay (worker/src/turn.js): Cloudflare STUN always, TURN when set up, so the
+  // picture reaches the TV from any Wi-Fi. Without an answer, try the direct way only.
+  const ice = await request(`/v1/cast/ice?id=${encodeURIComponent(id)}`);
+  const iceServers = ice.ok && ice.body && Array.isArray(ice.body.iceServers) ? ice.body.iceServers : [];
+  let connected = false;
   try {
     const s = await startSharing({
       stream,
+      iceServers,
       sendOffer: async (sdp) => {
         const o = await request('/v1/cast/signal', { method: 'POST', body: { signal: { type: 'offer', id, sdp } } });
         if (!o.ok) throw new Error(errorWords(o.status, o.body));
@@ -554,10 +560,17 @@ async function shareScreen() {
         const sig = a.ok && a.body ? R.sanitizeSignal(a.body.signal) : null;
         return sig && sig.type === 'answer' && sig.id === id ? sig.sdp : null;
       },
-      onState: (st) => { if (shareId === id) setShare(st === 'failed' ? 'failed' : st); },
+      onState: (st) => {
+        if (shareId !== id) return;
+        if (st === 'connected') connected = true;
+        if (st === 'failed') { giveUp(id, 'The TV could not receive your screen. Check this laptop\u2019s internet, then press Share my screen again.'); return; }
+        setShare(st);
+      },
     });
     if (shareId !== id) { s.stop(); return; }
     sharing = s;
+    // Never leave the TV on black: no picture within CONNECT_WAIT_MS = take it down and say so.
+    setTimeout(() => { if (shareId === id && !connected) giveUp(id, 'Your screen did not reach the TV. Press Share my screen to try again.'); }, CONNECT_WAIT_MS);
   } catch (err) {
     if (shareId !== id) return;
     shareId = '';
@@ -565,6 +578,14 @@ async function shareScreen() {
     setShare('failed', err && err.message ? err.message : '');
     press('back', null, 'Taken down');
   }
+}
+
+/** A share that failed: stop sending, take it off the TV, say why. @param {string} id @param {string} words */
+function giveUp(id, words) {
+  if (shareId !== id) return;
+  endShareHere();
+  setShare('failed', words);
+  if (!state || (state.stage.show && state.stage.show.button.id === id)) press('back', null, 'Taken down');
 }
 
 /** Stop this page's share and take it off the TV. */

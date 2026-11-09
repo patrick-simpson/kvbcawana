@@ -150,8 +150,9 @@ test('the TV opens its room, closes it on pagehide, and does neither in configur
   assert.ok(!/openRoom|openLive|pagehide/.test(cfg));
   assert.ok(start.indexOf('if (CONFIGURE)') < start.indexOf('openRoom()'));
   assert.ok(start.indexOf('if (CONFIGURE)') < start.indexOf("addEventListener('pagehide'"));
-  // No ICE servers anywhere (the TV answers with its real local address).
-  assert.ok(!/iceServers|stun:|turn:/.test(screen + app));
+  // ICE servers come ONLY from the Worker (owner 2026-11-08 picked the Cloudflare relay;
+  // worker/src/turn.js): no page names a STUN/TURN address or holds a credential itself.
+  assert.ok(!/stun:|turns?:/.test(screen + app));
 });
 
 test('the church\'s look, never Awana\'s', () => {
@@ -269,4 +270,33 @@ test('YouTube search results, Facebook links and video files become presses the 
   assert.match(screen, /subscribe\('finishedPlaying', \(\) => \{ playing = false; ended\(\); \}\)/);
   assert.match(screen, /v\.addEventListener\('ended', ended\)/);
   assert.match(screen, /R\.CLASSROOM_PLAYABLE_KINDS\.includes\(b\.kind\) && media/);
+});
+
+// Owner 2026-11-08, after a real try: "a laptop that was on the network didn't connect.
+// We got a black screen. That can't happen. Any way to make this work over the Web?"
+// (the Cloudflare relay); "the pin should not show up by default until it's clicked on,
+// same with the QR code".
+test('both ends ask the Worker for the relay before the offer and the answer', () => {
+  assert.match(app, /\/v1\/cast\/ice\?id=\$\{encodeURIComponent\(id\)\}/);
+  assert.match(app, /startSharing\(\{\n      stream,\n      iceServers,/);
+  assert.match(screen, /\/v1\/cast\/screen\/ice\?id=\$\{encodeURIComponent\(id\)\}/);
+  assert.match(screen, /answerShare\(\{\n      iceServers,/);
+});
+
+test('never a black screen: the picture shows only once it arrives, and a share that does not arrive says so and goes back', () => {
+  assert.match(screen, /v\.style\.visibility = 'hidden';/);
+  assert.match(screen, /if \(!v\.videoWidth\) return;/);
+  assert.match(screen, /shareFailed\(entry, 'The presenter\\u2019s screen did not arrive\.'\)/);
+  assert.match(screen, /request\('\/v1\/cast\/screen\/back'/);
+  assert.match(app, /giveUp\(id, 'Your screen did not reach the TV\./);
+  assert.match(app, /CONNECT_WAIT_MS\);/);
+});
+
+test('the code and QR stay hidden until a click, the tray or Display code asks', () => {
+  assert.match(screenPage, /<section class="layer card code-hidden" id="card">/);
+  assert.match(screenPage, /\.card\.code-hidden \.code, \.card\.code-hidden \.qr \{ display: none !important; \}/);
+  assert.match(screenPage, /Click this screen to show the code/);
+  assert.match(screen, /document\.addEventListener\('pointerdown', \(\) => \{ if \(layer\.hidden\) reveal\(\); \}\);/);
+  assert.match(screen, /const asked = Number\(r\.body\.revealAt\) \|\| 0;/);
+  assert.match(screen, /REVEAL_MS = 5 \* 60 \* 1000/);
 });

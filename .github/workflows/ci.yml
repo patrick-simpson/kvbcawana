@@ -568,11 +568,15 @@ jobs:
           # Cast's YouTube search (routes.md 10.18): a YouTube Data API key (Google
           # Cloud, restricted to the YouTube Data API v3). Optional, like the others.
           YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
+          # The screen share's relay (routes.md 10.18, worker/src/turn.js): a Cloudflare
+          # Realtime TURN key's id and API token. Optional, like the others.
+          CF_TURN_KEY_ID: ${{ secrets.CF_TURN_KEY_ID }}
+          CF_TURN_API_TOKEN: ${{ secrets.CF_TURN_API_TOKEN }}
         run: |
           node -e '
             const names = ["INITIAL_PASSPHRASE",
               "TWOTIMTWO_USERNAME", "TWOTIMTWO_PASSWORD", "TWOTIMTWO_HOST"];
-            const optional = ["HANDBOOK_TOKEN", "PRESENTATION_TOKEN", "PRINT_DISPATCH_TOKEN", "YOUTUBE_API_KEY"];
+            const optional = ["HANDBOOK_TOKEN", "PRESENTATION_TOKEN", "PRINT_DISPATCH_TOKEN", "YOUTUBE_API_KEY", "CF_TURN_KEY_ID", "CF_TURN_API_TOKEN"];
             const out = {};
             for (const n of [...names, ...optional]) if (process.env[n]) out[n] = process.env[n];
             const missing = names.filter((n) => !out[n]);

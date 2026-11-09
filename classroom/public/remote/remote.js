@@ -292,9 +292,15 @@ async function shareMyScreen() {
   }
   s.id = r.body.button;
   shareNote('Waiting for the TV…');
+  // The relay (worker/src/turn.js): Cloudflare STUN always, TURN when set up, so the
+  // picture reaches the TV from any Wi-Fi (owner 2026-11-08). None = the direct way only.
+  const ice = await request(`/v1/classroom/ice?id=${encodeURIComponent(s.id)}`);
+  const iceServers = ice.ok && ice.body && Array.isArray(ice.body.iceServers) ? ice.body.iceServers : [];
+  if (s.ended) return;
   try {
     const handle = await screenShare.startSharing({
       stream,
+      iceServers,
       sendOffer: async (sdp) => {
         const o = await request('/v1/classroom/signal', { method: 'POST', body: { signal: { type: 'offer', id: s.id, sdp } } });
         if (!o.ok) throw new Error('The TV did not take the share. Try again.');

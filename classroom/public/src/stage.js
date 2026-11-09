@@ -330,7 +330,11 @@ export async function createStage(deps) {
       if (sig && sig.type === 'offer' && sig.id === s.id && sig.sdp !== s.answered) {
         s.answered = sig.sdp;
         const lib = await import(`./shared/screenShare.js${V}`);
+        const ice = await request(`/v1/classroom/ice?id=${encodeURIComponent(s.id)}`);
+        const iceServers = ice.ok && ice.body && Array.isArray(ice.body.iceServers) ? ice.body.iceServers : [];
+        if (share !== s) return;
         const pc = await lib.answerShare({
+          iceServers,
           offerSdp: sig.sdp,
           sendAnswer: async (sdp) => {
             const a = await request('/v1/classroom/signal', { method: 'POST', body: { signal: { type: 'answer', id: s.id, sdp } } });
