@@ -42,7 +42,7 @@ function Banner({ item, calm }) {
     <M.div
       className={`checkout-leave checkout-leave--${item.kind}`}
       role="status"
-      style={club ? { '--club': club.primary, '--club-deep': club.deep || club.primary } : undefined}
+      style={club ? { '--club': club.plate || club.primary, '--club-deep': club.deep || club.primary } : undefined}
       {...motion}
     >
       {club?.logo

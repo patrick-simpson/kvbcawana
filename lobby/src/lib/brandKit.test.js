@@ -454,6 +454,24 @@ describe('shared/brand kit', () => {
       expect(cssVar(`brand-${id}`)?.toUpperCase(), id).toBe(c.primary.toUpperCase());
       expect(cssVar(`brand-${id}-deep`)?.toUpperCase(), `${id} deep`).toBe(c.deep.toUpperCase());
       expect(cssVar(`brand-${id}-tint`)?.toUpperCase(), `${id} tint`).toBe(c.tint.toUpperCase());
+      expect(cssVar(`brand-${id}-plate`)?.toUpperCase(), `${id} plate`).toBe(c.plate.toUpperCase());
+    }
+  });
+
+  it('every club\'s plate (the fill under white text) reads at 4.5:1 or better, and is the primary or a kit shade', () => {
+    const lum = (hex) => {
+      const c = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255)
+        .map((v) => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4));
+      return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+    };
+    const ratio = (hex) => 1.05 / (lum(hex) + 0.05);
+    for (const id of CLUBS) {
+      const c = tokens.clubs[id];
+      expect(ratio(c.plate), `${id} plate`).toBeGreaterThanOrEqual(4.5);
+      // Never invented: the primary where it passes, else the kit's deep shade
+      // (T&T's is the public site's text-safe green, #277A43).
+      expect([c.primary, c.deep, '#277A43'], id).toContain(c.plate);
+      expect(theme.clubs[id].plate.toUpperCase(), `${id} theme plate`).toBe(c.plate.toUpperCase());
     }
   });
 

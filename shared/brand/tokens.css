@@ -6,25 +6,35 @@
  * dashboard read a byte-identical mirror of this file). A unit test in the
  * signage repo (src/lib/brandKit.test.js) fails if the two files disagree,
  * so edit both together.
+ *
+ * -plate is the club's text-safe fill: the shade a plate or chip takes when
+ * it carries WHITE text (4.5:1 or better). Where the primary already passes
+ * it is the primary; Puggles, Sparks and T&T take a darker shade.
  */
 :root {
   --brand-puggles: #1DB6D9;
   --brand-puggles-deep: #1A627C;
+  --brand-puggles-plate: #1A627C;
   --brand-puggles-tint: #BCDCEE;
   --brand-cubbies: #4C72B8;
   --brand-cubbies-deep: #2F4F8A;
+  --brand-cubbies-plate: #4C72B8;
   --brand-cubbies-tint: #C4DDF3;
   --brand-sparks: #F04A4B;
   --brand-sparks-deep: #B82B32;
+  --brand-sparks-plate: #B82B32;
   --brand-sparks-tint: #FDDACF;
   --brand-tnt: #58BD79;
   --brand-tnt-deep: #2F8A4E;
+  --brand-tnt-plate: #277A43;
   --brand-tnt-tint: #D0E9D5;
   --brand-trek: #047E71;
   --brand-trek-deep: #02554C;
+  --brand-trek-plate: #047E71;
   --brand-trek-tint: #CCEAEC;
   --brand-journey: #8A649D;
   --brand-journey-deep: #56467F;
+  --brand-journey-plate: #8A649D;
   --brand-journey-tint: #DED5EA;
   --brand-journey-ink: #403A77;
 

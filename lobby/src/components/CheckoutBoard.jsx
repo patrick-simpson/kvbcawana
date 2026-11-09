@@ -223,7 +223,7 @@ export default function CheckoutBoard({ decision, checkout, calm, demo = false, 
                   <li
                     key={g.club}
                     className="checkout-club"
-                    style={{ '--club': g.palette.primary, '--club-deep': g.palette.deep || g.palette.primary }}
+                    style={{ '--club': g.palette.plate || g.palette.primary, '--club-deep': g.palette.deep || g.palette.primary }}
                   >
                     <span className="checkout-plate">
                       {g.mark

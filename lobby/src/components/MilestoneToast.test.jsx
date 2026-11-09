@@ -300,10 +300,10 @@ describe('the toast plate', () => {
 
   it('is the club\'s own colour for a club or one child, hot for the room, blue for handbooks', () => {
     const sparks = getClubPalette('Sparks');
-    expect(fill(<MilestoneToast celebration={{ kind: 'club', club: 'Sparks', count: 20 }} club={sparks} />)).toBe(norm(sparks.primary));
+    expect(fill(<MilestoneToast celebration={{ kind: 'club', club: 'Sparks', count: 20 }} club={sparks} />)).toBe(norm(sparks.plate));
     cleanup();
     const tnt = getClubPalette('T&T');
-    expect(fill(<MilestoneToast celebration={{ kind: 'kid', firstName: 'Ava', club: 'T&T', count: 10 }} club={tnt} />)).toBe(norm(tnt.primary));
+    expect(fill(<MilestoneToast celebration={{ kind: 'kid', firstName: 'Ava', club: 'T&T', count: 10 }} club={tnt} />)).toBe(norm(tnt.plate));
     cleanup();
     expect(fill(<MilestoneToast celebration={{ kind: 'tally', count: 25 }} club={null} />)).toBe('var(--brand-hot)');
     cleanup();

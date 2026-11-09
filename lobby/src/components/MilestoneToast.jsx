@@ -235,7 +235,7 @@ function Toast({ celebration, club, compact, below, afterNotice }) {
       line: holdThenLand(hold + beats(1.5), DUR.settle, { opacity: 0, y: '0.35em' }, { opacity: 1, y: '0em' }, EASE.settle),
     };
   });
-  const plate = t.tone === 'club' ? (club?.primary || 'var(--brand-orange)')
+  const plate = t.tone === 'club' ? (club?.plate || club?.primary || 'var(--brand-orange)')
     : t.tone === 'handbook' ? 'var(--brand-blue)'
       : 'var(--brand-hot)';
   const style = {

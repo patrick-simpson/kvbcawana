@@ -14,7 +14,7 @@ import '../../styles/settings-overhaul.css';
 function ClubChip({ club }) {
   const palette = getClubPalette(club);
   return (
-    <span className="club-chip" style={{ '--club': palette.primary, '--club-deep': palette.deep }}>{club || 'Club'}</span>
+    <span className="club-chip" style={{ '--club': palette.plate || palette.primary, '--club-deep': palette.deep }}>{club || 'Club'}</span>
   );
 }
 

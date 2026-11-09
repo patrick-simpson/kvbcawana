@@ -17,14 +17,14 @@
 // Neither matcher may change what the other answers, and no spelling may move
 // from one to the other: the label goldens (printer/scripts/test-label-golden.cjs)
 // and lobby/src/lib/clubs.test.js pin both. Colors are the Awana 2026-27
-// catalog's (shared/brand/tokens.json; Puggles is blue by the owner's call).
+// catalog's (shared/brand/tokens.json; `plate` = the text-safe fill for WHITE text on a club's colour, 4.5:1 or better; Puggles is blue by the owner's call).
 //
 // Self-contained: see shared/README.md for how each app loads it.
 
 /**
  * @typedef {{
  *   id: string, key: string, name: string, aliases: string[], mark: string, monogram: string,
- *   primary: string, deep: string, accent: string, confetti: string[],
+ *   primary: string, deep: string, plate: string, accent: string, confetti: string[],
  * }} ClubRow
  */
 
@@ -32,27 +32,27 @@
 export const CLUB_TABLE = Object.freeze([
   {
     id: 'puggles', key: 'puggle', name: 'Puggles', aliases: ['puggle'], mark: 'puggles', monogram: 'P',
-    primary: '#1DB6D9', deep: '#1A627C', accent: '#BCDCEE', confetti: ['#1DB6D9', '#BCDCEE', '#FCB614', '#FFFFFF'],
+    primary: '#1DB6D9', deep: '#1A627C', plate: '#1A627C', accent: '#BCDCEE', confetti: ['#1DB6D9', '#BCDCEE', '#FCB614', '#FFFFFF'],
   },
   {
     id: 'cubbies', key: 'cubbie', name: 'Cubbies', aliases: ['cubbie'], mark: 'cubbies', monogram: 'C',
-    primary: '#4C72B8', deep: '#2F4F8A', accent: '#C4DDF3', confetti: ['#4C72B8', '#C4DDF3', '#F15A28', '#FFFFFF'],
+    primary: '#4C72B8', deep: '#2F4F8A', plate: '#4C72B8', accent: '#C4DDF3', confetti: ['#4C72B8', '#C4DDF3', '#F15A28', '#FFFFFF'],
   },
   {
     id: 'sparks', key: 'spark', name: 'Sparks', aliases: ['spark'], mark: 'sparks', monogram: 'S',
-    primary: '#F04A4B', deep: '#B82B32', accent: '#FDDACF', confetti: ['#F04A4B', '#FCB614', '#FFFFFF'],
+    primary: '#F04A4B', deep: '#B82B32', plate: '#B82B32', accent: '#FDDACF', confetti: ['#F04A4B', '#FCB614', '#FFFFFF'],
   },
   {
     id: 't&t', key: 't&t', name: 'T&T', aliases: ['truth & training', 'truth and training', 'tnt', 't & t'], mark: 'tnt', monogram: 'T&T',
-    primary: '#58BD79', deep: '#2F8A4E', accent: '#D0E9D5', confetti: ['#58BD79', '#D0E9D5', '#FFFFFF'],
+    primary: '#58BD79', deep: '#2F8A4E', plate: '#277A43', accent: '#D0E9D5', confetti: ['#58BD79', '#D0E9D5', '#FFFFFF'],
   },
   {
     id: 'trek', key: 'trek', name: 'Trek', aliases: [], mark: 'trek', monogram: 'TR',
-    primary: '#047E71', deep: '#02554C', accent: '#CCEAEC', confetti: ['#047E71', '#CCEAEC', '#FFFFFF'],
+    primary: '#047E71', deep: '#02554C', plate: '#047E71', accent: '#CCEAEC', confetti: ['#047E71', '#CCEAEC', '#FFFFFF'],
   },
   {
     id: 'journey', key: 'journey', name: 'Journey', aliases: [], mark: 'journey', monogram: 'J',
-    primary: '#8A649D', deep: '#56467F', accent: '#DED5EA', confetti: ['#8A649D', '#DED5EA', '#FCB614', '#FFFFFF'],
+    primary: '#8A649D', deep: '#56467F', plate: '#8A649D', accent: '#DED5EA', confetti: ['#8A649D', '#DED5EA', '#FCB614', '#FFFFFF'],
   },
 ]);
 

@@ -88,7 +88,7 @@ export function ClubLinesCard({ form, update }) {
               <div className="field" key={key}>
                 {/* The club's own chip: the label still reads "Puggles phrase". */}
                 <label htmlFor={id}>
-                  <span className="club-chip" style={{ '--club': club.primary, '--club-deep': club.deep }}>{name}</span>
+                  <span className="club-chip" style={{ '--club': club.plate || club.primary, '--club-deep': club.deep }}>{name}</span>
                   {' '}phrase
                 </label>
                 <input

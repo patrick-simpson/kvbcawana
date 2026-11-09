@@ -63,6 +63,9 @@ export function sanitizeTheme(raw, baseUrl) {
       name: typeof club.name === 'string' ? club.name.slice(0, 30) : undefined,
       primary: color,
       deep: hexOrNull(club.deep) ?? darken(color, 0.78),
+      // The text-safe fill for white text (shared/clubs.js `plate`); a theme
+      // without it leaves the baked one in place.
+      plate: hexOrNull(club.plate) ?? undefined,
       accent: hexOrNull(club.tint) ?? lighten(color, 0.65),
       confetti: [color, lighten(color, 0.45), '#FFFFFF'],
       aliases: Array.isArray(club.aliases)

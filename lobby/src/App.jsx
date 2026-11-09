@@ -1759,7 +1759,7 @@ export default function App() {
                   label={getClubPalette(config.cornerClub).name.toUpperCase()}
                   value={cornerClubCount}
                   size="calc(2.5 * min(1vw, 1.7778vh))"
-                  plate={getClubPalette(config.cornerClub).primary}
+                  plate={getClubPalette(config.cornerClub).plate}
                 />
               </M.div>
             )}

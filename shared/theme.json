@@ -13,6 +13,7 @@
       "name": "Puggles",
       "color": "#1DB6D9",
       "deep": "#1A627C",
+      "plate": "#1A627C",
       "tint": "#BCDCEE",
       "aliases": [
         "puggle"
@@ -33,6 +34,7 @@
       "name": "Cubbies",
       "color": "#4C72B8",
       "deep": "#2F4F8A",
+      "plate": "#4C72B8",
       "tint": "#C4DDF3",
       "aliases": [
         "cubbie",
@@ -47,6 +49,7 @@
       "name": "Sparks",
       "color": "#F04A4B",
       "deep": "#B82B32",
+      "plate": "#B82B32",
       "tint": "#FDDACF",
       "aliases": [
         "spark"
@@ -60,6 +63,7 @@
       "name": "T&T",
       "color": "#58BD79",
       "deep": "#2F8A4E",
+      "plate": "#277A43",
       "tint": "#D0E9D5",
       "aliases": [
         "t&t",
@@ -86,6 +90,7 @@
       "name": "Trek",
       "color": "#047E71",
       "deep": "#02554C",
+      "plate": "#047E71",
       "tint": "#CCEAEC",
       "aliases": [],
       "art": {
@@ -98,6 +103,7 @@
       "name": "Journey",
       "color": "#8A649D",
       "deep": "#56467F",
+      "plate": "#8A649D",
       "tint": "#DED5EA",
       "aliases": [],
       "art": {

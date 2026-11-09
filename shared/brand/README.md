@@ -7,7 +7,7 @@ label printer's dashboard and labels. This folder is the ONE copy
 
 | File | What it is |
 | --- | --- |
-| `tokens.json` | Club colors (primary, deep, tint), house colors, the three font families and the motion timing table, for code (JS, canvas). |
+| `tokens.json` | Club colors (primary, deep, plate, tint; `plate` = the fill under WHITE text, 4.5:1 or better), house colors, the three font families and the motion timing table, for code (JS, canvas). |
 | `tokens.css` | The same values as `--brand-*` custom properties, for plain CSS. |
 | `fonts.css` | `@font-face` rules for pages with no bundler (paths relative to this file). |
 | `fonts/` | Paytone One and Londrina Solid, each as the FULL font (an unmodified TTF and a lossless WOFF2), and Figtree (variable): a latin WOFF2 for the web and the full TTF for the printer's canvas, with each font's SIL Open Font License. Plus two faces for the printed labels only: Comic Neue (Regular, Bold) and Playfair Display (variable), full unmodified TTFs. See "The three voices", "The club faces (labels only)" and "Reserved Font Names and the OFL" below. |

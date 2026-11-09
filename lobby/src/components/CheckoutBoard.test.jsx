@@ -36,7 +36,7 @@ describe('CheckoutBoard', () => {
     // Youngest club first, as the clubs stand: Sparks before T&T.
     expect(clubs.map((c) => c.querySelector('.checkout-plate__mark').getAttribute('alt'))).toEqual(['Sparks', 'T&T']);
     const [sparks] = clubs;
-    expect(sparks.style.getPropertyValue('--club')).toBe(getClubPalette('Sparks').primary);
+    expect(sparks.style.getPropertyValue('--club')).toBe(getClubPalette('Sparks').plate);
     expect(sparks.querySelector('.checkout-plate__count').textContent).toBe('2 waiting');
     expect([...sparks.querySelectorAll('.checkout-name__chip')].map((c) => c.textContent)).toEqual(['Demo Kid', 'Sample Star']);
     // Still reads as a list, separators and all.

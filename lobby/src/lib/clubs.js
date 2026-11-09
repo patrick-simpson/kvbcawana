@@ -43,6 +43,7 @@ const CLUBS = Object.fromEntries(CLUB_TABLE.map((c) => [c.id, {
   mascot: ART[c.id].mascot,
   primary: c.primary,
   deep: c.deep,
+  plate: c.plate,
   accent: c.accent,
   confetti: [...c.confetti],
 }]));
@@ -53,6 +54,7 @@ const DEFAULT_CLUB = {
   mascot: null,
   primary: '#FAA41D',
   deep: '#C97A08',
+  plate: '#C97A08',
   accent: '#FFE8C2',
   confetti: ['#FAA41D', '#FCB614', '#FFFFFF'],
 };
@@ -75,6 +77,7 @@ export function applyClubOverrides(overrides) {
     const merged = {};
     if (o.primary) merged.primary = o.primary;
     if (o.deep) merged.deep = o.deep;
+    if (o.plate) merged.plate = o.plate;
     if (o.accent) merged.accent = o.accent;
     if (Array.isArray(o.confetti) && o.confetti.length) merged.confetti = o.confetti;
     if (o.logoUrl) merged.logo = o.logoUrl;

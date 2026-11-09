@@ -14,7 +14,7 @@ describe('CheckoutBanner', () => {
     const { container } = still(<CheckoutBanner item={{ id: 1, kind: 'name', firstName: 'Ava', club: 'Sparks' }} />);
     const banner = container.querySelector('.checkout-leaves .checkout-leave--name');
     expect(banner.getAttribute('role')).toBe('status');
-    expect(banner.style.getPropertyValue('--club')).toBe(getClubPalette('Sparks').primary);
+    expect(banner.style.getPropertyValue('--club')).toBe(getClubPalette('Sparks').plate);
     expect(banner.querySelector('.checkout-leave__mark').getAttribute('alt')).toBe('Sparks');
     expect(banner.querySelector('.checkout-leave__text').textContent).toBe('Ava has checked out');
   });

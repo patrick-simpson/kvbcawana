@@ -18,6 +18,8 @@ describe('the club table', () => {
       const themeKey = c.id === 't&t' ? 'tnt' : c.id;
       expect(theme.clubs[themeKey].color.toLowerCase(), c.id).toBe(c.primary.toLowerCase());
       expect(JSON.stringify(tokens)).toContain(c.primary);
+      expect(theme.clubs[themeKey].plate.toLowerCase(), `${c.id} plate`).toBe(c.plate.toLowerCase());
+      expect(tokens.clubs[themeKey].plate.toLowerCase(), `${c.id} plate`).toBe(c.plate.toLowerCase());
     }
   });
 
