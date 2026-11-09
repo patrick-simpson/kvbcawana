@@ -108,7 +108,7 @@ export const GLOBAL_MIN_NETS = 10;
  * notices. A token from before this rule has no stamp: it is let in and stamped while
  * the rule is younger than this (`sess:since`), so nothing signed in is dropped at deploy.
  */
-export const SESSION_IDLE_DAYS = 60;
+export const SESSION_IDLE_DAYS = 120;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 /**
