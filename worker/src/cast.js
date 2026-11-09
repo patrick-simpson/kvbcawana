@@ -51,6 +51,19 @@
 // and nobody can lock joining for everyone. A wrong code and a right code while someone
 // else presents get the SAME answer (403 `refused`), so a busy room never confirms a
 // guess. Tokens are stored hashed (SHA-256), at most TOKENS_MAX, each good for TOKEN_TTL_MS.
+//
+// The DESK (owner 2026-11-09): a back-of-house window on the lobby computer
+// (cast.kvbchurch.org/desk/, KVBC Awana's "Cast control" window on a second monitor)
+// that can do everything a presenter can, always alongside the one phone presenter.
+// It is NOT a presenter: it holds no token and never takes the presenter's slot, so it
+// never blocks a join, is never refused `busy`, and no join, leave, kick or reset
+// touches it; last press wins between them. Its credential is the computer's own sync
+// session (Authorization: Bearer, the same sign-in the app already uses for open, close,
+// kick and reset): the /v1/cast/desk/* routes are `session` routes, the registry checks
+// the session before anything runs. They run the presenter's own code with the caller
+// named DESK, so the room caps (CAST_FILES_MAX, CAST_BYTES_MAX), the room's bytes an
+// hour, and the per-caller rates (files, PowerPoints, presses) apply to it exactly as to
+// a presenter, with an allowance of its own.
 
 import { Classroom, newId } from './classroom.js';
 import { netOf } from './netof.js';
@@ -93,6 +106,8 @@ export const YOUTUBE_PER_HOUR = 60;
 export const YOUTUBE_RESULTS = 8;
 const YOUTUBE_CACHE_MS = 10 * 60 * 1000;
 const TOKEN_RE = /^t[a-z0-9]{24,40}$/;
+/** The desk's name in the rates and press buckets (a token's is its 64-hex hash: never equal). */
+export const DESK = 'desk';
 
 /** The largest PowerPoint (bytes) the presenter may send to be turned into slides. */
 export const CONVERT_MAX_BYTES = 40 * 1024 * 1024;
@@ -404,6 +419,27 @@ export class Cast {
     return json(body);
   }
 
+  /**
+   * GET /v1/cast/desk/state (the desk, signed in): what a presenter's state says, plus the
+   * code (always: the TV's "hidden until asked" does not apply to the desk) and whether a
+   * presenter is connected now.
+   */
+  async deskState() {
+    const room = await this.roomDoc();
+    const body = await (await this.engine.remoteState()).json();
+    const t = this.now();
+    const presenter = room.tokens.some((x) => t - x.at <= TOKEN_TTL_MS && t - (this.seen.get(x.hash) ?? x.at) <= PRESENTER_IDLE_MS);
+    return json({ ...body, code: room.code, presenter });
+  }
+
+  /** POST /v1/cast/desk/reveal (the desk's "Show the code on the TV"): the TV shows its code; nobody is let go. */
+  async deskReveal() {
+    const room = await this.roomDoc();
+    await this.storage.put(ROOM_KEY, { ...room, revealAt: this.now() });
+    this.ring({ what: 'cast', rev: (await this.engine.stage()).rev });
+    return json({ ok: true });
+  }
+
   /** GET /v1/cast/screen (the Cast screen): its code and the stage. */
   async screen() {
     const room = await this.roomDoc();
@@ -606,4 +642,20 @@ export function mountCast(registry, core) {
   registry.add('PUT', '/v1/cast/convert/:id/:n', 'public', presenter(async ({ params, request }) => c().convertPart(params.id, params.n, request)));
   registry.add('POST', '/v1/cast/convert/:id/start', 'public', presenter(async ({ params, body }) => c().convertGo(params.id, await body())));
   registry.add('GET', '/v1/cast/convert/:id', 'public', presenter(async ({ params }) => c().convertStatus(params.id)));
+  // The desk (the lobby computer's own sign-in, owner 2026-11-09): the presenter's routes
+  // under /v1/cast/desk/, as the caller DESK. Never a token: join, leave, kick and reset
+  // never touch it, and it never holds the presenter's slot. No screen-share signal
+  // routes (it is the same computer as the TV).
+  registry.add('GET', '/v1/cast/desk/state', 'session', async () => c().deskState());
+  registry.add('POST', '/v1/cast/desk/reveal', 'session', async () => c().deskReveal());
+  registry.add('GET', '/v1/cast/desk/youtube', 'session', async ({ url }) => c().youtube(url.searchParams.get('q')));
+  registry.add('POST', '/v1/cast/desk/press', 'session', async ({ body }) => c().engine.press(DESK, await body()));
+  registry.add('POST', '/v1/cast/desk/files', 'session', async ({ body }) => c().fileStart(DESK, await body()));
+  registry.add('PUT', '/v1/cast/desk/files/:id/:n', 'session', async ({ params, request }) => c().engine.putPart(params.id, params.n, request));
+  registry.add('POST', '/v1/cast/desk/files/:id/done', 'session', async ({ params }) => c().engine.finishFile(params.id));
+  registry.add('GET', '/v1/cast/desk/files/:id', 'session', async ({ params }) => c().engine.readFile(params.id));
+  registry.add('POST', '/v1/cast/desk/convert', 'session', async ({ body }) => c().convertStart(await body(), DESK));
+  registry.add('PUT', '/v1/cast/desk/convert/:id/:n', 'session', async ({ params, request }) => c().convertPart(params.id, params.n, request));
+  registry.add('POST', '/v1/cast/desk/convert/:id/start', 'session', async ({ params, body }) => c().convertGo(params.id, await body()));
+  registry.add('GET', '/v1/cast/desk/convert/:id', 'session', async ({ params }) => c().convertStatus(params.id));
 }

@@ -42,7 +42,7 @@ const LOCAL_ORIGIN = /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/;
  * @type {{ method: string, path: RegExp, max: number }[]}
  */
 export const BODY_CAPS = [
-  { method: 'PUT', path: /^\/v1\/(classroom|cast)\/files\/[^/]+\/\d+$/, max: CLASSROOM_CLIP_PART_BYTES },
+  { method: 'PUT', path: /^\/v1\/(classroom|cast|cast\/desk)\/files\/[^/]+\/\d+$/, max: CLASSROOM_CLIP_PART_BYTES },
   { method: 'PUT', path: /^\/v1\/cast\/convert\/[^/]+\/result$/, max: CLASSROOM_FILE_MAX_BYTES },
   { method: 'POST', path: /^\/v1\/history\/rows$/, max: ROWS_BODY_MAX },
   { method: 'POST', path: /^\/v1\/history\/import$/, max: IMPORT_BODY_MAX },

@@ -1740,6 +1740,28 @@ each good for `TOKEN_TTL_MS` (8 h).
 | `PUT /v1/cast/convert/:id/result` | machine | the PDF's bytes (20 MB at most) | `{ok, id}`: kept as a file of the room, status `done`; not a PDF: 400 `type`, status `failed` |
 | `POST /v1/cast/convert/:id/failed` | machine | `{reason}` | `{ok}`: status `failed` |
 
+**The desk** (owner 2026-11-09): KVBC Awana's back-of-house "Cast control" window on the lobby
+computer's other monitor (`https://cast.kvbchurch.org/desk/`, `site/cast/desk/`) does everything a
+presenter does, always ALONGSIDE the one phone presenter. Its credential is the computer's own sync
+session (`Authorization: Bearer`, the sign-in the app already uses for open, close, reset and kick;
+handed to the page by the app's bridge), so these are ordinary `session` routes. It holds no token
+and is never the presenter: it never blocks a join, is never refused `busy`/`refused`, and no join,
+leave, kick or reset touches it; between it and the phone the last press wins. The routes run the
+presenter's own code with the caller named `DESK` ('desk', never a token hash), so the room caps
+(`CAST_FILES_MAX`, `CAST_BYTES_MAX`), the room's `CAST_UPLOAD_BYTES_PER_HOUR`, the per-caller hourly
+rates (`CAST_FILES_PER_HOUR`, `CAST_CONVERTS_PER_HOUR`) and the press bucket apply to it as to a
+presenter, with an allowance of its own; its file parts get the same edge cap (`BODY_CAPS`). No
+screen-share signal or ICE routes (it is the TV's own computer).
+
+| Route | Auth | Request | Answer |
+| --- | --- | --- | --- |
+| `GET /v1/cast/desk/state` | session | | as `GET /v1/cast/state` (reading it is watching) plus `code` (always, whether or not the TV shows it) and `presenter` (a phone is connected and not idle) |
+| `POST /v1/cast/desk/reveal` | session | `{}` | `{ok}`: the TV shows its code for `REVEAL_MS` (`revealAt`); nobody is let go, nothing taken down |
+| `POST /v1/cast/desk/press` | session | as `POST /v1/cast/press` | as `POST /v1/cast/press` (Back takes down what is up) |
+| `GET /v1/cast/desk/youtube?q=` | session | | as `GET /v1/cast/youtube` |
+| `POST /v1/cast/desk/files`, `PUT /v1/cast/desk/files/:id/:n`, `POST /v1/cast/desk/files/:id/done`, `GET /v1/cast/desk/files/:id` | session | as the presenter's | as the presenter's (the same room, caps and rates; the caller `DESK`) |
+| `POST /v1/cast/desk/convert`, `PUT /v1/cast/desk/convert/:id/:n`, `POST /v1/cast/desk/convert/:id/start`, `GET /v1/cast/desk/convert/:id` | session | as the presenter's | as the presenter's |
+
 PowerPoint (owner 2026-11-08, "Support pptx upload and show a preview on the phone screen", the
 exact copy): the presenter's browser scrambles the file, the job (`scripts/cast/convert.mjs`) reads
 it with the machine token, LibreOffice makes the PDF, the PDF comes back as a file of the room; the
