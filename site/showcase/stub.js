@@ -63,6 +63,8 @@
   var define = function (name, value) {
     try { Object.defineProperty(window, name, { value: value, configurable: true, enumerable: true, writable: false }); } catch (e) { /* kept */ }
   };
+  // The scoring twin reads its board as a signed-in screen does (useScoreboard).
+  if (SCORE && KIND === 'projector') SEED.projector['awanaSyncSession.v1'] = SESSION;
   define('localStorage', memoryStorage(SEED[KIND]));
   define('sessionStorage', memoryStorage({}));
   define('indexedDB', undefined);

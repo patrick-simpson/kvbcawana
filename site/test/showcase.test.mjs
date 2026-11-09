@@ -114,6 +114,7 @@ test('the 6:05 projector twin (?score=1) has T&T\'s game up and a home page poin
   };
   const read = async (win) => win.fetch('https://showcase.invalid/api/v1/scoreboard');
   const game = run('?at=2026-10-14T18:04:56&score=1');
+  assert.ok(game.win.localStorage.getItem('awanaSyncSession.v1'), 'signed in, so it reads the board');
   const first = await (await read(game.win)).json();
   assert.equal(first.board.active, 'tnt');
   assert.deepEqual(first.board.scores.tnt, { blue: 12, red: 13, yellow: 14, green: 7 });
@@ -125,4 +126,5 @@ test('the 6:05 projector twin (?score=1) has T&T\'s game up and a home page poin
   // The 6:00 twin (the grand welcome) must never have a club up: it would own the wall.
   const opening = run('?at=2026-10-14T17:59:52');
   assert.equal((await read(opening.win)).status, 404);
+  assert.equal(opening.win.localStorage.getItem('awanaSyncSession.v1'), null, 'the opening twin stays signed out, as before');
 });
