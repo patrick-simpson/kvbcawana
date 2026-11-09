@@ -538,6 +538,25 @@ describe('display/classroom-preview (a /settings preview opens a closed classroo
   });
 });
 
+describe('display: downloads and navigation are locked down (10.14.0)', () => {
+  const src = require('node:fs').readFileSync(require('node:path').join(__dirname, '../src/display/display.js'), 'utf8');
+  it('no screen or settings view may navigate itself to a file: page', () => {
+    expect(src.includes("url.startsWith('file:')")).toBe(false);
+    expect((src.match(/if \(isSitePage\(url\)\) return;/g) || []).length).toBe(2);
+  });
+  it('a download is cancelled unless the Display settings window made it in the browser (.json or .csv)', () => {
+    expect(src.includes("lobbySession.on('will-download', (_e, item, wc) => {")).toBe(true);
+    expect(src.includes('if (!downloadAllowed(item, wc)) {')).toBe(true);
+    expect(src.includes('item.cancel();')).toBe(true);
+    expect(src.includes('if (!configView || !wc || wc !== configView.webContents) return false;')).toBe(true);
+    expect(src.includes("if (!url.startsWith('blob:')) return false;")).toBe(true);
+    expect(src.includes('return /\\.(json|csv)$/i.test(safeDownloadName(item));')).toBe(true);
+    // The saved name is a bare file name, never a path.
+    expect(src.includes("path.join(app.getPath('downloads'), safeDownloadName(item))")).toBe(true);
+    expect(src.includes('path.basename(String(item.getFilename() ||')).toBe(true);
+  });
+});
+
 describe('display: the classroom\'s all-day black screen (owner 2026-10-19)', () => {
   it('keeps the classroom screen up outside its window, without keeping the PC awake, until put away by hand', () => {
     const src = require('node:fs').readFileSync(require('node:path').join(__dirname, '../src/display/display.js'), 'utf8');

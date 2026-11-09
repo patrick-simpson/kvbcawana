@@ -324,7 +324,7 @@ function createDisplay(opts) {
       return { action: 'deny' };
     });
     wc.on('will-navigate', (event, url) => {
-      if (isSitePage(url) || url.startsWith('file:')) return;
+      if (isSitePage(url)) return;
       event.preventDefault();
       if (/^https?:/i.test(url)) shell.openExternal(url);
     });
@@ -816,7 +816,7 @@ function createDisplay(opts) {
       return { action: 'deny' };
     });
     vc.on('will-navigate', (event, url) => {
-      if (isSitePage(url) || url.startsWith('file:')) return;
+      if (isSitePage(url)) return;
       event.preventDefault();
       if (/^https?:/i.test(url)) shell.openExternal(url);
     });
@@ -1008,6 +1008,21 @@ function createDisplay(opts) {
   const onResume = () => { evaluate(); scheduleTick(); refreshSources(); };
   const onUnlock = () => evaluate();
 
+  // A download's file name, never a path: just the last part, letters, digits and a few
+  // safe marks. '' when nothing usable is left.
+  function safeDownloadName(item) {
+    let name = '';
+    try { name = path.basename(String(item.getFilename() || '')); } catch { name = ''; }
+    return name.replace(/[^A-Za-z0-9 ._()-]/g, '_').replace(/^\.+/, '').slice(0, 120);
+  }
+  function downloadAllowed(item, wc) {
+    if (!configView || !wc || wc !== configView.webContents) return false;
+    let url = '';
+    try { url = String(item.getURL() || ''); } catch { url = ''; }
+    if (!url.startsWith('blob:')) return false;
+    return /\.(json|csv)$/i.test(safeDownloadName(item));
+  }
+
   let sessionWired = false;
   let uncaughtWired = false;
   function wireSession() {
@@ -1022,11 +1037,19 @@ function createDisplay(opts) {
     const ALLOWED = new Set(['fullscreen', 'screen-wake-lock', 'persistent-storage', 'clipboard-sanitized-write']);
     lobbySession.setPermissionRequestHandler((_wc, permission, callback) => callback(ALLOWED.has(permission)));
     lobbySession.setPermissionCheckHandler((_wc, permission) => ALLOWED.has(permission));
-    // Settings and slide exports are <a download> links: save them straight
-    // to Downloads and show the file, instead of a Save dialog on the TV.
-    lobbySession.on('will-download', (_e, item) => {
+    // Downloads (10.14.0): only the operator's Display settings window may save a file,
+    // and only what its own page made in the browser (the settings and slide exports,
+    // History's CSV: blob: links, .json or .csv). Those go straight to Downloads and the
+    // file is shown. Anything else, from the TV window, an iframe, or a link to a file on
+    // the web, is cancelled: a remote page must never be able to drop files on the PC.
+    lobbySession.on('will-download', (_e, item, wc) => {
+      if (!downloadAllowed(item, wc)) {
+        log('download refused', safeDownloadName(item) || '(no name)');
+        item.cancel();
+        return;
+      }
       const { app } = require('electron');
-      const file = path.join(app.getPath('downloads'), item.getFilename());
+      const file = path.join(app.getPath('downloads'), safeDownloadName(item));
       item.setSavePath(file);
       item.once('done', (_ev, st) => { if (st === 'completed') shell.showItemInFolder(file); log('download', st, file); });
     });
