@@ -110,7 +110,30 @@ export function resultPress(result, R) {
   return videoPress({ link: result && result.youtube, title: result && result.title }, R);
 }
 
-/** The code in the QR's link (awana.kvbchurch.org/cast/#code=123456), '' when none. @param {unknown} hash */
+/** Cast's own address (owner 2026-11-09): the presenter page at its root, the TV at /screen/. */
+export const CAST_HOME = 'https://cast.kvbchurch.org/';
+
+/**
+ * The presenter page a TV page sends people to: the folder above the TV page, so
+ * cast.kvbchurch.org/screen/ says cast.kvbchurch.org/ (and the old
+ * awana.kvbchurch.org/cast/screen/ copy its own /cast/). Off https (a test, a file):
+ * Cast's own address.
+ * @param {unknown} tvHref the TV page's address
+ */
+export function presenterUrl(tvHref) {
+  try {
+    const u = new URL('../', String(tvHref));
+    if (u.protocol === 'https:') return `${u.origin}${u.pathname}`;
+  } catch { /* not an address */ }
+  return CAST_HOME;
+}
+
+/** The presenter page's address in words: no https://, no trailing slash. @param {string} url */
+export function addressWords(url) {
+  return String(url).replace(/^https:\/\//, '').replace(/\/$/, '');
+}
+
+/** The code in the QR's link (cast.kvbchurch.org/#code=123456), '' when none. @param {unknown} hash */
 export function codeFromHash(hash) {
   const m = /(?:^#|&)code=(\d{6})(?:&|$)/.exec(typeof hash === 'string' ? hash : '');
   return m && codeReady(m[1]) ? m[1] : '';

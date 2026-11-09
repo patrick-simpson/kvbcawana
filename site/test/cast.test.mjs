@@ -14,7 +14,7 @@ import {
   TOKEN_KEY, captureWords, cleanCode, clock, codeReady, errorWords, filePress, fileProblem, formatCode,
   joinWords, linkToCopy, placeholderId, shareWords, size, textPress, titleFromName, tvWords, videoPress,
   SLIDES_ACCEPT, convertWords, isPresentation, slideView, slidesChoice,
-  codeFromHash, facebookPress, resultPress,
+  codeFromHash, facebookPress, resultPress, CAST_HOME, presenterUrl, addressWords,
 } from '../cast/logic.js';
 
 const SITE = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
@@ -238,7 +238,7 @@ test('the QR link carries the code in the fragment; the page connects with it an
   assert.equal(codeFromHash('#x=1&code=654321'), '654321');
   assert.equal(codeFromHash('#code=012345'), '');
   assert.equal(codeFromHash(''), '');
-  assert.match(screen, /\/cast\/#code=\$\{d\}/);
+  assert.match(screen, /`\$\{presenterUrl\(location\.href\)\}#code=\$\{d\}`/);
   assert.match(app, /codeFromHash\(location\.hash\)/);
   assert.match(app, /history\.replaceState\(null, '', location\.pathname \+ location\.search\)/);
   assert.match(screen, /cdnjs\.cloudflare\.com\/ajax\/libs\/qrcode-generator\/1\.4\.4\//);
@@ -341,4 +341,21 @@ test('the pages name their own files relatively and call their own origin\'s /ap
   assert.match(screenPage, /href="\.\.\/church\/church\.css"/);
   assert.match(css, /url\('fonts\/Jost-Variable\.ttf'\)/);
   for (const src of [app, screen]) assert.match(src, /if \(!base && location\.protocol === 'https:'\) base = `\$\{location\.origin\}\/api`;/);
+});
+
+test('the TV sends people to the presenter page beside it: cast.kvbchurch.org once moved', () => {
+  assert.equal(CAST_HOME, 'https://cast.kvbchurch.org/');
+  assert.equal(presenterUrl('https://cast.kvbchurch.org/screen/'), 'https://cast.kvbchurch.org/');
+  assert.equal(presenterUrl('https://cast.kvbchurch.org/screen/?configure=1#x'), 'https://cast.kvbchurch.org/');
+  assert.equal(presenterUrl('https://awana.kvbchurch.org/cast/screen/'), 'https://awana.kvbchurch.org/cast/');
+  assert.equal(presenterUrl('http://localhost:5173/screen/'), CAST_HOME);
+  assert.equal(presenterUrl('file:///x/screen/index.html'), CAST_HOME);
+  assert.equal(presenterUrl(undefined), CAST_HOME);
+  assert.equal(addressWords('https://cast.kvbchurch.org/'), 'cast.kvbchurch.org');
+  assert.equal(addressWords('https://awana.kvbchurch.org/cast/'), 'awana.kvbchurch.org/cast');
+  assert.match(screen, /import \{ addressWords, presenterUrl \} from '\.\.\/logic\.js';/);
+  assert.match(screenPage, /Go to <b id="card-addr">cast\.kvbchurch\.org<\/b> and enter/);
+  assert.match(screen, /addr\.textContent = addressWords\(presenterUrl\(location\.href\)\)/);
+  assert.match(screen, /presenters go to \$\{addressWords\(presenterUrl\(location\.href\)\)\} and type it/);
+  assert.ok(!/awana\.kvbchurch\.org\/cast/.test(screen + screenPage), 'the TV never names the old address');
 });

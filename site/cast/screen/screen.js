@@ -19,7 +19,7 @@
 //   first PDF). Video commands run once by id, never ones from before this page loaded.
 // - Reports what it shows (POST /v1/cast/screen/now) only while a presenter watches
 //   (the Worker's `watch`): on a change, and every 10 s in a video.
-// - The code screen carries a QR code of awana.kvbchurch.org/cast/#code=<code> (the
+// - The code screen carries a QR code of cast.kvbchurch.org/#code=<code> (the
 //   presenter page reads the code from it and connects) and says a laptop must join the
 //   KVBC_Guest Wi-Fi to share its screen (owner 2026-11-08). The QR is drawn by
 //   qrcode-generator (cdnjs), white on the black code screen; no QR when it cannot load.
@@ -38,6 +38,7 @@
 
 import * as R from '../shared/classroomRemote.js';
 import { CONNECT_WAIT_MS, answerShare } from '../shared/screenShare.js';
+import { addressWords, presenterUrl } from '../logic.js';
 
 const SESSION_KEY = 'awanaSyncSession.v1';
 const SESSION_RE = /^v1\.\d+\.\d+\.[A-Za-z0-9_-]{20,}$/;
@@ -125,6 +126,8 @@ function calm(title, words) {
 }
 
 function drawCode() {
+  const addr = $('card-addr'); // gone once a calm note took the line
+  if (addr) addr.textContent = addressWords(presenterUrl(location.href));
   const c = $('code');
   const d = typeof code === 'string' && /^\d{6}$/.test(code) ? code : '';
   c.classList.toggle('is-empty', !d);
@@ -155,8 +158,7 @@ function qrcodeLib() {
 
 /** Where the QR sends a phone (the code in the fragment: never sent to a server). @param {string} d */
 export function qrUrl(d) {
-  const origin = /^https:\/\//.test(location.origin) ? location.origin : 'https://awana.kvbchurch.org';
-  return `${origin}/cast/#code=${d}`;
+  return `${presenterUrl(location.href)}#code=${d}`;
 }
 
 async function drawQr(d) {
@@ -744,12 +746,12 @@ async function start() {
   if (CONFIGURE) {
     // KVBC Awana's display Settings window: a note only. Never a room, socket or close.
     document.body.classList.add('configure');
-    calm('Cast is on.', 'The TV shows a code; presenters go to awana.kvbchurch.org/cast and type it. Turn Cast off from the KVBC Awana icon in the taskbar.');
+    calm('Cast is on.', `The TV shows a code; presenters go to ${addressWords(presenterUrl(location.href))} and type it. Turn Cast off from the KVBC Awana icon in the taskbar.`);
     return;
   }
   drawCode();
-  // The Worker is this site's own /api (awana.kvbchurch.org/cast/ and
-  // cast.kvbchurch.org alike: each site answers /api through the sync service), so
+  // The Worker is this site's own /api (cast.kvbchurch.org and the old /cast/ copy on
+  // awana.kvbchurch.org alike: each site answers /api through the sync service), so
   // the page asks nothing first. A test may name another (window.castBase).
   if (typeof window.castBase === 'string') base = window.castBase;
   if (!base && location.protocol === 'https:') base = `${location.origin}/api`;

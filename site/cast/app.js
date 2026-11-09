@@ -1,6 +1,6 @@
 // Cast, the presenter's page (owner 2026-11-08: "set it up kind of like an air
 // server ... present from their laptop but through a webpage that is controlling
-// that computer"; "TV code only"). awana.kvbchurch.org/cast
+// that computer"; "TV code only"). cast.kvbchurch.org (awana.kvbchurch.org/cast before 2026-11-09)
 //
 // - The code on the TV is the only way in (POST /v1/cast/join): the Worker answers a
 //   TOKEN, kept in sessionStorage only (this tab, gone when it closes), carried as
@@ -20,7 +20,7 @@
 // - ONE presenter at a time (owner 2026-11-08): a join while someone else presents is
 //   refused (the Worker's 409 `busy`, its own words); Disconnect frees the room
 //   (POST /v1/cast/leave) and "Display code" also puts the TV back to its code.
-// - The TV's QR code opens this page as /cast/#code=123456: the code is read from the
+// - The TV's QR code opens this page as cast.kvbchurch.org/#code=123456: the code is read from the
 //   fragment, the address cleaned, and it connects.
 // - YouTube: search (GET /v1/cast/youtube, the Worker's key) or a link; a public
 //   Facebook video's link; a video file (a clip, up to 200 MB, sent in ~1 MB parts).
@@ -686,7 +686,7 @@ async function start() {
   if (typeof window.castBase === 'string') base = window.castBase;
   if (!base && location.protocol === 'https:') base = `${location.origin}/api`;
 
-  // The TV's QR code: /cast/#code=123456. The code leaves the address bar at once.
+  // The TV's QR code: cast.kvbchurch.org/#code=123456. The code leaves the address bar at once.
   const fromQr = codeFromHash(location.hash);
   if (fromQr) { try { history.replaceState(null, '', location.pathname + location.search); } catch { /* fine */ } }
   if (tokenStore.get() && base) showPresent();
