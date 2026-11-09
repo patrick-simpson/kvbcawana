@@ -22,6 +22,7 @@ import '@fontsource-variable/oswald';
 import '@fontsource/lilita-one';
 import App from './App.jsx';
 import { RootErrorBoundary } from './components/RootErrorBoundary.jsx';
+import { forgetPresentationKey } from './lib/forgetPresentationKey.js';
 import './styles/app.css';
 
 // Jelly UI web components (<jelly-theme>, <jelly-button>, …), vendored
@@ -32,6 +33,10 @@ import './styles/app.css';
 // Custom elements upgrade in place whenever the module lands, so the
 // render below never waits on it.
 import(/* @vite-ignore */ new URL('vendor/jelly-ui.js', document.baseURI).href);
+
+// The archived presentation's saved history key, left on the lobby computer: gone
+// (src/lib/forgetPresentationKey.js; owner 2026-11-09).
+forgetPresentationKey();
 
 // Offline shell: cache-first for hashed assets and shared/ club art,
 // network-first for HTML/JSON (see src/sw.js — emitted with a per-build
