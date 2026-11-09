@@ -271,17 +271,19 @@ only the celebration banners and confetti — no background, countdown,
 tally, or buttons — ready to sit on top of a livestream or projection:
 
 ```
-https://awana.kvbchurch.org/lobby/?overlay=1&passphrase=YOUR_PASSPHRASE
+https://awana.kvbchurch.org/lobby/?overlay=1#passphrase=YOUR_PASSPHRASE
 ```
 
-- `passphrase` (or `p`) — the church passphrase in the URL, since embedded
-  browsers can't open the settings panel; it signs the page in to the live
-  channel and is then removed from the address bar. (An old link's Pusher
-  `key` / `cluster` are ignored.)
+- `#passphrase=` (or `#p=`) — the church passphrase after the `#`, since
+  embedded browsers can't open the settings panel; it signs the page in to the
+  live channel and is then removed from the address bar. After the `#` a
+  browser never sends it to a server, so it stays out of server logs. An older
+  link with `?passphrase=` (or `?p=`) still works; make new links with `#`.
+  (An old link's Pusher `key` / `cluster` are ignored.)
 - In OBS: add a **Browser** source with that URL at your canvas size —
   the background is transparent automatically.
 - For systems that need a chroma key instead of transparency, use
-  `&chroma=00b140` (green) and key it out.
+  `&chroma=00b140` (green, before the `#`) and key it out.
 
 ---
 

@@ -41,6 +41,24 @@ beforeEach(() => {
 });
 afterEach(() => { globalThis.fetch = realFetch; });
 
+describe('a feed link\'s passphrase is taken out of the address once read', () => {
+  afterEach(() => window.history.replaceState({}, '', '/'));
+  it('from the fragment and from an old link\'s query, keeping everything else', () => {
+    fakeService();
+    window.history.replaceState({}, '', '/?overlay=1&p=old&chroma=00b140#passphrase=kennebec&keep=1');
+    render(<Driver />);
+    expect(window.location.search).toBe('?overlay=1&chroma=00b140');
+    expect(window.location.hash).toBe('#keep=1');
+    expect(window.location.href).not.toMatch(/kennebec|old/);
+  });
+  it('leaves no empty # behind', () => {
+    fakeService();
+    window.history.replaceState({}, '', '/?overlay=1#p=kennebec');
+    render(<Driver />);
+    expect(window.location.href).toBe(`${window.location.origin}/?overlay=1`);
+  });
+});
+
 describe('passphrase v2 on the screen', () => {
   it('signs in with the derived authKey only: the word never leaves the browser', async () => {
     const calls = fakeService({

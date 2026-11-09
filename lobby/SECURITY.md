@@ -278,8 +278,10 @@ three leak paths at once, each of which is a documented, encouraged workflow:
    table, so anything in `VALIDATORS` is settable from a file at a public URL.
 2. Settings → Export serialises the overrides to a JSON file that gets emailed
    and dropped in shared drives.
-3. The URL: OBS / ProPresenter links carry the passphrase (`?passphrase=`, the
-   owner's choice; it is stripped from the address bar once read) and used to
+3. The URL: OBS / ProPresenter links carry the passphrase (`#passphrase=`, the
+   owner's choice; in the fragment since 2026-11-09 so it never reaches a
+   server log, an old `?passphrase=` link still works; it is stripped from the
+   address bar once read) and used to
    carry Pusher's public `?key=`, now ignored. URLs land in browser history,
    screenshots, and the kiosk shortcut taped to the wall, so the display key
    itself never travels in one.

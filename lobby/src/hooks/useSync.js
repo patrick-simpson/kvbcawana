@@ -146,7 +146,8 @@ export function onSyncDoorbell(fn) {
  */
 export function useSyncDriver({ handlers, dispatch, store }) {
   // A feed that cannot be typed into (OBS, ProPresenter) carries the word in
-  // its address: ?passphrase=… signs it in once (owner's choice, 2026-10-01).
+  // its address: #passphrase=… (or an old link's ?passphrase=…) signs it in
+  // once (owner's choice, 2026-10-01; the fragment since 2026-11-09).
   // The word is then taken out of the address bar, so it is not left on
   // screen or in this browser's history; the session is what stays.
   const storeRef = useRef(store);
@@ -364,10 +365,20 @@ export async function changePassphrase(current, next) {
   return { ok: true, rotatedKey: Boolean(res.body.rotatedKey), ...(landed ? {} : { historyNote: 'The passphrase changed, but the sync service did not keep the saved history under the new word yet. Ask for the service to be updated before the next club night.' }) };
 }
 
-/** The ?passphrase= (or ?p=) a feed's link carries, or ''. */
-export function passphraseFromUrl(search = typeof window !== 'undefined' ? window.location.search : '') {
+/**
+ * The passphrase a feed's link carries, or ''. The fragment form
+ * (#passphrase=… or #p=…) is the one to hand out (security, 2026-11-09): a
+ * browser never sends the fragment to a server, so the word stays out of every
+ * request and server log. An existing saved link's ?passphrase= / ?p= still
+ * works; the fragment wins when a link has both.
+ */
+export function passphraseFromUrl(
+  search = typeof window !== 'undefined' ? window.location.search : '',
+  hash = typeof window !== 'undefined' ? window.location.hash : '',
+) {
+  const f = new URLSearchParams(String(hash || '').replace(/^#/, ''));
   const q = new URLSearchParams(search);
-  return normalizeSyncPassphrase(q.get('passphrase') || q.get('p') || '');
+  return normalizeSyncPassphrase(f.get('passphrase') || f.get('p') || q.get('passphrase') || q.get('p') || '');
 }
 
 function stripPassphraseFromUrl() {
@@ -375,6 +386,13 @@ function stripPassphraseFromUrl() {
     const url = new URL(window.location.href);
     url.searchParams.delete('passphrase');
     url.searchParams.delete('p');
+    const f = new URLSearchParams(url.hash.replace(/^#/, ''));
+    if (f.has('passphrase') || f.has('p')) {
+      f.delete('passphrase');
+      f.delete('p');
+      const rest = f.toString();
+      url.hash = rest ? `#${rest}` : '';
+    }
     window.history.replaceState(window.history.state, '', url);
   } catch { /* an embed that cannot rewrite its URL keeps it; harmless */ }
 }

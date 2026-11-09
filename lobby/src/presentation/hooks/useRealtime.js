@@ -24,7 +24,7 @@ import { saveLiveBirthdays } from './useBirthdays.js';
  *   shared/schedule.json or the device skip-weeks overlay.
  *
  * The screen listens on the sync service's live channel once it is signed in
- * (the church passphrase: QuickNav, or `?passphrase=` on a feed's link, which
+ * (the church passphrase: QuickNav, or `#passphrase=` on a feed's link, which
  * useSync reads). An old link that still carries Pusher's `?key=&cluster=`
  * is simply ignored.
  */

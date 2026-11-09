@@ -201,6 +201,16 @@ describe('a feed link that carries the passphrase (OBS, ProPresenter)', () => {
     expect(passphraseFromUrl('?p=KENNEBEC')).toBe('kennebec');
     expect(passphraseFromUrl('?key=x')).toBe('');
   });
+
+  it('reads #passphrase= or #p= (never sent to a server), and prefers it over the query', async () => {
+    // Security, 2026-11-09: the fragment form is the one to hand out.
+    const { passphraseFromUrl } = await import('../hooks/useSync.js');
+    expect(passphraseFromUrl('', '#passphrase=%20Kennebec%20')).toBe('kennebec');
+    expect(passphraseFromUrl('?overlay=1', '#p=KENNEBEC&x=1')).toBe('kennebec');
+    expect(passphraseFromUrl('?passphrase=old', '#passphrase=new')).toBe('new');
+    expect(passphraseFromUrl('?passphrase=old', '#other=1')).toBe('old');
+    expect(passphraseFromUrl('', '')).toBe('');
+  });
 });
 
 describe('the cloud check-in test button\'s words', () => {

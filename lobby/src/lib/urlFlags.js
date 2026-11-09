@@ -5,8 +5,10 @@
 //   ?overlay=1            transparent stage, banners + confetti only
 //   ?chroma=00b140        solid key color instead of transparency
 //                         (implies overlay mode)
-//   ?passphrase=... (or ?p=)  sign in to the sync service's live channel
-//                         (read by src/hooks/useSync.js, not here).
+//   #passphrase=... (or #p=)  sign in to the sync service's live channel
+//                         (read by src/hooks/useSync.js, not here). In the
+//                         fragment so it never reaches a server log; an old
+//                         link's ?passphrase= / ?p= still works.
 //                         An old link that still carries Pusher's ?key= and
 //                         ?cluster= just has them ignored.
 //   ?lowPower=1           forces confetti off and reduced motion on,
@@ -31,7 +33,7 @@
 //                         else = no flag.
 //
 // Example OBS browser source URL:
-//   https://awana.kvbchurch.org/lobby/?overlay=1&passphrase=…
+//   https://awana.kvbchurch.org/lobby/?overlay=1#passphrase=…
 // lib/clubs.js CORNER_CLUB_IDS, written out (this file imports only the pure
 // lib/safeUrl.js; urlFlags.test.js pins the two lists equal).
 import { sameSiteConfigUrl } from './safeUrl.js';
