@@ -22,7 +22,7 @@
 // - The code screen carries a QR code of awana.kvbchurch.org/cast/#code=<code> (the
 //   presenter page reads the code from it and connects) and says a laptop must join the
 //   KVBC_Guest Wi-Fi to share its screen (owner 2026-11-08). The QR is drawn by
-//   qrcode-generator (cdnjs), flat charcoal on the cream; no QR when it cannot load.
+//   qrcode-generator (cdnjs), white on the black code screen; no QR when it cannot load.
 // - The code and its QR are HIDDEN until asked for (owner 2026-11-08: "the pin should
 //   not show up by default until it's clicked on, same with the QR code"): a click or a
 //   key on this screen, the tray's "Show Cast code" or a presenter's "Display code" (the
@@ -162,9 +162,10 @@ async function drawQr(d) {
     const px = Math.max(4, Math.floor(512 / (n + quiet * 2)));
     canvas.width = canvas.height = px * (n + quiet * 2);
     const ctx = canvas.getContext('2d');
-    ctx.fillStyle = '#F6F2EA';
+    // White on black, like the screen around it (phone cameras read light-on-dark codes).
+    ctx.fillStyle = '#000000';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = '#3A332A';
+    ctx.fillStyle = '#FFFFFF';
     for (let r = 0; r < n; r += 1) for (let col = 0; col < n; col += 1) if (q.isDark(r, col)) ctx.fillRect((col + quiet) * px, (r + quiet) * px, px, px);
     box.hidden = false;
   } catch {

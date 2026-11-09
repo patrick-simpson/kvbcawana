@@ -19,33 +19,37 @@
   .layer { position: fixed; inset: 0; }
 
   /* ── waiting: the code ── */
-  .card { background: var(--cream); display: grid; grid-template-rows: auto 1fr auto; padding: 6.2vh 7vw 6.6vh; transition: opacity var(--t-slow) var(--ease-in-out), transform var(--t-slow) var(--ease-in-out); }
+  /* The code screen: white on black (owner 2026-11-08: "the present on this screen should be
+     black background white text/qr"). KVBC Awana's Settings window note stays on cream. */
+  .card { --c-bg: #000; --c-text: #FFFFFF; --c-muted: rgba(255, 255, 255, .7); --c-rule: rgba(255, 255, 255, .2); background: var(--c-bg); color: var(--c-text); display: grid; grid-template-rows: auto 1fr auto; padding: 6.2vh 7vw 6.6vh; transition: opacity var(--t-slow) var(--ease-in-out), transform var(--t-slow) var(--ease-in-out); }
   .card.is-away { opacity: 0; transform: scale(.985); }
   .card .logo { width: calc(26 * var(--u)); min-width: 260px; height: auto; display: block; }
   .card .middle { align-self: center; display: grid; grid-template-columns: 1fr auto; gap: calc(5 * var(--u)); align-items: center; }
   .middle > div { min-width: 0; }
   .qr { margin: 0; text-align: center; }
   .qr canvas { display: block; width: calc(20 * var(--u)); height: calc(20 * var(--u)); image-rendering: pixelated; }
-  .qr figcaption { margin-top: calc(1 * var(--u)); font: 500 calc(1.6 * var(--u))/1.3 var(--heading); letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
-  .card .foot b { font-weight: 700; color: var(--charcoal); }
+  .qr figcaption { margin-top: calc(1 * var(--u)); font: 500 calc(1.6 * var(--u))/1.3 var(--heading); letter-spacing: .14em; text-transform: uppercase; color: var(--c-muted); }
+  .card .foot b { font-weight: 700; color: var(--c-text); }
   /* The code and QR stay hidden until someone clicks the screen (owner 2026-11-08: "the pin
      should not show up by default until it's clicked on, same with the QR code"). */
-  .reveal { display: none; margin: calc(3.4 * var(--u)) 0 0; padding: calc(2 * var(--u)) calc(3 * var(--u)); border: 2px dashed var(--tan); border-radius: calc(1 * var(--u)); font: 500 calc(3 * var(--u))/1.2 var(--heading); color: var(--muted); width: max-content; }
+  .reveal { display: none; margin: calc(3.4 * var(--u)) 0 0; padding: calc(2 * var(--u)) calc(3 * var(--u)); border: 2px dashed var(--c-rule); border-radius: calc(1 * var(--u)); font: 500 calc(3 * var(--u))/1.2 var(--heading); color: var(--c-muted); width: max-content; }
   .card.code-hidden .code, .card.code-hidden .qr { display: none !important; }
   .card.code-hidden .reveal { display: block; }
   .card.code-hidden { cursor: pointer; }
   .card h1 { font: 500 calc(5 * var(--u))/1.05 var(--heading); letter-spacing: -.01em; margin: 0; }
-  .card .go { font: 400 calc(2.5 * var(--u))/1.4 var(--body); color: var(--muted); margin: calc(1.6 * var(--u)) 0 0; }
-  .card .go b { font-weight: 700; color: var(--charcoal); }
-  .code { display: flex; gap: calc(3.6 * var(--u)); margin: calc(3.4 * var(--u)) 0 0; font: 400 calc(14.5 * var(--u))/.9 var(--heading); letter-spacing: .06em; color: var(--green); font-variant-numeric: tabular-nums; }
-  .code.is-empty { color: var(--rule); }
-  .card .foot { display: flex; align-items: center; gap: calc(1.2 * var(--u)); border-top: 1px solid var(--rule); padding-top: calc(1.8 * var(--u)); font: 400 calc(1.7 * var(--u))/1.4 var(--body); color: var(--muted); }
+  .card .go { font: 400 calc(2.5 * var(--u))/1.4 var(--body); color: var(--c-muted); margin: calc(1.6 * var(--u)) 0 0; }
+  .card .go b { font-weight: 700; color: var(--c-text); }
+  .code { display: flex; gap: calc(3.6 * var(--u)); margin: calc(3.4 * var(--u)) 0 0; font: 400 calc(14.5 * var(--u))/.9 var(--heading); letter-spacing: .06em; color: var(--c-text); font-variant-numeric: tabular-nums; }
+  .code.is-empty { color: var(--c-rule); }
+  .card .foot { display: flex; align-items: center; gap: calc(1.2 * var(--u)); border-top: 1px solid var(--c-rule); padding-top: calc(1.8 * var(--u)); font: 400 calc(1.7 * var(--u))/1.4 var(--body); color: var(--c-muted); }
   .card .foot::before { content: ''; width: calc(.9 * var(--u)); height: calc(.9 * var(--u)); border-radius: 50%; background: var(--tan); flex: none; }
 
   /* configure mode and the signed-out card: calm, on the same cream, no code */
   .card.calm h1 { font-size: calc(3.6 * var(--u)); max-width: 30ch; }
   .card.calm .go { max-width: 48ch; }
   body.configure { cursor: auto; overflow: auto; background: var(--cream); --u: min(1.6vw, 2.4vh); }
+  body.configure .card { --c-bg: var(--cream); --c-text: var(--charcoal); --c-muted: var(--muted); --c-rule: var(--rule); }
+  body.configure .card .logo { content: url('/cast/church/kvbc-logo.png'); }
   body.configure .card { position: static; min-height: 100vh; padding: 32px 28px; }
 
   /* ── something up ── */
@@ -96,7 +100,7 @@
 <body>
   <!-- Waiting: the code (or, signed out / configure mode, a calm note) -->
   <section class="layer card code-hidden" id="card">
-    <img class="logo" src="/cast/church/kvbc-logo.png" alt="Kennebec Valley Baptist Church" width="1302" height="277">
+    <img class="logo" src="/cast/church/kvbc-logo-white.png" alt="Kennebec Valley Baptist Church" width="1302" height="277">
     <div class="middle">
       <div>
         <h1 id="card-title">Present on this screen</h1>
