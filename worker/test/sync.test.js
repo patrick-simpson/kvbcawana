@@ -2,11 +2,13 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
   GLOBAL_MAX_FAILS,
+  GLOBAL_MIN_NETS,
   GUESSES_IN_FLIGHT_MAX,
   IP_LOCK_MS,
   IP_MAX_FAILS,
   SyncCore,
   buildDeck,
+  netOf,
   buildSlidesChunks,
 } from '../src/sync.js';
 import { allowedOrigin } from '../src/index.js';
@@ -145,6 +147,32 @@ describe('login with the passphrase', () => {
     // Nothing is left held: a right word from a fresh address still signs in.
     expect(s.core.guessingAll).toBe(0);
     expect((await s.login('kennebec', '10.0.0.8')).res.status).toBe(200);
+  });
+
+  it('one attacker (or a few addresses) can never lock everyone out; many networks still do', async () => {
+    const s = setup();
+    // Nine networks, far more than 30 wrong tries between them over the hour.
+    for (let round = 0; round < 3; round += 1) {
+      for (let n = 0; n < GLOBAL_MIN_NETS - 1; n += 1) for (let i = 0; i < IP_MAX_FAILS; i += 1) await s.login('guess', `10.7.${n}.1`);
+      s.tick(IP_LOCK_MS + 1);
+    }
+    expect((await s.storage.get('fails:all')).count).toBeGreaterThanOrEqual(GLOBAL_MAX_FAILS);
+    expect((await s.login('kennebec', '10.9.9.9')).res.status).toBe(200);
+    // A tenth network within the window: now everyone waits.
+    await s.login('guess', '10.7.99.1');
+    expect((await s.login('kennebec', '10.9.9.10')).res.status).toBe(429);
+  });
+
+  it('an IPv6 /64 is one network: its addresses share one count', async () => {
+    expect(netOf('2001:db8:1:2:aaaa::1')).toBe('2001:db8:1:2::/64');
+    expect(netOf('2001:DB8:1:2:ffff:ffff:ffff:ffff')).toBe('2001:db8:1:2::/64');
+    expect(netOf('2001:db8::1')).toBe('2001:db8:0:0::/64');
+    expect(netOf('::ffff:10.0.0.1')).toBe('10.0.0.1');
+    expect(netOf('10.0.0.1')).toBe('10.0.0.1');
+    const s = setup();
+    for (let i = 0; i < IP_MAX_FAILS; i += 1) await s.login('guess', `2001:db8:1:2::${i + 1}`);
+    expect((await s.login('kennebec', '2001:db8:1:2::99')).res.status).toBe(429);
+    expect((await s.login('kennebec', '2001:db8:1:3::1')).res.status).toBe(200);
   });
 
   it('a right word clears that address\'s count', async () => {

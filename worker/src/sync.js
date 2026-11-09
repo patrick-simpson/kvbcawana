@@ -28,7 +28,9 @@
 // and change everything. So the passphrase is the one lock, and guessing it
 // is ONLINE only, against limits: IP_MAX_FAILS wrong tries from one address
 // lock that address out for IP_LOCK_MS, and GLOBAL_MAX_FAILS across all
-// addresses in an hour lock logins for everyone for GLOBAL_LOCK_MS. A screen
+// addresses in an hour lock logins for everyone for GLOBAL_LOCK_MS, but only when
+// they came from at least GLOBAL_MIN_NETS different networks (an IPv4 address, an
+// IPv6 /64: netOf), so one person cannot lock the church out. A screen
 // already signed in never needs to log in again, so a lock only ever delays
 // setting up a new one. (The old design sealed the keys under the passphrase
 // on a public channel, where a short word could be guessed offline in
@@ -89,6 +91,31 @@ export const IP_LOCK_MS = 15 * 60 * 1000;
 export const GLOBAL_MAX_FAILS = 30;
 export const GLOBAL_WINDOW_MS = 60 * 60 * 1000;
 export const GLOBAL_LOCK_MS = 60 * 60 * 1000;
+/**
+ * The global lock needs wrong tries from this many different networks within the
+ * window. One address can make at most 20 tries an hour (5 per 15 minutes), so a
+ * single attacker, a household or a few phones can never lock everyone out; a
+ * guessing run spread over ten or more networks (what the global lock is for) still
+ * does. An IPv6 /64 counts as one network, as it does for the per-address limit.
+ */
+export const GLOBAL_MIN_NETS = 10;
+
+/**
+ * The network a guess is counted against: an IPv4 address as it is, an IPv6 address's
+ * /64 (one home or phone is handed a whole /64, so per address would be no limit).
+ * @param {string} ip
+ */
+export function netOf(ip) {
+  const s = String(ip || '').trim().toLowerCase();
+  if (!s.includes(':')) return s;
+  const mapped = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/.exec(s);
+  if (mapped) return mapped[1];
+  const [head, tail = ''] = s.split('::');
+  const h = head ? head.split(':') : [];
+  const t = tail ? tail.split(':') : [];
+  const groups = s.includes('::') ? [...h, ...Array(Math.max(0, 8 - h.length - t.length)).fill('0'), ...t] : h;
+  return `${groups.slice(0, 4).map((g) => (parseInt(g, 16) || 0).toString(16)).join(':')}::/64`;
+}
 /**
  * Guesses being checked at once (memory only). A guess is counted the moment it
  * arrives, before any await (the body, the verifier's hash), so many wrong logins
@@ -560,8 +587,11 @@ export class SyncCore {
 
     const prevAll = await this.storage.get('fails:all');
     const allFresh = !prevAll || t - prevAll.first > GLOBAL_WINDOW_MS || (prevAll.until && prevAll.until <= t);
-    const all = allFresh ? { count: 1, first: t, until: 0 } : { ...prevAll, count: prevAll.count + 1 };
-    if (all.count >= GLOBAL_MAX_FAILS) all.until = t + GLOBAL_LOCK_MS;
+    const all = allFresh ? { count: 1, first: t, until: 0, nets: [] } : { ...prevAll, count: prevAll.count + 1, nets: Array.isArray(prevAll.nets) ? prevAll.nets : [] };
+    // Which networks the window's wrong tries came from (only as many as the rule needs).
+    const net = netOf(ip);
+    if (!all.nets.includes(net) && all.nets.length < GLOBAL_MIN_NETS) all.nets = [...all.nets, net];
+    if (all.count >= GLOBAL_MAX_FAILS && all.nets.length >= GLOBAL_MIN_NETS) all.until = t + GLOBAL_LOCK_MS;
     await this.storage.put('fails:all', all);
     return Math.max(0, IP_MAX_FAILS - mine.count);
   }
@@ -895,7 +925,8 @@ export class SyncCore {
    * @param {Request} request @param {string} ip
    */
   async login(request, ip) {
-    return this.guess(ip, () => this.loginChecked(request, ip));
+    const who = netOf(ip);
+    return this.guess(who, () => this.loginChecked(request, who));
   }
 
   /** The login, inside its guess slot. @param {Request} request @param {string} ip */
@@ -1085,7 +1116,8 @@ export class SyncCore {
    * @param {Request} request @param {string} ip
    */
   async changePassphrase(request, ip) {
-    return this.guess(ip, () => this.changePassphraseChecked(request, ip));
+    const who = netOf(ip);
+    return this.guess(who, () => this.changePassphraseChecked(request, who));
   }
 
   /** The change, inside its guess slot. @param {Request} request @param {string} ip */
