@@ -7,11 +7,11 @@ import { Twin, TwinHandle } from './Twin';
  * screens (Twin.tsx), with the time of night as its spine:
  *
  *   #welcome   5:45  the lobby TV's welcome: the church's logo and the 3D intro
- *                    video (owner 2026-11-01: "the new welcome graphics")
+ *                    video (owner 2026-11-01: "the new welcome graphics"), then
+ *                    every season poster (the lobby's own list: the Grand Prix
+ *                    video too; 5:55 "Coming up" folded in here 2026-11-09)
  *   #doors     5:50  the check-in page on a phone (the reader taps names, or it
  *                    taps on its own), the label each tap prints, the lobby TV
- *   #promos    5:55  the lobby TV looping every season poster (the lobby's own
- *                    list: the Grand Prix video too)
  *   #opening   6:00  the projector wall: the countdown runs out, the grand welcome
  *   #projector 6:05  the projector wall: game time, T&T's game scored live (the scoreboard)
  *   #journey   6:30  the Journey room's PC: the lesson starts, run from the
@@ -94,34 +94,6 @@ const Time: React.FC<{ hm: string; ampm?: string }> = ({ hm, ampm = 'PM' }) => (
 );
 
 const Tag: React.FC<{ children: React.ReactNode }> = ({ children }) => <p className="kv-tag">{children}</p>;
-
-// ── 5:45 Welcome ─────────────────────────────────────────────────────────────
-// The lobby's welcome (owner, 2026-11-01: the home page shows the new welcome
-// graphics): the flagship slide, the church's logo landing big in the middle,
-// carrying on into the 3D intro video and back, on every pass of this twin
-// (`intro`; lobby/src/lib/flagship.js showcaseIntro). The real lobby plays the
-// video now and then; here it plays each time round.
-const Welcome: React.FC = () => {
-  const [ref] = useScene('17:45:00');
-  return (
-    <section ref={ref} id="welcome" className="kv-scene kv-scene--welcome" aria-labelledby="welcome-title">
-      <div className="kv-wrap kv-scene__grid">
-        <div className="kv-scene__copy">
-          <Time hm="5:45" />
-          <h2 className="kv-scene__title" id="welcome-title">Welcome in.</h2>
-          <p className="kv-scene__line">Before the first family walks in, the lobby is already saying hello: the church's logo lands, then the club's friends fly through.</p>
-        </div>
-        <div className="kv-scene__stage">
-          <figure className="kv-device kv-device--tv">
-            <Twin kind="lobby" at={wall('17:45:00')} width={1600} height={900} intro
-              title="The lobby TV's welcome: the church's logo, then the 3D intro video" />
-            <figcaption><Tag>Lobby TV · welcome</Tag></figcaption>
-          </figure>
-        </div>
-      </div>
-    </section>
-  );
-};
 
 // ── 5:50 Doors open ──────────────────────────────────────────────────────────
 // The showcase's club, in the order the check-in page taps them by itself.
@@ -215,34 +187,53 @@ const Doors: React.FC = () => {
   );
 };
 
-// ── 5:55 Coming up: the season's posters ─────────────────────────────────────
-// Every poster the lobby has, on a loop, on its own TV (owner, 2026-10-16: "a
+// ── 5:45 Welcome in, and what's coming up ────────────────────────────────────
+// ONE lobby TV (owner 2026-11-09: the home page was twice its length; 5:55
+// "Coming up" folded in here). It opens on the lobby's welcome (owner,
+// 2026-11-01: the new welcome graphics): the flagship slide, the church's logo
+// landing big in the middle, carrying on into the 3D intro video and back, on
+// every pass of this twin (`intro`; lobby/src/lib/flagship.js showcaseIntro).
+// After WELCOME_MS it plays every poster the lobby has (owner, 2026-10-16: "a
 // section for the promos that plays all of them on loop. Then any new ones can
-// get added"). The list is the lobby's own (PREVIEW_PROMOS, handed up by the
-// twin), so a new poster joins by itself; each plays to its end card, as the
-// Settings window's Preview the promos plays it, then the next.
+// get added"), each to its end card as the Settings window's Preview the
+// promos plays it, then the welcome again. The list is the lobby's own
+// (PREVIEW_PROMOS, handed up by the twin), so a new poster joins by itself.
 interface PromoItem { key: string; label: string }
+const WELCOME_MS = 14000; // the welcome's turn before (and between) the posters
 const PROMO_GAP_MS = 900;
 const PROMO_START_MS = 5000; // a poster that never comes up is skipped
 const PROMO_MAX_MS = 40000; // and one that never ends is moved on from
 
-const Promos: React.FC = () => {
-  const [ref, active] = useScene('17:55:00');
+const Welcome: React.FC = () => {
+  const [ref, active] = useScene('17:45:00');
   const tv = useRef<TwinHandle>(null);
   const [list, setList] = useState<PromoItem[]>([]);
   const [now, setNow] = useState<PromoItem | null>(null);
-  const run = useRef({ next: 0, sentAt: 0, playing: false, endedAt: 0 });
+  const fresh = () => ({ next: 0, sentAt: 0, playing: false, endedAt: 0, welcomeAt: Date.now() });
+  const run = useRef(fresh());
   useEffect(() => {
-    if (!active) { run.current = { next: 0, sentAt: 0, playing: false, endedAt: 0 }; setNow(null); }
+    run.current = fresh();
+    if (!active) setNow(null);
   }, [active]);
 
   useEvery(active, 300, () => {
     if (!tv.current?.loaded() || !list.length) return;
     const r = run.current;
     const t = Date.now();
+    if (r.welcomeAt) {
+      if (t - r.welcomeAt < WELCOME_MS) return;
+      r.welcomeAt = 0;
+    }
     const stuck = r.sentAt && ((!r.playing && t - r.sentAt > PROMO_START_MS) || t - r.sentAt > PROMO_MAX_MS);
     const ready = !r.sentAt || stuck || (!r.playing && r.endedAt && t - r.endedAt >= PROMO_GAP_MS);
     if (!ready) return;
+    if (r.next > 0 && r.next % list.length === 0 && !r.welcomeAt && r.sentAt) {
+      // Every poster has played: the welcome's turn again.
+      r.sentAt = 0; r.playing = false; r.endedAt = 0; r.welcomeAt = t;
+      r.next = 0;
+      setNow(null);
+      return;
+    }
     const item = list[r.next % list.length];
     r.next += 1;
     r.sentAt = t;
@@ -263,12 +254,12 @@ const Promos: React.FC = () => {
   };
 
   return (
-    <section ref={ref} id="promos" className="kv-scene kv-scene--promos" aria-labelledby="promos-title">
+    <section ref={ref} id="welcome" className="kv-scene kv-scene--welcome" aria-labelledby="welcome-title">
       <div className="kv-wrap kv-scene__grid">
         <div className="kv-scene__copy">
-          <Time hm="5:55" />
-          <h2 className="kv-scene__title" id="promos-title">Coming up.</h2>
-          <p className="kv-scene__line">Between arrivals, the lobby tells families what's next: every poster and promo video of the season, one after another.</p>
+          <Time hm="5:45" />
+          <h2 className="kv-scene__title" id="welcome-title">Welcome in.</h2>
+          <p className="kv-scene__line">Before the first family walks in, the lobby says hello, then shows what's coming up: every poster and promo video of the season.</p>
           {list.length > 0 && (
             <ol className="kv-promos__list" aria-label="The season's posters">
               {list.map((p) => <li key={p.key} className={now && now.key === p.key ? 'is-on' : undefined}>{p.label}</li>)}
@@ -277,9 +268,9 @@ const Promos: React.FC = () => {
         </div>
         <div className="kv-scene__stage">
           <figure className="kv-device kv-device--tv">
-            <Twin ref={tv} kind="lobby" at={wall('17:55:00')} width={1600} height={900} onEvent={onEvent}
-              title="The lobby TV playing the season's posters, one after another" />
-            <figcaption><Tag>{now ? `Lobby TV · ${now.label}` : 'Lobby TV'}</Tag></figcaption>
+            <Twin ref={tv} kind="lobby" at={wall('17:45:00')} width={1600} height={900} intro onEvent={onEvent}
+              title="The lobby TV: the church's logo and the 3D intro video, then the season's posters, one after another" />
+            <figcaption><Tag>{now ? `Lobby TV · ${now.label}` : 'Lobby TV · welcome'}</Tag></figcaption>
           </figure>
         </div>
       </div>
@@ -508,7 +499,6 @@ export const Night: React.FC = () => (
   <div id="night" className="kv-night">
     <Welcome />
     <Doors />
-    <Promos />
     <OpeningCeremony />
     <Games />
     <Journey />
