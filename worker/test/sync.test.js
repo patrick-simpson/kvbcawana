@@ -473,6 +473,10 @@ describe('requests', () => {
     expect(allowedOrigin('http://localhost:5173')).toBe('http://localhost:5173');
     expect(allowedOrigin('https://awana.kvbchurch.org')).toBe('https://awana.kvbchurch.org');
     expect(allowedOrigin('https://kvbcawana.pages.dev')).toBe('https://kvbcawana.pages.dev');
+    expect(allowedOrigin('https://cast.kvbchurch.org')).toBe('https://cast.kvbchurch.org');
+    expect(allowedOrigin('https://kvbc-cast.pages.dev')).toBe('https://kvbc-cast.pages.dev');
+    expect(allowedOrigin('https://cast.kvbchurch.org.evil.example')).toBeNull();
+    expect(allowedOrigin('https://preview.kvbc-cast.pages.dev')).toBeNull();
     expect(allowedOrigin('https://evil.example')).toBeNull();
     expect(allowedOrigin('https://patrick-simpson.github.io.evil.example')).toBeNull();
     expect(allowedOrigin(null)).toBeNull();

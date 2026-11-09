@@ -23,6 +23,10 @@ const ALLOWED_ORIGINS = [
   // preview deploy or the bare Worker address still calls in cross-origin).
   'https://awana.kvbchurch.org',
   'https://kvbcawana.pages.dev',
+  // Cast's own site (owner 2026-11-09; site/cast-site/, Pages project kvbc-cast):
+  // same origin through its own /api too, listed for the same reasons.
+  'https://cast.kvbchurch.org',
+  'https://kvbc-cast.pages.dev',
 ];
 const LOCAL_ORIGIN = /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/;
 
