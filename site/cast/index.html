@@ -20,8 +20,9 @@
 
   header { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 4px 0 8px; }
   header img { display: block; width: 168px; height: auto; }
-  .leave { font: 500 14px/1 var(--heading); letter-spacing: .04em; color: var(--muted); background: none; border: 0; padding: 12px 0 12px 12px; cursor: pointer; }
-  .leave:hover { color: var(--charcoal); }
+  /* Secondary to everything else, but a real target: 44 px tall, charcoal on cream (11:1), a muted outline (5.2:1). */
+  .leave { min-height: 44px; padding: 0 16px; font: 500 15px/1 var(--heading); letter-spacing: .02em; color: var(--charcoal); background: transparent; border: 1px solid var(--muted); border-radius: 6px; cursor: pointer; }
+  .leave:active { background: var(--sand); }
 
   h1 { font: 500 clamp(30px, 8vw, 40px)/1.1 var(--heading); letter-spacing: -.01em; margin: 40px 0 10px; }
   h2 { font: 500 22px/1.2 var(--heading); margin: 0; }
@@ -60,6 +61,10 @@
   .controls { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
   .controls .quiet { flex: 1 1 auto; }
   .controls .down { flex-basis: 100%; }
+  /* Volume: a smaller and a bigger button around the level, on a row of their own. */
+  .vol { flex: 1 1 100%; display: flex; align-items: center; gap: 8px; }
+  .controls .vol .quiet { flex: none; width: 56px; font-size: 24px; }
+  .vol-level { flex: 1; text-align: center; font: 500 16px/1.2 var(--heading); font-variant-numeric: tabular-nums; }
   #share-state { margin: 12px 0 0; font-size: 15px; }
   #share-state.bad { color: var(--error); }
 
@@ -197,8 +202,11 @@
         <button class="quiet" type="button" data-op="seek" data-by="-10">Back 10 s</button>
         <button class="quiet" type="button" data-op="toggle" id="btn-play">Pause</button>
         <button class="quiet" type="button" data-op="seek" data-by="10">Ahead 10 s</button>
-        <button class="quiet" type="button" data-op="volume" data-step="-1" aria-label="Volume down">Volume −</button>
-        <button class="quiet" type="button" data-op="volume" data-step="1" aria-label="Volume up">Volume +</button>
+        <div class="vol" role="group" aria-label="Volume">
+          <button class="quiet" type="button" data-op="volume" data-step="-1" aria-label="Volume down">−</button>
+          <span class="vol-level" id="vol-level">Volume</span>
+          <button class="quiet" type="button" data-op="volume" data-step="1" aria-label="Volume up">+</button>
+        </div>
         <button class="quiet" type="button" data-op="mute" id="btn-mute">Mute</button>
       </div>
       <!-- The slides on the TV: this one big, the next beside Back / Next, then every slide. -->

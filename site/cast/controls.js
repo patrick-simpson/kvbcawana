@@ -35,7 +35,7 @@ import { CONNECT_WAIT_MS, canShareScreen, startSharing } from './shared/screenSh
 import {
   captureWords, errorWords, filePress, fileProblem, linkToCopy, shareWords, size, textPress, titleFromName, tvWords, videoPress,
   CONVERT_GIVE_UP_MS, CONVERT_POLL_MS, SLIDES_ACCEPT, convertWords, slidesChoice,
-  clock, facebookPress, resultPress,
+  clock, facebookPress, resultPress, volumeWords,
 } from './logic.js';
 import { createPreview } from './preview.js';
 
@@ -151,6 +151,7 @@ export function createControls(conn) {
     const video = state.now && shown && state.now.button === shown.id ? state.now.video : null;
     setText($('btn-play'), video && video.paused ? 'Play' : 'Pause');
     setText($('btn-mute'), video && video.muted ? 'Unmute' : 'Mute');
+    if ($('vol-level')) setText($('vol-level'), volumeWords(video));
     $('btn-mute').dataset.op = video && video.muted ? 'unmute' : 'mute';
     for (const t of document.querySelectorAll('.thumb')) t.setAttribute('aria-pressed', String(Boolean(shown && shown.file && shown.file === t.dataset.file)));
   }
@@ -614,7 +615,7 @@ export function createControls(conn) {
       if (b.dataset.by) data.by = Number(b.dataset.by);
       if (b.dataset.step) data.step = Number(b.dataset.step);
       const p = R.sanitizeClassroomPress('video', data);
-      if (p) press('video', p.data, b.textContent.trim());
+      if (p) press('video', p.data, (b.getAttribute('aria-label') || b.textContent).trim());
     });
     $('pdf-input').setAttribute('accept', SLIDES_ACCEPT);
     // The slides on the TV: the preview's Back / Next and its strip are presses.

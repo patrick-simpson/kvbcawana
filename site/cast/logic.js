@@ -222,6 +222,16 @@ export function tvWords({ stage, now, screenOnline }, opts = {}) {
   return { main, sub, online: screenOnline };
 }
 
+/**
+ * The volume between the − and + buttons: "Volume 60%", " · muted" when it is. The TV's
+ * report carries the level; with no report yet it just says "Volume".
+ * @param {{ muted?: boolean, volume?: number } | null | undefined} video
+ */
+export function volumeWords(video) {
+  if (!video || typeof video.volume !== 'number') return 'Volume';
+  return `Volume ${video.volume}%${video.muted ? ' · muted' : ''}`;
+}
+
 /** The screen share's state in words. @param {string} state @param {string} [error] */
 export function shareWords(state, error) {
   switch (state) {

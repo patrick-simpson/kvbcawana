@@ -12,7 +12,7 @@ import { fileURLToPath } from 'node:url';
 import * as R from '../../shared/classroomRemote.js';
 import {
   TOKEN_KEY, captureWords, cleanCode, clock, codeReady, errorWords, filePress, fileProblem, formatCode,
-  joinWords, linkToCopy, placeholderId, shareWords, size, textPress, titleFromName, tvWords, videoPress,
+  joinWords, linkToCopy, placeholderId, shareWords, size, textPress, titleFromName, tvWords, videoPress, volumeWords,
   SLIDES_ACCEPT, convertWords, isPresentation, slideView, slidesChoice,
   codeFromHash, facebookPress, resultPress, CAST_HOME, presenterUrl, addressWords,
 } from '../cast/logic.js';
@@ -103,6 +103,16 @@ test('refusals are one plain sentence, the Worker\'s own when it sent one', () =
   assert.match(captureWords({ name: 'NotAllowedError' }), /cancelled/);
   assert.equal(shareWords('connected'), 'Sharing. The TV shows what you see.');
   assert.equal(shareWords('failed', 'The TV did not answer.'), 'The TV did not answer.');
+});
+
+test('the volume between the − and + buttons', () => {
+  assert.equal(volumeWords({ muted: false, volume: 60 }), 'Volume 60%');
+  assert.equal(volumeWords({ muted: true, volume: 60 }), 'Volume 60% · muted');
+  assert.equal(volumeWords(null), 'Volume');
+  // Both pages carry the level between the two buttons, and write it only when it changes.
+  for (const page of [read('cast', 'index.html'), read('cast', 'desk', 'index.html')]) {
+    assert.match(page, /data-step="-1"[^>]*>−<\/button>\s*<span class="vol-level" id="vol-level">Volume<\/span>\s*<button[^>]*data-step="1"[^>]*>\+<\/button>/);
+  }
 });
 
 test('the "On the TV now" line', () => {

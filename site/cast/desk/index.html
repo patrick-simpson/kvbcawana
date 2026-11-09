@@ -119,6 +119,9 @@
   .tv-sub { color: var(--text-2); margin-top: 2px; }
   .tv-sub:empty { display: none; }
   .controls { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  .vol { display: inline-flex; align-items: center; gap: 4px; }
+  .vol .quiet { min-width: 32px; padding: 5px 0; font-size: 16px; line-height: 20px; }
+  .vol-level { min-width: 112px; text-align: center; font-variant-numeric: tabular-nums; }
   .room { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--stroke); }
   .room .controls { margin-top: 0; }
   #press-note { margin-top: 12px; }
@@ -316,8 +319,11 @@
           <button class="quiet" type="button" data-op="seek" data-by="-10">Back 10 s</button>
           <button class="quiet" type="button" data-op="toggle" id="btn-play">Pause</button>
           <button class="quiet" type="button" data-op="seek" data-by="10">Ahead 10 s</button>
-          <button class="quiet" type="button" data-op="volume" data-step="-1" aria-label="Volume down">Volume −</button>
-          <button class="quiet" type="button" data-op="volume" data-step="1" aria-label="Volume up">Volume +</button>
+          <div class="vol" role="group" aria-label="Volume">
+            <button class="quiet" type="button" data-op="volume" data-step="-1" aria-label="Volume down">−</button>
+            <span class="vol-level" id="vol-level">Volume</span>
+            <button class="quiet" type="button" data-op="volume" data-step="1" aria-label="Volume up">+</button>
+          </div>
           <button class="quiet" type="button" data-op="mute" id="btn-mute">Mute</button>
         </div>
         <div class="slides" id="ctl-pdf" data-preview="none" hidden>
