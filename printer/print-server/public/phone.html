@@ -99,6 +99,9 @@
   .top.no-title h1 { display: none; }
   /* A phone keeps its one header row: Record keeping is for the desk laptop. */
   @media (max-width: 639px) { #record-btn { display: none; } .hdr-btn .wide { display: none; } .hdr-btn.exit, .mode-btn { padding: 0 12px; font-size: 18px; } }
+  /* The "+" menu keeps its size in the header row (at 360 px it was squeezed to ~18 px). */
+  #menu-btn { flex: none; min-width: 38px; }
+  @media (max-width: 380px) { .mode-btn { padding: 0 9px; font-size: 17px; } }
   /* Reprint a name tag (owner 2026-10-22): tonight's checked-in children, one tap each. */
   .reprint-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; margin-top: 8px; }
   .reprint-list button { min-height: 52px; padding: 6px 10px 6px 14px; border: 0; border-radius: 12px; cursor: pointer; text-align: left; position: relative; overflow: hidden;
