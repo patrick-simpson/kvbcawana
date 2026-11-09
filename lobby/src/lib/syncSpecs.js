@@ -155,12 +155,10 @@ export const SCREEN_ACTIONS = {
   // jump to game time): the countdown, held until the next Next.
   projector: Object.freeze(['select', 'resume', 'slide-next', 'slide-prev', 'backup', 'backup-end', 'slide-go', 'to-countdown']),
   journey: Object.freeze(['start-downloads', 'pause-downloads', 'resume-downloads', 'stop-downloads', 'delete-downloads']),
-  // show-presentation (owner 2026-11-08: "add a button on the remote to push the
-  // slideshow on the lobby computer at any time"): the presentation controls
-  // (site/presentation/) switch a KVBC Awana computer's display to its
-  // Presentation screen. Queued like Journey's (the app has no page up on a
-  // Sunday afternoon); the app's own socket hears the ring and collects it at once.
-  computer: Object.freeze(['show-presentation']),
+  // None since 2026-11-09 (owner: the presentation is over): show-presentation, the
+  // presentation controls' "Show on lobby computer", is gone with it (KVBC Awana
+  // 10.13.0). A computer's actions stay queued (SCREEN_ACTION_QUEUED_KINDS).
+  computer: Object.freeze([]),
 };
 
 /** The opening-ceremony remote's backup screens: a flag beside its pledge, or the verse. */

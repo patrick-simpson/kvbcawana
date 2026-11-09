@@ -105,17 +105,12 @@ describe('a second launch', () => {
   });
 });
 
-describe('show-presentation from afar (owner 2026-11-08: the presentation controls\' button)', () => {
-  it('only with the display role, through display.showScreen', () => {
-    assert.match(main, /onAction: \(action\) => \{\n      if \(action !== 'show-presentation'\) return;\n      if \(!roles\.display \|\| !display\)/);
-    assert.match(main, /display\.showScreen\('presentation'\)/);
-  });
-
-  it('the bell: this computer\'s own screen ring wakes device-sync; no station id; stopped on quit', () => {
-    assert.match(main, /match: \(data\) => wake\.isScreenRing\(data, roles\.deviceId\)/);
-    assert.match(main, /stationId: \(\) => '',/);
-    assert.match(main, /onWake: \(\) => \{ if \(deviceSync\) deviceSync\.wake\(\); \}/);
-    assert.match(main, /if \(screenBell\) screenBell\.stop\(\);/);
+describe('show-presentation is gone (owner 2026-11-09: the presentation is over; 10.13.0)', () => {
+  it('no action handler, no Presentation screen shown from afar, no live-channel bell for it', () => {
+    assert.ok(!/show-presentation/.test(main), 'main.js takes no show-presentation');
+    assert.ok(!/showScreen\('presentation'\)/.test(main));
+    assert.ok(!/screenBell/.test(main), 'the bell socket is gone');
+    assert.ok(!/isScreenRing/.test(main));
   });
 
   it('showScreen lets a tray Hide go, switches another screen as if chosen, and never reloads the same screen up', () => {

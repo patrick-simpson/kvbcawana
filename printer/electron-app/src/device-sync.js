@@ -51,10 +51,11 @@ const FILE = 'device-sync.json';
 /**
  * The actions this computer takes from afar (lobby/src/lib/syncSpecs.js
  * SCREEN_ACTIONS.computer; worker/src/routes.md 10.8): queued by the Worker and
- * handed over in the next hello's answer, each once. show-presentation (owner
- * 2026-11-08): the presentation controls' "Show on the lobby computer".
+ * handed over in the next hello's answer, each once. None since 10.13.0: the one
+ * there was, show-presentation (owner 2026-11-08), went with the presentation
+ * (owner 2026-11-09). The plumbing stays for the next one.
  */
-const ACTIONS = Object.freeze(['show-presentation']);
+const ACTIONS = Object.freeze([]);
 
 /** A hello this often (the Worker calls a screen online for 3 minutes after one). */
 const HELLO_MS = 2 * 60 * 1000;

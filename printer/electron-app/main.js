@@ -119,7 +119,6 @@ let wizard = null;        // src/setup-wizard.js
 let syncSession = null;   // src/sync-session.js
 let syncClient = null;    // print-server/sync-client.js (loaded in app.whenReady)
 let deviceSync = null;    // src/device-sync.js: this computer's row on /settings
-let screenBell = null;    // the live channel's ring for this computer's own actions (print-server/station-wake.js)
 let stationKeys = null;   // print-server/station-keys.js: the station key and the history key (safeStorage only)
 // Online check-in P2: this computer as a print station. 'off' | 'refused' (safeStorage
 // cannot keep the key: the station role is refused, fail closed) | 'signed-out' | 'waiting' | 'ready'.
@@ -1503,32 +1502,12 @@ app.whenReady().then(async () => {
       const own = syncSession.session();
       if (own && own.session === s.session) syncSession.signOut();
     },
-    // An action from afar (owner 2026-11-08: the presentation controls' "Show on the
-    // lobby computer"): the display switches to its Presentation screen, or
-    // brings it back if it was put away. Nothing without the display role.
-    onAction: (action) => {
-      if (action !== 'show-presentation') return;
-      if (!roles.display || !display) { console.log('[device] show-presentation: this computer has no display role'); return; }
-      console.log('[device] show-presentation:', display.showScreen('presentation'));
-      refreshTray();
-    },
     log: (...a) => console.log(...a),
   });
-  // The ring for this computer's actions (the Worker rings `screen-action` with
-  // its id when one is queued): a hello at once instead of at the next 2 or 15
-  // minute one. Only with the display role (its one action is the display's).
-  {
-    const wake = require(path.join(printServerDir(), 'station-wake.js'));
-    const bellWanted = () => roles.display && roles.setupDone;
-    screenBell = wake.startStationWake({
-      signedIn: () => { const s = bellWanted() ? deviceSession() : null; return s ? { base: s.url, session: s.session } : null; },
-      stationId: () => '',
-      match: (data) => wake.isScreenRing(data, roles.deviceId),
-      onWake: () => { if (deviceSync) deviceSync.wake(); },
-      tag: '[device]',
-      log: (m) => console.log(m),
-    });
-  }
+  // No ring for this computer's actions since 10.13.0 (owner 2026-11-09): its one
+  // action, the presentation controls' "Show on lobby computer", went with the
+  // presentation, and so did the live channel socket that heard it. A future
+  // action is collected by the next hello.
   wizard = createSetupWizard({
     staticDir: path.join(__dirname, 'static'),
     iconPath: getIconPath() || undefined,
@@ -1608,7 +1587,6 @@ app.on('window-all-closed', () => {
 app.on('before-quit', () => {
   app.isQuitting = true;
   if (display) display.beforeQuit();
-  if (screenBell) screenBell.stop();
   if (serverModule && serverModule.stopListening) serverModule.stopListening();
   else if (serverInstance) serverInstance.close();
   if (pdfWindow && !pdfWindow.isDestroyed()) pdfWindow.destroy();

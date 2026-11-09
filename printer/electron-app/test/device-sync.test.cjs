@@ -466,21 +466,20 @@ describe('main.js wiring', () => {
 });
 
 
-describe('actions from afar (owner 2026-11-08: show-presentation)', () => {
-  it('the allowlist is SCREEN_ACTIONS.computer, and a computer\'s actions are queued (lobby/src/lib/syncSpecs.js)', async () => {
+describe('actions from afar (none since 10.13.0: show-presentation went with the presentation, owner 2026-11-09)', () => {
+  it('the allowlist is SCREEN_ACTIONS.computer (now empty), and a computer\'s actions are still queued (lobby/src/lib/syncSpecs.js)', async () => {
     const { SCREEN_ACTIONS, SCREEN_ACTION_QUEUED_KINDS } = await import('../../../lobby/src/lib/syncSpecs.js');
     assert.deepEqual([...ds.ACTIONS], [...SCREEN_ACTIONS.computer]);
+    assert.deepEqual([...ds.ACTIONS], []);
     assert.ok(SCREEN_ACTION_QUEUED_KINDS.includes('computer'));
   });
 
-  it('a hello\'s answer hands an action over: run once, in order; junk and other kinds\' actions are not', async () => {
+  it('a hello\'s answer runs nothing outside the allowlist: an old show-presentation, junk, other kinds\' actions', async () => {
     const ran = [];
     const pc = await computer({ display: true, onAction: (a) => ran.push(a) });
     pc.worker.queue = [{ action: 'show-presentation', at: 'x' }, { action: 'reset-tally' }, { action: 42 }, null];
     await pc.sync.start();
-    assert.deepEqual(ran, ['show-presentation']);
-    await pc.sync.start();
-    assert.deepEqual(ran, ['show-presentation'], 'handed over once');
+    assert.deepEqual(ran, []);
   });
 
   it('wake() (the live channel rang its id) says hello at once; never while signed out', async () => {
@@ -488,10 +487,9 @@ describe('actions from afar (owner 2026-11-08: show-presentation)', () => {
     const pc = await computer({ display: true, onAction: (a) => ran.push(a) });
     await pc.sync.start();
     const before = pc.worker.calls.length;
-    pc.worker.queue = [{ action: 'show-presentation', at: 'y' }];
     await pc.sync.wake();
     assert.ok(pc.worker.calls.length > before, 'a round ran');
-    assert.deepEqual(ran, ['show-presentation']);
+    assert.deepEqual(ran, []);
     pc.worker.token = 'other';
     await pc.sync.start();   // 401: signed out
     const n = pc.worker.calls.length;

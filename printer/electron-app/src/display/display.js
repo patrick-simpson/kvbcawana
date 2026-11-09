@@ -39,7 +39,7 @@ const SOURCES_EVERY_MS = 60 * 60 * 1000; // re-read the schedule and feed hourly
 const RETRY_LOAD_MS = 30 * 1000;
 const CURSOR_IDLE_MS = 3000;
 // What the volunteer calls the monitor it goes on, in titles and the tray.
-const WHERE = { lobby: 'the lobby TV', projector: 'the projector', journey: 'the Journey screen', classroom: 'the downstairs classroom screen', presentation: 'the presentation screen' };
+const WHERE = { lobby: 'the lobby TV', projector: 'the projector', journey: 'the Journey screen', classroom: 'the downstairs classroom screen' };
 const IPC_HANDLES = ['configure:get', 'configure:set'];
 const IPC_EVENTS = ['card:cancel', 'chooser:choose', 'chooser:cancel', 'configure:choose-monitor', 'configure:reload-screen',
   'configure:reload-settings', 'configure:open-log', 'configure:cancel-shutdown'];
@@ -491,10 +491,9 @@ function createDisplay(opts) {
     // by hand (or Hide in the tray) puts it away until the next scheduled window.
     if (win.inWindow) blackDismissed = false;
     if (!visible && reason === 'off' && urls().screen.id === 'classroom' && !blackDismissed && !SMOKE) { visible = true; reason = 'black'; }
-    // The presentation (owner 2026-11-01: "I'll only run this once on an off club
-    // night") is up whenever it is the chosen screen, whatever the hours say;
+    // A screen that is up whenever it is chosen (`always`: Cast), whatever the hours say;
     // closing it by hand or Hide in the tray puts it away (like the classroom's black).
-    if (!visible && reason === 'off' && urls().screen.always && !blackDismissed && !SMOKE) { visible = true; reason = 'presentation'; }
+    if (!visible && reason === 'off' && urls().screen.always && !blackDismissed && !SMOKE) { visible = true; reason = 'always'; }
     if (reason !== lastReason) { log('state', reason, win.dateKey); lastReason = reason; }
     if (visible) openLobby(); else closeLobby();
     const clubNightAhead = nextClubNight(t, sources, 60, hours()) === win.dateKey && win.minutes < hours().closeMin;
@@ -674,15 +673,15 @@ function createDisplay(opts) {
     state.settings = next;
     saveState();
     log('screen chosen', next.screen);
-    blackDismissed = false; // a screen chosen by hand comes up (the presentation, the classroom's black)
+    blackDismissed = false; // a screen chosen by hand comes up (Cast, the classroom's black)
     if (wasUp) closeLobby();
     evaluate();
     loadConfigScreen();
   }
 
   /**
-   * Shows a screen now, from afar (owner 2026-11-08: the presentation controls'
-   * "Show on the lobby computer"; device-sync's show-presentation). Another
+   * Shows a screen now (Cast's tray switch; it was first the presentation's
+   * "Show on the lobby computer", removed in 10.13.0). Another
    * screen is switched as if chosen by hand; the same screen already up is left
    * alone (its page, and the deck opened in it, are not reloaded); the same screen
    * put away (closed by hand, the tray's Hide) comes back.
@@ -691,7 +690,7 @@ function createDisplay(opts) {
   function showScreen(id) {
     if (!running) loadState();
     // A Hide (or a Show) from the tray is let go, as Resume schedule does: the
-    // presentation is up whenever it is the chosen screen and nothing hides it.
+    // screen is up whenever it is the chosen screen and nothing hides it.
     if (state.overrides !== NO_OVERRIDES) { state.overrides = NO_OVERRIDES; saveState(); }
     blackDismissed = false;
     if (settingsForScreen(state.settings, id).screen !== state.settings.screen) { setScreen(id); return 'switched'; }

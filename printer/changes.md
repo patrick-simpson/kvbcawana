@@ -1,4 +1,9 @@
-﻿## [10.12.0] - 2026-11-08
+﻿## [10.13.0] - 2026-11-09
+The presentation screen is gone.
+
+**No more Presentation screen.** The congregation presentation is over (owner: "I want that gone"), so the display no longer offers "Presentation" as a screen, and the presentation page's "Show on lobby computer" button no longer reaches this computer. A computer that had Presentation chosen shows the lobby signage instead. The small always-open connection the app kept for that button is closed too, so the lobby computer uses a little less of the free plan. Cast is unchanged.
+
+## [10.12.0] - 2026-11-08
 A tidier taskbar menu.
 
 **The right-click menu, reorganized.** The KVBC Awana icon's menu was one long list (owner: "It seems like it is messy"). It now opens with the computer's name and a short status line (what the screen shows, which printer it prints to), then any warning that needs you, then four groups: **Screen** (choose the screen, show or hide it, set it up, reload, the display log), **Cast** (Cast on or off, Show Cast code, Disconnect the presenter), **Printing** (the printer, the print server, restart, the check-in page, the status window) and **App** (the version, updates, Start with Windows, Set up this computer). Display settings, the settings page and Quit stay one click away. Windows draws this menu itself, so it looks like any other Windows menu. Every item does what it did before.

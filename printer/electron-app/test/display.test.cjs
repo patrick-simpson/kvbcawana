@@ -217,18 +217,17 @@ describe('display/screens', () => {
       expect(screenUrls(SITE, 'journey').page).toBe('https://awana.kvbchurch.org/journey/');
       expect(screenUrls(SITE, 'classroom').page).toBe('https://awana.kvbchurch.org/classroom/');
       expect(screenUrls(SITE, 'classroom').configure).toBe('https://awana.kvbchurch.org/classroom/?configure=1');
-      expect(screenUrls(SITE, 'presentation').page).toBe('https://awana.kvbchurch.org/presentation/?screen=tv');
-      expect(screenUrls(SITE, 'presentation').configure).toBe('https://awana.kvbchurch.org/presentation/?configure=1');
-      expect(isScreenPage('https://awana.kvbchurch.org/presentation/?configure=1', screenUrls(SITE, 'presentation').base)).toBe(true);
-      expect(SCREENS.presentation.always).toBe(true);
-      expect(Object.keys(SCREENS)).toEqual(['lobby', 'projector', 'journey', 'classroom', 'presentation', 'cast']);
+      // The presentation screen was removed in 10.13.0 (owner 2026-11-09): a computer
+      // that had it chosen gets the lobby.
+      expect(Object.keys(SCREENS)).toEqual(['lobby', 'projector', 'journey', 'classroom', 'cast']);
+      expect(screenUrls(SITE, 'presentation').page).toBe('https://awana.kvbchurch.org/lobby/index.html');
     });
 
     it('Cast (owner 2026-11-08) is the tray switch, up whenever on, never one of the Screen menu\'s choices', () => {
       expect(screenUrls(SITE, 'cast').page).toBe('https://awana.kvbchurch.org/cast/screen/');
       expect(screenUrls(SITE, 'cast').configure).toBe('https://awana.kvbchurch.org/cast/screen/?configure=1');
       expect(SCREENS.cast.always).toBe(true);
-      expect(CHOOSABLE.map((x) => x.id)).toEqual(['lobby', 'projector', 'journey', 'classroom', 'presentation']);
+      expect(CHOOSABLE.map((x) => x.id)).toEqual(['lobby', 'projector', 'journey', 'classroom']);
     });
 
     it('gives each a configure-mode page', () => {

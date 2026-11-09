@@ -11,10 +11,9 @@
 // (settings.js settingsForScreen): the classroom's own hours (4:00 to 8:00 pm, black until its 6:30 card)
 // and its 8:00 pm shutdown, owner 2026-10-17. Changed afterwards, they stay.
 //
-// The presentation (owner 2026-11-01, CLAUDE.md "Presentation"): the congregation deck
-// on the TV (`query` screen=tv), the presenter view in the Settings window (its
-// configure page carries no `query`). Up whenever it is chosen (`always`): it is
-// for one night, not a club-night screen (display.js).
+// The presentation screen (owner 2026-11-01) was REMOVED in 10.13.0 (owner 2026-11-09:
+// the presentation is over, its page archived): a computer that had it chosen falls
+// back to the lobby (screenFor's default).
 //
 // Cast (owner 2026-11-08: the lobby computer "kind of like an air server"; "It should
 // be allowed to be enabled by right clicking on the icon in the task bar"): the tray's
@@ -23,7 +22,7 @@
 // it is not one of the Screen menu's choices or the wizard's (display.js castOn/castOff).
 'use strict';
 
-/** @typedef {'lobby' | 'projector' | 'journey' | 'classroom' | 'presentation' | 'cast'} ScreenId */
+/** @typedef {'lobby' | 'projector' | 'journey' | 'classroom' | 'cast'} ScreenId */
 /** @typedef {{ id: ScreenId, name: string, short: string, dir: string, page: string, background: string, query?: Record<string, string>, always?: boolean, toggle?: boolean, defaults?: { hours: { start: string, end: string }, shutdownAt: string } }} Screen */
 
 /** @type {Record<ScreenId, Screen>} */
@@ -34,10 +33,6 @@ const SCREENS = {
   classroom: {
     id: 'classroom', name: 'Downstairs classroom', short: 'the downstairs classroom', dir: '../classroom/', page: '', background: '#000000',
     defaults: { hours: { start: '16:00', end: '20:00' }, shutdownAt: '20:00' },
-  },
-  presentation: {
-    id: 'presentation', name: 'Presentation', short: 'the presentation', dir: '../presentation/', page: '', background: '#000000',
-    query: { screen: 'tv' }, always: true,
   },
   cast: {
     id: 'cast', name: 'Cast (screen sharing)', short: 'Cast', dir: '../cast/screen/', page: '', background: '#F6F2EA',

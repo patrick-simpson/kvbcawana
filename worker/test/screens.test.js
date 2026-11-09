@@ -212,16 +212,14 @@ describe('a screen\'s own settings', () => {
     expect((await s.call('GET', '/v1/screens')).body.screens.map((x) => x.kind)).toEqual(['computer']);
   });
 
-  it('show-presentation (owner 2026-11-08): a computer\'s one action waits for its next hello and rings its id', async () => {
+  it('show-presentation is refused since 2026-11-09 (owner: the presentation is over): nothing queued, nothing rung', async () => {
     const s = setup();
     await s.signIn();
     const PC = 'pc_ffffffffffffffffffff';
     await s.call('POST', '/v1/screens/hello', { id: PC, kind: 'computer', name: 'Lobby computer' });
-    const res = await s.call('POST', `/v1/screens/${PC}/action`, { action: 'show-presentation', data: { screen: 'lobby' } });
-    expect(res.body).toEqual({ ok: true, delivered: false, queued: true });
-    expect(s.frames.map((f) => f.d)).toEqual([{ what: 'screen-action', id: PC, action: 'show-presentation', at: expect.any(String) }]);
-    const hi = await s.call('POST', '/v1/screens/hello', { id: PC, kind: 'computer' });
-    expect(hi.body.actions).toEqual([{ action: 'show-presentation', at: expect.any(String) }]);
+    const res = await s.call('POST', `/v1/screens/${PC}/action`, { action: 'show-presentation' });
+    expect(res.status).toBe(400);
+    expect(s.frames.map((f) => f.d).filter((d) => d && d.what === 'screen-action')).toEqual([]);
     expect((await s.call('POST', '/v1/screens/hello', { id: PC, kind: 'computer' })).body.actions).toEqual([]);
   });
 
