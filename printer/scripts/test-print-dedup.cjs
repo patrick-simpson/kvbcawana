@@ -27,6 +27,13 @@ const PORT = Number(process.env.AWANA_TEST_PORT || require('./free-port.cjs')())
   fs.writeFileSync(path.join(dataDir, 'config.json'), JSON.stringify({ printerName: 'Fake' }));
   fs.writeFileSync(path.join(dataDir, 'clubbers.csv'), 'First Name,Last Name,Club\nAva,Stone,Sparks\n');
   Object.assign(process.env, { AWANA_DATA_DIR: dataDir, AWANA_PORT: String(PORT), AWANA_BIND_HOST: '127.0.0.1', PRINTER_NAME: 'Fake' });
+  // A stand-in printer that always fails (as the missing one did), and, with a `slow`
+  // file beside it, takes 0.8 s doing it: the asynchronous window a real overlap lives in.
+  // (Until 10.14.0 the window was a slowly served club image URL; URLs are never
+  // fetched now.)
+  const binDir = fs.mkdtempSync(path.join(os.tmpdir(), 'awana-dedup-bin-'));
+  fs.writeFileSync(path.join(binDir, 'powershell'), `#!/bin/sh\nif [ -f "${binDir}/slow" ]; then sleep 0.8; fi\necho "no printer" >&2\nexit 1\n`, { mode: 0o755 });
+  process.env.PATH = `${binDir}${path.delimiter}${process.env.PATH}`;
   const server = require(path.join(root, 'print-server', 'server.js'));
   const listener = server.startListening();
   await new Promise((r) => { if (listener.listening) return r(); listener.once('listening', r); });
@@ -34,73 +41,50 @@ const PORT = Number(process.env.AWANA_TEST_PORT || require('./free-port.cjs')())
   const post = (p, body) => fetch(`${base}${p}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
     .then(async (r) => ({ status: r.status, body: await r.json().catch(() => null) }));
 
-  // A club image served slowly: the print path awaits its download before
-  // rendering, which is the asynchronous window the real overlaps live in
-  // (the print call itself is synchronous here, so a second request cannot
-  // even be read while it runs; on the laptop it is the same).
   const http = require('http');
   const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');
-  const slow = http.createServer((req, res) => { setTimeout(() => { res.writeHead(200, { 'Content-Type': 'image/png' }); res.end(PNG); }, 1500); });
-  await new Promise((r) => slow.listen(0, '127.0.0.1', r));
-  const img = (n) => `http://127.0.0.1:${slow.address().port}/club-${n}.png`;
 
   console.log('\nduplicate guard: the key is claimed while the print is under way');
   {
-    const first = post('/print', { name: 'Ava Stone', clubberId: '4821', clubName: 'Sparks', clubImageData: img(1) });
+    fs.writeFileSync(path.join(binDir, 'slow'), '');
+    const first = post('/print', { name: 'Ava Stone', clubberId: '4821', clubName: 'Sparks' });
     await new Promise((r) => setTimeout(r, 300));
-    const second = await post('/print', { name: 'Ava Stone', clubberId: '4821', clubName: 'Sparks', clubImageData: img(1) });
+    const second = await post('/print', { name: 'Ava Stone', clubberId: '4821', clubName: 'Sparks' });
     check('a second request for the same child while the first is printing is a duplicate, not a second label',
       second.status === 200 && second.body && second.body.duplicate === true, JSON.stringify(second));
     const other = await post('/print', { name: 'Eli Stone', clubberId: '4822', clubName: 'Cubbies' });
     check('a different child is not held up by it', !(other.body && other.body.duplicate), JSON.stringify(other));
     const r1 = await first;
+    fs.unlinkSync(path.join(binDir, 'slow'));
     check('the first request itself settled (here: no printer, so it failed)', r1.status === 500, JSON.stringify(r1));
     // The print failed, so nothing was recorded and the claim is released:
     // the child's next label is not a "duplicate" of a label that never printed.
     const third = await post('/print', { name: 'Ava Stone', clubberId: '4821', clubName: 'Sparks' });
     check('once it has settled without printing, the next request is tried again', !(third.body && third.body.duplicate), JSON.stringify(third));
   }
-  slow.close();
-
-  console.log('\nclub image download: whatever the URL answers, the label is not held hostage');
+  console.log('\nclub image: a URL in a job body is never fetched (10.14.0, no SSRF)');
   {
-    let open = 0;
-    const odd = http.createServer((req, res) => {
-      open++;
-      res.on('close', () => { open--; });
-      if (req.url === '/missing.png') { res.writeHead(404); res.end('gone'); return; }
-      if (req.url === '/page.png') { res.writeHead(200, { 'Content-Type': 'text/html' }); res.end('<html>login</html>'); return; }
-      if (req.url === '/declared-huge.png') { res.writeHead(200, { 'Content-Type': 'image/png', 'Content-Length': String(50 * 1024 * 1024) }); res.write(PNG); return; }
-      if (req.url === '/endless.png') {
-        res.writeHead(200, { 'Content-Type': 'image/png' });
-        const chunk = Buffer.alloc(256 * 1024);
-        const pump = () => { if (res.destroyed) return; if (res.write(chunk)) setImmediate(pump); else res.once('drain', pump); };
-        pump();
-        return;
-      }
-      res.writeHead(200, { 'Content-Type': 'image/png' }); res.end(PNG);
-    });
-    await new Promise((r) => odd.listen(0, '127.0.0.1', r));
-    const at = (p) => `http://127.0.0.1:${odd.address().port}${p}`;
-    const t0 = Date.now();
+    let hits = 0;
+    const target = http.createServer((req, res) => { hits++; res.writeHead(200, { 'Content-Type': 'image/png' }); res.end(PNG); });
+    await new Promise((r) => target.listen(0, '127.0.0.1', r));
+    const at = (p) => `http://127.0.0.1:${target.address().port}${p}`;
     const rs = await Promise.all([
-      post('/print', { name: 'Ivy Stone', clubberId: '5001', clubName: 'Sparks', clubImageData: at('/missing.png') }),
-      post('/print', { name: 'Jon Stone', clubberId: '5002', clubName: 'Sparks', clubImageData: at('/page.png') }),
-      post('/print', { name: 'Kai Stone', clubberId: '5003', clubName: 'Sparks', clubImageData: at('/declared-huge.png') }),
-      post('/print', { name: 'Lia Stone', clubberId: '5004', clubName: 'Sparks', clubImageData: at('/endless.png') }),
+      post('/print', { name: 'Ivy Stone', clubberId: '5001', clubName: 'Sparks', clubImageData: at('/club.png') }),
+      post('/print', { name: 'Jon Stone', clubberId: '5002', clubName: 'Sparks', clubImageData: 'https://169.254.169.254/latest/meta-data/' }),
+      post('/print', { name: 'Kai Stone', clubberId: '5003', clubName: 'Sparks', clubImageData: 'data:text/html;base64,PGh0bWw+' }),
+      post('/print', { name: 'Lia Stone', clubberId: '5004', clubName: 'Sparks', clubImageData: 'data:image/png;base64,' + PNG.toString('base64') }),
     ]);
-    const took = Date.now() - t0;
-    check('a 404, an HTML page, a declared-huge file and an endless stream each let the print go on (here: to the missing printer)',
+    check('a URL, a metadata address, a non-image data URL and an inline PNG each let the print go on (here: to the failing printer)',
       rs.every((r) => r.status === 500 && r.body && !/image|icon/i.test(r.body.error || '')), JSON.stringify(rs.map((r) => [r.status, r.body && r.body.error])));
-    check('none of them waited on the download past its 4 s timeout plus the retry', took < 12000, `${took} ms`);
-    const mem = process.memoryUsage().heapUsed;
-    check('the endless stream was cut off at the 2 MB cap, not buffered', mem < 400 * 1024 * 1024, `${Math.round(mem / 1048576)} MB heap`);
-    await new Promise((r) => setTimeout(r, 200));
-    check('every upstream connection was drained or destroyed', open === 0, `${open} still open`);
+    check('the URL was never requested', hits === 0, `${hits} request(s)`);
+    const images = require(path.join(root, 'print-server', 'server', 'images.js'));
+    check('an inline PNG resolves to its bytes', (await images.resolveImageBuffer('data:image/png;base64,' + PNG.toString('base64'))).equals(PNG));
+    check('an http URL resolves to nothing', (await images.resolveImageBuffer(at('/club.png'))) === null && hits === 0);
+    check('a data URL that is not an image resolves to nothing', (await images.resolveImageBuffer('data:text/plain;base64,aGk=')) === null);
     const src = require('./server-source.cjs')();
-    check('non-200 answers close the socket, not leave it to the agent', /res\.statusCode !== 200\) \{[\s\S]{0,200}?req\.destroy\(\);/.test(src));
+    check('the print server has no http(s) client for images', !/require\('https?'\)/.test(fs.readFileSync(path.join(root, 'print-server', 'server', 'images.js'), 'utf8')));
     check('a label prints without its icon rather than fail (the icon is decoration)', /console\.log\(`\[icon\] Could not load club image: \$\{e\.message\}`\);\s*\}\s*return null;/.test(src));
-    odd.close();
+    target.close();
   }
 
   console.log('\nduplicate guard: every guarded print claims and releases its key');

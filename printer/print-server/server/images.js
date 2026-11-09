@@ -1,11 +1,9 @@
 'use strict';
-// Temp files, remote images, club icon cache.
+// Temp files, the club image a job may carry.
 // One of the modules server.js was split into (server.js loads them in the order the old
 // file ran them). Another module's names are reached as $module.name.
 
 const { CLUB_TABLE, clubKeyByLabel } = require('../clubTable');
-const http  = require('http');
-const https = require('https');
 const fs    = require('fs');
 const path  = require('path');
 const os    = require('os');
@@ -47,82 +45,26 @@ function sweepOrphanedTempFiles() {
   } catch { /* tmpdir unreadable — non-critical */ }
 }
 
-// ── Download a remote image into a Buffer ─────────────────────────────────────
-// A club logo is a small PNG. Anything else the URL answers with is refused
-// before it is buffered: the icon is decoration, and a label must never wait
-// on, or hold in memory, whatever a misconfigured or hostile URL sends.
-const IMAGE_MAX_BYTES = 2 * 1024 * 1024;
-function downloadImage(url) {
-  return new Promise((resolve, reject) => {
-    const proto = url.startsWith('https') ? https : http;
-    const req = proto.get(url, { timeout: 4000 }, (res) => {
-      if (res.statusCode !== 200) {
-        // Close the socket: a stalled upstream must not be held open until
-        // the agent gives up on it.
-        req.destroy();
-        reject(new Error(`HTTP ${res.statusCode}`));
-        return;
-      }
-      const type = String(res.headers['content-type'] || '').toLowerCase();
-      if (type && !type.startsWith('image/')) {
-        req.destroy();
-        reject(new Error(`not an image (${type.split(';')[0]})`));
-        return;
-      }
-      const declared = Number(res.headers['content-length']);
-      if (Number.isFinite(declared) && declared > IMAGE_MAX_BYTES) {
-        req.destroy();
-        reject(new Error(`too large (${declared} bytes)`));
-        return;
-      }
-      const chunks = [];
-      let size = 0;
-      res.on('data', (c) => {
-        size += c.length;
-        if (size > IMAGE_MAX_BYTES) { req.destroy(new Error(`too large (over ${IMAGE_MAX_BYTES} bytes)`)); return; }
-        chunks.push(c);
-      });
-      res.on('error', reject);
-      res.on('end', () => resolve(Buffer.concat(chunks)));
-    });
-    req.on('error', reject);
-    req.on('timeout', () => { req.destroy(new Error('timeout')); });
-  });
-}
-
-// ── Club icon cache ───────────────────────────────────────────────────────────
-// Remote club logos are downloaded once per URL and kept in memory, so every
-// print doesn't re-fetch the same PNG and a mid-event network blip doesn't
-// cost the label its icon. Bounded so a misbehaving client can't grow it.
-const iconCache = new Map();  // url → Buffer
-const ICON_CACHE_MAX = 20;
-
 // ── Resolve clubImageData → Buffer (or null) ──────────────────────────────────
+// Only an inline image (data:image/...;base64,...) is ever used (10.14.0). Until then
+// any http(s) URL in a job body was fetched from the check-in laptop, which let whoever
+// could put a job in front of it make the laptop call any address on the church network
+// (SSRF). Nothing sends a URL today: the Worker's jobs carry no club image, and the six
+// known clubs always print the kit's official mark (label-render.js), so a URL is simply
+// ignored and the label prints with its mark or monogram.
+const IMAGE_MAX_BYTES = 2 * 1024 * 1024;
+const DATA_IMAGE_RE = /^data:image\/(png|jpeg|jpg|gif|webp|bmp);base64,/i;
 async function resolveImageBuffer(clubImageData) {
-  if (!clubImageData) return null;
+  if (!clubImageData || typeof clubImageData !== 'string') return null;
   try {
-    if (clubImageData.startsWith('data:')) {
-      // base64 data URL
-      const b64 = clubImageData.replace(/^data:[^;]+;base64,/, '');
-      return Buffer.from(b64, 'base64');
+    const m = clubImageData.match(DATA_IMAGE_RE);
+    if (!m) {
+      if (/^https?:\/\//i.test(clubImageData)) throw new Error('a URL is never fetched');
+      throw new Error('not an inline image');
     }
-    if (/^https?:\/\//.test(clubImageData)) {
-      if (iconCache.has(clubImageData)) return iconCache.get(clubImageData);
-      // One retry — venue Wi-Fi hiccups are routine, a second attempt 400ms
-      // later usually succeeds and the result is cached for the whole event.
-      let buf;
-      try {
-        buf = await downloadImage(clubImageData);
-      } catch (firstErr) {
-        await new Promise(r => setTimeout(r, 400));
-        buf = await downloadImage(clubImageData);
-      }
-      if (iconCache.size >= ICON_CACHE_MAX) {
-        iconCache.delete(iconCache.keys().next().value);  // evict oldest entry
-      }
-      iconCache.set(clubImageData, buf);
-      return buf;
-    }
+    const b64 = clubImageData.slice(m[0].length);
+    if (b64.length > Math.ceil(IMAGE_MAX_BYTES / 3) * 4) throw new Error(`too large (over ${IMAGE_MAX_BYTES} bytes)`);
+    return Buffer.from(b64, 'base64');
   } catch (e) {
     console.log(`[icon] Could not load club image: ${e.message}`);
   }
