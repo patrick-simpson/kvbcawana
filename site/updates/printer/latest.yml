@@ -1,8 +1,8 @@
-version: 10.11.0
+version: 10.12.0
 files:
-  - url: https://github.com/patrick-simpson/kvbcawana/releases/download/printer-v10.11.0/KVBC-Awana-Setup.exe
-    sha512: BVWbsCUC/vU7RQZ+eD20vlyEqnaNSsQPtY1Y+lm+b3HuZUfbSwtjMUkBvQfeIoXKPWmFOHYuAz17csE8OWOvBw==
-    size: 244691050
-path: https://github.com/patrick-simpson/kvbcawana/releases/download/printer-v10.11.0/KVBC-Awana-Setup.exe
-sha512: BVWbsCUC/vU7RQZ+eD20vlyEqnaNSsQPtY1Y+lm+b3HuZUfbSwtjMUkBvQfeIoXKPWmFOHYuAz17csE8OWOvBw==
-releaseDate: '2026-11-08T21:54:34.756Z'
+  - url: https://github.com/patrick-simpson/kvbcawana/releases/download/printer-v10.12.0/KVBC-Awana-Setup.exe
+    sha512: Mf9R04ifC2ExLOrmcmP4jV++KUj6QJuWsq7/f9/jsfur5vIrpwvC3Z92Kfno3VPddtWDYibFcp00/CijgDeENQ==
+    size: 244692111
+path: https://github.com/patrick-simpson/kvbcawana/releases/download/printer-v10.12.0/KVBC-Awana-Setup.exe
+sha512: Mf9R04ifC2ExLOrmcmP4jV++KUj6QJuWsq7/f9/jsfur5vIrpwvC3Z92Kfno3VPddtWDYibFcp00/CijgDeENQ==
+releaseDate: '2026-11-09T01:34:12.511Z'
