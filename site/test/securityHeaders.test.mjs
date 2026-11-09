@@ -83,23 +83,22 @@ test('inline scripts are allowed by their exact fingerprint (the classroom\'s co
   assert.deepEqual(inlineScriptHashes('<script type="module" src="a.js"></script><script src="b.js"></script>', sha), []);
 });
 
-test('the build gives the classroom and the Cast screen the TV policy', () => {
+test('the build gives the classroom the TV policy (the Cast screen has it on its own site, castSite.test.mjs)', () => {
   assert.match(build, /const CLASSROOM_CSP = tvPolicy\(path\.join\(OUT, 'classroom'\), false\);/);
-  assert.match(build, /const CAST_SCREEN_CSP = tvPolicy\(path\.join\(OUT, 'cast', 'screen'\), true\);/);
   assert.match(build, /'\/classroom\/\*',\n(?:  '.*',\n)*  `  Content-Security-Policy: \$\{CLASSROOM_CSP\}`,/);
-  assert.match(build, /'\/cast\/screen\/\*',\n  `  Content-Security-Policy: \$\{CAST_SCREEN_CSP\}`,/);
+  // Cast moved to cast.kvbchurch.org (owner 2026-11-09): this site serves no /cast/screen/.
+  assert.ok(!/CAST_SCREEN_CSP|'\/cast\/screen\/\*'/.test(build));
 });
 
 test('a built site carries the TV policy with the built pages\' own fingerprints', { skip: !existsSync(DIST_HEADERS) && 'site/dist is not built' }, () => {
   const text = readFileSync(DIST_HEADERS, 'utf8');
   const csp = (rule) => (ruleLines(text, rule) || []).find((l) => l.startsWith('Content-Security-Policy: '))?.slice(25);
   const classroom = csp('/classroom/*');
-  const cast = csp('/cast/screen/*');
-  assert.ok(classroom && cast);
+  assert.ok(classroom);
+  assert.equal(csp('/cast/screen/*'), undefined, 'the Cast screen lives on cast.kvbchurch.org now');
   const built = readFileSync(path.join(SITE, 'dist', 'classroom', 'index.html'), 'utf8');
   const hashes = inlineScriptHashes(built, sha);
   assert.ok(hashes.length >= 1);
   for (const h of hashes) assert.ok(directives(classroom)['script-src'].includes(h), h);
   assert.ok(!directives(classroom)['frame-src'].includes('https://www.facebook.com'));
-  assert.ok(directives(cast)['frame-src'].includes('https://www.facebook.com'));
 });

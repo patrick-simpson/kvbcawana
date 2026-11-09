@@ -59,3 +59,24 @@ test('site/build.mjs writes them into _redirects, and a built site has them', ()
   assert.equal(existsSync(path.join(SITE, 'dist', 'lobby', 'about.html')), false);
   assert.equal(existsSync(path.join(SITE, 'dist', 'journey', 'about.html')), false);
 });
+
+test('every old /cast address goes permanently to Cast\'s own site with its path kept (owner 2026-11-09)', async () => {
+  const { CAST_HOME, CAST_REDIRECTS, castRedirects } = await import('../lib/redirects.js');
+  assert.equal(CAST_HOME, 'https://cast.kvbchurch.org');
+  assert.deepEqual(castRedirects(), [
+    '/cast https://cast.kvbchurch.org/ 301',
+    '/cast/ https://cast.kvbchurch.org/ 301',
+    '/cast/* https://cast.kvbchurch.org/:splat 301',
+  ]);
+  assert.equal(CAST_REDIRECTS.length, 3);
+  const build = readFileSync(path.join(SITE, 'build.mjs'), 'utf8');
+  assert.match(build, /\.\.\.castRedirects\(\),/);
+  const built = path.join(SITE, 'dist');
+  if (!existsSync(built)) return;
+  assert.equal(existsSync(path.join(built, 'cast')), false, 'nothing is built at /cast, so the redirect answers');
+  const rules = readFileSync(path.join(built, '_redirects'), 'utf8').split('\n');
+  for (const line of castRedirects()) assert.ok(rules.includes(line), line);
+  // Nothing earlier in the file catches a /cast path first.
+  const first = rules.findIndex((l) => l.startsWith('/cast'));
+  assert.ok(rules.slice(0, first).every((l) => !/^\/(cast|\*)/.test(l)));
+});

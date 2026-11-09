@@ -2,7 +2,7 @@ name: Cast - turn a PowerPoint into slides
 
 # Owner 2026-11-08: "Support pptx upload and show a preview on the phone screen"
 # (the exact copy, about a minute). The sync Worker starts this job for a presenter
-# on awana.kvbchurch.org/cast (worker/src/cast.js, routes.md 10.18) with ONE input,
+# on cast.kvbchurch.org (worker/src/cast.js, routes.md 10.18) with ONE input,
 # job = <id>.<key>: the PowerPoint was scrambled in the presenter's browser; the job
 # reads it from the Worker with the machine token (HANDBOOK_TOKEN), opens it with the
 # key, LibreOffice Impress makes the PDF, and the PDF goes back to the Worker as a

@@ -32,7 +32,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { downloadRedirects } from './lib/downloads.js';
 import { REPO_FOLDERS, RELEASE_FILES, mustStream, releaseBase, releaseFiles, repoPathFor } from './lib/largeFiles.js';
-import { pageRedirects } from './lib/redirects.js';
+import { castRedirects, pageRedirects } from './lib/redirects.js';
 import { SITE_HEADERS, inlineScriptHashes, tvPagePolicy } from './lib/securityHeaders.js';
 import { buildCheckinPages, CHECKIN_MODULES } from './checkin/checkin-page.mjs';
 
@@ -183,14 +183,21 @@ run(`node scripts/stamp-build.mjs ${hashTree(path.join(ROOT, 'classroom', 'publi
   for (const f of ['sync-protocol.js', 'cloud-crypto.js']) cpSync(path.join(ROOT, 'shared', f), path.join(out, 'shared', f));
 }
 
-// /cast: the lobby computer's AirServer-like screen (owner 2026-11-08; worker/src/routes.md
-// 10.18). The presenter's page (/cast/, the code on the TV is the only way in) and the TV's
-// page (/cast/screen/, KVBC Awana's Cast screen), in the CHURCH's own look (church/: logo,
+// Cast: the lobby computer's AirServer-like screen (owner 2026-11-08; worker/src/routes.md
+// 10.18), on its OWN site since 2026-11-09 (owner): https://cast.kvbchurch.org, the
+// Cloudflare Pages project kvbc-cast (site/cast-site/), built here into site/dist-cast.
+// The presenter's page at its root (the code on the TV is the only way in) and the TV's
+// page at /screen/ (KVBC Awana's Cast screen), in the CHURCH's own look (church/: logo,
 // self-hosted Jost and Almarai with their OFL licences, church.css), never Awana's kit.
 // Both carry the shared rules and the screen share beside them. Unlisted, noindex.
+// This site no longer carries a copy: awana.kvbchurch.org/cast/* 301s there (_redirects
+// below, site/lib/redirects.js).
+const CAST_ORIGIN = 'https://cast.kvbchurch.org';
+const CAST_OUT = path.join(ROOT, 'site', 'dist-cast');
+rmSync(CAST_OUT, { recursive: true, force: true });
 {
   const src = path.join(ROOT, 'site', 'cast');
-  const out = path.join(OUT, 'cast');
+  const out = CAST_OUT;
   mkdirSync(path.join(out, 'shared'), { recursive: true });
   mkdirSync(path.join(out, 'screen'), { recursive: true });
   for (const f of ['index.html', 'app.js', 'logic.js', 'preview.js']) cpSync(path.join(src, f), path.join(out, f));
@@ -259,6 +266,8 @@ writeFileSync(path.join(OUT, '_redirects'), [
   // The lobby's and Journey's about pages are sections of the home page now, and
   // the desk check-in is the one check-in page.
   ...pageRedirects(),
+  // Cast moved to its own site (owner 2026-11-09): every /cast address, path kept.
+  ...castRedirects(),
   // Pages serves foo.html at /foo (and 308s the .html form there).
   // The one settings page for every screen (ROADMAP.md#settings-page).
   '/settings /lobby/settings 302',
@@ -280,7 +289,6 @@ const tvPolicy = (dir, facebook) => tvPagePolicy({
   scriptHashes: [...new Set(builtPages(dir).flatMap((f) => inlineScriptHashes(readFileSync(f, 'utf8'), sha256b64)))],
 });
 const CLASSROOM_CSP = tvPolicy(path.join(OUT, 'classroom'), false);
-const CAST_SCREEN_CSP = tvPolicy(path.join(OUT, 'cast', 'screen'), true);
 writeFileSync(path.join(OUT, '_headers'), [
   '/*',
   '  X-Robots-Tag: noindex, nofollow',
@@ -316,9 +324,6 @@ writeFileSync(path.join(OUT, '_headers'), [
   '  Cache-Control: no-cache',
   '  X-Robots-Tag: noindex, nofollow',
   `  Content-Security-Policy: ${CLASSROOM_CSP}`,
-  // The Cast screen (site/cast/screen/, the lobby TV while Cast is on): the TV policy.
-  '/cast/screen/*',
-  `  Content-Security-Policy: ${CAST_SCREEN_CSP}`,
   // The phone remote (journey/public/remote/, owner 2026-10-13): always the newest page, never in a search engine.
   '/journey/remote/*',
   '  Cache-Control: no-cache',
@@ -402,16 +407,12 @@ writeFileSync(path.join(ROOT, 'site', 'lib', 'large-files.generated.js'),
 
 // Cast's own site (owner 2026-11-09): https://cast.kvbchurch.org, the Cloudflare Pages
 // project kvbc-cast (site/cast-site/, which holds its wrangler.toml and its one Function,
-// /api through the SYNC binding, like this site's). The same Cast files as /cast/ above,
-// at its ROOT: the presenter page at /, the TV page at /screen/, church/ and shared/
-// beside them (their paths are relative, so nothing in them changes). Its own _headers
+// /api through the SYNC binding, like this site's). The Cast files built above sit at its
+// ROOT: the presenter page at /, the TV page at /screen/, church/ and shared/ beside
+// them (their paths are relative). Its own _headers
 // (noindex, the security headers, the TV policy on /screen/* with the copy's own
 // inline-script fingerprints and Cast's origin), robots.txt, and a _routes.json that lets
 // only /api invoke the Function, so its static files cost no requests.
-const CAST_ORIGIN = 'https://cast.kvbchurch.org';
-const CAST_OUT = path.join(ROOT, 'site', 'dist-cast');
-rmSync(CAST_OUT, { recursive: true, force: true });
-cpSync(path.join(OUT, 'cast'), CAST_OUT, { recursive: true });
 writeFileSync(path.join(CAST_OUT, 'robots.txt'), 'User-agent: *\nDisallow: /\n');
 const CAST_TV_CSP = tvPagePolicy({
   origin: CAST_ORIGIN,
@@ -438,7 +439,7 @@ for (const must of ['index.html', 'app.js', 'logic.js', 'preview.js', 'shared/cl
   if (!existsSync(path.join(CAST_OUT, must))) throw new Error(`the Cast site build is missing ${must}`);
 }
 
-for (const must of ['index.html', 'lobby/index.html', 'lobby/countdown.html', 'lobby/settings.html', 'lobby/projector-remote.html', 'lobby/scoreboard.html', 'journey/index.html', 'journey/remote/index.html', 'classroom/index.html', 'classroom/version.json', 'classroom/src/logic.js', 'classroom/src/stage.js', 'classroom/src/shared/classroomRemote.js', 'classroom/src/shared/screenShare.js', 'classroom/remote/index.html', 'classroom/remote/remote.js', 'journey/remote/remote.js', 'journey/src/shared/journeyRemote.js', 'lobby/shared/sync.json', 'checkin/index.html', 'checkin/ym/index.html', 'checkin/desk-transport.js', 'checkin/cloud-crypto.js', 'checkin/clubs.js', 'checkin/brand/fonts.css', 'links/index.html', 'logo/index.html', 'tools/handbook-form/index.html', 'tools/print/index.html', 'tools/print/shared/letterhead.js', 'tools/tally/index.html', 'presentation/index.html', 'presentation/app.js', 'presentation/shared/cloud-crypto.js', 'cast/index.html', 'cast/app.js', 'cast/logic.js', 'cast/preview.js', 'cast/shared/classroomRemote.js', 'cast/shared/screenShare.js', 'cast/screen/index.html', 'cast/screen/screen.js', 'cast/church/church.css', 'cast/church/kvbc-logo.png', 'cast/church/fonts/Jost-Variable.ttf', 'classic.html', 'robots.txt', 'lobby/showcase.html', 'lobby/countdown-showcase.html', 'lobby/settings-showcase.html', 'journey/showcase.html', 'journey/remote/showcase.html', 'checkin/showcase.html']) {
+for (const must of ['index.html', 'lobby/index.html', 'lobby/countdown.html', 'lobby/settings.html', 'lobby/projector-remote.html', 'lobby/scoreboard.html', 'journey/index.html', 'journey/remote/index.html', 'classroom/index.html', 'classroom/version.json', 'classroom/src/logic.js', 'classroom/src/stage.js', 'classroom/src/shared/classroomRemote.js', 'classroom/src/shared/screenShare.js', 'classroom/remote/index.html', 'classroom/remote/remote.js', 'journey/remote/remote.js', 'journey/src/shared/journeyRemote.js', 'lobby/shared/sync.json', 'checkin/index.html', 'checkin/ym/index.html', 'checkin/desk-transport.js', 'checkin/cloud-crypto.js', 'checkin/clubs.js', 'checkin/brand/fonts.css', 'links/index.html', 'logo/index.html', 'tools/handbook-form/index.html', 'tools/print/index.html', 'tools/print/shared/letterhead.js', 'tools/tally/index.html', 'presentation/index.html', 'presentation/app.js', 'presentation/shared/cloud-crypto.js', 'classic.html', 'robots.txt', 'lobby/showcase.html', 'lobby/countdown-showcase.html', 'lobby/settings-showcase.html', 'journey/showcase.html', 'journey/remote/showcase.html', 'checkin/showcase.html']) {
   if (!existsSync(path.join(OUT, must))) throw new Error(`site build is missing ${must}`);
 }
 console.log(`\n✓ site/dist built for ${ORIGIN} (build ${BUILD_ID.slice(0, 7)})`);

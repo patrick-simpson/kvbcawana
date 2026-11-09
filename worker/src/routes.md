@@ -1698,8 +1698,9 @@ with no club up and no clock.
 
 Owner 2026-11-08: "set it up kind of like an air server ... present from their laptop but
 through a webpage that is controlling that computer"; "TV code only". KVBC Awana's tray turns
-the Cast screen on (`site/cast/screen/`, signed in like every screen); it opens a ROOM and shows
-a six-digit CODE. A presenter on awana.kvbchurch.org/cast types the code (no passphrase) and gets
+the Cast screen on (https://cast.kvbchurch.org/screen/, `site/cast/screen/`, signed in like every screen); it opens a ROOM and shows
+a six-digit CODE. A presenter on https://cast.kvbchurch.org (Cast's own site, Pages project `kvbc-cast`, since 2026-11-09;
+awana.kvbchurch.org/cast 301s there) types the code (no passphrase) and gets
 a TOKEN, carried as `X-Cast-Token` on the presenter routes. Engine = the Sparks remote's
 (`worker/src/classroom.js`, rules `shared/classroomRemote.js`) in a second room (`worker/src/cast.js`;
 storage `cast:stage`, `castmeta:<id>`/`castpart:`, `cast:room {code, at, tokens: [{hash, at}]}`;

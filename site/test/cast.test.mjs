@@ -174,10 +174,10 @@ test('the church\'s look, never Awana\'s', () => {
   assert.ok(!/awana/i.test(quoted(screen)), 'no "Awana" on the TV but the app\'s own name');
 });
 
-test('the build copies both pages, the church kit and the shared modules', () => {
-  assert.match(build, /path\.join\(OUT, 'cast'\)/);
+test('the build copies both pages, the church kit and the shared modules (into Cast\'s own site)', () => {
+  assert.match(build, /const out = CAST_OUT;/);
   assert.match(build, /\['classroomRemote\.js', 'screenShare\.js'\]/);
-  for (const f of ['cast/index.html', 'cast/screen/index.html', 'cast/screen/screen.js', 'cast/shared/screenShare.js', 'cast/church/church.css']) assert.ok(build.includes(`'${f}'`), f);
+  for (const f of ['index.html', 'screen/index.html', 'screen/screen.js', 'shared/screenShare.js', 'church/church.css']) assert.ok(build.includes(`'${f}'`), f);
 });
 
 // PowerPoint (owner 2026-11-08: "Support pptx upload and show a preview on the phone

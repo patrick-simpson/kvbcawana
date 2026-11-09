@@ -21,3 +21,17 @@ export const PAGE_REDIRECTS = [
 ];
 
 export const pageRedirects = () => PAGE_REDIRECTS.map(([from, to]) => `${from} ${to} 301`);
+
+// Cast moved to its own site (owner 2026-11-09): https://cast.kvbchurch.org, the presenter
+// page at its root and the TV page at /screen/. Every old awana.kvbchurch.org/cast
+// address goes there permanently with its path kept (/cast/ -> /, /cast/screen/ ->
+// /screen/); a QR code's #code= fragment rides along (the browser keeps it). Pages
+// follows a redirect even where a file exists, and this site builds no /cast copy.
+export const CAST_HOME = 'https://cast.kvbchurch.org';
+export const CAST_REDIRECTS = [
+  ['/cast', `${CAST_HOME}/`],
+  ['/cast/', `${CAST_HOME}/`],
+  ['/cast/*', `${CAST_HOME}/:splat`],
+];
+
+export const castRedirects = () => CAST_REDIRECTS.map(([from, to]) => `${from} ${to} 301`);

@@ -46,7 +46,8 @@ test('the project: kvbc-cast, published from dist-cast, /api through the SYNC bi
 test('the build writes dist-cast with the Cast pages at its root', () => {
   assert.match(build, /const CAST_ORIGIN = 'https:\/\/cast\.kvbchurch\.org';/);
   assert.match(build, /const CAST_OUT = path\.join\(ROOT, 'site', 'dist-cast'\);/);
-  assert.match(build, /cpSync\(path\.join\(OUT, 'cast'\), CAST_OUT, \{ recursive: true \}\);/);
+  assert.match(build, /const out = CAST_OUT;/);
+  assert.ok(!/path\.join\(OUT, 'cast'\)/.test(build), 'the main site builds no /cast copy');
   assert.match(build, /origin: CAST_ORIGIN,\n  facebook: true,/);
   assert.match(build, /'\/screen\/\*',\n(?:  '.*',\n)*  `  Content-Security-Policy: \$\{CAST_TV_CSP\}`,/);
   assert.match(build, /include: \['\/api', '\/api\/\*'\], exclude: \[\]/);

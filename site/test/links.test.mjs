@@ -15,7 +15,7 @@ const ALLOWED = [
   '/classroom/', '/classroom/remote/', // owner 2026-10-18: the Sparks remote is on the links page
   '/lobby/projector-remote.html', // the opening ceremony remote (phone: Next and Back for the projector's slides)
   '/lobby/scoreboard.html', // the game time scoreboard (phone: four teams' scores and the stopwatch on the projector)
-  '/cast/', // owner 2026-11-08: Cast, present on the lobby TV with the code it shows
+  'https://cast.kvbchurch.org/', // owner 2026-11-08: Cast, present on the lobby TV with the code it shows; its own site since 2026-11-09
   '/settings', '/logo/',
   '/tools/print/', // owner 2026-10-28: the letterhead maker; renamed the Print tool 2026-11-05
   '/download/kvbc-awana', '/help', '/capabilities.html', '/release-notes/printer.md',
@@ -23,6 +23,9 @@ const ALLOWED = [
 ];
 
 const hrefs = [...page.matchAll(/<a\b[^>]*\bhref="([^"]*)"/gi)].map((m) => m[1]);
+// The one link off this site: Cast's own site (owner 2026-11-09: Cast moved to
+// cast.kvbchurch.org; awana.kvbchurch.org/cast/ only redirects there now).
+const CAST = 'https://cast.kvbchurch.org/';
 
 test('the page asks search engines to skip it', () => {
   assert.match(page, /<meta name="robots" content="noindex,nofollow">/);
@@ -31,10 +34,11 @@ test('the page asks search engines to skip it', () => {
 test('every link is one of the listed pages: no extra links, no passphrase, query string or http', () => {
   assert.ok(hrefs.length > 0, 'the page has links');
   for (const href of hrefs) {
-    assert.ok(href.startsWith('/'), `${href} is not a site-relative link`);
     assert.ok(ALLOWED.includes(href), `${href} is not in the allowed list`);
     assert.ok(!href.includes('passphrase'), `${href} names a passphrase`);
     assert.ok(!href.includes('?'), `${href} has a query string`);
+    if (href === CAST) continue;
+    assert.ok(href.startsWith('/'), `${href} is not a site-relative link`);
     assert.ok(!href.includes('http'), `${href} is absolute`);
   }
 });
@@ -45,7 +49,8 @@ test('each of the 18 listed pages is linked exactly once', () => {
 });
 
 test('no external hosts and no script', () => {
-  assert.ok(!page.includes('https://'), 'no https:// URL');
+  assert.ok(!page.replaceAll(`href="${CAST}"`, '').includes('https://'), 'no https:// URL but Cast\'s own site');
+  assert.ok(!page.includes('/cast/"'), 'Cast is linked at its own site, not the old /cast/');
   assert.ok(!page.includes('googleapis'), 'no Google Fonts');
   assert.ok(!/<script/i.test(page), 'no <script');
 });

@@ -2,8 +2,9 @@
 // Cast, the lobby computer's AirServer-like screen (owner 2026-11-08: "set it up kind
 // of like an air server ... present from their laptop but through a webpage that is
 // controlling that computer"; "TV code only"; src/routes.md 10.18). KVBC Awana's tray
-// turns the Cast screen on (site/cast/screen/, signed in like every screen); it opens
-// a room here and shows a six-digit CODE. A presenter on awana.kvbchurch.org/cast types
+// turns the Cast screen on (cast.kvbchurch.org/screen/, site/cast/screen/, signed in like
+// every screen); it opens a room here and shows a six-digit CODE. A presenter on
+// cast.kvbchurch.org (Cast's own site since 2026-11-09; awana.kvbchurch.org/cast 301s) types
 // that code (no passphrase: a guest speaker has none) and gets a short-lived TOKEN;
 // with it they put things on the TV: their shared screen, a YouTube video, text,
 // pictures, a PDF (PowerPoint saved as PDF), a Google Slides link (copied as its PDF).
