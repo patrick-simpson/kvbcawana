@@ -15,6 +15,17 @@
 import { slideView } from '/cast/logic.js';
 
 const PDFJS = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/';
+// Fingerprints of the exact files (subresource integrity, owner 2026-11-09: refuse an
+// altered copy if the CDN were ever tampered with). Checked against cdnjs's own
+// published sha512s; change them together with the version above.
+const PDFJS_SRI = 'sha512-q+4liFwdPC/bNdhUpZx6aXDx/h77yEQtn4I1slHydcbZK34nLaR3cAeYSJshoxIOq3mjEf7xJE8YWIUHMn+oCQ==';
+const PDFJS_WORKER_SRI = 'sha512-BbrZ76UNZq5BhH7LL7pn9A4TKQpQeNCHOo65/akfelcIBbcVvYWOFQKPXIrykE3qZxYjmDX573oa4Ywsc7rpTw==';
+/** pdf.js's worker, fetched with its fingerprint and handed over as a blob (a Worker cannot check one). */
+async function pdfWorkerUrl() {
+  const res = await fetch(`${PDFJS}pdf.worker.min.js`, { integrity: PDFJS_WORKER_SRI, mode: 'cors', credentials: 'omit' });
+  if (!res.ok) throw new Error('pdf.js worker');
+  return URL.createObjectURL(new Blob([await res.text()], { type: 'text/javascript' }));
+}
 /** A press shows here before the TV confirms it, at most this long. */
 export const PENDING_MS = 4000;
 const BIG_KEEP = 8;
@@ -28,9 +39,13 @@ function pdfLib() {
       if (window.pdfjsLib) { resolve(window.pdfjsLib); return; }
       const s = document.createElement('script');
       s.src = `${PDFJS}pdf.min.js`;
+      s.integrity = PDFJS_SRI;
+      s.crossOrigin = 'anonymous';
       s.onload = () => {
-        window.pdfjsLib.GlobalWorkerOptions.workerSrc = `${PDFJS}pdf.worker.min.js`;
-        resolve(window.pdfjsLib);
+        pdfWorkerUrl().then((url) => {
+          window.pdfjsLib.GlobalWorkerOptions.workerSrc = url;
+          resolve(window.pdfjsLib);
+        }, () => { libPromise = null; reject(new Error('pdf.js worker')); });
       };
       s.onerror = () => { libPromise = null; reject(new Error('pdf.js')); };
       document.head.append(s);

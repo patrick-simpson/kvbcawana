@@ -31,6 +31,17 @@ const SESSION_KEY = 'awanaSyncSession.v1';
 const SESSION_RE = /^v1\.\d+\.\d+\.[A-Za-z0-9_-]{20,}$/;
 export const DOORBELL_MESSAGE = 'awana-display:sync-doorbell';
 const PDFJS = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/';
+// Fingerprints of the exact files (subresource integrity, owner 2026-11-09: refuse an
+// altered copy if the CDN were ever tampered with). Checked against cdnjs's own
+// published sha512s; change them together with the version above.
+const PDFJS_SRI = 'sha512-q+4liFwdPC/bNdhUpZx6aXDx/h77yEQtn4I1slHydcbZK34nLaR3cAeYSJshoxIOq3mjEf7xJE8YWIUHMn+oCQ==';
+const PDFJS_WORKER_SRI = 'sha512-BbrZ76UNZq5BhH7LL7pn9A4TKQpQeNCHOo65/akfelcIBbcVvYWOFQKPXIrykE3qZxYjmDX573oa4Ywsc7rpTw==';
+/** pdf.js's worker, fetched with its fingerprint and handed over as a blob (a Worker cannot check one). */
+async function pdfWorkerUrl() {
+  const res = await fetch(`${PDFJS}pdf.worker.min.js`, { integrity: PDFJS_WORKER_SRI, mode: 'cors', credentials: 'omit' });
+  if (!res.ok) throw new Error('pdf.js worker');
+  return URL.createObjectURL(new Blob([await res.text()], { type: 'text/javascript' }));
+}
 const YT_API = 'https://www.youtube.com/iframe_api';
 // pollMs: the doorbell (passed up by the embedded lobby) brings a press at once;
 // the poll is only its safety net, and keeps the remote's "the TV is on" (the
@@ -261,11 +272,13 @@ export async function createStage(deps) {
     await new Promise((ok, no) => {
       const s = document.createElement('script');
       s.src = `${PDFJS}pdf.min.js`;
+      s.integrity = PDFJS_SRI;
+      s.crossOrigin = 'anonymous';
       s.onload = ok;
       s.onerror = no;
       document.head.append(s);
     });
-    window.pdfjsLib.GlobalWorkerOptions.workerSrc = `${PDFJS}pdf.worker.min.js`;
+    window.pdfjsLib.GlobalWorkerOptions.workerSrc = await pdfWorkerUrl();
     return window.pdfjsLib;
   }
 
@@ -274,7 +287,7 @@ export async function createStage(deps) {
     if (!blob) { missing('The PDF could not be loaded.'); return; }
     try {
       const lib = await pdfLib();
-      const doc = await lib.getDocument({ data: new Uint8Array(await blob.arrayBuffer()) }).promise;
+      const doc = await lib.getDocument({ data: new Uint8Array(await blob.arrayBuffer()), isEvalSupported: false }).promise;
       pdfDoc = { file, doc };
       pdfPages = doc.numPages;
       await drawPdfPage(page, false);

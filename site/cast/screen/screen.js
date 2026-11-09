@@ -45,6 +45,18 @@ const SYNC_INDEX = new URL('/lobby/shared/sync.json', location.href).href;
 const PDFJS = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/';
 const YT_API = 'https://www.youtube.com/iframe_api';
 const QR_LIB = 'https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js';
+// Fingerprints of the exact files (subresource integrity, owner 2026-11-09: refuse an
+// altered copy if the CDN were ever tampered with). Checked against cdnjs's own
+// published sha512s; change them together with the version above.
+const PDFJS_SRI = 'sha512-q+4liFwdPC/bNdhUpZx6aXDx/h77yEQtn4I1slHydcbZK34nLaR3cAeYSJshoxIOq3mjEf7xJE8YWIUHMn+oCQ==';
+const PDFJS_WORKER_SRI = 'sha512-BbrZ76UNZq5BhH7LL7pn9A4TKQpQeNCHOo65/akfelcIBbcVvYWOFQKPXIrykE3qZxYjmDX573oa4Ywsc7rpTw==';
+/** pdf.js's worker, fetched with its fingerprint and handed over as a blob (a Worker cannot check one). */
+async function pdfWorkerUrl() {
+  const res = await fetch(`${PDFJS}pdf.worker.min.js`, { integrity: PDFJS_WORKER_SRI, mode: 'cors', credentials: 'omit' });
+  if (!res.ok) throw new Error('pdf.js worker');
+  return URL.createObjectURL(new Blob([await res.text()], { type: 'text/javascript' }));
+}
+const QR_LIB_SRI = 'sha512-ZDSPMa/JM1D+7kdg2x3BsruQ6T/JpJo3jWDWkCZsP+5yVyp1KfESqLI+7RqB5k24F7p2cV7i2YHh/890y6P6Sw==';
 const FB_SDK = 'https://connect.facebook.net/en_US/sdk.js';
 const T = Object.assign({
   pollMs: 30000, reportVideoMs: 10000, timeoutMs: 10000, fadeMs: 450,
@@ -133,6 +145,8 @@ function qrcodeLib() {
     qrLib = new Promise((ok, no) => {
       const sc = document.createElement('script');
       sc.src = QR_LIB;
+      sc.integrity = QR_LIB_SRI;
+      sc.crossOrigin = 'anonymous';
       sc.onload = () => (typeof window.qrcode === 'function' ? ok(window.qrcode) : no(new Error('qr')));
       sc.onerror = () => { qrLib = null; no(new Error('qr')); };
       document.head.append(sc);
@@ -365,11 +379,13 @@ async function pdfLib() {
   await new Promise((ok, no) => {
     const s = document.createElement('script');
     s.src = `${PDFJS}pdf.min.js`;
+    s.integrity = PDFJS_SRI;
+    s.crossOrigin = 'anonymous';
     s.onload = ok;
     s.onerror = no;
     document.head.append(s);
   });
-  window.pdfjsLib.GlobalWorkerOptions.workerSrc = `${PDFJS}pdf.worker.min.js`;
+  window.pdfjsLib.GlobalWorkerOptions.workerSrc = await pdfWorkerUrl();
   return window.pdfjsLib;
 }
 
@@ -377,7 +393,7 @@ async function openPdf(blob, page) {
   if (!blob) { status('The slides could not be loaded.'); return; }
   try {
     const lib = await pdfLib();
-    const doc = await lib.getDocument({ data: new Uint8Array(await blob.arrayBuffer()) }).promise;
+    const doc = await lib.getDocument({ data: new Uint8Array(await blob.arrayBuffer()), isEvalSupported: false }).promise;
     pdf = { doc, pages: doc.numPages };
     await drawPdfPage(page);
   } catch { status('The slides could not be opened.'); }
