@@ -4,6 +4,7 @@ import { sanitizeSlides } from '../lib/slides.js';
 import { sanitizeMilestoneList } from '../lib/milestones.js';
 import { NIGHT_THEME_VALUES } from '../lib/skins.js';
 import { parseUrlFlags } from '../lib/urlFlags.js';
+import { isHttpsUrlOrEmpty } from '../lib/safeUrl.js';
 import { matchesRule } from '../lib/settingRules.js';
 import { SHARED_KEYS, sanitizeSettingsPayload, sanitizeSharedValues } from '../lib/sharedSettings.js';
 
@@ -20,6 +21,9 @@ const SHARED_STORAGE_KEY = 'awanaSharedSettings.v1';
 // a broken screen on club night.
 const bool = { type: 'bool' };
 const string = { type: 'string' };
+// A string that goes into an iframe's src: '' or https only (security,
+// 2026-11-09: never javascript:, data: or http:, whoever wrote it).
+const httpsUrl = { type: 'string', https: true };
 const array = { type: 'array' };
 const between = (min, max) => ({ type: 'number', min, max });
 const oneOf = (...values) => ({ type: 'enum', values });
@@ -27,7 +31,7 @@ const oneOf = (...values) => ({ type: 'enum', values });
 const VALIDATORS = {
   backgroundSource: oneOf('powerpoint', 'manual', 'pptx', 'video'),
   manualSlides: array,
-  powerpointEmbedUrl: string,
+  powerpointEmbedUrl: httpsUrl,
   slideshowDelaySec: between(0, 600),
   useLocalSlideshow: bool,
   countdownTargetTime: string,
@@ -121,7 +125,7 @@ export function sanitizeOverrides(raw) {
   const clean = {};
   for (const [key, value] of Object.entries(raw)) {
     const rule = Object.prototype.hasOwnProperty.call(VALIDATORS, key) ? VALIDATORS[key] : null;
-    if (rule && matchesRule(rule, value)) clean[key] = TRANSFORMS[key] ? TRANSFORMS[key](value) : value;
+    if (rule && matchesRule(rule, value) && (!rule.https || isHttpsUrlOrEmpty(value))) clean[key] = TRANSFORMS[key] ? TRANSFORMS[key](value) : value;
   }
   return clean;
 }

@@ -154,8 +154,13 @@ describe('leak path 3: URL flags never return it as a setting', () => {
     saveFleetConfigUrl(URL_);
     // resolveRemoteConfigUrl is exactly what App.jsx calls, so this is the
     // real precedence rule and not a re-implementation of it.
-    expect(resolveRemoteConfigUrl(parseUrlFlags('?config=https://typed.example/x.json').configUrl, loadFleetConfigUrl()))
-      .toBe('https://typed.example/x.json');
+    // Security, 2026-11-09: ?config= takes only this site's own files (lib/safeUrl.js),
+    // so the typed one is on awana.kvbchurch.org; another host's is ignored and the
+    // provisioned one stands.
+    const page = 'https://awana.kvbchurch.org/lobby/';
+    expect(resolveRemoteConfigUrl(parseUrlFlags('?config=https://awana.kvbchurch.org/typed.json', page).configUrl, loadFleetConfigUrl()))
+      .toBe('https://awana.kvbchurch.org/typed.json');
+    expect(resolveRemoteConfigUrl(parseUrlFlags('?config=https://typed.example/x.json', page).configUrl, loadFleetConfigUrl())).toBe(URL_);
     expect(resolveRemoteConfigUrl(parseUrlFlags('?key=pk').configUrl, loadFleetConfigUrl())).toBe(URL_);
   });
 });

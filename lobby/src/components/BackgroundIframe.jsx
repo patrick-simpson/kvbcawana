@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { flagshipOnAir, withFlagship } from '../lib/flagship.js';
+import { isHttpsUrl } from '../lib/safeUrl.js';
 import PptxSlideshow from './PptxSlideshow.jsx';
 import ManualSlideshow from './ManualSlideshow.jsx';
 import CatalogScene from './CatalogScene.jsx';
@@ -83,7 +84,7 @@ function isOneDrivePptx(url) {
 }
 
 export default function BackgroundIframe({
-  url, slideshowDelaySec, useLocalSlideshow, backgroundSource, manualSlides,
+  url: givenUrl, slideshowDelaySec, useLocalSlideshow, backgroundSource, manualSlides,
   calendarSlides,
   // The season's scene theme, and the weather's atmosphere modifier over it.
   // Both default to today's behaviour so an unthemed install looks unchanged.
@@ -105,6 +106,9 @@ export default function BackgroundIframe({
   paused = false,
   onSlide,
 }) {
+  // Only an https address is ever framed (security, 2026-11-09; useConfig
+  // already drops anything else, this is the second check at the iframe).
+  const url = isHttpsUrl(givenUrl) ? givenUrl : '';
   // One array identity per (calendarSlides, manualSlides) pair — a fresh
   // array every render used to restart ManualSlideshow's hold timer on
   // every App re-render. Unconditional: hooks come before the early returns.

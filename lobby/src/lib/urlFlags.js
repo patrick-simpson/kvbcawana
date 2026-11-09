@@ -32,11 +32,13 @@
 //
 // Example OBS browser source URL:
 //   https://awana.kvbchurch.org/lobby/?overlay=1&passphrase=…
-// lib/clubs.js CORNER_CLUB_IDS, written out (this file imports nothing;
-// urlFlags.test.js pins the two lists equal).
+// lib/clubs.js CORNER_CLUB_IDS, written out (this file imports only the pure
+// lib/safeUrl.js; urlFlags.test.js pins the two lists equal).
+import { sameSiteConfigUrl } from './safeUrl.js';
+
 export const CLUB_FLAG_IDS = Object.freeze(['puggles', 'cubbies', 'sparks', 'tnt', 'trek', 'journey']);
 
-export function parseUrlFlags(search = window.location.search) {
+export function parseUrlFlags(search = window.location.search, pageHref = window.location.href) {
   const params = new URLSearchParams(search);
 
   const overlayParam = (params.get('overlay') || '').toLowerCase();
@@ -46,17 +48,13 @@ export function parseUrlFlags(search = window.location.search) {
   const lowPowerParam = (params.get('lowPower') || '').toLowerCase();
   const lowPower = ['1', 'true', 'yes'].includes(lowPowerParam);
 
-  // ?config=<https-url>: fetch a JSON of config overrides at startup —
+  // ?config=<url>: fetch a JSON of config overrides at startup —
   // central management for a fleet of displays. Precedence stays
   // defaults < remote config < this device's saved overrides < ?lowPower.
-  const configRaw = (params.get('config') || '').trim();
-  let configUrl = null;
-  try {
-    if (configRaw) {
-      const u = new URL(configRaw);
-      if (u.protocol === 'https:' || u.protocol === 'http:') configUrl = u.href;
-    }
-  } catch { /* malformed — ignore */ }
+  // Only this site's own files (security, 2026-11-09: a link to anyone's
+  // server could otherwise choose what the screen frames): the page's own
+  // origin or https://awana.kvbchurch.org; anything else is ignored.
+  const configUrl = sameSiteConfigUrl(params.get('config') || '', pageHref);
 
   const clubRaw = (params.get('club') || '').trim().toLowerCase();
   const club = CLUB_FLAG_IDS.includes(clubRaw) ? clubRaw : null;
