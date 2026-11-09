@@ -39,7 +39,7 @@ on:
         description: 'Version to release, e.g. 5.0.2 (no leading "v" and no "printer-v" prefix, both added automatically)'
         required: true
       ref:
-        description: 'Branch or commit to tag'
+        description: 'Branch, tag or commit to release; it must already be on main (default main)'
         required: false
         default: 'main'
 

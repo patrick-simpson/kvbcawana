@@ -34,7 +34,7 @@ on:
         type: string
         required: true
       ref:
-        description: 'Branch or commit to tag'
+        description: 'Branch, tag or commit to release; it must already be on main (default main)'
         type: string
         required: false
         default: 'main'
@@ -89,15 +89,71 @@ permissions:
   actions: write    # dispatch ci.yml so the site redeploys with the new feed
 
 jobs:
+  # Before ANY code from `ref` runs: turn it into one commit and refuse it
+  # unless that commit is already on main. A dispatch token that leaked could
+  # otherwise name a commit from a fork (GitHub serves fork commits by SHA
+  # through the parent repo) and have it tested, tagged, built and published
+  # to every church PC. Nothing from `ref` is executed here: the checkout is
+  # main's, and `ref` is only resolved and compared. `ref: main` (the
+  # default) resolves to main's head, exactly as before.
+  verify-ref:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      sha: ${{ steps.resolve.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Resolve ref to a commit on main
+        id: resolve
+        env:
+          REF: ${{ inputs.ref }}
+        run: |
+          set -euo pipefail
+          git fetch -q --tags origin '+refs/heads/*:refs/remotes/origin/*'
+          if [ -z "$REF" ]; then REF=main; fi
+          case "$REF" in -*) echo "::error::ref may not start with '-' (got: '$REF')"; exit 1;; esac
+          SHA=""
+          for cand in "refs/remotes/origin/$REF" "refs/tags/$REF" "$REF"; do
+            if SHA="$(git rev-parse -q --verify "$cand^{commit}" 2>/dev/null)"; then break; fi
+            SHA=""
+          done
+          if [ -z "$SHA" ] && [[ "$REF" =~ ^[0-9a-f]{40}$ ]]; then
+            # A full commit id not in main's history: fetch it so the check
+            # below can say no to it plainly.
+            git fetch -q origin "$REF" 2>/dev/null || true
+            SHA="$(git rev-parse -q --verify "$REF^{commit}" 2>/dev/null || true)"
+          fi
+          if [ -z "$SHA" ]; then
+            echo "::error::Could not resolve ref '$REF' to a commit in this repository"
+            exit 1
+          fi
+          if ! git merge-base --is-ancestor "$SHA" refs/remotes/origin/main; then
+            echo "::error::ref '$REF' is $SHA, which is not on main. Releases are built only from commits already on main."
+            exit 1
+          fi
+          echo "Releasing from $SHA ($REF), which is on main."
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+
   test:
+    needs: verify-ref
     runs-on: ubuntu-24.04
     timeout-minutes: ${{ inputs.test-timeout }}
+    # npm ci and the suites need no write access.
+    permissions:
+      contents: read
     outputs:
       sha: ${{ steps.sha.outputs.sha }}
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.ref }}
+          ref: ${{ needs.verify-ref.outputs.sha }}
+          persist-credentials: false
       - id: sha
         run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
       - name: Set up Node.js and install root dependencies
@@ -198,11 +254,16 @@ jobs:
     needs: [tag, test]
     runs-on: windows-latest
     timeout-minutes: 45
+    # npm ci and electron-builder need no write access; the artifact upload
+    # does not use the repo token.
+    permissions:
+      contents: read
 
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ needs.tag.outputs.sha }}
+          persist-credentials: false
 
       - name: Set up Node.js (electron-app)
         if: inputs.app == 'printer'
@@ -275,6 +336,8 @@ jobs:
     needs: [tag, build]
     runs-on: windows-latest
     timeout-minutes: 30
+    permissions:
+      contents: read
 
     steps:
       - name: Download installer
