@@ -348,7 +348,21 @@ function isSafePrinterName(name) {
   return PRINTER_NAME_RE.test(s);
 }
 
+// ── The Host header (DNS rebinding) ───────────────────────────────────────────
+// A hostile web page can point its own domain name at 127.0.0.1 and then talk to this
+// server as "same origin", with no Origin header and its own name in Host. Every request
+// must therefore name this server exactly: 127.0.0.1, localhost or [::1], on the port
+// the request actually arrived on. Anything else is refused before any route runs.
+function isAllowedHostHeader(host, port) {
+  if (typeof host !== 'string' || !host) return false;
+  const p = Number(port);
+  if (!Number.isInteger(p) || p <= 0) return false;
+  const h = host.trim().toLowerCase();
+  return h === `127.0.0.1:${p}` || h === `localhost:${p}` || h === `[::1]:${p}`;
+}
+
 module.exports = {
+  isAllowedHostHeader,
   isSafePrinterName,
   PRINTER_NAME_MAX,
   hasControlChars,

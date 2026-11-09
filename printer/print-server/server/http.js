@@ -40,6 +40,19 @@ for (const method of ['get', 'post', 'put', 'delete', 'patch']) {
   )));
 }
 
+// ── The Host check (10.14.0): DNS rebinding ──────────────────────────────────
+// FIRST, before CORS and every route: a request must name this server exactly in its
+// Host header (127.0.0.1, localhost or [::1] on the port it arrived on). A page that
+// re-points its own domain at 127.0.0.1 sends its own name there, and without this it
+// could read GET /config (the sync session, the display key), tonight's stats and the
+// history as if it were this computer's own page.
+app.use((req, res, next) => {
+  const port = (req.socket && req.socket.localPort) || $config.PORT;
+  if (security.isAllowedHostHeader(req.headers.host, port)) return next();
+  console.warn(`[security] Refused ${req.method} ${req.path}: Host "${String(req.headers.host || '').slice(0, 80)}" is not this server`);
+  return res.status(421).json({ error: 'This server only answers to 127.0.0.1 or localhost.' });
+});
+
 // ── CORS: an allowlist, not `*` ───────────────────────────────────────────────
 // This used to be `app.use(cors())`, i.e. `Access-Control-Allow-Origin: *` on
 // every response. Because the browser lets a page READ a response bearing that

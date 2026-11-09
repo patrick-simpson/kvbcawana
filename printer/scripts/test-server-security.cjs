@@ -168,7 +168,9 @@ async function main() {
     const lanPort = require('./free-port.cjs')('0.0.0.0');
     const lanListener = http.createServer(server.app);
     await new Promise((resolve) => lanListener.listen(lanPort, '0.0.0.0', resolve));
-    const lanReq = (o) => request({ ...o, host: lan, port: lanPort });
+    // 10.14.0: a Host naming anything but this server is refused first (421). The LAN
+    // caller here FORGES a localhost Host, so what refuses it is the loopback gate itself.
+    const lanReq = (o) => request({ ...o, host: lan, port: lanPort, headers: { Host: `127.0.0.1:${lanPort}`, ...(o.headers || {}) } });
 
     const GET_PATHS = [
       '/', '/phone', '/phone/ym', '/phone.html', '/index.html', '/step-chip.js',
@@ -222,6 +224,26 @@ async function main() {
   {
     const local = json(await request({ host: '127.0.0.1', pathname: '/health' }));
     check('/health reports no extension folder', local && !('extension' in local) && !('extensionRunning' in local), JSON.stringify(local && Object.keys(local)));
+  }
+
+  // ── DNS rebinding: the Host header (10.14.0) ────────────────────────────────
+  // A hostile page that points its own name at 127.0.0.1 reaches a loopback socket with
+  // no Origin and ITS name in Host. Every route refuses that before anything runs.
+  {
+    for (const host of [`evil.example:${PORT}`, 'evil.example', `127.0.0.1.evil.example:${PORT}`, `127.0.0.1:${PORT + 1}`, `localhost`]) {
+      for (const p of ['/config', '/stats/tonight', '/history/today', '/diagnostics', '/health']) {
+        const res = await request({ host: '127.0.0.1', pathname: p, headers: { Host: host } });
+        check(`forged Host "${host}" GET ${p} is refused (421)`, res.status === 421, `status ${res.status}`);
+        check(`forged Host "${host}" GET ${p} leaks nothing`,
+          !res.body.includes('SECRET-MUST-NOT-LEAK') && !res.body.includes('Leakcanary') && !res.body.includes('peanut'));
+      }
+    }
+    const post = await request({ host: '127.0.0.1', method: 'POST', pathname: '/print-custom', headers: { Host: `evil.example:${PORT}` }, body: { text: 'Rebound' } });
+    check('forged Host POST is refused (421)', post.status === 421, `status ${post.status}`);
+    for (const host of [`127.0.0.1:${PORT}`, `localhost:${PORT}`, `LOCALHOST:${PORT}`, `[::1]:${PORT}`]) {
+      const res = await request({ host: '127.0.0.1', pathname: '/health', headers: { Host: host } });
+      check(`Host "${host}" is this server and is answered`, res.status === 200, `status ${res.status}`);
+    }
   }
 
   // ── Origin policy ───────────────────────────────────────────────────────────
