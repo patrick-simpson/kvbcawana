@@ -49,8 +49,28 @@
 
 import { Classroom, newId } from './classroom.js';
 import { fail, json } from './http.js';
+import { CLASSROOM_CLIP_MAX_BYTES, CLASSROOM_FILE_MAX_BYTES, CLASSROOM_FILE_TYPES, fileLimits, isClipType } from '../../shared/classroomRemote.js';
 
 const ROOM_KEY = 'cast:room';
+
+// What a guest may keep in the room (a guest needs no passphrase, so this bounds
+// what one code can cost the free plan's storage and writes). A talk needs a few
+// pictures, a PDF or two and perhaps one video: at most CAST_FILES_MAX files and
+// CAST_BYTES_MAX bytes (one 200 MB clip plus two 20 MB PDFs or pictures). A new
+// upload that would pass either makes room by deleting the room's OLDEST finished
+// files that are not on the TV; one that still cannot fit is refused 413 `room-full`.
+export const CAST_FILES_MAX = 12;
+export const CAST_BYTES_MAX = CLASSROOM_CLIP_MAX_BYTES + 2 * CLASSROOM_FILE_MAX_BYTES;
+// Rates (memory only; a restart forgets them, the room caps above stay): a presenter
+// token may start CAST_FILES_PER_HOUR uploads or link copies and CAST_CONVERTS_PER_HOUR
+// PowerPoints an hour; the room takes CAST_UPLOAD_BYTES_PER_HOUR an hour whoever
+// sends them (leaving and joining again gets a new token, not a new allowance). 300 MB
+// is about 3,200 stored parts an hour, well inside the free plan's daily writes for a
+// normal evening, and more than a real talk sends.
+export const CAST_FILES_PER_HOUR = 30;
+export const CAST_CONVERTS_PER_HOUR = 6;
+export const CAST_UPLOAD_BYTES_PER_HOUR = 300 * 1024 * 1024;
+const HOUR_MS = 60 * 60 * 1000;
 /** A presenter's token is good this long (a long service or class). */
 export const TOKEN_TTL_MS = 8 * 60 * 60 * 1000;
 export const TOKENS_MAX = 20;
@@ -131,6 +151,74 @@ export class Cast {
     });
     /** @type {{ n: number, since: number }} */
     this.fails = { n: 0, since: 0 };
+    /** Per presenter token this hour (hash -> counts), memory only. @type {Map<string, { since: number, files: number, converts: number }>} */
+    this.rates = new Map();
+    /** Bytes the room took this hour, whoever sent them. */
+    this.roomBytes = { n: 0, since: 0 };
+  }
+
+  /** This token's counts for the hour. @param {string} who */
+  rateOf(who) {
+    const t = this.now();
+    let r = this.rates.get(who);
+    if (!r || t - r.since > HOUR_MS) {
+      r = { since: t, files: 0, converts: 0 };
+      this.rates.set(who, r);
+      while (this.rates.size > 64) this.rates.delete(/** @type {string} */ (this.rates.keys().next().value));
+    }
+    return r;
+  }
+
+  /** Bytes the room may still take this hour. */
+  roomBytesLeft() {
+    const t = this.now();
+    if (t - this.roomBytes.since > HOUR_MS) this.roomBytes = { n: 0, since: t };
+    return CAST_UPLOAD_BYTES_PER_HOUR - this.roomBytes.n;
+  }
+
+  /**
+   * Room for `bytes` more in the room: the oldest finished files not on the TV go
+   * until it fits. False when it cannot (what is up, or still uploading, fills it).
+   * @param {number} bytes
+   */
+  async makeRoom(bytes) {
+    const metas = [...(await this.storage.list({ prefix: 'castmeta:' })).values()].filter((m) => m?.id);
+    const shown = (await this.engine.stage()).show?.button?.file || null;
+    let count = metas.length;
+    let used = metas.reduce((n, m) => n + (Number(m.bytes) || 0), 0);
+    const fits = () => count + 1 <= CAST_FILES_MAX && used + bytes <= CAST_BYTES_MAX;
+    if (fits()) return true;
+    const old = metas.filter((m) => m.done && m.id !== shown).sort((a, b) => (a.at || 0) - (b.at || 0));
+    for (const m of old) {
+      if (fits()) break;
+      await this.engine.deleteFile(m);
+      count -= 1;
+      used -= Number(m.bytes) || 0;
+    }
+    return fits();
+  }
+
+  /** POST /v1/cast/files (the presenter): an upload or a link copy, within the room's caps and rates. @param {string} who @param {any} body */
+  async fileStart(who, body) {
+    const r = this.rateOf(who);
+    if (r.files >= CAST_FILES_PER_HOUR) return fail('That is a lot of files this hour. Wait a while, or share your screen instead.', 429, { reason: 'too-many' });
+    const isLink = typeof body?.url === 'string';
+    const bytes = isLink ? CLASSROOM_FILE_MAX_BYTES : Number(body?.bytes);
+    // Anything the engine would refuse anyway (type, empty, too big) gets its own answer.
+    const typeOk = CLASSROOM_FILE_TYPES.includes(body?.type) || isClipType(body?.type);
+    if (!isLink && (!typeOk || !Number.isInteger(bytes) || bytes < 1 || bytes > fileLimits(body.type).max)) return this.engine.startFile(body);
+    const left = this.roomBytesLeft();
+    if ((isLink ? 1 : bytes) > left) return fail('That is a lot sent to the TV this hour. Wait a while, or share your screen instead.', 429, { reason: 'too-many' });
+    if (!(await this.makeRoom(Math.min(bytes, left)))) return fail('The TV is holding as much as it can. Take down what is up, then try again.', 413, { reason: 'room-full' });
+    r.files += 1;
+    const res = isLink
+      ? await this.engine.importFile(body.url, body.name, { maxBytes: Math.min(CLASSROOM_FILE_MAX_BYTES, left) })
+      : await this.engine.startFile(body);
+    if (res.ok) {
+      const got = isLink ? Number((await res.clone().json())?.bytes) || 0 : bytes;
+      this.roomBytes.n += got;
+    }
+    return res;
   }
 
   /** @returns {Promise<{ code: string | null, at: number, tokens: { hash: string, at: number }[] }>} */
@@ -147,6 +235,7 @@ export class Cast {
     const convs = await this.storage.list({ prefix: CONV_PREFIX });
     for (const [, conv] of convs) if (conv?.id) await this.dropConvert(conv, true);
     this.converts = { n: 0, since: 0 };
+    this.roomBytes = { n: 0, since: 0 };
     const stage = await this.engine.stage();
     if (stage.show || stage.preview) await this.engine.saveStage({ ...stage, show: null, preview: null, cmds: [] });
   }
@@ -310,12 +399,17 @@ export class Cast {
     else await this.storage.put(CONV_PREFIX + conv.id, { ...conv, parts: 0 });
   }
 
-  /** POST /v1/cast/convert {bytes, name}: start sending a scrambled PowerPoint. @param {any} body */
-  async convertStart(body) {
+  /** POST /v1/cast/convert {bytes, name}: start sending a scrambled PowerPoint. @param {any} body @param {string} [who] */
+  async convertStart(body, who = '') {
     if (!this.convertReady()) return fail('PowerPoint is not set up here yet. Save it as a PDF and send that instead.', 503, { reason: 'not-configured' });
     const bytes = Number(body?.bytes);
     if (!Number.isInteger(bytes) || bytes < 29) return fail('That file is empty.', 400, { reason: 'empty' });
     if (bytes > CONVERT_MAX_CT) return fail('That PowerPoint is too big (40 MB at most). Save it as a PDF, or share your screen.', 413, { reason: 'too-big' });
+    const rate = this.rateOf(who);
+    if (rate.converts >= CAST_CONVERTS_PER_HOUR) return fail('That is a lot of PowerPoints this hour. Save it as a PDF and send that instead.', 429, { reason: 'too-many' });
+    if (bytes > this.roomBytesLeft()) return fail('That is a lot sent to the TV this hour. Wait a while, or share your screen instead.', 429, { reason: 'too-many' });
+    // The slides come back as a file of the room (20 MB at most): room for it first.
+    if (!(await this.makeRoom(CLASSROOM_FILE_MAX_BYTES))) return fail('The TV is holding as much as it can. Take down what is up, then try again.', 413, { reason: 'room-full' });
     const t = this.now();
     let pending = 0;
     for (const [, c] of await this.storage.list({ prefix: CONV_PREFIX })) {
@@ -328,6 +422,8 @@ export class Cast {
     const parts = Math.ceil(bytes / CONVERT_PART_BYTES);
     const name = String(body?.name || '').replace(/\.(pptx?|odp)$/i, '').replace(/\s+/g, ' ').trim().slice(0, 80);
     await this.storage.put(CONV_PREFIX + id, { id, parts, bytes, next: 0, name, status: 'uploading', at: t });
+    rate.converts += 1;
+    this.roomBytes.n += bytes;
     return json({ ok: true, id, parts, partBytes: CONVERT_PART_BYTES });
   }
 
@@ -451,7 +547,7 @@ export function mountCast(registry, core) {
   registry.add('GET', '/v1/cast/youtube', 'public', presenter(async ({ url }) => c().youtube(url.searchParams.get('q'))));
   registry.add('GET', '/v1/cast/state', 'public', presenter(async () => c().engine.remoteState()));
   registry.add('POST', '/v1/cast/press', 'public', presenter(async ({ body }, who) => c().engine.press(who, await body())));
-  registry.add('POST', '/v1/cast/files', 'public', presenter(async ({ body }) => c().engine.startFile(await body())));
+  registry.add('POST', '/v1/cast/files', 'public', presenter(async ({ body }, who) => c().fileStart(who, await body())));
   registry.add('PUT', '/v1/cast/files/:id/:n', 'public', presenter(async ({ params, request }) => c().engine.putPart(params.id, params.n, request)));
   registry.add('POST', '/v1/cast/files/:id/done', 'public', presenter(async ({ params }) => c().engine.finishFile(params.id)));
   registry.add('POST', '/v1/cast/signal', 'public', presenter(async ({ body }) => c().engine.putSignal(await body())));
@@ -469,7 +565,7 @@ export function mountCast(registry, core) {
   registry.add('PUT', '/v1/cast/convert/:id/result', 'public', machine(async ({ params, request }) => c().convertResult(params.id, request)));
   registry.add('POST', '/v1/cast/convert/:id/failed', 'public', machine(async ({ params, body }) => c().convertFailed(params.id, await body())));
   // ...then the presenter's upload and status.
-  registry.add('POST', '/v1/cast/convert', 'public', presenter(async ({ body }) => c().convertStart(await body())));
+  registry.add('POST', '/v1/cast/convert', 'public', presenter(async ({ body }, who) => c().convertStart(await body(), who)));
   registry.add('PUT', '/v1/cast/convert/:id/:n', 'public', presenter(async ({ params, request }) => c().convertPart(params.id, params.n, request)));
   registry.add('POST', '/v1/cast/convert/:id/start', 'public', presenter(async ({ params, body }) => c().convertGo(params.id, await body())));
   registry.add('GET', '/v1/cast/convert/:id', 'public', presenter(async ({ params }) => c().convertStatus(params.id)));

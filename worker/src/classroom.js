@@ -214,8 +214,13 @@ export class Classroom {
     return json({ ok: true, id, type: meta.type, bytes: meta.bytes, kind: kindOfType(meta.type) });
   }
 
-  /** Copies a picture or PDF from a link (a Google Drive share link works). @param {string} link @param {unknown} name */
-  async importFile(link, name) {
+  /**
+   * Copies a picture or PDF from a link (a Google Drive share link works).
+   * `maxBytes`: a lower cap than 20 MB (Cast's room allowance).
+   * @param {string} link @param {unknown} name @param {{ maxBytes?: number }} [opts]
+   */
+  async importFile(link, name, opts = {}) {
+    const max = Math.min(CLASSROOM_FILE_MAX_BYTES, opts.maxBytes ?? CLASSROOM_FILE_MAX_BYTES);
     const url = fileLinkFrom(link);
     if (!url) return fail('That is not an https link.', 400, { reason: 'link' });
     let res;
@@ -226,9 +231,9 @@ export class Classroom {
     }
     if (!res.ok) return fail(`That link answered ${res.status}.`, 502, { reason: 'status' });
     const declared = Number(res.headers.get('content-length'));
-    if (Number.isFinite(declared) && declared > CLASSROOM_FILE_MAX_BYTES) return fail('That file is too big (20 MB at most).', 413, { reason: 'too-big' });
+    if (Number.isFinite(declared) && declared > max) return fail('That file is too big (20 MB at most).', 413, { reason: 'too-big' });
     const bytes = new Uint8Array(await res.arrayBuffer());
-    if (bytes.length > CLASSROOM_FILE_MAX_BYTES) return fail('That file is too big (20 MB at most).', 413, { reason: 'too-big' });
+    if (bytes.length > max) return fail('That file is too big (20 MB at most).', 413, { reason: 'too-big' });
     const file = await this.storeBytes(bytes, oneLine(name, 80) || oneLine(new URL(url).pathname.split('/').pop(), 80));
     if (!file) return fail('That link is not a picture or a PDF (a web page, perhaps). Use the link to the file itself, or upload it.', 400, { reason: 'type' });
     return json({ ok: true, ...file });

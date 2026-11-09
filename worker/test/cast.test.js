@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { SyncCore } from '../src/sync.js';
-import { JOIN_FAILS_MAX, TOKEN_TTL_MS } from '../src/cast.js';
+import { CAST_BYTES_MAX, CAST_CONVERTS_PER_HOUR, CAST_FILES_MAX, CAST_FILES_PER_HOUR, JOIN_FAILS_MAX, TOKEN_TTL_MS } from '../src/cast.js';
 import { memoryStore, signInV2 } from './helpers.js';
 import { CLASSROOM_CLIP_PART_BYTES, CLASSROOM_FILE_PART_BYTES, fileLinkFrom, sanitizeButtons, sanitizeClassroomPress, sanitizeSignal } from '../../shared/classroomRemote.js';
 
@@ -298,6 +298,19 @@ describe('PowerPoint into slides', () => {
     await s.call('POST', '/v1/cast/open', {});
     expect((await s.raw('GET', `/v1/cast/convert/${id}/job`, undefined, s.machine)).status).toBe(404);
   });
+  it('a presenter may start only a few PowerPoints an hour (each one is a GitHub job and up to 40 MB)', async () => {
+    const s = await convertSetup();
+    for (let n = 0; n < CAST_CONVERTS_PER_HOUR; n += 1) {
+      const start = await s.call('POST', '/v1/cast/convert', { bytes: 40, name: 'x.pptx' }, s.as);
+      expect(start.status).toBe(200);
+      await s.call('POST', `/v1/cast/convert/${start.body.id}/failed`, { reason: 'convert' }, s.machine);
+    }
+    const over = await s.call('POST', '/v1/cast/convert', { bytes: 40, name: 'x.pptx' }, s.as);
+    expect(over.status).toBe(429);
+    expect(over.body.reason).toBe('too-many');
+    s.tick(61 * 60 * 1000);
+    expect((await s.call('POST', '/v1/cast/convert', { bytes: 40, name: 'x.pptx' }, s.as)).status).toBe(200);
+  });
 });
 
 // Owner 2026-11-08, later: one presenter at a time (refuse the second), Display code
@@ -446,5 +459,74 @@ describe('one presenter, leave, reset, YouTube search, Facebook and uploaded vid
     expect((await s.call('GET', '/v1/cast/state', undefined, { auth: '', cast: a })).status).toBe(401);
     expect((await s.call('GET', '/v1/cast/screen')).body.stage.show).not.toBeNull();
     expect((await s.join()).status).toBe(200);
+  });
+});
+
+// A guest needs no passphrase, so what one code may cost is bounded (cast.js): at most
+// CAST_FILES_MAX files and CAST_BYTES_MAX bytes in the room (the oldest finished files
+// not on the TV make room), a few uploads per token an hour, a byte allowance per room.
+describe('Cast: what a guest may keep in the room', () => {
+  async function presenter() {
+    const s = await setup();
+    const { code } = (await s.call('POST', '/v1/cast/open', {})).body;
+    const join = async () => (await s.call('POST', '/v1/cast/join', { code }, { auth: '' })).body.token;
+    return { ...s, code, join };
+  }
+  async function sendPng(s, token) {
+    const start = await s.call('POST', '/v1/cast/files', { type: 'image/png', bytes: PNG.length, name: 'a.png' }, { auth: '', cast: token });
+    if (start.status !== 200) return start;
+    await s.call('PUT', `/v1/cast/files/${start.body.id}/0`, PNG, { auth: '', cast: token });
+    return s.call('POST', `/v1/cast/files/${start.body.id}/done`, {}, { auth: '', cast: token });
+  }
+  const files = async (s) => [...(await s.core.storage.list({ prefix: 'castmeta:' })).values()];
+
+  it('a new file past the cap makes room by deleting the oldest one not on the TV', async () => {
+    const s = await presenter();
+    const t = await s.join();
+    const ids = [];
+    for (let n = 0; n < CAST_FILES_MAX; n += 1) { ids.push((await sendPng(s, t)).body.id); s.tick(1000); }
+    // The first is on the TV, so the second is the one that goes.
+    await s.call('POST', '/v1/cast/press', { action: 'item', data: { item: { id: 'bplaceholder', kind: 'image', file: ids[0], type: 'image/png' } } }, { auth: '', cast: t });
+    const next = await sendPng(s, t);
+    expect(next.status).toBe(200);
+    const left = (await files(s)).map((m) => m.id);
+    expect(left.length).toBe(CAST_FILES_MAX);
+    expect(left).toContain(ids[0]);
+    expect(left).not.toContain(ids[1]);
+    expect((await s.raw('GET', `/v1/cast/screen/files/${ids[1]}`)).status).toBe(404);
+  });
+
+  it('refuses room-full when what is up and still uploading fills the room', async () => {
+    const s = await presenter();
+    const t = await s.join();
+    const start = (bytes, type = 'video/mp4') => s.call('POST', '/v1/cast/files', { type, bytes }, { auth: '', cast: t });
+    expect((await start(200 * 1024 * 1024)).status).toBe(200);
+    expect((await start(20 * 1024 * 1024, 'application/pdf')).status).toBe(200);
+    expect((await start(CAST_BYTES_MAX - 220 * 1024 * 1024, 'application/pdf')).status).toBe(200);
+    const full = await start(1000, 'image/png');
+    expect(full.status).toBe(413);
+    expect(full.body.reason).toBe('room-full');
+  });
+
+  it('a token may start only so many uploads an hour', async () => {
+    const s = await presenter();
+    const t = await s.join();
+    for (let n = 0; n < CAST_FILES_PER_HOUR; n += 1) expect((await sendPng(s, t)).status).toBe(200);
+    const over = await sendPng(s, t);
+    expect(over.status).toBe(429);
+    expect(over.body.reason).toBe('too-many');
+    s.tick(61 * 60 * 1000);
+    expect((await sendPng(s, t)).status).toBe(200);
+  });
+
+  it('the room has an hourly byte allowance that a new token does not reset', async () => {
+    const s = await presenter();
+    let t = await s.join();
+    expect((await s.call('POST', '/v1/cast/files', { type: 'video/mp4', bytes: 200 * 1024 * 1024 }, { auth: '', cast: t })).status).toBe(200);
+    await s.call('POST', '/v1/cast/leave', {}, { auth: '', cast: t });
+    t = await s.join();
+    const over = await s.call('POST', '/v1/cast/files', { type: 'video/mp4', bytes: 101 * 1024 * 1024 }, { auth: '', cast: t });
+    expect(over.status).toBe(429);
+    expect(over.body.reason).toBe('too-many');
   });
 });
