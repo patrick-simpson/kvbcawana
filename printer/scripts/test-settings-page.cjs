@@ -486,7 +486,7 @@ async function main() {
     check('no Chrome extension ships with the app any more (10.0.0)', !fs.existsSync(path.join(__dirname, '..', 'chrome-extension')));
     const tray = read('electron-app', 'main.js');
     check('the app\'s tray and status window open the settings page', tray.includes(`const SETTINGS_URL = '${URL_}'`)
-      && /openExternalSafely\(SETTINGS_URL, 'tray menu'\)/.test(tray) && /ipcMain\.handle\('open-settings'/.test(tray));
+      && /openExternalSafely\(SETTINGS_URL, 'tray menu'\)/.test(tray) && /statusHandle\('open-settings'/.test(tray));
     check('the app no longer offers a firewall rule or a LAN address for phones', !/FIREWALL_RULE|enable-phone-checkin|get-lan-address/.test(tray)
       && !/enablePhone|getLanAddress|:3456\/phone/.test(read('electron-app', 'renderer', 'components', 'StatusPanel.jsx')));
   }
