@@ -135,8 +135,21 @@ export class Classroom {
     this.seq = 0;
     /** @type {Map<string, { tokens: number, t: number }>} */
     this.buckets = new Map();
-    /** The screen share now up: its offer and answer (memory only). @type {{ id: string, offer: any, answer: any, at: number } | null} */
-    this.rtc = null;
+    /** Told when a share ends or is replaced (turn.js revokes its relay credentials). @type {(id: string) => void} */
+    this.onShareEnd = () => {};
+    /** @type {{ id: string, offer: any, answer: any, at: number, by?: string } | null} */
+    this.share = null;
+  }
+
+  /** The screen share now up: its offer and answer (memory only); `by` = who started it. */
+  get rtc() { return this.share; }
+
+  set rtc(v) {
+    const old = this.share;
+    this.share = v;
+    if (old && (!v || v.id !== old.id)) {
+      try { this.onShareEnd(old.id); } catch { /* never in the way */ }
+    }
   }
 
   watching() { return this.watchAt > 0 && this.now() - this.watchAt <= CLASSROOM_WATCH_MS; }
@@ -378,7 +391,7 @@ export class Classroom {
       // A screen share starting: the screen button goes up; its offer follows (putSignal).
       case 'screen': {
         const id = newId('b', 10);
-        this.rtc = { id, offer: null, answer: null, at: t };
+        this.rtc = { id, offer: null, answer: null, at: t, by: who };
         next = { ...stage, show: { button: { id, kind: 'screen', title: p.data?.title || 'Shared screen' }, at: t, page: 1 }, preview: stage.preview?.held ? null : stage.preview, cmds };
         break;
       }
@@ -423,7 +436,7 @@ export class Classroom {
     if (!sig) return fail('That screen share message is not readable.', 400);
     const t = this.now();
     if (!this.rtc || this.rtc.id !== sig.id || t - this.rtc.at > SIGNAL_TTL_MS + 60 * 60 * 1000) return fail('That screen share has ended.', 409, { reason: 'ended' });
-    if (sig.type === 'offer') this.rtc = { id: sig.id, offer: sig, answer: null, at: t };
+    if (sig.type === 'offer') this.rtc = { id: sig.id, offer: sig, answer: null, at: t, by: this.rtc.by };
     else if (!this.rtc.offer) return fail('There is no offer to answer.', 409, { reason: 'no-offer' });
     else this.rtc = { ...this.rtc, answer: sig };
     this.ring({ what: this.room.what, rtc: sig.type, rev: (await this.stage()).rev });

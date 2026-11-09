@@ -313,6 +313,9 @@ export class SyncCore {
     // The screen share's relay (turn.js, routes.md 10.18): STUN always, Cloudflare TURN
     // credentials when its secrets are set, capped inside the free allowance.
     this.turn = new Turn({ storage: this.storage, now: this.now, env: () => this.rawEnv || {}, fetchFn: this.fetchFn });
+    // A share that ends (or is replaced) has its relay credentials revoked at once (turn.js).
+    this.classroom.onShareEnd = (id) => { this.turn.revoke(id).catch(() => {}); };
+    this.cast.engine.onShareEnd = (id) => { this.turn.revoke(id).catch(() => {}); };
     mountTurn(this.registry, this);   // /v1/cast/ice, /v1/cast/screen/ice, /v1/classroom/ice
     // The presentation (presentation.js, routes.md 10.14): the sealed congregation deck the
     // weekly AwanaReports job sends, and the slide every presentation screen shows.

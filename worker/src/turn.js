@@ -16,6 +16,19 @@
 // gets STUN only and the pages say the relay is resting until next month.
 // One set of credentials per share (its button id), kept in memory and handed to both
 // ends, so a share costs its hours once; the month's count is stored (`turn:month`).
+//
+// What the Worker CANNOT do: cap the bytes. The 6 Mbps cap is the presenter's own
+// browser's; whoever holds a credential could push more through Cloudflare until it
+// stops working. So credentials are handed out sparingly (security review 2026-11-09):
+//   - a share started by someone (a Cast presenter's token, a classroom session) gets
+//     credentials for at most TURN_SHARES_PER_HOUR shares an hour; past it, STUN only
+//     (reason `too-many`), never an error;
+//   - TURN_TTL_S stays 2 hours: Cloudflare says the TTL must outlast the use and the
+//     pages never refresh credentials mid-share, so a shorter TTL would cut a long class
+//     or service's share off (the black screen the owner ruled out); instead
+//   - a share's credentials are REVOKED (Cloudflare's revoke route) the moment the share
+//     ends or is replaced, and when the Cast presenter leaves or is disconnected, so a
+//     credential lives only as long as its share, not its whole TTL.
 
 import { fail, json } from './http.js';
 
@@ -23,6 +36,8 @@ export const STUN_URL = 'stun:stun.cloudflare.com:3478';
 export const TURN_TTL_S = 2 * 60 * 60;
 /** Relay-hours a month (each share books TTL x 2 ends). 120 h x ~5.4 GB worst case < 1,000 GB. */
 export const TURN_HOURS_PER_MONTH = 120;
+/** Shares one starter (a Cast token, a classroom session) may get relay credentials for in an hour. */
+export const TURN_SHARES_PER_HOUR = 4;
 const MONTH_KEY = 'turn:month';
 const API = 'https://rtc.live.cloudflare.com/v1/turn/keys';
 
@@ -54,8 +69,31 @@ export class Turn {
     this.now = now;
     this.env = env;
     this.fetchFn = fetchFn;
-    /** Credentials per share id, memory only. @type {Map<string, { at: number, servers: any[] }>} */
+    /** Credentials per share id, memory only. @type {Map<string, { at: number, servers: any[], users: string[] }>} */
     this.byShare = new Map();
+    /** Credential sets minted per starter this hour, memory only. @type {Map<string, { since: number, n: number }>} */
+    this.mints = new Map();
+  }
+
+  /**
+   * A share is over: its credentials are revoked at Cloudflare (best effort; they
+   * expire at their TTL anyway).
+   * @param {string} shareId
+   */
+  async revoke(shareId) {
+    const kept = this.byShare.get(shareId);
+    if (!kept) return;
+    this.byShare.delete(shareId);
+    const e = this.env() || {};
+    for (const user of kept.users) {
+      try {
+        await this.fetchFn(`${API}/${encodeURIComponent(e.CF_TURN_KEY_ID)}/credentials/${encodeURIComponent(user)}/revoke`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${e.CF_TURN_API_TOKEN}` },
+          signal: AbortSignal.timeout(8000),
+        });
+      } catch { /* expires at its TTL */ }
+    }
   }
 
   configured() {
@@ -65,13 +103,17 @@ export class Turn {
 
   monthOf() { return new Date(this.now()).toISOString().slice(0, 7); }
 
-  /** The ICE servers for one share (its button id). */
-  async iceFor(/** @type {string} */ shareId) {
+  /** The ICE servers for one share (its button id), started by `by`. @param {string} shareId @param {string} [by] */
+  async iceFor(shareId, by = '') {
     const stun = { urls: [STUN_URL] };
     if (!this.configured()) return { iceServers: [stun], relay: false, reason: 'not-configured' };
     const t = this.now();
     const kept = this.byShare.get(shareId);
-    if (kept && t - kept.at < (TURN_TTL_S - 600) * 1000) return { iceServers: [stun, ...kept.servers], relay: true };
+    // One set per share: both ends get the same, and a share never mints a second.
+    if (kept) return { iceServers: [stun, ...kept.servers], relay: true };
+    let rate = this.mints.get(by);
+    if (!rate || t - rate.since > 60 * 60 * 1000) rate = { since: t, n: 0 };
+    if (rate.n >= TURN_SHARES_PER_HOUR) return { iceServers: [stun], relay: false, reason: 'too-many' };
     const month = this.monthOf();
     const doc = await this.storage.get(MONTH_KEY);
     const used = doc?.month === month ? Number(doc.hours) || 0 : 0;
@@ -94,7 +136,10 @@ export class Turn {
     }
     if (!servers.length) return { iceServers: [stun], relay: false, reason: 'cloudflare' };
     await this.storage.put(MONTH_KEY, { month, hours: used + cost });
-    this.byShare.set(shareId, { at: t, servers });
+    this.mints.set(by, { ...rate, n: rate.n + 1 });
+    while (this.mints.size > 64) this.mints.delete(/** @type {string} */ (this.mints.keys().next().value));
+    const users = [...new Set(servers.map((x) => x.username).filter((u) => typeof u === 'string'))];
+    this.byShare.set(shareId, { at: t, servers, users });
     // Old shares' credentials expire anyway; keep the map small.
     for (const [id, v] of this.byShare) if (t - v.at > TURN_TTL_S * 1000) this.byShare.delete(id);
     return { iceServers: [stun, ...servers], relay: true };
@@ -103,7 +148,7 @@ export class Turn {
   /** GET .../ice?id= for a share that is up now (the room's rtc id). @param {string | null} id @param {{ id: string } | null} rtc */
   async answer(id, rtc) {
     if (!rtc || !id || rtc.id !== id) return fail('That screen share is not on the screen.', 409, { reason: 'ended' });
-    return json({ ok: true, ...(await this.iceFor(id)) });
+    return json({ ok: true, ...(await this.iceFor(id, rtc.by || '')) });
   }
 }
 

@@ -292,6 +292,8 @@ export class Cast {
   /** POST /v1/cast/leave {takeDown?} (the presenter): free the room; with takeDown, the TV back to its code. @param {string} who @param {any} body */
   async leave(who, body) {
     if (body?.takeDown === true) await this.engine.press('cast-presenter', { action: 'back' });
+    // Their screen share's relay goes with them (turn.js revokes it); the TV keeps what is up.
+    if (this.engine.rtc?.by === who) this.engine.onShareEnd(this.engine.rtc.id);
     const room = await this.roomDoc();
     // "Display code": the TV shows its code (hidden until asked, owner 2026-11-08).
     await this.storage.put(ROOM_KEY, { ...room, tokens: room.tokens.filter((x) => x.hash !== who), ...(body?.takeDown === true ? { revealAt: this.now() } : {}) });
@@ -317,6 +319,7 @@ export class Cast {
     const room = await this.roomDoc();
     const had = room.tokens.length;
     await this.storage.put(ROOM_KEY, { ...room, tokens: [] });
+    if (this.engine.rtc) this.engine.onShareEnd(this.engine.rtc.id);
     this.seen.clear();
     return json({ ok: true, disconnected: had > 0 });
   }
