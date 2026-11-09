@@ -24,12 +24,12 @@
       <h1 class="shout">Sign in</h1>
       <p>Type the church passphrase to run the downstairs classroom TV from this phone.</p>
       <form id="signin-form" autocomplete="off">
-        <label for="passphrase" class="label">Passphrase</label>
-        <input id="passphrase" type="password" autocomplete="current-password" autocapitalize="none" spellcheck="false" enterkeyhint="go" />
+        <label for="passphrase" class="label">Church passphrase</label>
+        <input id="passphrase" type="password" autocomplete="current-password" autocapitalize="none" spellcheck="false" enterkeyhint="go" aria-describedby="signin-note" />
+        <p id="signin-note" class="note" role="status" aria-live="polite"></p>
         <button id="signin-btn" type="submit" class="btn btn-hot">Sign in</button>
       </form>
-      <p id="signin-note" class="note" role="status"></p>
-      <p class="fine">The passphrase is never saved on this phone; only the sign-in is.</p>
+      <p class="fine">Same passphrase as on the screens. It is never saved on this phone; only the sign-in is.</p>
     </section>
 
     <section id="remote" class="remote" hidden>
