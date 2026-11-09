@@ -39,7 +39,7 @@ on:
   workflow_dispatch:
     inputs:
       to:
-        description: 'Send to (the downstairs Epson)'
+        description: 'Send to: the downstairs Epson or GMAIL_USER only (anything else is refused)'
         type: string
         default: 'kvbcdownstairs@print.epsonconnect.com'
       dry_run:

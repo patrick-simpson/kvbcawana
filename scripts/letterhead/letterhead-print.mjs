@@ -33,11 +33,11 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseLetter, letterHtml, LETTERHEAD_SVGS } from '../../shared/letterhead.js';
-import { ADDRESS_RE, buildMessage, sendMail } from '../handbook/smtp.mjs';
+import { ADDRESS_RE, EPSON_ADDRESS, buildMessage, recipientAllowed, sendMail } from '../handbook/smtp.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const KIT = path.resolve(HERE, '../../shared/brand');
-export const EPSON = 'kvbcdownstairs@print.epsonconnect.com';
+export const EPSON = EPSON_ADDRESS;
 export const DEFAULT_COPIES = 50;
 export const MAX_COPIES = 100;
 /** Most pages one email may carry (two-page letters halve the copies). */
@@ -184,6 +184,7 @@ export async function run(env, deps = {}) {
   if (!ADDRESS_RE.test(user) || !pass) throw new Fatal('GMAIL_USER and GMAIL_APP_PASSWORD are needed (the handbook job\'s secrets).');
   const to = dry ? user : String(env.TO || EPSON);
   if (!ADDRESS_RE.test(to)) throw new Fatal('The "to" address is not a plain email address.');
+  if (!recipientAllowed(to, user)) throw new Fatal('The "to" address must be the downstairs Epson or GMAIL_USER; nothing was sent.');
 
   const exe = env.PLAYWRIGHT_CHROMIUM;
   const launch = deps.launch || (async () => (await import('playwright')).chromium.launch(exe ? { executablePath: exe } : {}));
@@ -217,6 +218,7 @@ function mailSetup(env) {
   if (!ADDRESS_RE.test(user) || !pass) throw new Fatal('GMAIL_USER and GMAIL_APP_PASSWORD are needed (the handbook job\'s secrets).');
   const to = dry ? user : String(env.TO || EPSON);
   if (!ADDRESS_RE.test(to)) throw new Fatal('The "to" address is not a plain email address.');
+  if (!recipientAllowed(to, user)) throw new Fatal('The "to" address must be the downstairs Epson or GMAIL_USER; nothing was sent.');
   return { dry, user, pass, to };
 }
 

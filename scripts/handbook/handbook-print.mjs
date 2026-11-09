@@ -20,9 +20,9 @@
 // email the PDFs to GMAIL_USER instead), ATTEMPTS, RETRY_MS, TWOTIMTWO_ORIGIN
 // (the report's <base>, default https://kvbchurch.twotimtwo.com/).
 
-import { ADDRESS_RE, buildMessage, sendMail } from './smtp.mjs';
+import { ADDRESS_RE, EPSON_ADDRESS, buildMessage, recipientAllowed, sendMail } from './smtp.mjs';
 
-export const EPSON = 'kvbcdownstairs@print.epsonconnect.com';
+export const EPSON = EPSON_ADDRESS;
 /** [club query value, name on the file], in print order. */
 export const CLUBS = [['cubbies', 'Cubbies'], ['sparks', 'Sparks'], ['tnt', 'T&T']];
 /** Letter at 96 px an inch, 0.4 inch margins. */
@@ -169,6 +169,7 @@ export async function attempt(env, { send = sendMail } = {}) {
   if (!user || !pass) throw new Fatal('The GitHub secrets GMAIL_USER and GMAIL_APP_PASSWORD must both be set.');
   if (!ADDRESS_RE.test(user)) throw new Fatal('GMAIL_USER is not a plain email address.');
   if (!ADDRESS_RE.test(to)) throw new Fatal('The "to" address is not a plain email address.');
+  if (!recipientAllowed(to, user)) throw new Fatal('The "to" address must be the downstairs Epson or GMAIL_USER; nothing was sent.');
 
   const date = easternDate();
   /** @type {{ name: string, bytes: Uint8Array }[]} */

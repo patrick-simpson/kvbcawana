@@ -119,6 +119,24 @@ test('a PDF url refuses a file that is not a PDF and a failed download', async (
   assert.equal(sent, false);
 });
 
+test('mails only the Epson or GMAIL_USER: any other "to" is refused before anything is drawn, fetched or sent', async () => {
+  let drawn = false, fetched = false, sent = false;
+  const deps = {
+    launch: async () => { drawn = true; throw new Error('no'); },
+    get: async () => { fetched = true; return new Response('', { status: 404 }); },
+    send: async () => { sent = true; },
+  };
+  await assert.rejects(run({ ...ENV, TO: 'someone@elsewhere.example' }, deps), /downstairs Epson or GMAIL_USER/);
+  await assert.rejects(run({ GMAIL_USER: 'owner@example.org', GMAIL_APP_PASSWORD: 'x', PDF_URL: BALLOTS, TO: 'kvbcdownstairs@print.epsonconnect.com.evil.example' }, deps), /downstairs Epson or GMAIL_USER/);
+  await assert.rejects(run({ GMAIL_USER: 'owner@example.org', GMAIL_APP_PASSWORD: 'x', PDF_JOB: `${'a'.repeat(16)}.${'b'.repeat(43)}`, PRINT_FETCH_TOKEN: 't', TO: 'x@y.example' }, deps), /downstairs Epson or GMAIL_USER/);
+  assert.deepEqual([drawn, sent], [false, false]);
+  // The two allowed addresses still pass the address check (the run then
+  // stops at the stand-in launch/download, which is the point).
+  await assert.rejects(run({ ...ENV, TO: 'Owner@Example.org' }, deps), /^(?!.*downstairs Epson or GMAIL_USER)/);
+  await assert.rejects(run({ ...ENV, TO: EPSON }, deps), /^(?!.*downstairs Epson or GMAIL_USER)/);
+  void fetched;
+});
+
 // A PDF the repo holds under prints/ (owner 2026-11-04: the Parents' Night half
 // sheet; one print job for all three sources).
 async function standInRepo() {

@@ -7,7 +7,7 @@ import net from 'node:net';
 import fs from 'node:fs';
 import { test } from 'node:test';
 import { CLUBS, attempt, classify, easternDate, fileNameFor, withBase } from '../handbook-print.mjs';
-import { buildMessage, sendMail } from '../smtp.mjs';
+import { buildMessage, recipientAllowed, sendMail } from '../smtp.mjs';
 
 const enc = (s) => new TextEncoder().encode(s);
 const PDF = new Uint8Array([...enc('%PDF-1.4\n'), 0, 255, 128, ...enc('\n%%EOF\n')]);
@@ -117,6 +117,23 @@ test('one try: three PDFs in one message to the Epson', async () => {
     assert.equal(sent[0].pass, 'abcdefgh');
     for (const name of ['Cubbies', 'Sparks', 'T&T']) assert.match(sent[0].message, new RegExp(`filename="${name} handbook \\d{4}-\\d\\d-\\d\\d\\.pdf"`));
   } finally { w.server.close(); }
+});
+
+test('mails only the Epson or GMAIL_USER: any other "to" is refused before the Worker is asked', async () => {
+  const w = await fakeWorker(() => ({ status: 200, type: 'application/pdf', body: PDF }));
+  const sent = [];
+  try {
+    for (const TO of ['someone@elsewhere.example', 'kvbcdownstairs@print.epsonconnect.com.evil.example', 'owner@gmail.com.evil.example']) {
+      await assert.rejects(attempt({ ...ENV, SITE_ORIGIN: w.site, TO }, { send: async (m) => { sent.push(m); } }), /downstairs Epson or GMAIL_USER/);
+    }
+    assert.equal(w.asked.length, 0);
+    assert.equal(sent.length, 0);
+    await attempt({ ...ENV, SITE_ORIGIN: w.site, TO: 'Owner@Gmail.com' }, { send: async (m) => { sent.push(m); } });
+    assert.equal(sent.length, 1);
+  } finally { w.server.close(); }
+  assert.equal(recipientAllowed('kvbcdownstairs@print.epsonconnect.com', ''), true);
+  assert.equal(recipientAllowed('', ''), false);
+  assert.equal(recipientAllowed('a@b.example', ''), false);
 });
 
 test('a dry run goes to GMAIL_USER; no club sends nothing; a 401 is fatal', async () => {

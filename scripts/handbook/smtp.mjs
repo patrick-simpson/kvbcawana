@@ -11,6 +11,24 @@ import crypto from 'node:crypto';
 /** An address we will put on an SMTP line: one plain address, no CR/LF, no angle brackets. */
 export const ADDRESS_RE = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
 
+/** The downstairs Epson's Email Print address. */
+export const EPSON_ADDRESS = 'kvbcdownstairs@print.epsonconnect.com';
+
+/**
+ * The only places the print jobs may mail to: the downstairs Epson, or the
+ * owner's own Gmail (the GMAIL_USER secret, which a dry run uses). The sheets
+ * carry children's full names, so a "to" typed into a dispatch (or sent by
+ * someone holding a leaked dispatch token) can never send them anywhere else.
+ * @param {string} to @param {string} user
+ */
+export function recipientAllowed(to, user) {
+  const t = String(to || '').trim().toLowerCase();
+  if (!t) return false;
+  if (t === EPSON_ADDRESS) return true;
+  const u = String(user || '').trim().toLowerCase();
+  return Boolean(u) && t === u;
+}
+
 /** Base64 in 76-character lines (RFC 2045). @param {Uint8Array} bytes */
 export function base64Lines(bytes) {
   const b64 = Buffer.from(bytes).toString('base64');
