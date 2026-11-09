@@ -20,7 +20,11 @@ import {
 const SITE = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const read = (...p) => readFileSync(path.join(SITE, ...p), 'utf8');
 const page = read('cast', 'index.html');
-const app = read('cast', 'app.js');
+// The presenter's page is app.js (its way in) + controls.js (what it can put up; shared
+// with the lobby computer's desk since 2026-11-09): pinned together as one.
+const app = `${read('cast', 'app.js')}\n${read('cast', 'controls.js')}`;
+const appOwn = read('cast', 'app.js');
+const controls = read('cast', 'controls.js');
 const screenPage = read('cast', 'screen', 'index.html');
 const screen = read('cast', 'screen', 'screen.js');
 const css = read('cast', 'church', 'church.css');
@@ -121,14 +125,17 @@ test('the presenter\'s token lives in sessionStorage only, and every call carrie
   assert.match(app, /headers\['X-Cast-Token'\] = token/);
   // One request function for every call, and a 401 drops the token.
   assert.equal((app.match(/fetch\(base \+/g) || []).length, 1);
-  assert.match(app, /r\.status === 401 && path !== '\/v1\/cast\/join'\) disconnected/);
+  assert.match(controls, /r\.status === 401 && path !== '\/v1\/cast\/join'\) conn\.refused\(/);
+  assert.match(appOwn, /refused: \(words\) => disconnected\(words\),/);
+  assert.match(appOwn, /path: \(p\) => p,/);
   assert.ok(!/Authorization/.test(app), 'a presenter never sends the church sign-in');
 });
 
 test('the presenter page polls only while visible, and stops after 30 minutes untouched', () => {
   assert.match(app, /pollMs: 2000/);
   assert.match(app, /idleMs: 30 \* 60 \* 1000/);
-  assert.match(app, /if \(!tokenStore\.get\(\) \|\| document\.hidden\) return;/);
+  assert.match(controls, /if \(!conn\.live\(\) \|\| document\.hidden\) return;/);
+  assert.match(appOwn, /live: \(\) => Boolean\(tokenStore\.get\(\)\),/);
   assert.match(app, /getDisplayMedia\(\{ video: \{ frameRate: 30 \}, audio: true \}\)/);
   assert.match(app, /canShareScreen\(\)/);
 });
@@ -216,7 +223,7 @@ test('a PowerPoint is scrambled in the browser before it leaves; the preview rea
   assert.match(app, /crypto\.subtle\.encrypt\(\{ name: 'AES-GCM', iv \}/);
   assert.match(app, /'\/v1\/cast\/convert', \{ method: 'POST', body: \{ bytes: bytes\.length/);
   assert.match(app, /\/v1\/cast\/convert\/\$\{id\}\/start`, \{ method: 'POST', body: \{ key \}/);
-  assert.match(app, /\/v1\/cast\/files\/\$\{encodeURIComponent\(id\)\}`, \{ headers: \{ 'X-Cast-Token': tokenStore\.get\(\) \}/);
+  assert.match(controls, /conn\.path\(`\/v1\/cast\/files\/\$\{encodeURIComponent\(id\)\}`\)\}`, \{ headers: conn\.headers\(\)/);
   // A slide in the strip is a press straight to it; Back/Next step.
   assert.match(app, /press\('page', \{ to \}/);
   assert.match(app, /press\('page', \{ step \}/);
@@ -229,6 +236,7 @@ test('a PowerPoint is scrambled in the browser before it leaves; the preview rea
   assert.match(page, /data-slide="next"/);
   assert.match(page, /data-slide-strip/);
   assert.match(build, /'preview\.js'/);
+  assert.match(build, /'controls\.js'/);
 });
 
 // Owner 2026-11-08, later: one phone at a time, Display code, the TV's QR (and the
@@ -284,7 +292,7 @@ test('YouTube search results, Facebook links and video files become presses the 
 // same with the QR code".
 test('both ends ask the Worker for the relay before the offer and the answer', () => {
   assert.match(app, /\/v1\/cast\/ice\?id=\$\{encodeURIComponent\(id\)\}/);
-  assert.match(app, /startSharing\(\{\n      stream,\n      iceServers,/);
+  assert.match(app, /startSharing\(\{\n\s+stream,\n\s+iceServers,/);
   assert.match(screen, /\/v1\/cast\/screen\/ice\?id=\$\{encodeURIComponent\(id\)\}/);
   assert.match(screen, /answerShare\(\{\n      iceServers,/);
 });

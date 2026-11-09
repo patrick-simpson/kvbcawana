@@ -200,7 +200,7 @@ rmSync(CAST_OUT, { recursive: true, force: true });
   const out = CAST_OUT;
   mkdirSync(path.join(out, 'shared'), { recursive: true });
   mkdirSync(path.join(out, 'screen'), { recursive: true });
-  for (const f of ['index.html', 'app.js', 'logic.js', 'preview.js']) cpSync(path.join(src, f), path.join(out, f));
+  for (const f of ['index.html', 'app.js', 'controls.js', 'logic.js', 'preview.js']) cpSync(path.join(src, f), path.join(out, f));
   for (const f of ['index.html', 'screen.js']) cpSync(path.join(src, 'screen', f), path.join(out, 'screen', f));
   cpSync(path.join(src, 'church'), path.join(out, 'church'), { recursive: true });
   for (const f of ['classroomRemote.js', 'screenShare.js']) cpSync(path.join(ROOT, 'shared', f), path.join(out, 'shared', f));
