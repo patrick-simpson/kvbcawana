@@ -292,6 +292,7 @@ export function measureInk(text, face) {
  *   sub: string,
  *   chip: ChipText | null,
  *   textSize: string,
+ *   safeBottom?: number,
  * }} Frame
  */
 
@@ -927,15 +928,19 @@ export function fitFrame(frame, measure = measureText, ink = measureInk) {
   const subH = sub ? SUB.gap + sub.lines.length * sub.size * SUB.lineHeight : 0;
   const paras = tokenize(frame.headline);
 
+  // Where the copy may end: LAYOUT.safeBottom, or higher while the pickup
+  // board's strip is grown (overlayFit.js footTop; App's CopyRoomContext).
+  const bottom = frame.safeBottom ?? LAYOUT.safeBottom;
+
   /** @param {number} safeTop */
   const layout = (safeTop) => {
-    const room = LAYOUT.safeBottom - safeTop - kickerH - chipH - subH;
+    const room = bottom - safeTop - kickerH - chipH - subH;
     const headline = fitHeadline(paras, frame.textSize, room, measure, ink, Boolean(kicker));
     const headH = headline.lines.length
       ? (headline.lines.length * headline.lineHeight + sum(headline.rise) + headline.padBottom) * headline.size
       : 0;
     const height = kickerH + headH + subH + chipH - (kicker && !headH ? KICKER.gap : 0);
-    const top = Math.max(safeTop, Math.min(LAYOUT.top, LAYOUT.safeBottom - height));
+    const top = Math.max(safeTop, Math.min(LAYOUT.top, bottom - height));
     return { top, height, kicker, headline, sub, chip };
   };
 

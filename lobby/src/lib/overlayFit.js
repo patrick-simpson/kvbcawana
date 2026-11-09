@@ -66,9 +66,19 @@ import { BOARD_ANONYMOUS, BOARD_EMPTY, BOARD_NAMES, BOARD_STALE } from './checko
  *    the copy's own box at every size: it hid the start of a headline at 720p
  *    and the chip row at 1080p. It lays its words out in columns to fit the
  *    ~11u the strip leaves.
+ *
+ * `footTall` (owner 2026-11-09: "let it grow an extra row during pickup"): the
+ * pickup board's strip may stand `extra` u taller, its top that much higher
+ * (and the copy's own safe bottom that much higher with it: copyBottom), but
+ * only while the names would otherwise be drawn smaller than `below` u (a
+ * chip of 2u is a ~28px cap height on a 1080p TV; footGrows): a short list
+ * keeps the strip it has, a long one gets a third row of bigger names. The
+ * board still takes only the bottom of the screen; the copy above it
+ * steps up out of its way, never under it.
  */
 const FOOT = { top: 45, bottom: 1.8, gap: 1.2, chipLeft: 82 };
 export const OVERLAY = {
+  footTall: { extra: 4.4, below: 2, copyGap: 1.6 },
   band: { top: 1.4, width: 50, bottom: 10.4 },
   flags: { height: 2.5, gap: 0.6, width: 54 },
   centre: { top: 12, bottom: 46, width: 70 },
@@ -465,18 +475,58 @@ export const FOOT_CHIP = {
 export const FOOT_FLOOR_PX = 10;
 
 /**
- * The chip sizes a run `height` tall may use: at most two rows of the
+ * The chip sizes a run `height` tall may use: at most `rows` (two; three on
+ * the grown strip) rows of the
  * largest chips (a short list is big), never smaller than a twelfth of its
  * height, nor than `floor` (FOOT_FLOOR_PX on a real screen, in px; 0 for a TV
  * drawn in miniature, which keeps its proportions instead).
  * @param {number} height
  * @param {number} [floor]
+ * @param {number} [rows]
+ * @param {number} [minHeight]  the height the smallest size is a twelfth of (the ordinary strip's, on the grown one, so a grown strip never sends names behind "+N more" that the ordinary one named)
  * @returns {{ max: number, min: number }}
  */
-export function footRange(height, floor = 0) {
-  const max = height / (2 * FOOT_CHIP.row + FOOT_CHIP.gap);
-  return { max, min: Math.min(max, Math.max(floor, height / 12)) };
+export function footRange(height, floor = 0, rows = 2, minHeight = height) {
+  const max = height / (rows * FOOT_CHIP.row + (rows - 1) * FOOT_CHIP.gap);
+  return { max, min: Math.min(max, Math.max(floor, minHeight / 12)) };
 }
+
+/**
+ * The run's box on a 1920x1080 TV in u, the same on every screen (the strip
+ * is laid out in u): 65u x 8.7u, the strip less the tab and the card's padding.
+ * What a TV that has not been measured yet draws, and what footGrows judges.
+ */
+export const FOOT_BOX_U = { width: 65, height: 8.7 };
+
+/**
+ * Whether the pickup board's strip grows by `OVERLAY.footTall.extra` for
+ * this list: the names, fitted in the ordinary strip (two rows of the largest
+ * chips, more of smaller ones), would come out smaller than
+ * `OVERLAY.footTall.below` u. Pure and in u, so the board and the page's copy
+ * (which steps up for it) always agree, on every screen size.
+ * @param {{ club: string, names: string[], mark?: boolean }[]} groups
+ * @param {Measure} [measure]
+ */
+export function footGrows(groups, measure = measureText) {
+  if (!groups.length) return false;
+  const fit = fitFoot(groups, { ...FOOT_BOX_U, ...footRange(FOOT_BOX_U.height), step: 0.01 }, measure);
+  return fit.size < OVERLAY.footTall.below - 1e-9;
+}
+
+/**
+ * Where the board's strip starts (u down the 16:9 box): 45u, or
+ * `footTall.extra` higher on the grown strip.
+ * @param {boolean} [tall]
+ */
+export const footTop = (tall = false) => OVERLAY.foot.top - (tall ? OVERLAY.footTall.extra : 0);
+
+/**
+ * Where the slide copy must end: the strip's top (the ordinary strip's is the
+ * fit's own 45u, LAYOUT.safeBottom), or on the grown strip `footTall.copyGap`
+ * above it, since a drawn row's box reaches a little past what the fit counts.
+ * @param {boolean} [tall]
+ */
+export const copyBottom = (tall = false) => (tall ? footTop(true) - OVERLAY.footTall.copyGap : OVERLAY.foot.top);
 
 /** The words a club's plate counts with, and a trimmed club's last chip. */
 export const waitingLabel = (/** @type {number} */ n) => `${n} waiting`;

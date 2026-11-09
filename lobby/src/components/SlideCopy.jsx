@@ -1,7 +1,8 @@
-import { createElement, Fragment, useMemo, useState } from 'react';
+import { createElement, Fragment, useContext, useMemo, useState } from 'react';
 import { M } from '../lib/motion.jsx';
 import { EASE, shoutBaseline } from '../lib/brand.js';
 import { useFontsReady } from '../hooks/useFontsReady.js';
+import { CopyRoomContext } from '../lib/copyRoom.js';
 import StepChip from './brand/StepChip.jsx';
 import { CHIP, KICKER, READ, SUB, bidiIsolates, fitFrame, LOBBY_THEMES, lobbyTheme } from '../lib/lobbyFrame.js';
 import {
@@ -131,13 +132,17 @@ export default function SlideCopy({ frame, theme = 'sky', via = 'boot', still = 
   const { kicker, headline, sub, chip, textSize } = frame;
   const chipLabel = chip?.label ?? '';
   const chipValue = chip?.value ?? '';
+  // Where the copy may end: the pickup board's strip's top (App's provider),
+  // higher while a long list has the strip grown.
+  const { bottom } = useContext(CopyRoomContext);
   const fit = useMemo(() => {
     void loads; // re-measure once the real faces have loaded
     return fitFrame({
       kicker, headline, sub, textSize,
       chip: chipLabel && chipValue ? { label: chipLabel, value: chipValue } : null,
+      safeBottom: bottom,
     });
-  }, [kicker, headline, sub, textSize, chipLabel, chipValue, loads]);
+  }, [kicker, headline, sub, textSize, chipLabel, chipValue, loads, bottom]);
 
   // How long this copy waits before it lands, and then the whole beat sheet,
   // fixed when the copy first appears. Only an edit to the words themselves

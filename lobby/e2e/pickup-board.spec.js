@@ -61,6 +61,8 @@ const layout = (page) => page.evaluate(() => {
     frameTop: stage.top + stage.height / 2 - 28.125 * u,
     vh: stage.height,
     region: box(document.querySelector('.stage .checkout-region')),
+    // The grown, three-row strip (OVERLAY.footTall): a long list's.
+    tall: document.querySelector('.stage .checkout-region--tall') !== null,
     board: box(document.querySelector('.stage .checkout-board')),
     run,
     pieces,
@@ -88,7 +90,9 @@ const layout = (page) => page.evaluate(() => {
 
 /** The strip's own rules: under the copy's lowest line, clear of the left gutter and the corner chip. */
 function expectInTheFoot(l) {
-  expect(l.region.top).toBeGreaterThanOrEqual(l.frameTop + 45 * l.u - 1);
+  // The strip starts at 45u down the box, or 4.4u higher while a long list has
+  // it grown (OVERLAY.footTall.extra); the copy above it ends before it either way.
+  expect(l.region.top).toBeGreaterThanOrEqual(l.frameTop + (l.tall ? 45 - 4.4 : 45) * l.u - 1);
   expect(l.region.bottom).toBeLessThanOrEqual(l.vh - 1.8 * l.u + 1);
   expect(within({ x: l.board.left, y: l.board.top, width: l.board.right - l.board.left, height: l.board.bottom - l.board.top },
     { x: l.region.left, y: l.region.top, width: l.region.right - l.region.left, height: l.region.bottom - l.region.top })).toBe(true);
@@ -200,6 +204,8 @@ for (const [width, height] of [[1920, 1080], [1280, 720], [640, 480]]) {
       expectInTheFoot(l);
       expect(l.escaped).toBe(0);
       expect(l.size).toBeGreaterThanOrEqual(10);
+      // Sixty names are a long list: the strip has grown for them.
+      expect(l.tall).toBe(true);
       await expect(board.locator('.checkout-plate__count')).toHaveText(Array(6).fill('10 waiting'));
       const shown = await board.locator('.checkout-name__chip').count();
       const more = (await board.locator('.checkout-more').allTextContents()).map((t) => Number(/\d+/.exec(t)[0]));

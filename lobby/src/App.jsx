@@ -8,7 +8,7 @@ import TonightTicker, { tickerRows } from './components/TonightTicker.jsx';
 import ScoreTicker from './components/ScoreTicker.jsx';
 import { useScoreboard } from './hooks/useScoreboard.js';
 import { scoreTickerView, scoreTickerWanted } from './lib/scoreTicker.js';
-import CheckoutBoard from './components/CheckoutBoard.jsx';
+import CheckoutBoard, { useFootTall } from './components/CheckoutBoard.jsx';
 import CheckoutBanner from './components/CheckoutBanner.jsx';
 import NoticeBanner, { NOTICE_CHECK_MS, noticeShowing } from './components/NoticeBanner.jsx';
 import CornerChip from './components/CornerChip.jsx';
@@ -41,17 +41,18 @@ import { useCalendar } from './hooks/useCalendar.js';
 import { useWeather } from './hooks/useWeather.js';
 import { useSnowForecast } from './hooks/useSnowForecast.js';
 import { LobbyLiveContext } from './lib/lobbyLive.jsx';
+import { CopyRoomContext } from './lib/copyRoom.js';
 import { localDateStr } from './lib/calendarLogic.js';
 import { PREVIEW_PROMOS, previewPromo } from './lib/promos.js';
 import PromoSlide from './components/PromoSlide.jsx';
 import { fireMilestone, setConfettiLevel, setConfettiLoad, setConfettiSkin } from './lib/confetti.js';
 import { resolveSkin, sceneForSkin, SKIN_TABLE } from './lib/skins.js';
-import { BOARD_HIDDEN, decideBoard, demoCheckout, pickupNow } from './lib/checkoutBoard.js';
+import { BOARD_HIDDEN, BOARD_NAMES, decideBoard, demoCheckout, pickupNow } from './lib/checkoutBoard.js';
 import { SAMPLE_BOARD_NAMES, SAMPLE_NAMES, pick } from './lib/demoNames.js';
 import { useScreenSync } from './hooks/useScreenSync.js';
 import { clubKey, getAllClubs } from './lib/clubs.js';
 import { saveClubCounts } from './lib/clubCountsStore.js';
-import { OVERLAY, setupUp } from './lib/overlayFit.js';
+import { OVERLAY, copyBottom, setupUp } from './lib/overlayFit.js';
 import {
   autoSlideDeck, calendarSlidesFor, effectiveManualSlides, encoreSlotFor, isSlideDriven, promoSlotFor, promosAreOn,
   snowPhoneAsksWeather, tonightTitleOf, visibleManualSlides, wantsSnowForecast,
@@ -360,6 +361,11 @@ export default function App() {
     demo: boardDemo,
     now: boardNow,
   }), [boardData, config.checkoutBoardNamesAbove, config.checkoutBoardStaleMin, emptySince, boardDemo, boardNow]);
+  // The pickup board's grown, three-row strip (overlayFit.js footGrows): while
+  // a long list is up, the slide copy's own safe bottom steps up with the
+  // strip's top (CopyRoomContext), so the copy never ends under the names.
+  const boardTall = useFootTall(boardData?.entries, boardDecision.state === BOARD_NAMES);
+  const copyRoom = useMemo(() => ({ bottom: copyBottom(boardTall) }), [boardTall]);
   // Is the room being picked up: from 7:30 pm by itself, every night
   // (checkoutBoard.js pickupNow). The board, the "has checked out" banners and
   // the corner counter all follow it; outside it, no banner waits.
@@ -1508,6 +1514,7 @@ export default function App() {
     // just reduced transforms.
     <ZeroAnimationContext.Provider value={config.reduceMotion}>
     <LobbyLiveContext.Provider value={lobbyLive}>
+    <CopyRoomContext.Provider value={copyRoom}>
     <MotionConfig reducedMotion={config.reduceMotion ? 'always' : 'user'}>
     <div
       className={stageClass}
@@ -1970,6 +1977,7 @@ export default function App() {
       )}
     </div>
     </MotionConfig>
+    </CopyRoomContext.Provider>
     </LobbyLiveContext.Provider>
     </ZeroAnimationContext.Provider>
   );

@@ -3417,6 +3417,10 @@ input:focus-visible {
   z-index: 5;
   pointer-events: none;
 }
+/* The grown strip (overlayFit.js OVERLAY.footTall): only its top moves, to the
+   line the board sets inline from that table; the slide copy's own safe
+   bottom moves with it (App's CopyRoomContext). */
+.checkout-region--tall { top: var(--foot-top); }
 .checkout-board {
   --name-size: 1em;
   position: relative;

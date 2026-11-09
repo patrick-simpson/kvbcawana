@@ -1,9 +1,11 @@
-import { useLayoutEffect, useRef, useState } from 'react';
+import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { M } from '../lib/motion.jsx';
 import { DUR, EASE, SHAPES } from '../lib/brand.js';
 import { getAllClubs, getClubPalette } from '../lib/clubs.js';
-import { FOOT_FLOOR_PX, fitFoot, footRange, moreLabel, nameChipSeat, waitingLabel } from '../lib/overlayFit.js';
+import {
+  FOOT_BOX_U, FOOT_FLOOR_PX, OVERLAY, fitFoot, footGrows, footRange, footTop, moreLabel, nameChipSeat, waitingLabel,
+} from '../lib/overlayFit.js';
 import { measureInk } from '../lib/lobbyFrame.js';
 import { useFontsReady } from '../hooks/useFontsReady.js';
 import {
@@ -58,9 +60,31 @@ import {
  * The fit's box when the strip has not been measured (no layout: jsdom, or a
  * frame before the ResizeObserver's first answer), in u: the run's room on a
  * 1920x1080 screen (the strip, 75u x 9.45u there, less the tab and the
- * card's padding).
+ * card's padding; overlayFit.js FOOT_BOX_U), plus the grown strip's extra
+ * height when the board is in its three-row mode.
  */
-const FALLBACK = { width: 65, height: 8.7 };
+const FALLBACK = FOOT_BOX_U;
+
+/** Every club's plate and names for the fit: the board's own grouping (the plate's mark where the club has one). */
+function boardGroups(entries) {
+  return groupByClub(entries || [], getAllClubs()).map((g) => ({ ...g, mark: Boolean(getClubPalette(g.club).logo) }));
+}
+
+/**
+ * Whether the pickup board's strip is in its grown, three-row mode for these
+ * entries (overlayFit.js footGrows): re-judged when the faces arrive, since
+ * the names are measured in them. App asks it too, so the slide copy steps
+ * up out of the strip's way on exactly the board's own answer.
+ * @param {{firstName: string, club: string}[] | undefined} entries
+ * @param {boolean} active  a names board is being shown
+ */
+export function useFootTall(entries, active) {
+  const loads = useFontsReady();
+  return useMemo(() => {
+    void loads;
+    return active && footGrows(boardGroups(entries));
+  }, [entries, active, loads]);
+}
 
 /**
  * The run's own box, measured (px), while `active`: a ResizeObserver re-reads
@@ -117,6 +141,8 @@ export default function CheckoutBoard({ decision, checkout, calm, demo = false, 
   const listed = state === BOARD_NAMES;
   const runRef = useRef(/** @type {HTMLUListElement | null} */ (null));
   const box = useRunBox(runRef, listed);
+  // The strip's third row (owner 2026-11-09), never in Settings' miniature TV.
+  const tall = useFootTall(checkout?.entries, listed && !preview);
   // The browser's word, after the fit's: fitFoot predicts the wrap from
   // measured text, and a real screen can still wrap one chip more (CI's
   // 640x480 put five chips under the strip, 2026-10-08). While the run's
@@ -144,17 +170,14 @@ export default function CheckoutBoard({ decision, checkout, calm, demo = false, 
 
   const entries = checkout?.entries || [];
   const clubs = listed
-    ? groupByClub(entries, getAllClubs()).map((g) => {
-      const club = getClubPalette(g.club);
-      return { ...g, palette: club, mark: Boolean(club.logo) };
-    })
+    ? boardGroups(entries).map((g) => ({ ...g, palette: getClubPalette(g.club) }))
     : [];
   let fit = null;
   let nameSize;
   if (listed && box) {
     // Measured, in px: the chips' range from the run's height (footRange),
     // with a floor a lobby can read, except in Settings' miniature TV.
-    const range = footRange(box.height, preview ? 0 : FOOT_FLOOR_PX);
+    const range = footRange(box.height, preview ? 0 : FOOT_FLOOR_PX, tall ? 3 : 2, tall ? box.height * FOOT_BOX_U.height / (FOOT_BOX_U.height + OVERLAY.footTall.extra) : box.height);
     fit = fitFoot(clubs, { ...box, ...range, step: 0.25 });
     // The browser's correction (above): each extra name comes off the club
     // with the most still showing, as fitFoot's own overflow does.
@@ -173,7 +196,8 @@ export default function CheckoutBoard({ decision, checkout, calm, demo = false, 
     }
     nameSize = `${fit.size}px`;
   } else if (listed) {
-    fit = fitFoot(clubs, { ...FALLBACK, ...footRange(FALLBACK.height), step: 0.01 });
+    const height = FALLBACK.height + (tall ? OVERLAY.footTall.extra : 0);
+    fit = fitFoot(clubs, { width: FALLBACK.width, height, ...footRange(height, 0, tall ? 3 : 2, FALLBACK.height), step: 0.01 });
     nameSize = `calc(${fit.size} * var(--u))`;
   }
 
@@ -198,7 +222,13 @@ export default function CheckoutBoard({ decision, checkout, calm, demo = false, 
   return (
     // Keyed on what it shows, so moving between the one line and the list
     // lands the card afresh rather than stretching it across the strip.
-    <div key={listed ? 'list' : 'line'} className="checkout-region">
+    <div
+      key={listed ? 'list' : 'line'}
+      className={`checkout-region${tall ? ' checkout-region--tall' : ''}`}
+      // The grown strip starts footTop(true) u down the 16:9 box (the one
+      // table, OVERLAY); app.css reads it, the ordinary strip keeps its own.
+      style={tall ? { '--foot-top': `calc(50% + ${footTop(true) - 28.125} * var(--u))` } : undefined}
+    >
       <M.section
         className={`checkout-board ${state} checkout-board--${listed ? 'list' : 'line'}${demo ? ' checkout-board--demo' : ''}`}
         aria-live="polite"

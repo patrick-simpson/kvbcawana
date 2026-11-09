@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import {
   FOOT_CHIP, FOOT_FLOOR_PX, NAME_CHIP_CLEAR, NAME_CHIP_TEXT, OVERLAY, balanceLines, bandRoom, bandTop, boardPlacement,
-  fitFoot, fitParagraph, fitShout, footHeight, footRange, lobbyRoom, moreLabel, nameChipSeat, plateChrome, setupUp,
+  copyBottom, fitFoot, fitParagraph, fitShout, footGrows, footHeight, footRange, footTop, lobbyRoom, moreLabel, nameChipSeat, plateChrome, setupUp,
   waitingLabel, wrapLines,
 } from './overlayFit.js';
 import { LAYOUT } from './lobbyFrame.js';
@@ -515,6 +515,32 @@ describe('the pickup board in the foot (fitFoot)', () => {
     // A run too short for two rows of the floor still gets one size.
     const tiny = footRange(20, FOOT_FLOOR_PX);
     expect(tiny.min).toBe(tiny.max);
+  });
+
+  // The grown strip (owner 2026-11-09: "let it grow an extra row during pickup").
+  it('lets the strip grow a third row only for a long list, and the copy steps up with it', () => {
+    const names = (n) => Array.from({ length: n }, (_, i) => `Child${i}`);
+    const list = (n) => [0, 1, 2, 3].map((i) => ({ club: `C${i}`, names: names(Math.ceil(n / 4)), mark: true }));
+    // A short list is bigger than the threshold in the ordinary strip: no growth.
+    expect(footGrows(list(4), measure)).toBe(false);
+    // A long one would be drawn smaller than `below` u: it grows.
+    expect(footGrows(list(40), measure)).toBe(true);
+    expect(footGrows([], measure)).toBe(false);
+    // Three rows of the largest chips fill the taller strip exactly, as two do the ordinary one.
+    const rows3 = footRange(8.7 + OVERLAY.footTall.extra, 0, 3);
+    expect(rows3.max).toBeCloseTo((8.7 + OVERLAY.footTall.extra) / (3 * FOOT_CHIP.row + 2 * FOOT_CHIP.gap), 9);
+    // The smallest size stays a twelfth of the ORDINARY strip's height, so the
+    // taller strip never puts names behind "+N more" the ordinary one named.
+    expect(footRange(13.1, 0, 3, 8.7).min).toBeCloseTo(8.7 / 12, 9);
+    // One table: the strip's top and the copy's bottom move together, in OVERLAY.
+    expect(footTop(false)).toBe(OVERLAY.foot.top);
+    expect(copyBottom(false)).toBe(LAYOUT.safeBottom);
+    expect(footTop(true)).toBe(OVERLAY.foot.top - OVERLAY.footTall.extra);
+    expect(copyBottom(true)).toBeLessThan(footTop(true));
+    expect(copyBottom(true)).toBeGreaterThan(LAYOUT.top + 20);
+    // The ordinary strip is untouched (the first-run card shares it).
+    expect(OVERLAY.setup).toBe(OVERLAY.foot);
+    expect(css).toMatch(/\.checkout-region--tall \{ top: var\(--foot-top\); \}/);
   });
 
   // The strip and the card in px, from app.css (.checkout-region and
