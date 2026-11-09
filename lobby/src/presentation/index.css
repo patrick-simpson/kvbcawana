@@ -579,6 +579,16 @@
   width: auto;
 }
 
+/* While the first-run setup note stands in the bottom band (a display that is
+   not signed in), the characters stand on top of it instead of behind it:
+   6u lifts their feet (and the tilt's dip) clear of the note, which is about
+   3.8u tall and 0.5u off the edge at 1080p and 4.5u in all at 1024x768. Only
+   the full-size note (the touch one sits in the menu sheet and its own
+   place). Nothing in the note changes. */
+:root:has(.pj-setup-note:not(.pj-setup-note--touch)) .pj-game__character {
+  bottom: calc(6 * var(--u));
+}
+
 /* ── The game time scoreboard (views/ScoringView.jsx; owner 2026-11-05) ──
    Four team plates in the phone's 2 x 2 on pure black, everything else small
    along the bottom. Flat like the kit: hard offsets, a white keyline out of
