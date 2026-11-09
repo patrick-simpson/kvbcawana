@@ -23,6 +23,11 @@
   // The home page's welcome scene asks its lobby twin to play the flagship's 3D
   // intro on every pass (?intro=1; lobby/src/lib/flagship.js showcaseIntro).
   if (window.__SHOWCASE__ && new URLSearchParams(location.search).get('intro') === '1') window.__SHOWCASE__.intro = true;
+  // The game time scoreboard (owner 2026-11-05): the 6:05 scene's projector twin
+  // (?score=1) has T&T's game up, and the home page's points ring its doorbell
+  // (showcase:score) as the Worker's broadcast does. Numbers only; no other twin
+  // has a board (the 6:00 twin must stay on the welcome: a club up owns the wall).
+  var SCORE = new URLSearchParams(location.search).get('score') === '1';
   var BASE = 'https://showcase.invalid/api';
   var SESSION = 'v1.1.1790839331729.oWr6n92IJW5ldPGmtiyjPHAZpca-QGToNlKGXlKI6vc';
   // A public key made once for the showcase (cloud-crypto generateKeyPair); rows the
@@ -141,6 +146,14 @@
   var journeyNow = null;
   var presses = 0;
 
+  var zero = function () { return { blue: 0, red: 0, yellow: 0, green: 0 }; };
+  var board = SCORE ? {
+    v: 1, night: '2026-10-14', rev: 1, at: RealDate.now() + offset, active: 'tnt',
+    setups: { tnt: 'four', sparks: 'four', cubbies: 'four' },
+    scores: { tnt: { blue: 12, red: 13, yellow: 14, green: 7 }, sparks: zero(), cubbies: zero() },
+    clock: null, finale: null, sounds: false,
+  } : null;
+
   /** The stand-in Worker: a JSON answer, or null for 404. */
   function answer(path, method, body) {
     var now = iso();
@@ -187,6 +200,7 @@
           history: { db: true, pending: 0 }, changes: { head: 0, last: null },
         };
       case '/v1/changes': return { head: 0, changes: [] };
+      case '/v1/scoreboard': return board ? { ok: true, board: board, serverNow: RealDate.now() + offset } : null;
       default: return null;
     }
   }
@@ -282,6 +296,12 @@
       });
     } else if (m.type === 'showcase:now' && KIND === 'remote') {
       journeyNow = m.now && typeof m.now === 'object' ? m.now : null;
+    } else if (m.type === 'showcase:score' && board && /^(blue|red|yellow|green)$/.test(String(m.team))) {
+      board.scores.tnt[m.team] = Math.min(999, board.scores.tnt[m.team] + 1);
+      board.rev += 1;
+      board.at = RealDate.now() + offset;
+      var ring = JSON.stringify({ e: 'changed', d: { what: 'scoreboard', rev: board.rev, board: board, now: board.at } });
+      sockets.forEach(function (s) { if (s.readyState === 1) s._fire('message', { data: ring }); });
     } else if (m.type === 'showcase:key' && typeof m.key === 'string') {
       document.dispatchEvent(new KeyboardEvent('keydown', { key: m.key, code: m.code || '', bubbles: true }));
     }

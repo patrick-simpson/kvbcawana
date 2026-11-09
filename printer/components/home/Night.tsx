@@ -13,7 +13,7 @@ import { Twin, TwinHandle } from './Twin';
  *   #promos    5:55  the lobby TV looping every season poster (the lobby's own
  *                    list: the Grand Prix video too)
  *   #opening   6:00  the projector wall: the countdown runs out, the grand welcome
- *   #projector 6:05  the projector wall: game time
+ *   #projector 6:05  the projector wall: game time, T&T's game scored live (the scoreboard)
  *   #journey   6:30  the Journey room's PC: the lesson starts, run from the
  *                    leader's phone remote (#remote; the reader may press too)
  *   #pickup    7:30  the lobby's pickup board, and /settings on a laptop
@@ -315,21 +315,31 @@ const OpeningCeremony: React.FC = () => {
 };
 
 // ── 6:05 Game time ───────────────────────────────────────────────────────────
+// The game time scoreboard (owner 2026-11-05): T&T's game up on the wall, scored
+// from a leader's phone; a point every few seconds while the scene is in view
+// (the twin's stand-in Worker rings its doorbell: RED +1!, a lead, the plates).
+const POINTS = ['red', 'green', 'red', 'blue', 'yellow', 'green', 'red', 'blue'];
 const Games: React.FC = () => {
-  const [ref] = useScene('18:04:56');
+  const [ref, active] = useScene('18:04:56');
+  const twin = useRef<TwinHandle>(null);
+  const turn = useRef(0);
+  useEvery(active, 4500, () => {
+    twin.current?.send({ type: 'showcase:score', team: POINTS[turn.current % POINTS.length] });
+    turn.current += 1;
+  });
   return (
     <section ref={ref} id="projector" className="kv-scene kv-scene--projector" aria-labelledby="projector-title">
       <div className="kv-wrap kv-scene__grid">
         <div className="kv-scene__copy">
           <Time hm="6:05" />
           <h2 className="kv-scene__title" id="projector-title">Game time.</h2>
-          <p className="kv-scene__line">The projector keeps the gym on the clock, club by club.</p>
+          <p className="kv-scene__line">A leader scores the game from a phone. Every point lands on the wall.</p>
         </div>
         <div className="kv-scene__stage">
           <figure className="kv-device kv-device--wall">
-            <Twin kind="projector" at={wall('18:04:56')} width={1600} height={900}
-              title="The projector wall: the night's countdown and game time" />
-            <figcaption><Tag>Projector wall</Tag></figcaption>
+            <Twin ref={twin} kind="projector" score at={wall('18:04:56')} width={1600} height={900}
+              title="The projector wall: game time, T&T's game scored live" />
+            <figcaption><Tag>Projector wall · scoreboard</Tag></figcaption>
           </figure>
         </div>
       </div>

@@ -90,3 +90,39 @@ test('the promos section loops the lobby\'s own list of posters, so a new one jo
   }
   assert.ok(Array.isArray(keys));
 });
+
+test('the 6:05 projector twin (?score=1) has T&T\'s game up and a home page point raises it; no other twin has a board', async () => {
+  const run = (search) => {
+    const listeners = {};
+    const win = {
+      __SHOWCASE__: { kind: 'projector' },
+      location: { origin: 'https://awana.kvbchurch.org', href: `https://awana.kvbchurch.org/lobby/countdown-showcase.html${search}`, search, pathname: '/lobby/countdown-showcase.html' },
+      navigator: {},
+      fetch: async () => { throw new Error('the real network'); },
+      WebSocket: function RealSocket() {},
+      addEventListener: (type, fn) => { listeners[type] = fn; },
+      postMessage: () => {},
+      localStorage: {}, indexedDB: {},
+    };
+    win.window = win;
+    win.parent = win;
+    class Res { constructor(body, init) { this.body = body; this.status = (init && init.status) || 200; } async json() { return JSON.parse(this.body); } }
+    const ctx = vm.createContext({ ...win, window: win, Date, URL, URLSearchParams, Map, Promise, JSON, Object, Array, String, Number, Math, Function, setTimeout, Response: Res, EventTarget, Event: class {}, MessageEvent: class {}, CloseEvent: class {}, KeyboardEvent: class {} });
+    ctx.window = win;
+    vm.runInContext(stub, ctx);
+    return { win, listeners };
+  };
+  const read = async (win) => win.fetch('https://showcase.invalid/api/v1/scoreboard');
+  const game = run('?at=2026-10-14T18:04:56&score=1');
+  const first = await (await read(game.win)).json();
+  assert.equal(first.board.active, 'tnt');
+  assert.deepEqual(first.board.scores.tnt, { blue: 12, red: 13, yellow: 14, green: 7 });
+  game.listeners.message({ origin: 'https://awana.kvbchurch.org', source: game.win, data: { type: 'showcase:score', team: 'red' } });
+  game.listeners.message({ origin: 'https://awana.kvbchurch.org', source: game.win, data: { type: 'showcase:score', team: 'nope' } });
+  const after = await (await read(game.win)).json();
+  assert.equal(after.board.scores.tnt.red, 14);
+  assert.equal(after.board.rev, first.board.rev + 1);
+  // The 6:00 twin (the grand welcome) must never have a club up: it would own the wall.
+  const opening = run('?at=2026-10-14T17:59:52');
+  assert.equal((await read(opening.win)).status, 404);
+});
