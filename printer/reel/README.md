@@ -73,3 +73,19 @@ shot, so the projector's grand welcome fills the rest of it; the chorus gains
 the lobby's welcome video and the Grand Prix tearing open (a bar each), and
 Settings (one tap) and the every-screen grid (starting at film beat 100) each
 give up a bar.
+
+Owner, 2026-11-09 (the Sunday refresh: "make sure that it makes sense with the
+song"): the grid was measured again off the owner's file (125 BPM, steady
+across the whole song; the onsets sit within 13 ms of the grid, under half a
+30 fps frame). The cut now runs the WHOLE first chorus (song beats 48-159,
+through its turnaround) and splices phrase to phrase into the final chorus's
+last phrase (beat 384) to the song's stop (beat 398): film 112 = song 384, so
+the logo still lands on beat 392 (film 120). The scoreboard joined, filmed off
+the real Worker module (`shots.mjs` `scoreGame`): the countdown's 0:00 on beat
+46, the projector's 2D grand welcome on the first chorus hit (film 48), the
+phone's tap and RED +1! (film 56), TAKES THE LEAD! on the chorus's second
+phrase (film 64), the stopwatch (68), the lobby's score bar where the chorus
+breathes (76), RED WINS! on its third phrase (80), the snow alerts and pickup
+on the other two breaths (92, 108). Left the film: the retired fall posters
+(contest, Parents' Night) and the old game-time shot.
+

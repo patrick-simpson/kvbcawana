@@ -7,9 +7,9 @@
 // the file at reel/music/happy-dance.mp3 (git-ignored) or name it in
 // REEL_MUSIC. The film runs on its beat from song beat 48 (23.08 s: where the
 // song really starts, owner 2026-10-16; before it is the file's lead-in):
-// beats 48-159 (the verse and the first chorus), then a splice into the build,
-// beat 320, four bars before the final chorus, to the song's own last hit
-// (beat 392) and its ring, so every picture cut in film.js lands on the
+// beats 48-159 (the verse and the whole first chorus, through its turnaround),
+// then a splice to beat 384 (owner 2026-11-09 check: phrase to phrase, the
+// final chorus's last phrase) to the song's own stop (beat 398), so every picture cut in film.js lands on the
 // music's grid. A 20 ms crossfade at the splice, a short fade in, and a
 // 1.8 s fade out at the end.
 //
@@ -36,8 +36,8 @@ export const MUSIC = {
   at: (n) => 0.044 + n * 0.48,
 };
 const A_START = MUSIC.at(48);   // 23.084 s: the band comes in (film beat 0)
-const A_END = MUSIC.at(152);    // 73.004 s: the first chorus, before it quiets (104 film beats)
-const B_START = MUSIC.at(376);  // 180.524 s: the last two bars of the final chorus, to its last hit (beat 392)
+const A_END = MUSIC.at(160);    // 76.844 s: the whole first chorus, through its turnaround (112 film beats)
+const B_START = MUSIC.at(384);  // 184.364 s: the final chorus's last phrase, to the song's stop (beat 398)
 const XF = 0.02;
 
 const ff = (args) => execFileSync('ffmpeg', ['-v', 'error', '-y', ...args], { stdio: 'inherit' });

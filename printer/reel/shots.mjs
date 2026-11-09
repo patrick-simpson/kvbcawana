@@ -6,6 +6,7 @@
 // told before it loads, and what happens while it is filmed.
 import { liveChannel } from './lib/live.mjs';
 import { phoneApi } from './lib/phone.mjs';
+import { Scoreboard } from '../../worker/src/scoreboard.js';
 
 const WED = '2026-10-14'; // a club night
 const at = (hhmmss) => `${WED}T${hhmmss}-04:00`;
@@ -32,6 +33,43 @@ async function projector(page) {
   await page.route(/open-meteo/, (r) => r.abort());
   await page.addInitScript(() => {
     try { localStorage.setItem('awanaSetupChecklistDismissed.v1', '1'); } catch { /* */ }
+  });
+}
+
+/**
+ * The game time scoreboard (owner 2026-11-05): the REAL Worker module
+ * (worker/src/scoreboard.js) over memory storage, on the shot's virtual clock,
+ * answering the page's /v1/scoreboard calls; its doorbell rings ride the
+ * stand-in live channel exactly as the Worker's broadcast does. A T&T game
+ * under way: yellow leading, red one behind.
+ */
+async function scoreGame(page, ctx) {
+  const store = new Map();
+  let quiet = true;
+  const core = new Scoreboard({
+    storage: { get: async (k) => store.get(k), put: async (k, v) => { store.set(k, structuredClone(v)); } },
+    now: () => (ctx.now ? ctx.now() : Date.parse(at('18:12:00'))),
+    ring: (payload) => { if (!quiet && ctx.send) ctx.send('changed', payload).catch(() => {}); },
+  });
+  await core.club({ club: 'tnt' });
+  const seed = { blue: 12, red: 13, yellow: 14, green: 7 };
+  for (const [team, n] of Object.entries(seed)) for (let i = 0; i < n; i += 1) await core.point({ club: 'tnt', team, delta: 1 });
+  quiet = false;
+  const routes = {
+    'GET /v1/scoreboard': () => core.state(),
+    'POST /v1/scoreboard/club': (b) => core.club(b),
+    'POST /v1/scoreboard/point': (b) => core.point(b),
+    'POST /v1/scoreboard/end': () => core.end(),
+    'POST /v1/scoreboard/clock': (b) => core.clock(b),
+  };
+  ctx.score = core;
+  ctx.send = await liveChannel(page, {
+    answer: async (url, method, body) => {
+      const handler = routes[`${method} ${url.pathname.replace('/api', '')}`];
+      if (!handler) return undefined;
+      const res = await handler(body || {});
+      return { status: res.status, body: await res.json() };
+    },
   });
 }
 
@@ -118,8 +156,6 @@ export const SHOTS = {
   // Preview the promos plays them on a TV: a relay on the lobby's own channel.
   'promo-barf': promoShot('friend', 15.5),
   'promo-snow': promoShot('snowAlertsStorm', 20.5),
-  'promo-contest': promoShot('contest', 15.5),
-  'promo-parents': promoShot('parents', 15.5),
   // The new welcome graphics and the Grand Prix (owner, 2026-11-01): the lobby's
   // two videos, taken from the very files it plays (record.mjs; their first and
   // last frames are the lobby itself). `from` and `seconds`: the part the film uses.
@@ -135,12 +171,53 @@ export const SHOTS = {
     ready: 'body',
     warmup: async (shot) => { await shot.run(1.5); },
   },
-  // Game time, T&T's turn: two minutes left.
-  'projector-game': {
-    url: '/lobby/countdown', time: at('18:27:53'), seconds: 9,
-    setup: projector,
+  // The game time scoreboard (owner 2026-11-05), T&T's game, on the projector:
+  // red ties it (RED +1!), then passes yellow (TAKES THE LEAD!), the leader
+  // starts the stopwatch, then ends the game: RED WINS! Cues two bars apart so
+  // each takeover has cleared before the next.
+  'score-wall': {
+    url: '/lobby/countdown', time: at('18:12:00'), seconds: 21,
+    setup: async (page, ctx) => { await projector(page); await scoreGame(page, ctx); },
     ready: 'body',
-    warmup: async (shot) => { await shot.run(1.5); },
+    warmup: async (shot) => { await shot.run(2.5); },
+    cues: (ctx) => ({
+      1.0: () => ctx.score.point({ club: 'tnt', team: 'red', delta: 1 }),
+      4.84: () => ctx.score.point({ club: 'tnt', team: 'red', delta: 1 }),
+      8.68: () => ctx.score.clock({ op: 'start', kind: 'stopwatch' }),
+      12.52: () => ctx.score.end(),
+    }),
+  },
+  // The leader's phone (awana.kvbchurch.org/lobby/scoreboard.html): the big red
+  // +1 tapped on the same clip time as the wall's first point.
+  'score-phone': {
+    url: '/lobby/scoreboard.html', time: at('18:12:00'), seconds: 6,
+    viewport: { width: 390, height: 844 }, dpr: 2, mobile: true,
+    setup: async (page, ctx) => { await scoreGame(page, ctx); },
+    ready: '.sb-plus[data-team="red"]',
+    warmup: async (shot) => { await shot.run(2, 100); },
+    cues: (ctx) => ({
+      1.0: (page) => ctx.tap(page, '.sb-plus[data-team="red"]'),
+      4.84: (page) => ctx.tap(page, '.sb-plus[data-team="red"]'),
+    }),
+  },
+  // The lobby TV during the game: the score bar along the bottom, a point for
+  // green on beat 2 and one for red on beat 6.
+  'lobby-scorebar': {
+    url: '/lobby/', time: at('18:12:00'), seconds: 6,
+    setup: async (page, ctx) => {
+      await page.route(/open-meteo|twotimtwo/, (r) => r.abort());
+      await page.addInitScript((c) => {
+        localStorage.setItem('awanaSetupCardDismissed.v1', '1');
+        localStorage.setItem('awanaConfig.v1', JSON.stringify(c));
+      }, { calendarEnabled: false, seasonPromos: false, particleEffect: 'off', manualSlides: TYPED_DECK, firstArrivalMoment: false });
+      await scoreGame(page, ctx);
+    },
+    ready: '.score-ticker',
+    warmup: async (shot) => { await shot.run(2.5); },
+    cues: (ctx) => ({
+      1.0: () => ctx.score.point({ club: 'tnt', team: 'green', delta: 1 }),
+      2.92: () => ctx.score.point({ club: 'tnt', team: 'red', delta: 1 }),
+    }),
   },
   // Journey's teaching slides, stepped by the leader's phone remote (owner,
   // 2026-10-16: the remote beside the screen). The room's PC and the phone are
