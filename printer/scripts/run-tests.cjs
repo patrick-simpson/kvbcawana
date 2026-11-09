@@ -55,6 +55,7 @@ const SUITES = [
   ['test-print-dedup', 7],
   ['test-cloud-print', 10],
   ['test-station-keys', 5],
+  ['test-secret-store', 5],
   ['test-job-puller', 10],
   ['test-station-wake', 2],
   ['test-cloud-e2e', 10],

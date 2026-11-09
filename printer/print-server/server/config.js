@@ -5,6 +5,7 @@
 
 const events  = require('../events');
 const security = require('../security');
+const secretStores = require('../secret-store');
 const fs    = require('fs');
 const path  = require('path');
 const SERVER_DIR = path.join(__dirname, '..'); // print-server/, where server.js lives
@@ -31,6 +32,9 @@ Object.defineProperties(exports, {
   SERVER_VERSION: { enumerable: true, get: () => SERVER_VERSION },
   setPrinterName: { enumerable: true, get: () => setPrinterName },
   writeConfigFile: { enumerable: true, get: () => writeConfigFile },
+  useSecretStorage: { enumerable: true, get: () => useSecretStorage },
+  withStoredSecrets: { enumerable: true, get: () => withStoredSecrets },
+  secretStorageActive: { enumerable: true, get: () => !!secretStore },
 });
 
 // The Raspberry Pi print station (ROADMAP.md#cloud-check-in) prints through CUPS. It is
@@ -89,7 +93,62 @@ let configFileDamaged = null;
 // no usable backup is moved aside, never written over, so what it held can
 // still be copied back.
 function isConfigShape(v) { return !!v && typeof v === 'object' && !Array.isArray(v); }
+
+// ── The sign-in secrets at rest (10.14.0, secret-store.js) ────────────────────
+// Inside the KVBC Awana app (useSecretStorage, called by main.js with Electron's
+// safeStorage) the sync session and the display key are kept encrypted in
+// config-secrets.bin, never in config.json: loadConfigFile() lays them over the file and
+// writeConfigFile() takes them out of it. Outside the app (no store) config.json holds
+// them as before.
+let secretStore = null;
 function loadConfigFile() {
+  const fromFile = loadConfigFileRaw();
+  if (!secretStore) return fromFile;
+  return { ...secretStores.omitSecrets(fromFile), ...secretStore.read() };
+}
+/** The config with the kept secrets laid over it (the store is their truth while active). */
+function withStoredSecrets(next) {
+  if (!secretStore) return next;
+  return { ...secretStores.omitSecrets(next), ...secretStore.read() };
+}
+
+/**
+ * Called once by the app (main.js) right after it loads this server: keep the secrets
+ * with safeStorage from now on. Moves any plain-text secrets out of config.json (and its
+ * .bak) into config-secrets.bin, then puts them into the live config.
+ * @param {{ safeStorage: any }} deps
+ * @returns {{ ok: boolean, encrypted: boolean, migrated: boolean }}
+ */
+function useSecretStorage({ safeStorage } = {}) {
+  if (secretStore) return { ok: true, encrypted: secretStore.canEncrypt(), migrated: false };
+  const store = secretStores.createSecretStore({ dir: DATA_DIR, safeStorage, log: (m) => console.warn(m) });
+  const fromFile = loadConfigFileRaw();
+  const plain = secretStores.pickSecrets(fromFile);
+  const migrated = Object.keys(plain).length > 0;
+  // Plain text in config.json wins over an older kept copy: it is what this server last used.
+  store.write({ ...store.read(), ...plain });
+  secretStore = store;
+  if (migrated) {
+    writeConfigFile({ ...fromFile, ...store.read() });
+    console.log(`[secrets] Moved the sync sign-in and display key out of config.json${store.canEncrypt() ? ' into config-secrets.bin (encrypted)' : ' (kept in memory only: this computer cannot encrypt them)'}`);
+  }
+  // The backup of an older config.json may still hold them in plain text.
+  try {
+    if (fs.existsSync(CONFIG_BAK)) {
+      const bak = JSON.parse(fs.readFileSync(CONFIG_BAK, 'utf8'));
+      if (isConfigShape(bak) && Object.keys(secretStores.pickSecrets(bak)).length) {
+        saveFileAtomic(CONFIG_BAK, JSON.stringify(secretStores.omitSecrets(bak), null, 2), 'config.json.bak');
+      }
+    }
+  } catch (e) { /* an unreadable backup is left to loadConfigFileRaw's own recovery */ }
+  const merged = loadConfigFile();
+  for (const key of Object.keys(config)) if (!(key in merged)) delete config[key];
+  Object.assign(config, merged);
+  events.setDisplayKey(config.displayKey);
+  return { ok: true, encrypted: store.canEncrypt(), migrated };
+}
+
+function loadConfigFileRaw() {
   let raw = null;
   try { raw = fs.existsSync(CONFIG_FILE) ? fs.readFileSync(CONFIG_FILE, 'utf8') : null; } catch (e) { raw = ''; }
   if (raw === null) return {};
@@ -182,9 +241,16 @@ function dataSaveWarning() {
 }
 
 function writeConfigFile(next) {
+  // With the secret store active the secrets go there (exactly those in `next`: one left
+  // out is forgotten, which is how a sign-out is written) and never into config.json.
+  let toFile = next;
+  if (secretStore) {
+    secretStore.write(next);
+    toFile = secretStores.omitSecrets(next);
+  }
   const tmp = CONFIG_FILE + '.tmp';
   const fd = fs.openSync(tmp, 'w');
-  try { fs.writeSync(fd, JSON.stringify(next, null, 2), null, 'utf8'); fs.fsyncSync(fd); } finally { fs.closeSync(fd); }
+  try { fs.writeSync(fd, JSON.stringify(toFile, null, 2), null, 'utf8'); fs.fsyncSync(fd); } finally { fs.closeSync(fd); }
   // The file being replaced is the last good one: it becomes the backup.
   try { if (fs.existsSync(CONFIG_FILE)) fs.copyFileSync(CONFIG_FILE, CONFIG_BAK); } catch (e) { /* best effort */ }
   renameWithRetrySync(tmp, CONFIG_FILE);

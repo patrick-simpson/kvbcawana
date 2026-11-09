@@ -699,6 +699,12 @@ function startServer(config) {
     // stale the moment settings change — and is EMPTY when the server starts
     // before first-time setup. Push the current truth into the live module.
     if (serverModule.setPrinterName) serverModule.setPrinterName(config.printerName || '');
+    // The sync session and display key are kept with safeStorage, never in config.json
+    // (10.14.0; the wizard's rule): plain text left there by an older version moves out
+    // on this first call. Before applySavedConfig, which lays them over config.json.
+    if (serverModule.useSecretStorage) {
+      try { serverModule.useSecretStorage({ safeStorage }); } catch (e) { console.warn('[secrets] could not start:', e && e.message); }
+    }
     if (serverModule.applySavedConfig) serverModule.applySavedConfig(loadConfig() || {});
     // Operator alerts (#3 contract drift, etc.): the server decides WHEN,
     // this shell decides HOW — a system notification, so it lands even when
@@ -1371,7 +1377,10 @@ function deviceSession() {
   const own = syncSession.session();
   if (own) return { url: own.url, session: own.session };
   if (roles.print && syncClient) {
-    const c = loadConfig() || {};
+    // The print server's own sign-in (kept with safeStorage since 10.14.0, so asked of
+    // the server); config.json only for a server older than that.
+    const fromServer = serverModule && typeof serverModule.syncSignIn === 'function' ? serverModule.syncSignIn() : undefined;
+    const c = fromServer !== undefined ? (fromServer ? { syncUrl: fromServer.url, syncSession: fromServer.session } : {}) : (loadConfig() || {});
     if (syncClient.isValidSyncUrl(c.syncUrl) && syncClient.isValidSession(c.syncSession)) return { url: c.syncUrl, session: c.syncSession };
   }
   return null;

@@ -61,6 +61,11 @@ module.exports = {
   // saves, so the shell pushes the freshly merged config.json and printer
   // name into the LIVE module instead of relying on load-time state.
   applySavedConfig: $configRoutes.applySavedConfig, setPrinterName: $config.setPrinterName,
+  // 10.14.0: the app hands over Electron's safeStorage once, so the sync session and the
+  // display key are kept encrypted (config-secrets.bin) instead of in config.json; and it
+  // reads this computer's print-server sign-in here, never from config.json.
+  useSecretStorage: $config.useSecretStorage,
+  syncSignIn: () => ($relay.signedInToSync() ? { url: $config.config.syncUrl, session: $config.config.syncSession } : null),
   // Pure helpers exported for scripts/test-server-helpers.cjs — they carry
   // the assumptions about TwoTimTwo's real /clubber/csv export format.
   parseCSV: $clubbers.parseCSV, normalizeHeader: $clubbers.normalizeHeader, findClubberIn: $clubbers.findClubberIn, parseNoPhoto: $eligibility.parseNoPhoto, noPhotoFor: $eligibility.noPhotoFor,

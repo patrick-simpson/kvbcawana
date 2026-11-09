@@ -25,6 +25,7 @@
     "test:envelope": "node scripts/test-envelope.cjs",
     "test:cloud-crypto": "node scripts/test-cloud-crypto.cjs",
     "test:station-keys": "node scripts/test-station-keys.cjs",
+    "test:secret-store": "node scripts/test-secret-store.cjs",
     "test:job-puller": "node scripts/test-job-puller.cjs",
     "test:print-helper": "node scripts/test-print-helper.cjs",
     "test:station-wake": "node scripts/test-station-wake.cjs",

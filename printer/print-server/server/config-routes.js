@@ -78,7 +78,11 @@ function printableConfigLine(value, maxLen) {
 // operator clearing a leaked PIN had every reason to believe it was revoked.
 // Same for the display key: clearing it left the publisher still sealing with
 // the key it was supposed to have forgotten.
-function applySavedConfig(next) {
+function applySavedConfig(saved) {
+  // With the secret store active (10.14.0) the sync session and display key come from it,
+  // whatever `saved` holds: the app hands over config.json as it reads it, which no longer
+  // carries them, and every writer here has written them to the store first.
+  const next = $config.withStoredSecrets(saved || {});
   for (const key of Object.keys($config.config)) {
     if (!(key in next)) delete $config.config[key];
   }
