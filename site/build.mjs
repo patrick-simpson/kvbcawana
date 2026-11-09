@@ -33,7 +33,7 @@ import { fileURLToPath } from 'node:url';
 import { downloadRedirects } from './lib/downloads.js';
 import { REPO_FOLDERS, RELEASE_FILES, mustStream, releaseBase, releaseFiles, repoPathFor } from './lib/largeFiles.js';
 import { pageRedirects } from './lib/redirects.js';
-import { SITE_HEADERS } from './lib/securityHeaders.js';
+import { SITE_HEADERS, inlineScriptHashes, tvPagePolicy } from './lib/securityHeaders.js';
 import { buildCheckinPages, CHECKIN_MODULES } from './checkin/checkin-page.mjs';
 
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
@@ -266,6 +266,18 @@ writeFileSync(path.join(OUT, '_redirects'), [
 // every crawler to keep out, and every response says noindex, nofollow, so a page
 // reached some other way is still never listed.
 writeFileSync(path.join(OUT, 'robots.txt'), 'User-agent: *\nDisallow: /\n');
+// The TV pages that hold the session and show what strangers put up get a policy
+// that names every script they may run (site/lib/securityHeaders.js), with each
+// inline script of their built pages allowed by its fingerprint.
+const sha256b64 = (text) => createHash('sha256').update(text, 'utf8').digest('base64');
+const builtPages = (dir) => readdirSync(dir, { recursive: true }).filter((f) => String(f).endsWith('.html')).map((f) => path.join(dir, String(f)));
+const tvPolicy = (dir, facebook) => tvPagePolicy({
+  origin: ORIGIN,
+  facebook,
+  scriptHashes: [...new Set(builtPages(dir).flatMap((f) => inlineScriptHashes(readFileSync(f, 'utf8'), sha256b64)))],
+});
+const CLASSROOM_CSP = tvPolicy(path.join(OUT, 'classroom'), false);
+const CAST_SCREEN_CSP = tvPolicy(path.join(OUT, 'cast', 'screen'), true);
 writeFileSync(path.join(OUT, '_headers'), [
   '/*',
   '  X-Robots-Tag: noindex, nofollow',
@@ -300,6 +312,10 @@ writeFileSync(path.join(OUT, '_headers'), [
   '/classroom/*',
   '  Cache-Control: no-cache',
   '  X-Robots-Tag: noindex, nofollow',
+  `  Content-Security-Policy: ${CLASSROOM_CSP}`,
+  // The Cast screen (site/cast/screen/, the lobby TV while Cast is on): the TV policy.
+  '/cast/screen/*',
+  `  Content-Security-Policy: ${CAST_SCREEN_CSP}`,
   // The phone remote (journey/public/remote/, owner 2026-10-13): always the newest page, never in a search engine.
   '/journey/remote/*',
   '  Cache-Control: no-cache',
