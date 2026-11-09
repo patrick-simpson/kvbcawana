@@ -58,3 +58,53 @@ describe('the repair installer check', () => {
     assert.match(gone.reason, /could not be read/);
   });
 });
+
+describe('where the repair installer is written (10.14.0)', () => {
+  const { makeRepairPath, removeRepairDir, sweepRepairDirs, REPAIR_DIR_PREFIX } = require('../src/repair-installer');
+  it('a fresh private folder and a random file name each time, never the old fixed name', () => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'repair-where-'));
+    const a = makeRepairPath(tmp);
+    const b = makeRepairPath(tmp);
+    assert.notEqual(a.dir, b.dir);
+    assert.notEqual(path.basename(a.file), path.basename(b.file));
+    assert.ok(path.basename(a.dir).startsWith(REPAIR_DIR_PREFIX));
+    assert.equal(path.dirname(a.file), a.dir);
+    assert.match(path.basename(a.file), /^KVBC-Awana-Setup-[0-9a-f]{16}\.exe$/);
+    assert.ok(fs.statSync(a.dir).isDirectory());
+    removeRepairDir(a.dir);
+    assert.ok(!fs.existsSync(a.dir));
+  });
+  it('sweeps only its own folders once they are old', () => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'repair-sweep-'));
+    const old = makeRepairPath(tmp);
+    fs.writeFileSync(old.file, 'x');
+    const fresh = makeRepairPath(tmp);
+    fs.mkdirSync(path.join(tmp, 'someone-else'));
+    const past = new Date(Date.now() - 2 * 60 * 60 * 1000);
+    fs.utimesSync(old.dir, past, past);
+    assert.equal(sweepRepairDirs(tmp), 1);
+    assert.ok(!fs.existsSync(old.dir));
+    assert.ok(fs.existsSync(fresh.dir));
+    assert.ok(fs.existsSync(path.join(tmp, 'someone-else')));
+  });
+});
+
+describe('main.js writes and runs the installer safely (10.14.0)', () => {
+  const main = fs.readFileSync(path.join(__dirname, '..', 'main.js'), 'utf8');
+  const i = main.indexOf('function downloadRepairInstaller');
+  const fn = main.slice(i, main.indexOf('function probeServer', i));
+  it('no fixed temp name; exclusive create in its own folder', () => {
+    assert.ok(!main.includes("path.join(os.tmpdir(), 'KVBC-Awana-Setup.exe')"));
+    assert.match(fn, /repairInstaller\.makeRepairPath\(os\.tmpdir\(\)\)/);
+    assert.match(fn, /fs\.createWriteStream\(dest, \{ flags: 'wx' \}\)/);
+  });
+  it('the bytes as they arrived and the file on disk right before opening both match the feed', () => {
+    assert.match(fn, /streamHash\.update\(chunk\)/);
+    assert.ok(fn.indexOf('digestsMatch') < fn.indexOf('verifyInstaller(dest, feedText)'));
+    assert.ok(fn.indexOf('verifyInstaller(dest, feedText)') < fn.indexOf('shell.openPath(dest)'));
+  });
+  it('a failure deletes the folder, and a later start sweeps an old one', () => {
+    assert.match(fn, /repairInstaller\.removeRepairDir\(where\.dir\)/);
+    assert.match(main, /repairInstaller\.sweepRepairDirs\(os\.tmpdir\(\)\);/);
+  });
+});

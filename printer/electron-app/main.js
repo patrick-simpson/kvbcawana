@@ -14,6 +14,7 @@ const fs = require('fs');
 const net = require('net');
 const http = require('http');
 const os = require('os');
+const crypto = require('crypto');
 const { execFile, execFileSync, spawn } = require('child_process');
 const { removeShortcuts, findOldBrandShortcuts } = require('./src/shortcuts');
 const configStore = require('./src/config-store');
@@ -810,8 +811,18 @@ function downloadAndRunRepairInstaller() {
 }
 
 function downloadRepairInstaller(feedText) {
-  const dest = path.join(os.tmpdir(), 'KVBC-Awana-Setup.exe');
-  const file = fs.createWriteStream(dest);
+  // A fresh private folder and a random name, created exclusively (10.14.0): never a
+  // fixed name in the shared temp folder that something else could own or swap.
+  let where;
+  try { where = repairInstaller.makeRepairPath(os.tmpdir()); } catch (e) {
+    dialog.showErrorBox('Repair download failed', ((e && e.message) || 'could not make a temp folder') + '\n\nDownload it manually instead:\n' + REPAIR_INSTALLER_URL);
+    return;
+  }
+  const dest = where.file;
+  const file = fs.createWriteStream(dest, { flags: 'wx' });
+  // The digest of the bytes as they arrived; the file is hashed again right before it
+  // is opened, and both must match the feed.
+  const streamHash = crypto.createHash('sha512');
   const request = electronNet.request(REPAIR_INSTALLER_URL);
   let failed = false;
   const fail = (why) => {
@@ -819,6 +830,7 @@ function downloadRepairInstaller(feedText) {
     failed = true;
     try { file.destroy(); } catch { /* ignore */ }
     try { fs.unlinkSync(dest); } catch { /* a half file must never be run */ }
+    repairInstaller.removeRepairDir(where.dir);
     dialog.showErrorBox(
       'Repair download failed',
       why + '\n\nDownload it manually instead:\n' + REPAIR_INSTALLER_URL
@@ -831,13 +843,20 @@ function downloadRepairInstaller(feedText) {
     if (response.statusCode !== 200) { fail('HTTP ' + response.statusCode); return; }
     const expected = Number([].concat(response.headers['content-length'] || [])[0]) || 0;
     let received = 0;
-    response.on('data', (chunk) => { received += chunk.length; file.write(chunk); });
+    response.on('data', (chunk) => { received += chunk.length; streamHash.update(chunk); file.write(chunk); });
     response.on('end', () => {
       if (failed) return;
       // A connection cut short can still end cleanly: running half an installer is worse than none.
       if (expected && received !== expected) { fail('download incomplete'); return; }
+      const arrived = streamHash.digest('base64');
       file.end(() => {
         if (failed) return;
+        if (!repairInstaller.digestsMatch(repairInstaller.parseFeedSha512(feedText), arrived)) {
+          fail('Refused to run it: the downloaded installer does not match the checksum in the update feed.');
+          return;
+        }
+        // Hashed again from disk immediately before it is opened: the file that runs is
+        // the file that was checked.
         repairInstaller.verifyInstaller(dest, feedText).then((check) => {
           if (failed) return;
           if (!check.ok) { fail('Refused to run it: ' + check.reason + '.'); return; }
@@ -1429,6 +1448,8 @@ function removeOldAppIfHandedOff() {
 
 app.whenReady().then(async () => {
   const userData = app.getPath('userData');
+  // A repair installer run earlier has finished by now: its private temp folder goes.
+  repairInstaller.sweepRepairDirs(os.tmpdir());
   createPdfWindow();
   setupAutoUpdater();
 

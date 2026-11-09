@@ -77,4 +77,49 @@ async function verifyInstaller(file, feedText) {
   return { ok: true };
 }
 
-module.exports = { FEED_URL, parseFeedSha512, digestsMatch, sha512OfFile, verifyInstaller };
+// ── Where the installer is written (10.14.0) ──────────────────────────────────
+// Never a fixed name in the shared temp folder (another program could put its own file
+// there first, or swap it between the check and the run): a fresh folder of its own
+// (mkdtemp) and a random file name in it, created exclusively (flag 'wx'). The folder is
+// deleted when the run fails, and on a later start once the installer has finished.
+const path = require('path');
+const REPAIR_DIR_PREFIX = 'kvbc-awana-repair-';
+
+/** A new private folder and a random installer path in it. @param {string} tmpDir */
+function makeRepairPath(tmpDir) {
+  const dir = fs.mkdtempSync(path.join(tmpDir, REPAIR_DIR_PREFIX));
+  const file = path.join(dir, `KVBC-Awana-Setup-${crypto.randomBytes(8).toString('hex')}.exe`);
+  return { dir, file };
+}
+
+/** Delete a repair folder and what is in it. Never throws. @param {string} dir */
+function removeRepairDir(dir) {
+  try { fs.rmSync(dir, { recursive: true, force: true }); } catch { /* still in use: a later start sweeps it */ }
+}
+
+/**
+ * Delete repair folders older than `maxAgeMs` (an installer that ran has long finished).
+ * Returns how many went. Never throws.
+ * @param {string} tmpDir @param {number} [now] @param {number} [maxAgeMs]
+ */
+function sweepRepairDirs(tmpDir, now = Date.now(), maxAgeMs = 60 * 60 * 1000) {
+  let removed = 0;
+  let names = [];
+  try { names = fs.readdirSync(tmpDir); } catch { return 0; }
+  for (const name of names) {
+    if (!name.startsWith(REPAIR_DIR_PREFIX)) continue;
+    const dir = path.join(tmpDir, name);
+    try {
+      const st = fs.lstatSync(dir);
+      if (!st.isDirectory() || now - st.mtimeMs < maxAgeMs) continue;
+      fs.rmSync(dir, { recursive: true, force: true });
+      removed += 1;
+    } catch { /* locked or gone */ }
+  }
+  return removed;
+}
+
+module.exports = {
+  FEED_URL, parseFeedSha512, digestsMatch, sha512OfFile, verifyInstaller,
+  REPAIR_DIR_PREFIX, makeRepairPath, removeRepairDir, sweepRepairDirs,
+};
