@@ -28,9 +28,9 @@
 //   key on this screen, the tray's "Show Cast code" or a presenter's "Display code" (the
 //   Worker's `revealAt`) shows them for REVEAL_MS; anything put up hides them again.
 // - Videos (owner 2026-11-08): an uploaded video (`clip`) read with the session into a
-//   blob and played in a <video>; a public Facebook video in Facebook's own embedded
-//   player (its SDK, connect.facebook.net). One set of controls for YouTube, clips and
-//   Facebook (`media`); every one takes itself down when it ends.
+//   blob and played in a <video>; a public Facebook video in Facebook's plain iframe
+//   player (never its SDK on this page). One set of controls for YouTube and clips
+//   (`media`), each takes itself down when it ends; a Facebook video stays until Back.
 // - ?configure=1 (KVBC Awana's display Settings window, coordinator 2026-11-08): a
 //   short note only. No room is opened, no socket, nothing closed on pagehide.
 //
@@ -57,7 +57,6 @@ async function pdfWorkerUrl() {
   return URL.createObjectURL(new Blob([await res.text()], { type: 'text/javascript' }));
 }
 const QR_LIB_SRI = 'sha512-ZDSPMa/JM1D+7kdg2x3BsruQ6T/JpJo3jWDWkCZsP+5yVyp1KfESqLI+7RqB5k24F7p2cV7i2YHh/890y6P6Sw==';
-const FB_SDK = 'https://connect.facebook.net/en_US/sdk.js';
 const T = Object.assign({
   pollMs: 30000, reportVideoMs: 10000, timeoutMs: 10000, fadeMs: 450,
   pingMs: 25000, silentMs: 70000, retryMinMs: 2000, retryMaxMs: 60000,
@@ -511,68 +510,49 @@ async function playClip(b, show) {
   report(true);
 }
 
-/* ── A public Facebook video, in Facebook's own player ── */
+/* ── A public Facebook video, in Facebook's own plain player frame ── */
+// Security (2026-11-09): never Facebook's JavaScript SDK on this page. Any script here can
+// read the session in localStorage, so the video plays in Facebook's iframe player
+// (facebook.com/plugins/video.php), a cross-origin frame that cannot reach this page.
+// The plain player cannot tell us when the video ends and an item carries no length, so a
+// Facebook video stays up until the presenter presses Back (or puts something else up);
+// the video presses (pause, seek, sound) do nothing on it.
 
-let fbReady = null;
-function facebookSdk() {
-  if (window.castFacebook) return Promise.resolve(window.castFacebook);
-  if (!fbReady) {
-    fbReady = new Promise((ok, no) => {
-      window.fbAsyncInit = () => { window.FB.init({ xfbml: false, version: 'v19.0' }); ok(window.FB); };
-      const sc = document.createElement('script');
-      sc.src = FB_SDK;
-      sc.async = true;
-      sc.onerror = () => { fbReady = null; no(new Error('facebook')); };
-      document.head.append(sc);
-    });
-  }
-  return fbReady;
+/** Facebook's iframe player for an already validated video link, or ''. @param {string} href */
+export function facebookPlayerUrl(href, width, height) {
+  const clean = R.facebookVideoFrom(href);
+  if (!clean) return '';
+  const q = new URLSearchParams({
+    href: clean, show_text: 'false', autoplay: 'true', mute: '0', allowfullscreen: 'false',
+    width: String(Math.max(1, Math.round(width))), height: String(Math.max(1, Math.round(height))),
+  });
+  return `https://www.facebook.com/plugins/video.php?${q}`;
 }
 
-async function playFacebook(b) {
-  status('Loading the Facebook video…', b.title && b.title !== 'Facebook video' ? b.title : '', true);
+function playFacebook(b) {
+  // The biggest 16:9 box the screen holds.
+  const w = Math.min(window.innerWidth, window.innerHeight * (16 / 9));
+  const h = w * (9 / 16);
+  const src = facebookPlayerUrl(b.href, w, h);
+  if (!src) { status('Facebook would not play that video.', 'Only public videos can be shown.'); return; }
   const box = document.createElement('div');
   box.className = 'fb-box';
-  const el = document.createElement('div');
-  el.className = 'fb-video';
-  el.dataset.href = b.href;
-  el.dataset.autoplay = 'true';
-  el.dataset.allowfullscreen = 'false';
-  el.dataset.showText = 'false';
-  el.dataset.showCaptions = 'false';
-  // Facebook's player takes a width; it picks the height from the video's shape.
-  el.dataset.width = String(Math.round(Math.min(window.innerWidth, window.innerHeight * (16 / 9))));
-  el.id = `fb-${b.id}`;
-  box.append(el);
+  const frame = document.createElement('iframe');
+  frame.className = 'fb-video';
+  frame.title = b.title || 'Facebook video';
+  // Its own (facebook.com) origin for its scripts and cookies, nothing more: no top
+  // navigation, no popups, no forms.
+  frame.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-presentation');
+  frame.allow = 'autoplay; encrypted-media; picture-in-picture';
+  frame.referrerPolicy = 'strict-origin-when-cross-origin';
+  frame.width = String(Math.round(w));
+  frame.height = String(Math.round(h));
+  frame.style.width = `${Math.round(w)}px`;
+  frame.style.height = `${Math.round(h)}px`;
+  frame.src = src;
+  box.append(frame);
   layer.append(box);
-  let FB;
-  try { FB = await facebookSdk(); } catch { status('Facebook did not load.', 'The video may be private, or Facebook is blocked here.'); return; }
-  if (!layer.contains(box)) return;
-  const onReady = (msg) => {
-    if (msg.type !== 'video' || msg.id !== el.id || !layer.contains(box)) return;
-    FB.Event.unsubscribe('xfbml.ready', onReady);
-    const p = msg.instance;
-    layer.querySelector('.status')?.remove();
-    let playing = false;
-    const subs = [
-      p.subscribe('startedPlaying', () => { playing = true; report(); }),
-      p.subscribe('paused', () => { playing = false; report(); }),
-      p.subscribe('finishedPlaying', () => { playing = false; ended(); }),
-      p.subscribe('error', () => status('Facebook would not play that video.', 'Only public videos can be shown.')),
-    ];
-    media = {
-      play: () => p.play(), pause: () => p.pause(), paused: () => !playing,
-      seekBy: (by) => p.seek(Math.max(0, p.getCurrentPosition() + by)),
-      mute: () => p.mute(), unmute: () => p.unmute(), muted: () => p.isMuted(),
-      volume: () => Math.round(p.getVolume() * 100), setVolume: (x) => p.setVolume(x / 100),
-      t: () => p.getCurrentPosition(), d: () => p.getDuration(),
-      destroy: () => { for (const sub of subs) { try { sub.release(); } catch { /* gone */ } } },
-    };
-    try { p.unmute(); p.play(); } catch { /* blocked */ }
-    report(true);
-  };
-  FB.Event.subscribe('xfbml.ready', onReady);
-  FB.XFBML.parse(box);
+  report(true);
 }
 
 /* ── The video presses (YouTube, a clip, Facebook) ── */

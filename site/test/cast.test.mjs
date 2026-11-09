@@ -265,9 +265,15 @@ test('YouTube search results, Facebook links and video files become presses the 
   assert.match(fileProblem({ type: 'image/png', size: 5 }, 'clip', R), /Choose a video/);
   assert.equal(filePress({ id: 'fabcdefghijkl', type: 'video/mp4' }, 'Skit', R).press.data.item.kind, 'clip');
   assert.match(app, /\/v1\/cast\/youtube\?q=\$\{encodeURIComponent\(q\)\}/);
-  // The TV: one set of controls for YouTube, clips and Facebook; each takes itself down at its end.
-  assert.match(screen, /connect\.facebook\.net\/en_US\/sdk\.js/);
-  assert.match(screen, /subscribe\('finishedPlaying', \(\) => \{ playing = false; ended\(\); \}\)/);
+  // The TV: one set of controls for YouTube and clips; each takes itself down at its end.
+  // Facebook (security, 2026-11-09): never its SDK on the session-holding TV page, only
+  // its plain cross-origin iframe player, sandboxed, from the validated link; it cannot
+  // report its end, so it stays up until Back.
+  assert.doesNotMatch(screen, /connect\.facebook\.net/);
+  assert.doesNotMatch(screen, /\bFB\.|fbAsyncInit/);
+  assert.match(screen, /https:\/\/www\.facebook\.com\/plugins\/video\.php\?\$\{q\}/);
+  assert.match(screen, /const clean = R\.facebookVideoFrom\(href\);\n  if \(!clean\) return '';/);
+  assert.match(screen, /frame\.setAttribute\('sandbox', 'allow-scripts allow-same-origin allow-presentation'\)/);
   assert.match(screen, /v\.addEventListener\('ended', ended\)/);
   assert.match(screen, /R\.CLASSROOM_PLAYABLE_KINDS\.includes\(b\.kind\) && media/);
 });
