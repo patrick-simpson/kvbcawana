@@ -399,6 +399,11 @@ test('the desk reuses the presenter page\'s controls through the desk routes and
   assert.match(desk, /path: \(p\) => p\.replace\(\/\^\\\/v1\\\/cast\\\/\/, '\/v1\/cast\/desk\/'\),/);
   assert.match(desk, /headers: \(\) => \(session \? \{ Authorization: `Bearer \$\{session\}` \} : \{\}\),/);
   assert.match(desk, /nav: true,/);
+  // A mouse clicks: the shared words take their verb from the page.
+  assert.match(desk, /verb: 'Click',/);
+  const controls = read('cast', 'controls.js');
+  assert.match(controls, /const VERB = conn\.verb \|\| 'Tap';/);
+  assert.ok(!/\bTap (one|it|anywhere)/.test(controls), 'no hard-coded Tap in the shared controls');
   // Never a presenter token, never storage: the sign-in is the app's, in memory.
   assert.ok(!/X-Cast-Token|sessionStorage|localStorage/.test(desk));
   assert.ok(!/\/v1\/cast\/join|\/v1\/cast\/leave/.test(desk));

@@ -9,6 +9,7 @@
 //   conn.refused(w)  a 401: the page decides what that means (the presenter asks for
 //                    the code again; the desk asks the app for a newer sign-in)
 //   conn.onState(b)  every good state answer, for the page's own extras (the desk's code)
+//   conn.verb        'Tap' (the phone, the default) or 'Click' (the desk)
 //   conn.nav         true = the choices are a navigation pane (one always open) and the
 //                    page already heads "On the TV now" (so the line says just what is up)
 // The pages keep their own markup and look; the element ids are the same.
@@ -58,6 +59,8 @@ export const setText = (el, text) => {
 export function createControls(conn) {
   const TUNING = Object.assign({ pollMs: 2000, idleMs: 30 * 60 * 1000, timeoutMs: 12000, failuresBeforeWarning: 2 }, conn.tuning || {});
   const base = conn.base;
+  // "Tap" on a phone, "Click" at the desk's mouse.
+  const VERB = conn.verb || 'Tap';
   let state = null; // { stage, now, screenOnline }
   let failures = 0;
   let pollTimer = 0;
@@ -105,7 +108,7 @@ export function createControls(conn) {
     clearTimeout(pollTimer);
     if (!conn.live() || document.hidden) return;
     if (Date.now() - lastTouch > TUNING.idleMs) {
-      setText($('tv-sub'), 'Paused while you were away. Tap anywhere to see the TV again.');
+      setText($('tv-sub'), `Paused while you were away. ${VERB} anywhere to see the TV again.`);
       return;
     }
     const r = await request('/v1/cast/state');
@@ -211,7 +214,7 @@ export function createControls(conn) {
     if (!r.ok || !r.body) { setText(note, errorWords(r.status, r.body)); note.classList.add('bad'); return; }
     const results = Array.isArray(r.body.results) ? r.body.results : [];
     list.textContent = '';
-    setText(note, results.length ? 'Tap one to play it on the TV.' : 'Nothing found. Try other words.');
+    setText(note, results.length ? `${VERB} one to play it on the TV.` : 'Nothing found. Try other words.');
     for (const [i, v] of results.entries()) {
       if (!R.youtubeIdFrom(v.youtube)) continue;
       const li = document.createElement('li');
@@ -325,7 +328,7 @@ export function createControls(conn) {
       $('thumbs').append(thumb(pic));
       added += 1;
     }
-    if (added && !note.classList.contains('bad')) say(added === 1 ? 'Ready. Tap it to show it on the TV.' : `${added} ready. Tap one to show it on the TV.`);
+    if (added && !note.classList.contains('bad')) say(added === 1 ? `Ready. ${VERB} it to show it on the TV.` : `${added} ready. ${VERB} one to show it on the TV.`);
     render();
   }
 

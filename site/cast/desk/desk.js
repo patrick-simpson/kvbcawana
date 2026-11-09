@@ -31,6 +31,7 @@ const ui = createControls({
   base,
   tuning: window.castDeskTuning,
   nav: true,
+  verb: 'Click', // a mouse, not a finger
   // The presenter's routes, as the desk's twins (worker/src/routes.md 10.18 "The desk").
   path: (p) => p.replace(/^\/v1\/cast\//, '/v1/cast/desk/'),
   headers: () => (session ? { Authorization: `Bearer ${session}` } : {}),
