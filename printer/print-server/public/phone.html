@@ -167,7 +167,6 @@
   .fams.out.s5 { --co-min: 360px; --co-h: 240px; --co-fn: 46px; --co-kid: 24px; gap: 12px; }
   .fams.out .fam { gap: 6px; padding: 10px 14px 10px 20px; }
   .fams.out .fam .fn { font-size: var(--co-fn); }
-  .fams.out:not(.s1) .fam .fn { white-space: normal; overflow-wrap: anywhere; }
   .fams.out .fam .kids { font-size: var(--co-kid); max-height: none; }
   .fams.out .kid[data-state] { font-size: calc(var(--co-kid) * .9); }
   .out-done { display: flex; flex-direction: column; align-items: center; gap: 10px; }
@@ -204,7 +203,8 @@
     box-shadow: 0 2px 10px rgba(15,23,42,.08); }
   .fam { display: flex; flex-direction: column; justify-content: center; justify-content: safe center; gap: 4px; padding: 6px 10px 6px 16px; border-radius: 16px; }
   .fam::before, .fcard::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 7px; background: linear-gradient(var(--stripe)); }
-  .fam .fn { font-family: var(--f-shout); font-size: 20px; line-height: 1.05; color: var(--c-blue-deep); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .fam .fn { font-family: var(--f-shout); font-size: 20px; line-height: 1.05; color: var(--c-blue-deep); overflow: hidden; overflow-wrap: anywhere; hyphens: none;
+    text-wrap: balance; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; flex: none; }
   .fam .kids, .fcard .kids { display: flex; flex-wrap: wrap; gap: 2px 8px; font-weight: 700; font-size: 14px; color: #334155; }
   .fam .kids { max-height: 2.6em; overflow: hidden; }
   .kid { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
@@ -1406,6 +1406,12 @@ function stripe(f) {
 }
 function famLabel(f) { return f.kids.length === 1 ? f.kids[0].name : f.name + ': ' + f.kids.map(function(c) { return c.name.split(' ')[0]; }).join(', '); }
 function names(f) { return f.kids.map(function(c) { return c.name.toLowerCase(); }).join('|'); }
+// One name size per grid (owner finding 13): chosen from the tile width alone, never from a
+// name's length, so every name in a grid matches. A long name wraps to two balanced lines (CSS
+// .fam .fn); never under 16 px, up to 24 px where the tile is wide and tall enough for two lines.
+function nameSize(w, h) {
+  return Math.round(Math.max(16, Math.min(24, (w - 26) / 9, (h - 34) / 2.1)));
+}
 function famTile(f, fit) {
   var busy = f.kids.some(function(c) { return STATE[c.recid]; });
   var b = keyed('button', 'fam' + (busy ? ' has-pending' : ''), 'f:' + f.key);
@@ -1413,8 +1419,7 @@ function famTile(f, fit) {
   b.style.setProperty('--stripe', stripe(f));
   var single = f.kids.length === 1;
   var title = single ? f.kids[0].name : f.name;
-  var fs = Math.max(15, Math.min(24, fit.h * 0.3, (fit.w - 30) / (title.length * 0.6 + 0.4)));
-  var fn = el('div', 'fn', title); fn.style.fontSize = Math.round(fs) + 'px';
+  var fn = el('div', 'fn', title); fn.style.fontSize = fit.fs + 'px';   // ONE size for the whole grid (nameSize)
   var line = el('div', 'kids');
   f.kids.forEach(function(c) {
     var st = STATE[c.recid];
@@ -1580,7 +1585,8 @@ function renderFamilies(list) {
   var grid = el('div', 'fams');
   grid.style.gridTemplateColumns = 'repeat(' + cols + ', minmax(0, 1fr))';
   grid.style.gridAutoRows = Math.floor(h) + 'px';
-  main.forEach(function(f) { grid.appendChild(famTile(f, { w: w, h: h })); });
+  var fs = nameSize(w, h);
+  main.forEach(function(f) { grid.appendChild(famTile(f, { w: w, h: h, fs: fs })); });
   list.appendChild(grid);
   if (away.length) {
     var box = el('div', 'away');
