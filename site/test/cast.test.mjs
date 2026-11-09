@@ -300,3 +300,19 @@ test('the code and QR stay hidden until a click, the tray or Display code asks',
   assert.match(screen, /const asked = Number\(r\.body\.revealAt\) \|\| 0;/);
   assert.match(screen, /REVEAL_MS = 5 \* 60 \* 1000/);
 });
+
+// Owner 2026-11-08: "Everything this does should have professional animations and
+// transitions" (the TV and the presenter page). Motion lives ONLY inside the
+// prefers-reduced-motion: no-preference blocks, so "reduce motion" sees the finished page.
+test('every animation is inside the motion-allowed block; one shared motion language', () => {
+  const outside = (src) => src.replace(/@media \(prefers-reduced-motion: no-preference\) \{[\s\S]*?\n {0,2}\}\n/g, '');
+  for (const [name, src] of [['presenter', page], ['tv', screenPage], ['church.css', css]]) {
+    const style = name === 'church.css' ? src : (src.match(/<style>([\s\S]*?)<\/style>/) || ['', ''])[1];
+    assert.ok(!/animation:/.test(outside(style)), `${name}: an animation outside the motion block`);
+    assert.ok(!/@keyframes/.test(outside(style)), `${name}: keyframes outside the motion block`);
+  }
+  assert.match(css, /--ease-out: cubic-bezier\(\.22, 1, \.36, 1\);/);
+  assert.match(screenPage, /\.card:not\(\.code-hidden\) \.code > span \{ animation: cast-rise/);
+  assert.match(screen, /canvas\.classList\.add\('is-next'\);/);
+  assert.match(app, /function closePanel\(panel\)/);
+});

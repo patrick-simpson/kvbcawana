@@ -131,6 +131,35 @@
   #ctl-down .quiet { flex: 1 1 40%; }
   #code-help { margin-top: 8px; font-size: 14px; }
 
+  /* ── Motion (church.css's language; nothing moves with "reduce motion" on) ── */
+  @media (prefers-reduced-motion: no-preference) {
+    /* Each step (the code, then what to show) arrives; its parts follow one after another. */
+    main.m-enter > * { animation: cast-rise var(--t-slow) var(--ease-out) both; }
+    main.m-enter > *:nth-child(2) { animation-delay: 60ms; }
+    main.m-enter > *:nth-child(3) { animation-delay: 120ms; }
+    main.m-enter > *:nth-child(4) { animation-delay: 180ms; }
+    main.m-enter > *:nth-child(n+5) { animation-delay: 240ms; }
+    /* A choice opens with an eased slide; closing fades it back up (app.js keeps it while it does). */
+    .panel:not([hidden]) { animation: cast-drop var(--t-base) var(--ease-out) both; }
+    .panel.is-closing { animation: cast-close var(--t-quick) var(--ease-in) both; }
+    @keyframes cast-close { to { opacity: 0; transform: translateY(-6px); } }
+    .choice::after { transition: transform var(--t-base) var(--ease-in-out); }
+    .choice { transition: background-color var(--t-quick) var(--ease-out); }
+    .choice:active { background-color: rgba(185, 164, 142, .12); }
+    /* Buttons: a small, quick press. */
+    .primary, .quiet, .result, .thumb, .strip-slide { transition: transform var(--t-quick) var(--ease-out), background-color var(--t-quick) var(--ease-out), opacity var(--t-quick) var(--ease-out); }
+    .primary:active:not(:disabled), .quiet:active:not(:disabled), .result:active, .thumb:active, .strip-slide:active { transform: scale(.97); }
+    /* What changed eases in: the TV line, notes, the ready rows, new results and pictures. */
+    .m-again { animation: cast-fade var(--t-base) var(--ease-out) both; }
+    .ready:not([hidden]) { animation: cast-rise var(--t-base) var(--ease-out) both; }
+    .results > li, .thumbs > .thumb { animation: cast-pop var(--t-base) var(--ease-out) both; animation-delay: calc(var(--i, 0) * 45ms); }
+    .slides:not([hidden]) { animation: cast-rise var(--t-base) var(--ease-out) both; }
+    .slide-now canvas.m-again, .slide-next canvas.m-again { animation-duration: 260ms; }
+    .strip-slide[aria-current="true"] { transition: outline-color var(--t-base) var(--ease-out); }
+    .dot { transition: background-color var(--t-base) var(--ease-in-out); }
+    #share-state:not([hidden]) { animation: cast-drop var(--t-base) var(--ease-out) both; }
+  }
+
   footer { margin-top: 48px; font-size: 13px; color: var(--muted); }
 
   @media (min-width: 720px) {

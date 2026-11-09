@@ -274,7 +274,7 @@ async function change(show) {
   else if (b.kind === 'text') drawText(b);
   else if (b.kind === 'image') drawImage(prepared);
   else if (b.kind === 'pdf') await openPdf(prepared, show.page);
-  else if (b.kind === 'screen') { status('Connecting to the presenter’s screen…', b.title !== 'Shared screen' ? b.title : ''); trySignal(); }
+  else if (b.kind === 'screen') { status('Connecting to the presenter’s screen…', b.title !== 'Shared screen' ? b.title : '', true); trySignal(); }
   void layer.offsetWidth;
   layer.classList.add('is-in');
   report(true);
@@ -294,10 +294,11 @@ function clear() {
   shownPage = 0;
 }
 
-function status(words, small) {
+/** Words over the black; `working` = something is on its way (the breathing bar). */
+function status(words, small, working) {
   layer.querySelector('.status')?.remove();
   const p = document.createElement('p');
-  p.className = 'status';
+  p.className = working ? 'status working' : 'status';
   p.textContent = words;
   if (small) { const s = document.createElement('small'); s.textContent = small; p.append(s); }
   layer.append(p);
@@ -396,8 +397,13 @@ async function drawPdfPage(page) {
   canvas.style.height = `${Math.floor(v1.height * fit)}px`;
   await p.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
   if (!pdf) return;
-  const old = layer.querySelector('canvas');
-  if (old) old.replaceWith(canvas); else layer.append(canvas);
+  // The next page fades in OVER the last one, which goes once it is covered.
+  const olds = [...layer.querySelectorAll('canvas')];
+  if (olds.length) {
+    canvas.classList.add('is-next');
+    layer.append(canvas);
+    setTimeout(() => { for (const o of olds) o.remove(); }, 420);
+  } else layer.append(canvas);
   shownPage = n;
   report();
 }
@@ -461,7 +467,7 @@ function ended() {
 /* ── An uploaded video (a clip) ── */
 
 async function playClip(b, show) {
-  status('Loading the video…', b.title && b.title !== 'Video' ? b.title : '');
+  status('Loading the video…', b.title && b.title !== 'Video' ? b.title : '', true);
   const blob = await fetchFile(b.file);
   if (showKey !== `${show.button.id}@${show.at}`) return;
   if (!blob) { status('The video could not be loaded.', 'Try putting it up again.'); return; }
@@ -507,7 +513,7 @@ function facebookSdk() {
 }
 
 async function playFacebook(b) {
-  status('Loading the Facebook video…', b.title && b.title !== 'Facebook video' ? b.title : '');
+  status('Loading the Facebook video…', b.title && b.title !== 'Facebook video' ? b.title : '', true);
   const box = document.createElement('div');
   box.className = 'fb-box';
   const el = document.createElement('div');
@@ -611,7 +617,7 @@ async function trySignal() {
       onState: (st) => {
         if (rtc !== entry) return;
         if (st === 'failed') shareFailed(entry, 'The presenter\u2019s screen could not reach this TV.');
-        if (st === 'disconnected') status('The presenter\u2019s screen paused…', 'Waiting for it to come back.');
+        if (st === 'disconnected') status('The presenter\u2019s screen paused…', 'Waiting for it to come back.', true);
       },
     });
     if (rtc !== entry) { try { entry.pc.close(); } catch { /* closed */ } }

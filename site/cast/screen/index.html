@@ -19,8 +19,8 @@
   .layer { position: fixed; inset: 0; }
 
   /* ── waiting: the code ── */
-  .card { background: var(--cream); display: grid; grid-template-rows: auto 1fr auto; padding: 6.2vh 7vw 6.6vh; transition: opacity .5s ease; }
-  .card.is-away { opacity: 0; }
+  .card { background: var(--cream); display: grid; grid-template-rows: auto 1fr auto; padding: 6.2vh 7vw 6.6vh; transition: opacity var(--t-slow) var(--ease-in-out), transform var(--t-slow) var(--ease-in-out); }
+  .card.is-away { opacity: 0; transform: scale(.985); }
   .card .logo { width: calc(26 * var(--u)); min-width: 260px; height: auto; display: block; }
   .card .middle { align-self: center; display: grid; grid-template-columns: 1fr auto; gap: calc(5 * var(--u)); align-items: center; }
   .middle > div { min-width: 0; }
@@ -49,7 +49,7 @@
   body.configure .card { position: static; min-height: 100vh; padding: 32px 28px; }
 
   /* ── something up ── */
-  #show { background: #000; opacity: 0; transition: opacity .45s ease; }
+  #show { background: #000; opacity: 0; transition: opacity var(--t-slow) var(--ease-in-out); }
   #show.is-in { opacity: 1; }
   #show img, #show canvas, #show video { position: absolute; inset: 0; margin: auto; max-width: 100%; max-height: 100%; }
   #show img { width: 100%; height: 100%; object-fit: contain; }
@@ -66,6 +66,31 @@
   .text--page .words { border-left: 3px solid var(--tan); padding-left: calc(3 * var(--u)); }
   .status { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; text-align: center; padding: 10vw; font: 400 calc(2.4 * var(--u))/1.4 var(--heading); color: #CFC4B5; }
   .status small { display: block; margin-top: calc(1 * var(--u)); font: 400 calc(1.6 * var(--u))/1.4 var(--body); color: #8F8577; }
+
+  /* ── Motion (church.css's language; nothing moves with "reduce motion" on) ── */
+  @media (prefers-reduced-motion: no-preference) {
+    /* The code card arrives line by line. */
+    .card > .logo { animation: cast-rise var(--t-slow) var(--ease-out) both; }
+    .card .middle h1 { animation: cast-rise var(--t-slow) var(--ease-out) 90ms both; }
+    .card .middle .go { animation: cast-rise var(--t-slow) var(--ease-out) 170ms both; }
+    .card .middle .reveal { animation: cast-rise var(--t-slow) var(--ease-out) 250ms both; }
+    .card > .foot { animation: cast-fade var(--t-slow) var(--ease-out) 380ms both; }
+    /* Asked for: the digits rise one after another, the QR settles in beside them. */
+    .card:not(.code-hidden) .code > span { animation: cast-rise var(--t-slow) var(--ease-out) both; }
+    .card:not(.code-hidden) .code > span + span { animation-delay: 90ms; }
+    .card:not(.code-hidden) .qr { animation: cast-pop var(--t-slow) var(--ease-out) 160ms both; }
+    /* Whatever goes up settles in from a whisper larger as the black fades up. */
+    #show.is-in > :not(.status) { animation: cast-settle 900ms var(--ease-out) both; }
+    #show.is-in .text .heading { animation: cast-rise var(--t-slow) var(--ease-out) 120ms both; }
+    #show.is-in .text .words { animation: cast-rise var(--t-slow) var(--ease-out) 220ms both; }
+    /* A slide turning: the next page fades in over the last. */
+    #show canvas.is-next { animation: cast-fade 380ms var(--ease-in-out) both; }
+    /* Waiting (connecting, loading): a calm bar breathing under the words. */
+    .status { animation: cast-fade var(--t-base) var(--ease-out) both; }
+    .status.working::after { content: ''; display: block; width: calc(14 * var(--u)); height: 3px; margin: calc(2.4 * var(--u)) auto 0; border-radius: 3px; background: #CFC4B5; transform-origin: center; animation: cast-breathe 1.4s var(--ease-in-out) infinite alternate; }
+    @keyframes cast-breathe { from { transform: scaleX(.18); opacity: .35; } to { transform: scaleX(1); opacity: .9; } }
+  }
+  .status.working { flex-direction: column; }
 </style>
 </head>
 <body>

@@ -128,6 +128,10 @@ export function createPreview({ root, fetchPdf, go }) {
     target.width = src.width;
     target.height = src.height;
     target.getContext('2d').drawImage(src, 0, 0);
+    // The slide eases in (church.css motion; nothing under "reduce motion").
+    target.classList.remove('m-again');
+    void target.offsetWidth;
+    target.classList.add('m-again');
   }
 
   async function draw() {

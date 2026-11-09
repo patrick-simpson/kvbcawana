@@ -21,3 +21,30 @@
   --heading: 'Jost', 'Futura', 'Century Gothic', system-ui, sans-serif;
   --body: 'Almarai', system-ui, -apple-system, 'Segoe UI', sans-serif;
 }
+
+/* ── Motion (owner 2026-11-08: "Everything this does should have professional animations
+   and transitions"; picked: the Cast TV and the presenter page). ONE language for both:
+   calm, eased, never bouncy; opacity, a few pixels of travel and a whisper of scale only
+   (transform/opacity: smooth on the lobby computer and any phone). Every keyframe ends on
+   the element's own resting style, so with motion off (the OS's "reduce motion") the page
+   is simply in its finished state: all of it lives inside the one media query below. */
+:root {
+  --ease-out: cubic-bezier(.22, 1, .36, 1);      /* arrivals: fast start, soft landing */
+  --ease-in: cubic-bezier(.55, 0, 1, .45);       /* departures */
+  --ease-in-out: cubic-bezier(.65, 0, .35, 1);   /* moves and cross-fades */
+  --t-quick: 160ms;
+  --t-base: 320ms;
+  --t-slow: 620ms;
+}
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes cast-rise { from { opacity: 0; transform: translateY(14px); } }
+  @keyframes cast-fade { from { opacity: 0; } }
+  @keyframes cast-settle { from { opacity: 0; transform: scale(1.015); } }
+  @keyframes cast-pop { from { opacity: 0; transform: scale(.96); } }
+  @keyframes cast-drop { from { opacity: 0; transform: translateY(-8px); } }
+  @keyframes cast-sweep { from { transform: translateX(-100%); } to { transform: translateX(250%); } }
+  .m-rise { animation: cast-rise var(--t-slow) var(--ease-out) both; animation-delay: calc(var(--i, 0) * 70ms); }
+  .m-fade { animation: cast-fade var(--t-base) var(--ease-out) both; }
+  .m-pop { animation: cast-pop var(--t-base) var(--ease-out) both; animation-delay: calc(var(--i, 0) * 40ms); }
+  .m-drop { animation: cast-drop var(--t-base) var(--ease-out) both; }
+}

@@ -43,7 +43,14 @@ const SYNC_INDEX = new URL('/lobby/shared/sync.json', location.href).href;
 const TUNING = Object.assign({ pollMs: 2000, idleMs: 30 * 60 * 1000, timeoutMs: 12000, failuresBeforeWarning: 2 }, window.castTuning || {});
 
 const $ = (id) => /** @type {any} */ (document.getElementById(id));
-const setText = (el, text) => { if (el.textContent !== text) el.textContent = text; };
+/** Play an element's ease-in again (church.css motion; nothing under "reduce motion"). */
+const replay = (el, cls = 'm-again') => { if (!el) return; el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls); };
+const setText = (el, text) => {
+  if (el.textContent === text) return;
+  el.textContent = text;
+  // A note or the TV line that changed eases in (never an emptied one).
+  if (text && (el.classList.contains('note') || el.id === 'tv-main' || el.id === 'share-state')) replay(el);
+};
 // The token lives in THIS tab only (sessionStorage), never localStorage: a guest's
 // laptop keeps nothing once the tab is closed.
 const tokenStore = {
@@ -94,9 +101,11 @@ function request(path, opts = {}) {
 
 function showJoin(note, bad) {
   clearTimeout(pollTimer);
+  const was = $('join').hidden;
   $('present').hidden = true;
   $('leave').hidden = true;
   $('join').hidden = false;
+  if (was) replay($('join'), 'm-enter');
   setText($('join-note'), note || '');
   $('join-note').classList.toggle('bad', Boolean(bad));
 }
@@ -104,6 +113,7 @@ function showJoin(note, bad) {
 function showPresent() {
   $('join').hidden = true;
   $('present').hidden = false;
+  replay($('present'), 'm-enter');
   $('leave').hidden = false;
   touch();
   poll();
@@ -229,8 +239,18 @@ function onChoice(e) {
   for (const b of document.querySelectorAll('.choice')) {
     const mine = b === btn && open;
     b.setAttribute('aria-expanded', String(mine));
-    $(b.getAttribute('aria-controls')).hidden = !mine;
+    const panel = $(b.getAttribute('aria-controls'));
+    if (mine) { panel.classList.remove('is-closing'); panel.hidden = false; }
+    else if (!panel.hidden) closePanel(panel);
   }
+}
+
+/** A choice closing: its fade-up plays, then it hides (at once with motion off). */
+function closePanel(panel) {
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (reduce) { panel.hidden = true; return; }
+  panel.classList.add('is-closing');
+  setTimeout(() => { if (panel.classList.contains('is-closing')) { panel.hidden = true; panel.classList.remove('is-closing'); } }, 170);
 }
 
 function sendVideo(e) {
@@ -257,9 +277,10 @@ async function searchYouTube(e) {
   const results = Array.isArray(r.body.results) ? r.body.results : [];
   list.textContent = '';
   setText(note, results.length ? 'Tap one to play it on the TV.' : 'Nothing found. Try other words.');
-  for (const v of results) {
+  for (const [i, v] of results.entries()) {
     if (!R.youtubeIdFrom(v.youtube)) continue;
     const li = document.createElement('li');
+    li.style.setProperty('--i', String(i));
     const b = document.createElement('button');
     b.type = 'button';
     b.className = 'result';
@@ -377,6 +398,7 @@ function thumb(pic) {
   const b = document.createElement('button');
   b.type = 'button';
   b.className = 'thumb';
+  b.style.setProperty('--i', String(pictures.length % 8));
   b.dataset.file = pic.file.id;
   b.setAttribute('aria-pressed', 'false');
   b.setAttribute('aria-label', `Show ${pic.title || 'this picture'} on the TV`);
