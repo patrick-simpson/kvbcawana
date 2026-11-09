@@ -33,6 +33,7 @@ import { fileURLToPath } from 'node:url';
 import { downloadRedirects } from './lib/downloads.js';
 import { REPO_FOLDERS, RELEASE_FILES, mustStream, releaseBase, releaseFiles, repoPathFor } from './lib/largeFiles.js';
 import { pageRedirects } from './lib/redirects.js';
+import { SITE_HEADERS } from './lib/securityHeaders.js';
 import { buildCheckinPages, CHECKIN_MODULES } from './checkin/checkin-page.mjs';
 
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
@@ -268,6 +269,14 @@ writeFileSync(path.join(OUT, 'robots.txt'), 'User-agent: *\nDisallow: /\n');
 writeFileSync(path.join(OUT, '_headers'), [
   '/*',
   '  X-Robots-Tag: noindex, nofollow',
+  // Security (2026-11-09): browsers never guess a file's type (a picture can never
+  // run as a script); other sites see only our origin, never a page's address
+  // (a code or #fragment never leaves); and no other site may frame any page
+  // (Journey, the classroom and the home page's showcase twins frame only this
+  // site's own pages). Pages joins a header named twice with a comma, so a path
+  // below that adds its own Content-Security-Policy gets both policies, and a
+  // browser enforces each (site/lib/securityHeaders.js).
+  ...SITE_HEADERS,
   // Vite names every built asset by its content hash (main-DVTDSuLn.js), so a
   // changed file is a new URL and the old one can be kept for good. Pages'
   // default for them was max-age=0: every TV revalidated every script and
