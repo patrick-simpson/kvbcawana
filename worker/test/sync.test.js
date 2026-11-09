@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
   GLOBAL_MAX_FAILS,
+  GUESSES_IN_FLIGHT_MAX,
   IP_LOCK_MS,
   IP_MAX_FAILS,
   SyncCore,
@@ -123,6 +124,27 @@ describe('login with the passphrase', () => {
     const s = setup();
     for (let i = 0; i < GLOBAL_MAX_FAILS; i++) await s.login('guess', `10.1.${i}.1`);
     expect((await s.login('kennebec', '10.9.9.9')).res.status).toBe(429);
+  });
+
+  it('many wrong logins fired at once from one address get no more tries than one at a time', async () => {
+    const s = setup();
+    expect((await s.login('kennebec')).res.status).toBe(200);
+    const wrongKey = () => Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString('base64');
+    const fire = (ip) => s.core.handle(new Request('https://sync.test/v1/login', { method: 'POST', body: JSON.stringify({ authKey: wrongKey() }) }), ip);
+    const answers = await Promise.all(Array.from({ length: 40 }, () => fire('10.0.0.7')));
+    const counts = answers.reduce((m, r) => ({ ...m, [r.status]: (m[r.status] || 0) + 1 }), {});
+    expect(counts[401]).toBeLessThanOrEqual(IP_MAX_FAILS);
+    expect(counts[401] + counts[429]).toBe(40);
+    expect((await s.storage.get('fails:10.0.0.7')).count).toBeLessThanOrEqual(IP_MAX_FAILS);
+    // A second burst after them: the address is locked, nothing more is checked.
+    const again = await Promise.all(Array.from({ length: 10 }, () => fire('10.0.0.7')));
+    expect(again.every((r) => r.status === 429)).toBe(true);
+    // Everyone together: at most GUESSES_IN_FLIGHT_MAX are checked at once.
+    const wide = await Promise.all(Array.from({ length: 60 }, (_, i) => fire(`10.3.${i}.1`)));
+    expect(wide.filter((r) => r.status === 401).length).toBeLessThanOrEqual(GUESSES_IN_FLIGHT_MAX);
+    // Nothing is left held: a right word from a fresh address still signs in.
+    expect(s.core.guessingAll).toBe(0);
+    expect((await s.login('kennebec', '10.0.0.8')).res.status).toBe(200);
   });
 
   it('a right word clears that address\'s count', async () => {

@@ -89,6 +89,14 @@ export const IP_LOCK_MS = 15 * 60 * 1000;
 export const GLOBAL_MAX_FAILS = 30;
 export const GLOBAL_WINDOW_MS = 60 * 60 * 1000;
 export const GLOBAL_LOCK_MS = 60 * 60 * 1000;
+/**
+ * Guesses being checked at once (memory only). A guess is counted the moment it
+ * arrives, before any await (the body, the verifier's hash), so many wrong logins
+ * fired in parallel cannot all pass the lock check before the first one is
+ * recorded: one address may have at most its tries left in flight, everyone
+ * together GUESSES_IN_FLIGHT_MAX.
+ */
+export const GUESSES_IN_FLIGHT_MAX = 20;
 /** Same cap the print server keeps: every settings frame seals into 4096. */
 export const SETTINGS_JSON_MAX = 3800;
 /** The slide chunker's budget and count (print-server/events.js). */
@@ -162,6 +170,9 @@ export class SyncCore {
    */
   constructor({ storage, env, fetchFn, now, broadcast, closeAll, alarms, liveScreens, sleep, ringStations }) {
     this.storage = storage;
+    /** Guesses (logins, passphrase changes) being checked right now, per address and all together. @type {Map<string, number>} */
+    this.guessing = new Map();
+    this.guessingAll = 0;
     // The runtime switches (switches.js, routes.md 10.2): every module gets the
     // EFFECTIVE env (wrangler.toml's values are the defaults, a stored switch
     // overrides one), so their existing env reads need no edit.
@@ -521,13 +532,19 @@ export class SyncCore {
     return safeEqual(expect, session.sig);
   }
 
-  /** @param {string} ip @returns {Promise<number>} ms until this address may try again, 0 if now */
-  async lockedFor(ip) {
+  /**
+   * @param {string} ip @param {number} [pending] guesses from this address in flight, this one included
+   * @returns {Promise<number>} ms until this address may try again, 0 if now
+   */
+  async lockedFor(ip, pending = 0) {
     const t = this.now();
     const all = await this.storage.get('fails:all');
     if (all && all.until > t) return all.until - t;
     const mine = await this.storage.get(`fails:${ip}`);
     if (mine && mine.until > t) return mine.until - t;
+    // The tries recorded plus those still being checked must stay within the limit.
+    const fresh = !mine || (mine.until && mine.until <= t) || t - mine.first > IP_LOCK_MS;
+    if ((fresh ? 0 : mine.count) + pending > IP_MAX_FAILS) return 1000;
     return 0;
   }
 
@@ -568,11 +585,36 @@ export class SyncCore {
     return dropped;
   }
 
-  /** @param {string} ip */
-  async lockout(ip) {
-    const ms = await this.lockedFor(ip);
+  /** @param {string} ip @param {number} [pending] */
+  async lockout(ip, pending = 0) {
+    const ms = await this.lockedFor(ip, pending);
     if (!ms) return null;
     return fail('Too many wrong tries. Wait a little, then try again.', 429, { retryAfterSec: Math.ceil(ms / 1000) });
+  }
+
+  /**
+   * Runs one guess (a login, a passphrase change) holding a slot taken SYNCHRONOUSLY
+   * before anything is awaited, then checks the lock counting every guess still in
+   * flight; the slot is let go when the guess is answered (its failure, if any, is
+   * recorded by then).
+   * @param {string} ip @param {() => Promise<Response>} fn
+   */
+  async guess(ip, fn) {
+    const mine = this.guessing.get(ip) || 0;
+    if (mine >= IP_MAX_FAILS || this.guessingAll >= GUESSES_IN_FLIGHT_MAX) {
+      return fail('Too many tries at once. Wait a little, then try again.', 429, { retryAfterSec: 1 });
+    }
+    this.guessing.set(ip, mine + 1);
+    this.guessingAll += 1;
+    try {
+      const locked = await this.lockout(ip, this.guessing.get(ip) || 1);
+      if (locked) return locked;
+      return await fn();
+    } finally {
+      const n = (this.guessing.get(ip) || 1) - 1;
+      if (n > 0) this.guessing.set(ip, n); else this.guessing.delete(ip);
+      this.guessingAll = Math.max(0, this.guessingAll - 1);
+    }
   }
 
   // ── the state screens fetch ────────────────────────────────────────────────
@@ -853,8 +895,11 @@ export class SyncCore {
    * @param {Request} request @param {string} ip
    */
   async login(request, ip) {
-    const locked = await this.lockout(ip);
-    if (locked) return locked;
+    return this.guess(ip, () => this.loginChecked(request, ip));
+  }
+
+  /** The login, inside its guess slot. @param {Request} request @param {string} ip */
+  async loginChecked(request, ip) {
     const body = await this.body(request);
     const auth = await this.ensureAuth();
     if (!auth) return fail('The sync service has no passphrase yet. Finish its setup first.', 503);
@@ -1040,8 +1085,11 @@ export class SyncCore {
    * @param {Request} request @param {string} ip
    */
   async changePassphrase(request, ip) {
-    const locked = await this.lockout(ip);
-    if (locked) return locked;
+    return this.guess(ip, () => this.changePassphraseChecked(request, ip));
+  }
+
+  /** The change, inside its guess slot. @param {Request} request @param {string} ip */
+  async changePassphraseChecked(request, ip) {
     const body = await this.body(request);
     if (!body.next || typeof body.next !== 'object') {
       return fail('This service now needs the updated app or page. Reload it.', 400, { reason: 'legacy-off' });

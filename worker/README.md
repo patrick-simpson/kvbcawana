@@ -94,7 +94,9 @@ Because the word is short, it is only ever checked by this service, never
 anywhere a stranger could copy it and guess offline:
 
 - 5 wrong tries from one address lock that address out for 15 minutes;
-- 30 wrong tries in an hour, from anywhere, pause new sign-ins for an hour.
+- 30 wrong tries in an hour, from anywhere, pause new sign-ins for an hour;
+- a try is counted the moment it arrives, so many sent at once from one address
+  get no more tries than one at a time (and at most 20 are checked at once).
 
 A screen already signed in is never affected; a lock only delays setting up a
 new one.
