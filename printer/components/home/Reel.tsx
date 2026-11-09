@@ -26,7 +26,7 @@ type Mode = 'waiting' | 'playing' | 'paused' | 'ended' | 'missing';
 const reducedMotion = () => typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 /** The stand-in: the catalog's cover, drawn in the kit (the six club waves, the church's logo in white). */
-const StandIn: React.FC<{ missing: boolean }> = ({ missing }) => (
+const StandIn: React.FC<{ missing: boolean; onRetry: () => void }> = ({ missing, onRetry }) => (
   <div className={`kv-standin${missing ? ' is-missing' : ''}`} aria-hidden={!missing}>
     <div className="kv-standin__waves" aria-hidden="true">
       {(['journey', 'trek', 'tnt', 'sparks', 'cubbies', 'puggles'] as const).map((c, i) => (
@@ -40,8 +40,9 @@ const StandIn: React.FC<{ missing: boolean }> = ({ missing }) => (
     {missing && (
       <div className="kv-standin__copy">
         <p className="kv-standin__kicker">Demo reel</p>
-        <p className="kv-standin__title">Coming soon</p>
+        <p className="kv-standin__title">The film couldn't load.</p>
         <p className="kv-standin__line">A short film of one club night: the check-in table, the lobby, the projector and the lesson kiosk.</p>
+        <button type="button" className="kv-btn kv-btn--hot kv-standin__retry" onClick={onRetry}>Try again</button>
       </div>
     )}
   </div>
@@ -51,6 +52,9 @@ export const Reel: React.FC = () => {
   const video = useRef<HTMLVideoElement>(null);
   const [film, setFilm] = useState<string | null>(null);
   const [mode, setMode] = useState<Mode>('waiting');
+  // Bumped by "Try again": the video element is remounted (new key) and the
+  // mount effect below plays it muted again, as on the first load.
+  const [attempt, setAttempt] = useState(0);
   const [muted, setMuted] = useState(true);
   // The controls step away after a few seconds of stillness while it plays, and
   // come back on any movement, touch or keyboard focus (owner, 2026-10-16).
@@ -73,7 +77,12 @@ export const Reel: React.FC = () => {
     v.muted = true;
     if (reducedMotion()) return; // the poster and the play button wait for the reader
     v.play()?.catch(() => { /* autoplay refused: the play button is there */ });
-  }, [film]);
+  }, [film, attempt]);
+
+  const retry = () => {
+    setMode('waiting');
+    setAttempt((n) => n + 1);
+  };
 
   const play = (sound: boolean) => {
     const v = video.current;
@@ -108,9 +117,10 @@ export const Reel: React.FC = () => {
   return (
     <div className={`kv-reel is-${mode}${idle && mode === 'playing' ? ' is-idle' : ''}`}
       onPointerMove={wake} onPointerDown={wake} onFocus={wake}>
-      <StandIn missing={missing} />
+      <StandIn missing={missing} onRetry={retry} />
       {film && !missing && (
         <video
+          key={attempt}
           ref={video}
           className="kv-reel__video"
           src={film}
