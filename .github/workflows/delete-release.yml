@@ -9,10 +9,12 @@ name: Delete release
 #
 # This deletes the release and tag ONLY. Installed apps read their update
 # feed, not GitHub's "Latest" release (printer: site/updates/printer/latest.yml,
-# desktop / sound room: site/updates/lobby/lobby.yml), so if the bad release
-# was the one that feed points at, also revert that file on main (git revert
-# the feed commit) and let ci.yml redeploy; otherwise the feed keeps naming
-# deleted assets.
+# desktop / sound room: site/updates/lobby/lobby.yml). It REFUSES a release a
+# feed on main still serves (named in its urls or its version): deleting that
+# would leave every church PC offered a missing installer, and a leaked
+# dispatch token must not be able to do it. To remove a bad release the feed
+# points at, first revert the feed commit on main (git revert) and let ci.yml
+# redeploy, then run this. It runs only from main (its guard lives there).
 on:
   workflow_dispatch:
     inputs:
@@ -32,22 +34,41 @@ permissions:
 
 jobs:
   delete:
+    # Dispatched from another branch, an older copy of this file (without the
+    # guard below) would run: only main's copy may delete.
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: main
 
       # The update feeds are ours (site/updates/**), not GitHub's "Latest": a
-      # feed still naming this tag's assets would keep offering a deleted
-      # installer. Say so loudly; the person decides whether to revert the feed.
-      - name: Does a feed still point at this tag?
+      # feed on main still naming this tag would keep offering a deleted
+      # installer to every installed app. Read main itself (not whatever was
+      # checked out) and refuse.
+      - name: Refuse a release a feed on main still serves
         env:
           TAG: ${{ inputs.tag }}
         run: |
-          if grep -rIl -- "/$TAG/" site/updates >/dev/null 2>&1; then
-            echo "::warning::A feed under site/updates still names $TAG. Revert that feed commit on main, or installed apps keep being offered deleted assets."
-            echo "WARNING: a feed under site/updates still points at $TAG; revert it on main." >> "$GITHUB_STEP_SUMMARY"
-          fi
+          set -euo pipefail
+          git fetch -q origin main
+          for feed in site/updates/printer/latest.yml:printer-v site/updates/lobby/lobby.yml:desktop-v; do
+            file="${feed%%:*}"; prefix="${feed##*:}"
+            body="$(git show "origin/main:$file" 2>/dev/null || true)"
+            [ -n "$body" ] || continue
+            current="$(printf '%s\n' "$body" | sed -nE 's/^version:[[:space:]]*["\x27]?([0-9][0-9.]*).*/\1/p' | head -1)"
+            if [ -n "$current" ] && [ "$TAG" = "${prefix}${current}" ]; then
+              echo "::error::$TAG is the CURRENT release in $file on main. Revert that feed on main first, then delete it."
+              exit 1
+            fi
+            if printf '%s\n' "$body" | grep -qF -- "/$TAG/"; then
+              echo "::error::$file on main still points at $TAG. Revert that feed on main first, then delete it."
+              exit 1
+            fi
+          done
+          echo "No feed on main serves $TAG."
 
       - name: Delete release and tag
         env:

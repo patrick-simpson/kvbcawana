@@ -1,8 +1,10 @@
 # Deletes the named remote branches (by hand). For stale session branches a
 # Claude session cannot delete itself (its git access covers its own branch
-# only). Refuses main and any branch with commits main does not contain,
-# unless `force` is set; the deleted tips are printed so a branch can be
-# recreated from its SHA.
+# only). Refuses main (and the repo's default branch) ALWAYS, `force` or not,
+# however it is spelled (refs/heads/main, heads/main), and any branch with
+# commits main does not contain unless `force` is set; the deleted tips are
+# printed so a branch can be recreated from its SHA. It deletes only plain
+# branch names (refs/heads/<name>), never a tag, and runs only from main.
 name: Delete branches
 
 on:
@@ -21,24 +23,33 @@ permissions:
 
 jobs:
   delete:
+    # Dispatched from another branch, an older copy of this file would run:
+    # only main's copy (with the guards below) may delete.
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: main
           fetch-depth: 0
       - name: Delete
         env:
           BRANCHES: ${{ inputs.branches }}
           FORCE: ${{ inputs.force }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
         run: |
           set -u
           for b in $BRANCHES; do
-            if [ "$b" = main ]; then echo "::error::refusing to delete main"; exit 1; fi
-            if ! git rev-parse -q --verify "origin/$b" >/dev/null; then echo "$b: not found"; continue; fi
-            tip=$(git rev-parse "origin/$b")
+            b="${b#refs/heads/}"; b="${b#heads/}"; b="${b#origin/}"
+            case "$b" in
+              ''|-*|*:*|refs/*) echo "::error::'$b' is not a plain branch name"; exit 1 ;;
+            esac
+            if [ "$b" = main ] || [ "$b" = "$DEFAULT_BRANCH" ]; then echo "::error::refusing to delete $b (force does not change this)"; exit 1; fi
+            if ! git rev-parse -q --verify "refs/remotes/origin/$b" >/dev/null; then echo "$b: not found"; continue; fi
+            tip=$(git rev-parse "refs/remotes/origin/$b")
             if [ "$FORCE" != true ] && ! git merge-base --is-ancestor "$tip" origin/main; then
               echo "::warning::$b ($tip) has commits main does not contain; skipped (set force)"; continue
             fi
-            git push origin --delete "$b"
+            git push origin --delete "refs/heads/$b"
             echo "deleted $b (was $tip)" | tee -a "$GITHUB_STEP_SUMMARY"
           done
