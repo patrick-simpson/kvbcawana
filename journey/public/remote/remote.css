@@ -8,6 +8,7 @@
   --r-ink: var(--brand-journey-ink, #403A77);
   --r-tint: var(--brand-journey-tint, #DED5EA);
   --r-hot: var(--brand-hot, #F15A28);
+  --r-hot-btn: #CF4518;       /* white text on the kit hot is 3.4:1; on this fill 4.65:1 (AA) */
   --r-hot-deep: var(--brand-hot-deep, #9E3512);
   --r-text: var(--brand-ink, #231F20);
   --r-paper: #F6F4EF;
@@ -89,7 +90,8 @@ body {
 .note { min-height: 1.4em; margin: 10px 0 0; font-weight: 600; color: var(--r-hot-deep); }
 
 /* Sign in */
-.signin { max-width: 520px; margin: 24px auto; }
+.signin { max-width: 26rem; margin: 24px auto; }
+.signin .note { margin: 0; }
 .signin form { display: grid; gap: 10px; margin-top: 12px; }
 .signin input {
   font: 600 1.125rem/1.2 var(--r-body);
@@ -161,7 +163,7 @@ body {
 .btn:active, .btn.is-pressed { transform: translateY(5px); box-shadow: 0 0 0 var(--r-ink); }
 .btn:focus-visible { outline: 4px solid var(--r-hot); outline-offset: 3px; }
 .btn:disabled { opacity: 0.45; cursor: default; }
-.btn-hot { background: var(--r-hot); color: #fff; border-color: var(--r-hot-deep); box-shadow: 0 5px 0 var(--r-hot-deep); }
+.btn-hot { background: var(--r-hot-btn); color: #fff; border-color: var(--r-hot-deep); box-shadow: 0 5px 0 var(--r-hot-deep); }
 .btn-hot:active, .btn-hot.is-pressed { box-shadow: 0 0 0 var(--r-hot-deep); }
 
 /* The two that matter most: Back and Next, thumb-sized */
