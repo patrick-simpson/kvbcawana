@@ -22,6 +22,9 @@ function scrubLine(line) {
     // (a name with a space runs to the next slash; one with no slash after it, to the next space)
     .replace(/([A-Za-z]:(?:\\\\|\\|\/)Users(?:\\\\|\\|\/))(?:[^\\/"'\n]+?(?=[\\/])|[^\\/"'\s]+)/gi, '$1…')
     .replace(/((?:session|passphrase|authKey|token)=)[^&\s"']+/gi, '$1…')
+    // The JSON spelling, "session":"..." (also 'session': '...', escaped quotes, and
+    // keys like syncSession, displayKey, publishToken, sessionToken).
+    .replace(/(\\?["']?[A-Za-z]*(?:session|passphrase|authKey|token|displayKey|secret|password)[A-Za-z]*\\?["']?\s*:\s*\\?["'])((?:\\[^"']|[^"'\\])*)/gi, '$1…')
     .replace(/(Bearer\s+)[A-Za-z0-9._~+/=-]+/g, '$1…');
 }
 

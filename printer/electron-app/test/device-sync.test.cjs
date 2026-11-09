@@ -418,6 +418,18 @@ describe('log-tail.js', () => {
     assert.equal(scrubLine('wss://a/v1/live?session=v1.abc&station=9'), 'wss://a/v1/live?session=…&station=9');
     assert.equal(scrubLine('Authorization: Bearer v1.abc.def'), 'Authorization: Bearer …');
   });
+  it('scrubs the JSON spelling of sessions, tokens and passphrases (10.14.0)', () => {
+    assert.equal(scrubLine('{"session":"v1.abc.def","ok":true}'), '{"session":"…","ok":true}');
+    assert.equal(scrubLine('{"token": "tok-123", "n": 1}'), '{"token": "…", "n": 1}');
+    assert.equal(scrubLine('{"passphrase":"kennebec river"}'), '{"passphrase":"…"}');
+    assert.equal(scrubLine('{"syncSession":"s.1","displayKey":"k/2+=="}'), '{"syncSession":"…","displayKey":"…"}');
+    assert.equal(scrubLine('{"authKey":"a\\\\b","x":2}'), '{"authKey":"…","x":2}');
+    assert.equal(scrubLine("{'session': 'v1.zz'}"), "{'session': '…'}");
+    assert.equal(scrubLine('body={\\"token\\":\\"t-9\\"}'), 'body={\\"token\\":\\"…\\"}');
+    // Ordinary log lines are untouched.
+    assert.equal(scrubLine('{"screen":"classroom","windows":3}'), '{"screen":"classroom","windows":3}');
+    assert.equal(scrubLine('pen lifted: SMART Ink windows 2 -> 3'), 'pen lifted: SMART Ink windows 2 -> 3');
+  });
   it('main.js hands device-sync the display log under userData', () => {
     const main = fs.readFileSync(path.join(__dirname, '..', 'main.js'), 'utf8');
     assert.match(main, /logTail: \(\) => readLogTail\(path\.join\(userData, 'display', 'display\.log'\)\),/);
