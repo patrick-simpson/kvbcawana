@@ -89,7 +89,7 @@ async function drawQr(code) {
   if (!code) { box.hidden = true; return; }
   try {
     // Black on white in both themes (a phone camera reads that best; the card frames it).
-    await drawQrCode($('desk-qr'), `${presenterUrl(location.href)}#code=${code}`, { dark: '#000000', light: '#FFFFFF', size: 320 });
+    await drawQrCode($('desk-qr'), `${presenterUrl(location.href)}#code=${code}`, { dark: '#000000', light: '#FFFFFF', size: 200 });
     if (shownCode !== code) return;
     box.hidden = false;
   } catch {

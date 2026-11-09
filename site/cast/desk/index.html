@@ -76,11 +76,13 @@
   .looks label { display: inline-flex; gap: 6px; align-items: center; margin: 0; }
   .card { background: var(--card); border: 1px solid var(--stroke); border-radius: 8px; box-shadow: var(--shadow); padding: 16px; }
 
-  /* The window: title strip, then navigation | what to show | the code and the TV. */
+  /* The window: title strip, then navigation | the code and what to show | the TV.
+     The code is the hero and never scrolls away; the working column is capped so inputs
+     stay a sane length; the right column is "On the TV now", always in view. */
   #desk { display: grid; grid-template-rows: auto 1fr; height: 100%; }
   .top { display: flex; align-items: center; gap: 12px; padding: 12px 20px; }
   .top p { color: var(--text-2); }
-  .cols { display: grid; grid-template-columns: 200px minmax(0, 1fr) minmax(320px, 400px); gap: 16px; padding: 0 20px 20px; min-height: 0; }
+  .cols { display: grid; grid-template-columns: 208px minmax(0, 720px) minmax(320px, 560px); justify-content: start; gap: 16px; padding: 0 20px 20px; min-height: 0; }
   .choices { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
   .choice { width: 100%; justify-content: flex-start; gap: 12px; border: 0; background: transparent; min-height: 36px; padding: 8px 12px; position: relative; text-align: left; }
   .choice:hover { background: var(--subtle); }
@@ -89,30 +91,35 @@
   .choice b { font-weight: 400; }
   .choice[aria-current="page"] b { font-weight: 600; }
   .choice span { display: none; }
-  .main { overflow: auto; min-height: 0; }
+  .center { display: flex; flex-direction: column; gap: 16px; min-height: 0; }
+  .main { flex: 1; overflow: auto; min-height: 0; }
   .panel h2 { margin-bottom: 4px; font-size: 20px; line-height: 28px; }
   .panel > .help:first-of-type { margin-top: 0; }
-  .side { display: flex; flex-direction: column; gap: 16px; overflow: auto; min-height: 0; }
+  .side { overflow: auto; min-height: 0; }
 
-  /* The code: always shown here. */
-  .code-card { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px 16px; align-items: start; }
-  .code-words { display: grid; gap: 4px; }
-  .code-card .label { color: var(--text-2); }
-  #desk-code { font: 600 40px/48px var(--font-display); letter-spacing: .06em; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  /* The code: the hero, always shown here. */
+  .hero { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 24px; align-items: center; padding: 20px 24px; }
+  .hero-words { display: grid; gap: 4px; align-content: center; min-width: 0; }
+  .hero .label { color: var(--text-2); }
+  #desk-code { font: 600 clamp(52px, 3.55vw, 80px)/1.1 var(--font-display); letter-spacing: .08em; word-spacing: .22em; font-variant-numeric: tabular-nums; white-space: nowrap; margin: 4px 0; }
+  .hero-help { color: var(--text-2); }
+  #desk-qr-box { margin: 0; display: grid; justify-items: center; gap: 8px; }
+  #desk-qr { display: block; image-rendering: pixelated; border: 1px solid var(--stroke-strong); border-radius: 4px; }
   #desk-addr { font-weight: 600; }
-  #desk-qr-box { margin: 0; }
-  #desk-qr { display: block; width: 136px; height: 136px; image-rendering: pixelated; border-radius: 4px; }
-  #desk-presenter { color: var(--text-2); }
+  #desk-presenter { display: flex; align-items: center; gap: 8px; margin-top: 8px; color: var(--text-2); }
+  #desk-presenter::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--text-2); flex: none; }
   #desk-presenter[data-on="true"] { color: var(--ok); }
-  .code-actions { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 8px; }
+  #desk-presenter[data-on="true"]::before { background: var(--ok); }
 
   /* On the TV now. */
-  #tv .label, .code-card .label { margin-bottom: 4px; }
-  .tv-main { display: flex; gap: 8px; align-items: center; font-weight: 600; }
+  .tv-main { display: flex; gap: 8px; align-items: center; font-weight: 600; margin-top: 4px; }
   .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-2); flex: none; }
   #tv[data-online="true"] .dot { background: var(--ok); }
   .tv-sub { color: var(--text-2); margin-top: 2px; }
+  .tv-sub:empty { display: none; }
   .controls { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  .room { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--stroke); }
+  .room .controls { margin-top: 0; }
   #press-note { margin-top: 12px; }
 
   /* Search results, pictures, ready files. */
@@ -129,7 +136,7 @@
   .ready { margin-top: 12px; padding: 8px 12px; border: 1px solid var(--stroke); border-radius: 4px; display: flex; gap: 12px; align-items: center; justify-content: space-between; }
 
   /* The slides on the TV (preview.js): this one, the next, every slide. */
-  .slides { margin-top: 12px; }
+  .slides { margin-top: 12px; max-width: 440px; }
   .slide-now { position: relative; aspect-ratio: 16 / 9; background: #000; border-radius: 4px; overflow: hidden; }
   .slide-now canvas, .slide-next canvas { display: block; width: 100%; height: 100%; object-fit: contain; }
   .slides[data-preview="none"] .slide-now, .slides[data-preview="none"] .slide-next, .slides[data-preview="none"] .strip { display: none; }
@@ -154,12 +161,20 @@
   #desk-off h1 { margin-bottom: 8px; }
   #desk-off p + p { margin-top: 12px; }
 
-  /* Smaller windows: the code and the TV go above. */
+  /* A big monitor: scale the whole window up the way Windows' display scaling would, so
+     the three columns keep their proportions instead of floating in empty space. */
+  @media (min-width: 2200px) { html { zoom: 1.25; } }
+
+  /* Smaller windows: the window scrolls as one page, the code first. */
   @media (max-width: 1100px) {
-    .cols { grid-template-columns: 180px minmax(0, 1fr); }
-    .side { grid-column: 1 / -1; grid-row: 1; flex-direction: row; overflow: visible; }
-    .side > .card { flex: 1; }
+    html, body { height: auto; }
+    #desk { height: auto; min-height: 100%; }
+    .cols { grid-template-columns: minmax(0, 1fr); }
+    .choices { flex-direction: row; flex-wrap: wrap; }
+    .choice { width: auto; }
+    .main, .side { overflow: visible; }
   }
+  @media (max-width: 640px) { .hero { grid-template-columns: minmax(0, 1fr); } }
 
   /* High contrast (forced colors): Windows' own colours, every control outlined. */
   @media (forced-colors: active) {
@@ -197,101 +212,102 @@
       </ul>
     </nav>
 
-    <main class="main">
-      <section class="panel card" id="p-video">
-        <h2>YouTube</h2>
-        <form id="yt-search-form" role="search">
-          <label for="yt-q">Search YouTube</label>
-          <div class="row">
-            <input type="search" id="yt-q" maxlength="100" autocomplete="off" placeholder="A song, a video, a channel">
-            <button class="primary" type="submit">Search</button>
-          </div>
-        </form>
-        <p class="note" id="yt-note" role="status"></p>
-        <ul class="results" id="yt-results" aria-label="Search results"></ul>
-        <div class="or">Or paste a link</div>
-        <form id="video-form">
-          <label for="video-link">YouTube link</label>
-          <input type="url" id="video-link" placeholder="https://youtu.be/…" autocomplete="off">
-          <label for="video-title">Title <span class="opt">(optional)</span></label>
-          <input type="text" id="video-title" maxlength="60">
-          <p class="controls"><button class="primary" type="submit">Play on the TV</button></p>
-          <p class="help">A link with a start time (…?t=90) starts there.</p>
-        </form>
-      </section>
-
-      <section class="panel card" id="p-fb" hidden>
-        <h2>Facebook video</h2>
-        <form id="fb-form">
-          <label for="fb-link">Facebook video link</label>
-          <input type="url" id="fb-link" placeholder="https://www.facebook.com/…/videos/…" autocomplete="off">
-          <label for="fb-title">Title <span class="opt">(optional)</span></label>
-          <input type="text" id="fb-title" maxlength="60">
-          <p class="controls"><button class="primary" type="submit">Play on the TV</button></p>
-          <p class="help">On the video, choose Share, then Copy link. Only public videos play.</p>
-        </form>
-      </section>
-
-      <section class="panel card" id="p-pdf" hidden>
-        <h2>Slides</h2>
-        <p class="controls"><label class="file-pick primary">Choose a PowerPoint or PDF…<input type="file" id="pdf-input"></label></p>
-        <label for="pdf-link">Or a Google Slides link</label>
-        <div class="row">
-          <input type="url" id="pdf-link" placeholder="https://docs.google.com/presentation/…" autocomplete="off">
-          <button class="quiet" type="button" id="pdf-copy">Get it</button>
-        </div>
-        <p class="note" id="pdf-note" role="status"></p>
-        <div class="ready" id="pdf-ready" hidden><span id="pdf-ready-words"></span><button class="primary" type="button" id="pdf-show">Show</button></div>
-        <p class="help">A PowerPoint takes about a minute to turn into slides; a PDF goes up at once. Google Slides must be shared as “Anyone with the link”. Step through the slides under On the TV.</p>
-      </section>
-
-      <section class="panel card" id="p-pics" hidden>
-        <h2>Pictures</h2>
-        <p class="controls"><label class="file-pick primary">Choose pictures…<input type="file" id="pic-input" accept="image/jpeg,image/png,image/gif,image/webp" multiple></label></p>
-        <p class="note" id="pic-note" role="status"></p>
-        <div class="thumbs" id="thumbs"></div>
-      </section>
-
-      <section class="panel card" id="p-clip" hidden>
-        <h2>Video file</h2>
-        <p class="controls"><label class="file-pick primary">Choose a video…<input type="file" id="clip-input" accept="video/mp4,video/quicktime,video/webm,.mp4,.mov,.m4v,.webm"></label></p>
-        <p class="note" id="clip-note" role="status"></p>
-        <div class="ready" id="clip-ready" hidden><span id="clip-ready-words"></span><button class="primary" type="button" id="clip-show">Play</button></div>
-        <p class="help">MP4, MOV or WebM, up to 200 MB.</p>
-      </section>
-
-      <section class="panel card" id="p-text" hidden>
-        <h2>Text</h2>
-        <form id="text-form">
-          <label for="text-heading">Heading <span class="opt">(optional)</span></label>
-          <input type="text" id="text-heading" maxlength="60">
-          <label for="text-body">Text <span class="opt">(up to 8 lines)</span></label>
-          <textarea id="text-body" maxlength="400"></textarea>
-          <label>Look</label>
-          <div class="looks">
-            <label><input type="radio" name="look" value="page" checked> Light page</label>
-            <label><input type="radio" name="look" value="board"> White on dark</label>
-          </div>
-          <p class="controls"><button class="primary" type="submit">Show on the TV</button></p>
-        </form>
-      </section>
-    </main>
-
-    <aside class="side">
-      <section class="card code-card" aria-labelledby="code-h">
-        <div class="code-words">
+    <div class="center">
+      <section class="card hero" aria-labelledby="code-h">
+        <div class="hero-words">
           <h2 id="code-h" class="label">Connection code</h2>
           <p id="desk-code" aria-label="No code yet">— — —</p>
-          <p>Go to <span id="desk-addr">cast.kvbchurch.org</span></p>
+          <p class="hero-help">Scan the QR code, or go to the address and type the code.</p>
           <p id="desk-presenter" data-on="false" role="status">No presenter is connected.</p>
         </div>
-        <figure id="desk-qr-box" hidden><canvas id="desk-qr" aria-label="QR code: open the Cast page with this code"></canvas></figure>
-        <div class="code-actions">
-          <button class="quiet" type="button" id="btn-reveal">Show the code on the TV</button>
-          <button class="quiet" type="button" id="btn-kick" disabled>Disconnect the presenter</button>
-        </div>
+        <figure id="desk-qr-box" hidden>
+          <canvas id="desk-qr" aria-label="QR code: open the Cast page with this code"></canvas>
+          <figcaption id="desk-addr">cast.kvbchurch.org</figcaption>
+        </figure>
       </section>
 
+      <main class="main">
+        <section class="panel card" id="p-video">
+          <h2>YouTube</h2>
+          <form id="yt-search-form" role="search">
+            <label for="yt-q">Search YouTube</label>
+            <div class="row">
+              <input type="search" id="yt-q" maxlength="100" autocomplete="off" placeholder="A song, a video, a channel">
+              <button class="primary" type="submit">Search</button>
+            </div>
+          </form>
+          <p class="note" id="yt-note" role="status"></p>
+          <ul class="results" id="yt-results" aria-label="Search results"></ul>
+          <div class="or">Or paste a link</div>
+          <form id="video-form">
+            <label for="video-link">YouTube link</label>
+            <input type="url" id="video-link" placeholder="https://youtu.be/…" autocomplete="off">
+            <label for="video-title">Title <span class="opt">(optional)</span></label>
+            <input type="text" id="video-title" maxlength="60">
+            <p class="controls"><button class="primary" type="submit">Play on the TV</button></p>
+            <p class="help">A link with a start time (…?t=90) starts there.</p>
+          </form>
+        </section>
+
+        <section class="panel card" id="p-fb" hidden>
+          <h2>Facebook video</h2>
+          <form id="fb-form">
+            <label for="fb-link">Facebook video link</label>
+            <input type="url" id="fb-link" placeholder="https://www.facebook.com/…/videos/…" autocomplete="off">
+            <label for="fb-title">Title <span class="opt">(optional)</span></label>
+            <input type="text" id="fb-title" maxlength="60">
+            <p class="controls"><button class="primary" type="submit">Play on the TV</button></p>
+            <p class="help">On the video, choose Share, then Copy link. Only public videos play.</p>
+          </form>
+        </section>
+
+        <section class="panel card" id="p-pdf" hidden>
+          <h2>Slides</h2>
+          <p class="controls"><label class="file-pick primary">Choose a PowerPoint or PDF…<input type="file" id="pdf-input"></label></p>
+          <label for="pdf-link">Or a Google Slides link</label>
+          <div class="row">
+            <input type="url" id="pdf-link" placeholder="https://docs.google.com/presentation/…" autocomplete="off">
+            <button class="quiet" type="button" id="pdf-copy">Get it</button>
+          </div>
+          <p class="note" id="pdf-note" role="status"></p>
+          <div class="ready" id="pdf-ready" hidden><span id="pdf-ready-words"></span><button class="primary" type="button" id="pdf-show">Show</button></div>
+          <p class="help">A PowerPoint takes about a minute to turn into slides; a PDF goes up at once. Google Slides must be shared as “Anyone with the link”. Step through the slides under On the TV.</p>
+        </section>
+
+        <section class="panel card" id="p-pics" hidden>
+          <h2>Pictures</h2>
+          <p class="controls"><label class="file-pick primary">Choose pictures…<input type="file" id="pic-input" accept="image/jpeg,image/png,image/gif,image/webp" multiple></label></p>
+          <p class="note" id="pic-note" role="status"></p>
+          <div class="thumbs" id="thumbs"></div>
+        </section>
+
+        <section class="panel card" id="p-clip" hidden>
+          <h2>Video file</h2>
+          <p class="controls"><label class="file-pick primary">Choose a video…<input type="file" id="clip-input" accept="video/mp4,video/quicktime,video/webm,.mp4,.mov,.m4v,.webm"></label></p>
+          <p class="note" id="clip-note" role="status"></p>
+          <div class="ready" id="clip-ready" hidden><span id="clip-ready-words"></span><button class="primary" type="button" id="clip-show">Play</button></div>
+          <p class="help">MP4, MOV or WebM, up to 200 MB.</p>
+        </section>
+
+        <section class="panel card" id="p-text" hidden>
+          <h2>Text</h2>
+          <form id="text-form">
+            <label for="text-heading">Heading <span class="opt">(optional)</span></label>
+            <input type="text" id="text-heading" maxlength="60">
+            <label for="text-body">Text <span class="opt">(up to 8 lines)</span></label>
+            <textarea id="text-body" maxlength="400"></textarea>
+            <label>Look</label>
+            <div class="looks">
+              <label><input type="radio" name="look" value="page" checked> Light page</label>
+              <label><input type="radio" name="look" value="board"> White on dark</label>
+            </div>
+            <p class="controls"><button class="primary" type="submit">Show on the TV</button></p>
+          </form>
+        </section>
+      </main>
+    </div>
+
+    <aside class="side">
       <section class="card" id="tv" data-online="false" aria-live="polite" aria-labelledby="tv-h">
         <h2 id="tv-h" class="label">On the TV now</h2>
         <p class="tv-main"><span class="dot" aria-hidden="true"></span><span id="tv-main">Connecting…</span></p>
@@ -321,6 +337,12 @@
           <div class="strip" data-slide-strip aria-label="Every slide"></div>
         </div>
         <div class="controls"><button class="quiet" type="button" id="btn-down" hidden>Take it down</button></div>
+        <div class="room">
+          <div class="controls">
+            <button class="quiet" type="button" id="btn-reveal">Show the code on the TV</button>
+            <button class="quiet" type="button" id="btn-kick" disabled>Disconnect the presenter</button>
+          </div>
+        </div>
         <p class="note" id="press-note" role="status"></p>
       </section>
     </aside>
