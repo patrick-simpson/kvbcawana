@@ -74,14 +74,19 @@
   .or { margin: 16px 0 4px; color: var(--text-2); font-size: 12px; }
   .looks { display: flex; gap: 16px; }
   .looks label { display: inline-flex; gap: 6px; align-items: center; margin: 0; }
-  .card { background: var(--card); border: 1px solid var(--stroke); border-radius: 8px; box-shadow: var(--shadow); padding: 16px; }
+  .card { background: var(--card); border: 1px solid var(--stroke); border-radius: 8px; box-shadow: var(--shadow); padding: clamp(16px, 1.3vw, 28px); }
 
-  /* The window: title strip, then navigation | the code and what to show | the TV.
-     The code is the hero and never scrolls away; the working column is capped so inputs
-     stay a sane length; the right column is "On the TV now", always in view. */
+  /* The window: title strip, then the navigation pane (full height) | the content area.
+     The content area fills the rest of the window with 24 px padding: the connection card
+     across the top (the hero, it scales with the window), then what to show (inputs capped
+     at a readable measure) beside "On the TV now", which takes the remaining width. Both
+     lower cards stretch to the window's foot and scroll inside themselves, so no blank
+     band is left to the right or below. */
   #desk { display: grid; grid-template-rows: auto 1fr; height: 100%; }
-  .top { display: flex; align-items: center; gap: 12px; padding: 12px 20px; }
-  .cols { display: grid; grid-template-columns: 208px minmax(0, 720px) minmax(320px, 560px); justify-content: start; gap: 16px; padding: 0 20px 20px; min-height: 0; }
+  .top { display: flex; align-items: center; gap: 12px; padding: 12px 24px; }
+  .cols { display: grid; grid-template-columns: 208px minmax(0, 1fr); gap: 24px; padding: 0 24px 24px; min-height: 0; }
+  .content { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); gap: 16px 24px; min-height: 0; min-width: 0; }
+  .hero { grid-column: 1 / -1; }
   .choices { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
   .choice { width: 100%; justify-content: flex-start; gap: 12px; border: 0; background: transparent; min-height: 36px; padding: 8px 12px; position: relative; text-align: left; }
   .choice:hover { background: var(--subtle); }
@@ -91,34 +96,43 @@
   .choice b { font-weight: 400; }
   .choice[aria-current="page"] b { font-weight: 600; }
   .choice span { display: none; }
-  .center { display: flex; flex-direction: column; gap: 16px; min-height: 0; }
-  .main { flex: 1; overflow: auto; min-height: 0; }
+  .main { display: flex; flex-direction: column; overflow: auto; min-height: 0; min-width: 0; height: min(100%, 760px); }
+  .main > .panel { flex: 1 0 auto; }
+  .panel > form, .panel > .row, .panel > .note, .panel > .help, .panel > .ready, .panel > .results, .panel > .or, .panel > label, .panel > .controls { max-width: 720px; }
+  .panel > .thumbs { max-width: 960px; }
   .panel h2 { margin-bottom: 4px; font-size: 20px; line-height: 28px; }
   .panel > .help:first-of-type { margin-top: 0; }
-  .side { overflow: auto; min-height: 0; }
+  .side { display: flex; flex-direction: column; overflow: auto; min-height: 0; min-width: 0; height: min(100%, 760px); }
+  .side > .card { flex: 1 0 auto; }
 
-  /* The code: the hero, always shown here. */
-  .hero { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 24px; align-items: center; padding: 20px 24px; }
+  /* The code: the hero, always shown here. It grows with the window (64 px code and
+     200 px QR at 1366 wide, about 120 px and 320 px at 2560) so it reads from a few feet. */
+  .hero { display: grid; grid-template-columns: auto auto minmax(0, 1fr); gap: 8px clamp(24px, 3vw, 72px); align-items: center; padding: clamp(20px, 1.6vw, 36px) clamp(24px, 2vw, 48px); }
   .hero-words { display: grid; gap: 4px; align-content: center; min-width: 0; }
+  .hero-side { grid-column: 3; display: grid; gap: 8px; align-content: center; min-width: 0; padding-left: clamp(24px, 3vw, 72px); border-left: 1px solid var(--stroke); }
   .hero .label { color: var(--text-2); }
   .hero .label, #tv-h { display: flex; align-items: center; gap: 8px; }
-  #desk-code { font: 600 clamp(52px, 3.55vw, 80px)/1.1 var(--font-display); letter-spacing: .08em; word-spacing: .22em; font-variant-numeric: tabular-nums; white-space: nowrap; margin: 4px 0; }
-  .hero-help { color: var(--text-2); }
+  #desk-code { font: 600 clamp(56px, 4.7vw, 124px)/1.1 var(--font-display); letter-spacing: .08em; word-spacing: .22em; font-variant-numeric: tabular-nums; white-space: nowrap; margin: 4px 0; }
+  .hero-help { color: var(--text-2); font-size: clamp(14px, .9vw, 20px); line-height: 1.45; }
   #desk-qr-box { margin: 0; display: grid; justify-items: center; gap: 8px; }
-  #desk-qr { display: block; image-rendering: pixelated; border: 1px solid var(--stroke-strong); border-radius: 4px; }
+  #desk-qr { display: block; width: clamp(200px, 12.5vw, 330px); height: auto; aspect-ratio: 1; image-rendering: pixelated; border: 1px solid var(--stroke-strong); border-radius: 4px; }
   #desk-addr { font-weight: 600; }
-  #desk-presenter { display: flex; align-items: center; gap: 8px; margin-top: 8px; color: var(--text-2); }
+  #desk-presenter { display: flex; align-items: center; gap: 8px; color: var(--text-2); font-size: clamp(14px, .9vw, 20px); }
   #desk-presenter::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--text-2); flex: none; }
   #desk-presenter[data-on="true"] { color: var(--ok); }
   #desk-presenter[data-on="true"]::before { background: var(--ok); }
 
   /* On the TV now. */
-  .tv-main { display: flex; gap: 8px; align-items: center; font-weight: 600; margin-top: 4px; }
-  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-2); flex: none; }
+  .tv-main { display: flex; gap: 12px; align-items: center; font: 600 clamp(20px, 1.5vw, 34px)/1.25 var(--font-display); margin-top: 8px; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--text-2); flex: none; }
   #tv[data-online="true"] .dot { background: var(--ok); }
-  .tv-sub { color: var(--text-2); margin-top: 2px; }
+  .tv-sub { color: var(--text-2); margin-top: 2px; font-size: clamp(14px, 1vw, 22px); line-height: 1.4; }
   .tv-sub:empty { display: none; }
   .controls { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  #ctl-video { display: grid; grid-template-columns: repeat(3, minmax(112px, 168px)); gap: 8px; margin-top: 16px; }
+  #ctl-video[hidden] { display: none; }
+  #ctl-video .vol { grid-column: span 2; }
+  #ctl-video .vol-level { flex: 1; }
   .vol { display: inline-flex; align-items: center; gap: 4px; }
   .vol .quiet { min-width: 32px; padding: 5px 0; font-size: 16px; line-height: 20px; }
   .vol-level { min-width: 112px; text-align: center; font-variant-numeric: tabular-nums; }
@@ -140,7 +154,7 @@
   .ready { margin-top: 12px; padding: 8px 12px; border: 1px solid var(--stroke); border-radius: 4px; display: flex; gap: 12px; align-items: center; justify-content: space-between; }
 
   /* The slides on the TV (preview.js): this one, the next, every slide. */
-  .slides { margin-top: 12px; max-width: 440px; }
+  .slides { margin-top: 12px; max-width: min(100%, 760px); }
   .slide-now { position: relative; aspect-ratio: 16 / 9; background: #000; border-radius: 4px; overflow: hidden; }
   .slide-now canvas, .slide-next canvas { display: block; width: 100%; height: 100%; object-fit: contain; }
   .slides[data-preview="none"] .slide-now, .slides[data-preview="none"] .slide-next, .slides[data-preview="none"] .strip { display: none; }
@@ -153,6 +167,8 @@
   .slide-next[data-end="true"] canvas { display: none; }
   .slide-next[data-end="true"] .slide-endword { display: grid; }
   .slide-buttons { display: grid; gap: 8px; }
+  .slides[data-preview="none"] .slide-buttons { grid-template-columns: repeat(2, minmax(0, 168px)); }
+  .slides[data-preview="none"] .slide-label { grid-column: 1 / -1; }
   .slide-label { font-weight: 600; font-variant-numeric: tabular-nums; }
   .strip { display: flex; gap: 6px; overflow-x: auto; margin-top: 8px; padding-bottom: 6px; }
   .strip-slide { position: relative; flex: none; width: 96px; padding: 0; overflow: hidden; }
@@ -165,19 +181,18 @@
   #desk-off h1 { margin-bottom: 8px; }
   #desk-off p + p { margin-top: 12px; }
 
-  /* A big monitor: scale the whole window up the way Windows' display scaling would, so
-     the three columns keep their proportions instead of floating in empty space. */
-  @media (min-width: 2200px) { html { zoom: 1.25; } }
-
   /* Smaller windows: the window scrolls as one page, the code first. */
   @media (max-width: 1100px) {
     html, body { height: auto; }
     #desk { height: auto; min-height: 100%; }
-    .cols { grid-template-columns: minmax(0, 1fr); }
+    .cols { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+    .content { grid-template-columns: minmax(0, 1fr); grid-template-rows: none; }
+    .hero-side { padding-left: 0; border-left: 0; }
     .choices { flex-direction: row; flex-wrap: wrap; }
     .choice { width: auto; }
     .main, .side { overflow: visible; }
   }
+  @media (max-width: 1100px) { .hero { grid-template-columns: auto minmax(0, 1fr); } .hero-side { grid-column: 1 / -1; padding-top: 8px; } }
   @media (max-width: 640px) { .hero { grid-template-columns: minmax(0, 1fr); } }
 
   /* High contrast (forced colors): Windows' own colours, every control outlined. */
@@ -215,18 +230,20 @@
       </ul>
     </nav>
 
-    <div class="center">
+    <div class="content">
       <section class="card hero" aria-labelledby="code-h">
         <div class="hero-words">
           <h2 id="code-h" class="label"><svg class="icon" viewBox="0 0 20 20" width="20" height="20" aria-hidden="true" focusable="false"><rect x="3" y="3" width="5" height="5" rx="1"/><rect x="12" y="3" width="5" height="5" rx="1"/><rect x="3" y="12" width="5" height="5" rx="1"/><path d="M12 12h2v2h-2zM15.5 15.5H17V17h-1.5z"/></svg><span>Connection code</span></h2>
           <p id="desk-code" aria-label="No code yet">— — —</p>
-          <p class="hero-help">Scan the QR code, or go to the address and type the code.</p>
-          <p id="desk-presenter" data-on="false" role="status">No presenter is connected.</p>
         </div>
         <figure id="desk-qr-box" hidden>
           <canvas id="desk-qr" aria-label="QR code: open the Cast page with this code"></canvas>
           <figcaption id="desk-addr">cast.kvbchurch.org</figcaption>
         </figure>
+        <div class="hero-side">
+          <p class="hero-help">Scan the QR code, or go to the address and type the code.</p>
+          <p id="desk-presenter" data-on="false" role="status">No presenter is connected.</p>
+        </div>
       </section>
 
       <main class="main">
@@ -308,7 +325,6 @@
           </form>
         </section>
       </main>
-    </div>
 
     <aside class="side">
       <section class="card" id="tv" data-online="false" aria-live="polite" aria-labelledby="tv-h">
@@ -352,6 +368,7 @@
         <p class="note" id="press-note" role="status"></p>
       </section>
     </aside>
+    </div>
   </div>
 </div>
 <script type="module" src="desk.js"></script>
