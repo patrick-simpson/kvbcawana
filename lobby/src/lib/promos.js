@@ -36,7 +36,7 @@ import { dateKey } from './time.js';
 /**
  * @typedef {Object} SeasonPromo
  * @property {string} id
- * @property {string} kind 'contest' | 'friend' | 'parents' | 'barfEpic' | 'finalists' | 'grandPrix'
+ * @property {string} kind 'contest' | 'friend' | 'parents' | 'barfEpic' | 'finalists' | 'grandPrix' | 'veterans'
  * @property {string} eventDate Last day the promo shows, inclusive.
  * @property {string} showFrom First day the promo may show.
  * @property {number} durationSec How long the slideshow holds THIS poster.
@@ -54,11 +54,16 @@ import { dateKey } from './time.js';
  *   then does it appear over the identical picture (GrandPrixPromo.jsx).
  * @property {string} [theme] The lobby theme its last (and with `enter`,
  *   first) frame is drawn in (with `exit: 'seamless'`).
+ * @property {boolean} [encore] On its `eventDate` ONLY it gets a second showing
+ *   in every pass through the deck (buildEncoreSlot, lobbyDeck.js placeEncore).
  */
 
 // The Grand Prix video's length, to the frame: 2021 frames at 60 fps (the torn
 // cut, video/grand-prix/output/gp-brand/grand-prix-torn-1080p60.mp4).
 export const GRAND_PRIX_SEC = 2021 / 60;
+
+// The Veterans Day poster's hold: a quiet 10 s (VeteransPromo.jsx).
+export const VETERANS_SEC = 10;
 
 // Parents' Night, where the finalists are voted on (PARENTS_DATE below is the same day).
 const PARENTS_NIGHT = '2026-11-04';
@@ -86,6 +91,10 @@ export const SEASON_PROMOS = [
     id: 'promo_grand_prix', kind: 'grandPrix', eventDate: '2027-03-20', showFrom: '2027-01-01', durationSec: GRAND_PRIX_SEC,
     exit: 'seamless', enter: 'seamless', theme: 'sky',
   },
+  // "Thank you, veterans" (owner 2026-11-10: "It's only to show up on 11/11"):
+  // Wednesday, November 11 ONLY (showFrom and eventDate are the same day), gone
+  // the day after. It airs twice per pass that day (`encore`, buildEncoreSlot).
+  { id: 'promo_veterans', kind: 'veterans', eventDate: '2026-11-11', showFrom: '2026-11-11', durationSec: VETERANS_SEC, encore: true },
 ];
 
 /**
@@ -262,6 +271,43 @@ export function buildPromoSlot(events, todayStr, opts = {}) {
     : promos;
   if (!lapped.length) return null;
   return { id: 'season_promo', type: 'promo', durationSec: PROMO_DURATION_SEC, promos: lapped };
+}
+
+/**
+ * The "double time" showing: on the day of a promo that has `encore`, a SECOND
+ * slot the deck places far from the main one (lobbyDeck.js placeEncore), so the
+ * poster airs twice in every pass that day and never on any other. Same guards
+ * as buildPromoSlot (switched off, no feed, unusable date key: nothing). Never
+ * persisted or published.
+ *
+ * @param {Array<any>|null|undefined} events
+ * @param {string} todayStr
+ * @param {{ specialDates?: Record<string, any>|null, enabled?: boolean }} [opts]
+ * @returns {PromoSlot|null}
+ */
+export function buildEncoreSlot(events, todayStr, opts = {}) {
+  const { specialDates = null, enabled = true } = opts;
+  if (!enabled) return null;
+  if (!Array.isArray(events) || events.length === 0) return null;
+  const today = showDate(todayStr);
+  if (!today) return null;
+  const p = SEASON_PROMOS.find((x) => x.encore && x.eventDate === today && slideInWindow({ showFrom: x.showFrom, showUntil: x.eventDate }, today));
+  if (!p) return null;
+  return {
+    id: 'season_promo_encore',
+    type: 'promo',
+    durationSec: PROMO_DURATION_SEC,
+    promos: [{
+      id: p.id,
+      kind: p.kind,
+      eventDate: p.eventDate,
+      tonight: true,
+      countdown: countdownLabel(nightsUntil(events, today, p.eventDate, specialDates), today, p.eventDate),
+      afterContest: today > CONTEST_DATE,
+      durationSec: p.durationSec,
+      ...ending(p),
+    }],
+  };
 }
 
 /**

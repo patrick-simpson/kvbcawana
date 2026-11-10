@@ -6,6 +6,8 @@ import {
   PROMO_DURATION_SEC,
   SEASON_PROMOS,
   buildPromoSlot,
+  buildEncoreSlot,
+  VETERANS_SEC,
   countdownLabel,
   isPromoSlide,
   nightsUntil,
@@ -116,7 +118,7 @@ describe('the promo holds', () => {
   it('gives every descriptor in the table its own duration', () => {
     // The finalists' showreel is 21 s: six posters take their bow (each with its zoom) before the call.
     // The Grand Prix is a 33.68 s video (the torn cut, 2021 frames at 60 fps).
-    expect(SEASON_PROMOS.map((p) => p.durationSec)).toEqual([15, 15, 15, 15, 21, 2021 / 60]);
+    expect(SEASON_PROMOS.map((p) => p.durationSec)).toEqual([15, 15, 15, 15, 21, 2021 / 60, VETERANS_SEC]);
   });
 });
 
@@ -201,9 +203,9 @@ describe('buildPromoSlot', () => {
     expect(buildPromoSlot(season, 'tomorrow')).toBeNull();
   });
 
-  it('every descriptor in the table is one of the six known kinds', () => {
+  it('every descriptor in the table is one of the seven known kinds', () => {
     expect(SEASON_PROMOS.map((p) => p.kind).sort())
-      .toEqual(['barfEpic', 'contest', 'finalists', 'friend', 'grandPrix', 'parents']);
+      .toEqual(['barfEpic', 'contest', 'finalists', 'friend', 'grandPrix', 'parents', 'veterans']);
   });
 
   // The Grand Prix video (owner 2026-10-29: "Get that one set to show up on
@@ -370,5 +372,63 @@ describe('previewPromo: Settings → Slides → Preview the promos', () => {
   it('without a feed the snow week names the coming Wednesday', () => {
     expect(previewPromo('snowAlertsStorm', null, '2026-12-04').snow).toMatchObject({ date: '2026-12-09', weekday: 'Wednesday' });
     expect(previewPromo('snowAlertsStorm', [], '2026-12-09').snow).toMatchObject({ date: '2026-12-09', when: 'tonight' });
+  });
+});
+
+// "Thank you, veterans" (owner 2026-11-10: "It's only to show up on 11/11"):
+// Wednesday the 11th only, and twice per pass that day.
+describe('the Veterans Day poster', () => {
+  const kinds = (day, extra = {}) => (buildPromoSlot(season, day, extra)?.promos ?? []).filter(Boolean).map((p) => p.kind);
+
+  it('is a quiet 10 seconds that airs twice on its day (encore)', () => {
+    const v = SEASON_PROMOS.find((p) => p.kind === 'veterans');
+    expect(v).toMatchObject({ id: 'promo_veterans', eventDate: '2026-11-11', showFrom: '2026-11-11', durationSec: 10, encore: true });
+    expect(VETERANS_SEC).toBe(10);
+    expect(SEASON_PROMOS.filter((p) => p.encore)).toHaveLength(1);
+  });
+
+  it('shows on November 11 only: not before, never after', () => {
+    expect(kinds('2026-11-08')).toEqual([]);
+    expect(kinds('2026-11-09')).toEqual([]);
+    expect(kinds('2026-11-10')).toEqual([]);
+    expect(kinds('2026-11-11')).toEqual(['veterans']);
+    expect(kinds('2026-11-12')).toEqual([]);
+    expect(buildPromoSlot(season, '2026-11-12')).toBeNull();
+  });
+
+  it('says Tonight! on its one day', () => {
+    expect(buildPromoSlot(season, '2026-11-11').promos[0]).toMatchObject({ tonight: true, countdown: 'Tonight!' });
+  });
+
+  it('takes the off laps after the snow slide in November, and is gone on the 12th', () => {
+    const lap = (day) => buildPromoSlot(season, day, { snowAlerts: true })?.promos.map((p) => (p ? p.kind : null));
+    expect(lap('2026-11-11')).toEqual(['snowAlerts', 'veterans', 'veterans', 'veterans', 'veterans', 'veterans']);
+    expect(lap('2026-11-10')).not.toContain('veterans');
+    expect(lap('2026-11-12')).not.toContain('veterans');
+  });
+
+  it('is NOT in the Preview list (it also feeds the home page poster loop, and must not outlive Wednesday)', () => {
+    expect(PREVIEW_PROMOS.map((p) => p.key)).not.toContain('veterans');
+    expect(previewPromo('veterans', season, '2026-11-11')).not.toBeNull();
+  });
+});
+
+describe('buildEncoreSlot', () => {
+  it('is the same poster as a second slot, on 2026-11-11 only', () => {
+    const slot = buildEncoreSlot(season, '2026-11-11');
+    expect(slot).toMatchObject({ id: 'season_promo_encore', type: 'promo', durationSec: PROMO_DURATION_SEC });
+    expect(slot.promos).toHaveLength(1);
+    expect(slot.promos[0]).toMatchObject({ id: 'promo_veterans', kind: 'veterans', durationSec: 10, tonight: true, countdown: 'Tonight!' });
+    expect(slot.promos[0]).toEqual(buildPromoSlot(season, '2026-11-11').promos[0]);
+    expect(isPromoSlide(slot)).toBe(true);
+  });
+
+  it('is null every other day, with no feed, or switched off', () => {
+    for (const day of ['2026-11-09', '2026-11-10', '2026-11-12', '2026-11-13', '2026-10-14', '2027-01-06', '']) {
+      expect(buildEncoreSlot(season, day)).toBeNull();
+    }
+    expect(buildEncoreSlot([], '2026-11-11')).toBeNull();
+    expect(buildEncoreSlot(null, '2026-11-11')).toBeNull();
+    expect(buildEncoreSlot(season, '2026-11-11', { enabled: false })).toBeNull();
   });
 });

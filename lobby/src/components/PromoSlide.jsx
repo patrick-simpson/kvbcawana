@@ -5,6 +5,7 @@ import ParentsPromo, { DETAILS as PARENTS_DETAILS } from './promos/ParentsPromo.
 import SnowAlertsPromo, { DETAILS as SNOW_ALERTS_DETAILS } from './promos/SnowAlertsPromo.jsx';
 import FinalistsPromo, { DETAILS as FINALISTS_DETAILS } from './promos/FinalistsPromo.jsx';
 import GrandPrixPromo, { DETAILS as GRAND_PRIX_DETAILS } from './promos/GrandPrixPromo.jsx';
+import VeteransPromo, { DETAILS as VETERANS_DETAILS } from './promos/VeteransPromo.jsx';
 
 export { RotatingDetail, splatPath, landsAt, keyframes } from './promos/kit.jsx';
 
@@ -19,7 +20,9 @@ export { RotatingDetail, splatPath, landsAt, keyframes } from './promos/kit.jsx'
 // text-message sign-up) rides the same slot on its own cadence and wears the
 // lobby's kit rather than a poster's faces; see src/lib/snowAlerts.js. The
 // Awana Grand Prix (January to race day, 2027) is a video, not a showreel,
-// that ends on the lobby's own screen (./promos/GrandPrixPromo.jsx).
+// that ends on the lobby's own screen (./promos/GrandPrixPromo.jsx). The
+// Veterans Day poster (Wednesday, November 11, 2026 only, twice per pass) is a quiet 10
+// seconds in the lobby's kit (./promos/VeteransPromo.jsx).
 // ─────────────────────────────────────────────────────────────
 
 // Every line each poster says in its one rotating detail slot, in order.
@@ -33,6 +36,7 @@ export const PROMO_DETAILS = Object.freeze({
   snowAlerts: SNOW_ALERTS_DETAILS,
   finalists: FINALISTS_DETAILS,
   grandPrix: GRAND_PRIX_DETAILS,
+  veterans: VETERANS_DETAILS,
 });
 
 const NO_DETAILS = Object.freeze([]);
@@ -61,6 +65,7 @@ const SCENES = {
   snowAlerts: SnowAlertsPromo,
   finalists: FinalistsPromo,
   grandPrix: GrandPrixPromo,
+  veterans: VeteransPromo,
 };
 
 /**

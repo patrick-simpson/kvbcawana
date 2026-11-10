@@ -53,7 +53,7 @@ import { clubKey, getAllClubs } from './lib/clubs.js';
 import { saveClubCounts } from './lib/clubCountsStore.js';
 import { OVERLAY, setupUp } from './lib/overlayFit.js';
 import {
-  autoSlideDeck, calendarSlidesFor, effectiveManualSlides, isSlideDriven, promoSlotFor, promosAreOn,
+  autoSlideDeck, calendarSlidesFor, effectiveManualSlides, encoreSlotFor, isSlideDriven, promoSlotFor, promosAreOn,
   snowPhoneAsksWeather, tonightTitleOf, visibleManualSlides, wantsSnowForecast,
 } from './lib/lobbyDeck.js';
 import {
@@ -884,6 +884,13 @@ export default function App() {
     [calendar.events, todayStr, specialDates, promosOn, snowForecast]
   );
 
+  // The "double time" second showing, on a promo's own day only (placed far
+  // from the slot by BackgroundIframe's deck).
+  const encoreSlot = useMemo(
+    () => encoreSlotFor(calendar.events, todayStr, { specialDates, enabled: promosOn }),
+    [calendar.events, todayStr, specialDates, promosOn]
+  );
+
   // A preview runs for its promo's own hold, and Escape ends it early (a click
   // on it does too). Each start is a new `at`, so the poster replays from the
   // top even when the same one is picked twice.
@@ -1525,6 +1532,7 @@ export default function App() {
             backgroundSource={config.backgroundSource}
             manualSlides={shownManualSlides}
             calendarSlides={autoSlides}
+            encoreSlot={encoreSlot}
             sceneTheme={sceneTheme ?? 'sky'}
             cozy={mood.cozy}
             dim={mood.dim}

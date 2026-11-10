@@ -5,7 +5,7 @@
 // and memoizes each answer on exactly the inputs named here, so a fresh array
 // identity never restarts the background slideshow's hold timer.
 import { buildCalendarSlides, deriveClubInfo } from './calendarLogic.js';
-import { buildPromoSlot } from './promos.js';
+import { buildEncoreSlot, buildPromoSlot, isPromoSlide } from './promos.js';
 import { inSnowSeason } from './snowAlerts.js';
 import { mergeSyncedDeck, visibleSlides } from './slides.js';
 
@@ -109,6 +109,40 @@ export function promoSlotFor(events, todayStr, { specialDates, enabled, snowFore
  */
 export function autoSlideDeck(calendarSlides, promoSlot) {
   return promoSlot ? [...calendarSlides, promoSlot] : calendarSlides;
+}
+
+/**
+ * The "double time" slot (owner 2026-11-10): a promo's second showing on its
+ * own day, or null.
+ * @param {any} events
+ * @param {string} todayStr
+ * @param {{ specialDates: any, enabled: boolean }} o
+ */
+export function encoreSlotFor(events, todayStr, { specialDates, enabled }) {
+  return buildEncoreSlot(events, todayStr, { specialDates, enabled });
+}
+
+/**
+ * The slides the background plays after the flagship: the auto slides
+ * (calendar slides, then the promo slot) and the typed deck, with the encore
+ * set as far from the promo slot as the deck allows:
+ *   typed slides     [...auto, ...typed, encore]
+ *   calendar only    [encore, ...calendar, slot]
+ *   neither          no encore (nothing would separate the two showings)
+ * The flagship, when on the air, leads and separates them further. Never two
+ * showings back to back by this function's choice. Callers memoize on the
+ * inputs, so identity only changes when one does.
+ * @param {any[]} autoSlides calendar slides then the promo slot
+ * @param {any[]} typed
+ * @param {any} encore
+ */
+export function placeEncore(autoSlides, typed, encore) {
+  const auto = autoSlides || [];
+  const rest = typed || [];
+  if (!encore) return [...auto, ...rest];
+  if (rest.length) return [...auto, ...rest, encore];
+  if (auto.some((s) => !isPromoSlide(s))) return [encore, ...auto];
+  return auto;
 }
 
 /**

@@ -1,0 +1,112 @@
+/* ── Veterans Day (VeteransPromo.jsx) ────────────────────────────────────
+   "Thank you, veterans": Awana blue, the flag's three bands along the foot, a
+   navy corner tab with the church's logo, three white stars. The lobby's own
+   kit (Paytone One, Londrina Solid), not a poster's faces, so every rule is
+   .veterans* (src/lib/promoFonts.test.js). Flat: hard offsets, no gradient,
+   blur or glow. The component owns the timing; this file owns the look.
+
+   The field, the bands and the tab are full-bleed (they belong to the screen's
+   edges); the words and stars sit in the widest 16:9 stage that fits, sized in
+   --u (1% of its width), so 640x480, 720p, 1080p and 4K hold one picture. */
+
+.promo-slide--veterans {
+  background: #4c72b8;
+}
+
+.veterans {
+  --u: min(1vw, 1.7778vh);
+  --vet-navy: #26366f;
+  --vet-red: #b82b32;
+  --vet-cream: #ffe8c2;
+  color: #ffffff;
+}
+
+/* ── The three bands, full width, 21.875u tall at the foot ───────────────── */
+.veterans__waves {
+  position: absolute;
+  inset: auto 0 0 0;
+  height: calc(var(--u) * 21.875);
+  z-index: 1;
+  pointer-events: none;
+}
+.veterans__band {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.veterans__band--white path { fill: #ffffff; }
+.veterans__band--red path { fill: var(--vet-red); }
+.veterans__band--navy path { fill: var(--vet-navy); }
+
+/* ── The corner tab ──────────────────────────────────────────────────────── */
+.veterans__tab {
+  position: absolute;
+  z-index: 3;
+  left: 0;
+  top: 0;
+  width: calc(var(--u) * 25);
+  box-sizing: border-box;
+  padding: calc(var(--u) * 2.3) calc(var(--u) * 2.9) calc(var(--u) * 2.7) calc(var(--u) * 3.1);
+  background: var(--vet-navy);
+  border-radius: 0 0 calc(var(--u) * 4.7) 0;
+  box-shadow: calc(var(--u) * 0.73) calc(var(--u) * 0.73) 0 rgba(0, 0, 0, 0.18);
+  pointer-events: none;
+}
+.veterans__logo {
+  display: block;
+  width: calc(var(--u) * 17.7);
+  height: auto;
+  aspect-ratio: 1910 / 403;
+}
+/* The church's two-line logo is never drawn under 260px wide (the kit's rule),
+   so on a small screen the tab goes with it. */
+@media (max-width: 1469.98px), (max-height: 826px) {
+  .veterans__tab { display: none; }
+}
+
+/* ── The words and the stars ─────────────────────────────────────────────── */
+.veterans__stage {
+  position: absolute;
+  z-index: 2;
+  left: 50%;
+  top: 50%;
+  width: calc(var(--u) * 100);
+  height: calc(var(--u) * 56.25);
+  translate: -50% -50%;
+  pointer-events: none;
+}
+.veterans__copy {
+  position: absolute;
+  left: calc(var(--u) * 6.25);
+  top: calc(var(--u) * 11.7);
+}
+.veterans__kicker {
+  font-family: var(--font-condensed);
+  font-size: calc(var(--u) * 2.6);
+  line-height: 1;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: var(--vet-cream);
+}
+.veterans__headline {
+  margin-top: calc(var(--u) * 0.73);
+  font-family: var(--font-shout);
+  font-size: calc(var(--u) * 9.8);
+  line-height: 0.98;
+  letter-spacing: 0.005em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: #ffffff;
+  text-shadow: calc(var(--u) * 0.52) calc(var(--u) * 0.52) 0 var(--vet-navy);
+}
+.veterans__star {
+  position: absolute;
+}
+.veterans__star svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.veterans__star polygon { fill: #ffffff; }

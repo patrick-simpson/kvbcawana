@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { flagshipOnAir, withFlagship } from '../lib/flagship.js';
+import { placeEncore } from '../lib/lobbyDeck.js';
 import { isHttpsUrl } from '../lib/safeUrl.js';
 import PptxSlideshow from './PptxSlideshow.jsx';
 import ManualSlideshow from './ManualSlideshow.jsx';
@@ -85,7 +86,7 @@ function isOneDrivePptx(url) {
 
 export default function BackgroundIframe({
   url: givenUrl, slideshowDelaySec, useLocalSlideshow, backgroundSource, manualSlides,
-  calendarSlides,
+  calendarSlides, encoreSlot = null,
   // The season's scene theme, and the weather's atmosphere modifier over it.
   // Both default to today's behaviour so an unthemed install looks unchanged.
   sceneTheme = 'sky', cozy = false, dim = 1,
@@ -124,8 +125,8 @@ export default function BackgroundIframe({
     return () => clearInterval(t);
   }, []);
   const deck = useMemo(
-    () => withFlagship([...(calendarSlides || []), ...(manualSlides || [])], flagshipOn),
-    [calendarSlides, manualSlides, flagshipOn]
+    () => withFlagship(placeEncore(calendarSlides, manualSlides, encoreSlot), flagshipOn),
+    [calendarSlides, manualSlides, encoreSlot, flagshipOn]
   );
 
   // Full-screen looping video (#25): one file uploaded in Settings,

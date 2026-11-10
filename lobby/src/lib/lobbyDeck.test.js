@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  autoSlideDeck, calendarSlidesFor, effectiveManualSlides, isSlideDriven, promoSlotFor, promosAreOn,
+  autoSlideDeck, calendarSlidesFor, effectiveManualSlides, encoreSlotFor, isSlideDriven, placeEncore, promoSlotFor, promosAreOn,
   snowPhoneAsksWeather, tonightTitleOf, visibleManualSlides, wantsSnowForecast,
 } from './lobbyDeck.js';
 
@@ -78,6 +78,42 @@ describe('autoSlideDeck', () => {
     const promo = { id: 'promo' };
     expect(autoSlideDeck(cal, promo)).toEqual([slide('c1'), promo]);
     expect(autoSlideDeck(cal, null)).toBe(cal);
+  });
+});
+
+describe('placeEncore (double time)', () => {
+  const slot = { id: 'season_promo', type: 'promo' };
+  const encore = { id: 'season_promo_encore', type: 'promo' };
+  const cal = [slide('c1'), slide('c2')];
+  const typed = [slide('t1'), slide('t2')];
+
+  it('goes after the typed slides, as far from the slot as the deck allows', () => {
+    expect(placeEncore([...cal, slot], typed, encore)).toEqual([...cal, slot, ...typed, encore]);
+    expect(placeEncore([slot], typed, encore)).toEqual([slot, ...typed, encore]);
+  });
+  it('goes before the calendar slides when there are no typed slides', () => {
+    expect(placeEncore([...cal, slot], [], encore)).toEqual([encore, ...cal, slot]);
+    expect(placeEncore([...cal, slot], null, encore)).toEqual([encore, ...cal, slot]);
+  });
+  it('is left out when nothing would separate it from the slot', () => {
+    expect(placeEncore([slot], [], encore)).toEqual([slot]);
+    expect(placeEncore([], [], encore)).toEqual([]);
+  });
+  it('changes nothing without an encore', () => {
+    expect(placeEncore([...cal, slot], typed, null)).toEqual([...cal, slot, ...typed]);
+  });
+  it('never puts the two showings next to each other in the cases it places', () => {
+    for (const deck of [placeEncore([...cal, slot], typed, encore), placeEncore([slot], typed, encore)]) {
+      const i = deck.indexOf(slot);
+      const j = deck.indexOf(encore);
+      expect(Math.abs(i - j)).toBeGreaterThan(1);
+    }
+  });
+  it('is built only on the day, from the calendar', () => {
+    const events = [{ date: '2026-11-11', kind: 'club', title: 'Awana meeting', isCancelled: false, isSpecial: false }];
+    expect(encoreSlotFor(events, '2026-11-11', { specialDates: null, enabled: true })?.id).toBe('season_promo_encore');
+    expect(encoreSlotFor(events, '2026-11-12', { specialDates: null, enabled: true })).toBeNull();
+    expect(encoreSlotFor(events, '2026-11-11', { specialDates: null, enabled: false })).toBeNull();
   });
 });
 
