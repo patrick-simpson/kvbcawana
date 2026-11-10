@@ -157,6 +157,12 @@ export default function CheckoutBoard({ decision, checkout, calm, demo = false, 
     ? `${box ? `${box.width}x${box.height}` : '-'}|${(checkout?.entries || []).map((e) => `${e.club}/${e.firstName}`).join(',')}`
     : '';
   const extraN = extra.key === fitKey ? extra.n : 0;
+  // A club's mark that arrives after the render widens its plate, and the
+  // browser may then wrap one chip more with no render to notice it (Chrome
+  // 149 draws each chip a pixel or so wider than the fit measures: CI,
+  // 2026-11-10). Each mark's load draws again, so the check below runs.
+  const [, setMarks] = useState(0);
+  const markLoaded = () => setMarks((n) => n + 1);
   // No dependency list on purpose: the check has to run after EVERY render,
   // including the one useFontsReady makes when the faces arrive, and it stops
   // by itself (it only acts while the run overflows).
@@ -260,7 +266,7 @@ export default function CheckoutBoard({ decision, checkout, calm, demo = false, 
                   >
                     <span className="checkout-plate">
                       {g.mark
-                        ? <img className="checkout-plate__mark" src={g.palette.logo} alt={g.palette.name || g.club} draggable="false" />
+                        ? <img className="checkout-plate__mark" src={g.palette.logo} alt={g.palette.name || g.club} draggable="false" onLoad={markLoaded} />
                         : <span className="checkout-plate__name">{g.club}</span>}
                       <span className="checkout-plate__count">{waitingLabel(g.names.length)}</span>
                     </span>
