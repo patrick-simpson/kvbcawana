@@ -355,29 +355,41 @@ describe('ManualSlideshow as the lobby director sees it (rebrand stage 4)', () =
   it('reports every slide, and whether it holds check-ins', () => {
     const onSlide = vi.fn();
     render(<ManualSlideshow slides={[deck[0], held]} slideshowDelaySec={5} onSlide={onSlide} />);
-    expect(onSlide).toHaveBeenLastCalledWith({ key: '0:s_1', special: false, poster: false });
+    expect(onSlide).toHaveBeenLastCalledWith({ key: '0:s_1', special: false, poster: false, copy: true });
     act(() => vi.advanceTimersByTime(5000));
-    expect(onSlide).toHaveBeenLastCalledWith({ key: '1:s_h', special: true, poster: false });
+    expect(onSlide).toHaveBeenLastCalledWith({ key: '1:s_h', special: true, poster: false, copy: true });
     act(() => vi.advanceTimersByTime(6000));
-    expect(onSlide).toHaveBeenLastCalledWith({ key: '2:s_1', special: false, poster: false });
+    expect(onSlide).toHaveBeenLastCalledWith({ key: '2:s_1', special: false, poster: false, copy: true });
+  });
+
+  it('says whether the slide is ordinary copy that can refit (the pickup strip may grow only then)', () => {
+    const onSlide = vi.fn();
+    const promoSlot = {
+      id: 'season_promo', type: 'promo', durationSec: 12,
+      promos: [{ id: 'promo_contest', kind: 'contest', eventDate: '2026-10-14', tonight: false, countdown: '3 club nights left', afterContest: false }],
+    };
+    render(<ManualSlideshow slides={[deck[0], promoSlot]} slideshowDelaySec={5} onSlide={onSlide} />);
+    expect(onSlide).toHaveBeenLastCalledWith(expect.objectContaining({ poster: false, copy: true }));
+    act(() => vi.advanceTimersByTime(5000));
+    expect(onSlide).toHaveBeenLastCalledWith(expect.objectContaining({ poster: true, copy: false }));
   });
 
   it('never holds when the deck could not move on to an ordinary slide', () => {
     const onSlide = vi.fn();
     const { unmount } = render(<ManualSlideshow slides={[held]} slideshowDelaySec={5} onSlide={onSlide} />);
-    expect(onSlide).toHaveBeenLastCalledWith({ key: '0:s_h', special: false, poster: false });
+    expect(onSlide).toHaveBeenLastCalledWith({ key: '0:s_h', special: false, poster: false, copy: true });
     unmount();
     const onOnly = vi.fn();
     render(<ManualSlideshow slides={[held, { ...held, id: 's_h2' }]} slideshowDelaySec={5} onSlide={onOnly} />);
-    expect(onOnly).toHaveBeenLastCalledWith({ key: '0:s_h', special: false, poster: false });
+    expect(onOnly).toHaveBeenLastCalledWith({ key: '0:s_h', special: false, poster: false, copy: true });
   });
 
   it('stops holding when the slideshow goes away', () => {
     const onSlide = vi.fn();
     const { unmount } = render(<ManualSlideshow slides={[held, deck[0]]} slideshowDelaySec={5} onSlide={onSlide} />);
-    expect(onSlide).toHaveBeenLastCalledWith({ key: '0:s_h', special: true, poster: false });
+    expect(onSlide).toHaveBeenLastCalledWith({ key: '0:s_h', special: true, poster: false, copy: true });
     unmount();
-    expect(onSlide).toHaveBeenLastCalledWith({ key: 'none', special: false, poster: false });
+    expect(onSlide).toHaveBeenLastCalledWith({ key: 'none', special: false, poster: false, copy: false });
   });
 
   it('sweeps the stinger over any change that involves a held slide, and only then', () => {
@@ -409,9 +421,9 @@ describe('ManualSlideshow on the lobby scene (rebrand stage 4b)', () => {
   it('says when the slide up is the promo poster, which the band notice steps aside for', () => {
     const onSlide = vi.fn();
     render(<ManualSlideshow slides={[sky[0], promo]} slideshowDelaySec={5} onSlide={onSlide} />);
-    expect(onSlide).toHaveBeenLastCalledWith({ key: '0:s_1', special: false, poster: false });
+    expect(onSlide).toHaveBeenLastCalledWith({ key: '0:s_1', special: false, poster: false, copy: true });
     act(() => vi.advanceTimersByTime(5000));
-    expect(onSlide).toHaveBeenLastCalledWith({ key: '1:season_promo', special: true, poster: true });
+    expect(onSlide).toHaveBeenLastCalledWith({ key: '1:season_promo', special: true, poster: true, copy: false });
   });
 
   it('keeps the studio across an ordinary change: same scene, same field, same corner tab', () => {

@@ -132,8 +132,10 @@ function useRunBox(ref, active) {
  *   it says so on its card, so it can never pass for a real list
  * @param {boolean} [props.preview] drawn in Settings' miniature TV: no floor
  *   in px on the chips' size
+ * @param {boolean} [props.grow] the strip may stand its third row (App's
+ *   `room.footMayGrow`: only over ordinary slide copy that can refit)
  */
-export default function CheckoutBoard({ decision, checkout, calm, demo = false, preview = false }) {
+export default function CheckoutBoard({ decision, checkout, calm, demo = false, preview = false, grow = true }) {
   useFontsReady();
   const state = decision?.state;
   const shown = state === BOARD_NAMES || state === BOARD_ANONYMOUS
@@ -142,7 +144,8 @@ export default function CheckoutBoard({ decision, checkout, calm, demo = false, 
   const runRef = useRef(/** @type {HTMLUListElement | null} */ (null));
   const box = useRunBox(runRef, listed);
   // The strip's third row (owner 2026-11-09), never in Settings' miniature TV.
-  const tall = useFootTall(checkout?.entries, listed && !preview);
+  const long = useFootTall(checkout?.entries, listed && !preview);
+  const tall = long && grow;
   // The browser's word, after the fit's: fitFoot predicts the wrap from
   // measured text, and a real screen can still wrap one chip more (CI's
   // 640x480 put five chips under the strip, 2026-10-08). While the run's

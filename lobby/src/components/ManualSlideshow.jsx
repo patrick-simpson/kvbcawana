@@ -122,9 +122,11 @@ function Presence({ zero, custom, children }) {
  *
  * `paused`: names are on screen, so the slide on screen keeps its place and
  * its remaining time (the slideshow timer stops, it does not restart).
- * `onSlide({ key, special, poster })`: told on every slide change; `special`
- * is whether that slide holds check-ins, `poster` whether it is the promo
- * poster (full-bleed art the band notice steps aside for). A deck that could never move on to an
+ * `onSlide({ key, special, poster, copy })`: told on every slide change;
+ * `special` is whether that slide holds check-ins, `poster` whether it is the
+ * promo poster (full-bleed art the band notice steps aside for), `copy`
+ * whether it is ordinary fitted copy (SlideCopy: words that refit around the
+ * pickup strip), not a poster, video, picture or the flagship. A deck that could never move on to an
  * ordinary slide (one slide, or only held ones) never holds, so a child's
  * moment can never wait forever. `still` skips the studio's ambient loops
  * (weak hardware; see BackgroundIframe).
@@ -349,11 +351,11 @@ export default function ManualSlideshow({ slides, slideshowDelaySec, clubTint = 
       advance();
       return;
     }
-    onSlide?.({ key: slideKey, special, poster: kind === 'promo' });
+    onSlide?.({ key: slideKey, special, poster: kind === 'promo', copy: kind === 'copy' });
   }, [onSlide, slideKey, special, kind, skipped, advance]);
   // Leaving the slideshow (the background switched away) must never leave
   // the lobby holding check-ins.
-  useEffect(() => () => onSlide?.({ key: 'none', special: false, poster: false }), [onSlide]);
+  useEffect(() => () => onSlide?.({ key: 'none', special: false, poster: false, copy: false }), [onSlide]);
 
   if (!slides.length || !slide || skipped) return null;
 

@@ -219,7 +219,7 @@ export default function App() {
   // in turn, so the two never compete for the room. `special` only ever
   // comes from a deck that can move on to an ordinary slide (see
   // ManualSlideshow), so a child can never wait forever.
-  const [slideInfo, setSlideInfo] = useState({ key: 'none', special: false, poster: false });
+  const [slideInfo, setSlideInfo] = useState({ key: 'none', special: false, poster: false, copy: false });
   // Settings → Slides → "Preview the promos": one promo played full screen on
   // this TV for its own hold, over whatever the slideshow is doing. It holds
   // check-ins exactly as the real poster would (names wait behind the
@@ -361,11 +361,6 @@ export default function App() {
     demo: boardDemo,
     now: boardNow,
   }), [boardData, config.checkoutBoardNamesAbove, config.checkoutBoardStaleMin, emptySince, boardDemo, boardNow]);
-  // The pickup board's grown, three-row strip (overlayFit.js footGrows): while
-  // a long list is up, the slide copy's own safe bottom steps up with the
-  // strip's top (CopyRoomContext), so the copy never ends under the names.
-  const boardTall = useFootTall(boardData?.entries, boardDecision.state === BOARD_NAMES);
-  const copyRoom = useMemo(() => ({ bottom: copyBottom(boardTall) }), [boardTall]);
   // Is the room being picked up: from 7:30 pm by itself, every night
   // (checkoutBoard.js pickupNow). The board, the "has checked out" banners and
   // the corner counter all follow it; outside it, no banner waits.
@@ -396,7 +391,17 @@ export default function App() {
     boardState: boardDecision.state,
     checkInUp: currentEvent != null,
     leaveUp: leaveNow != null,
+    slideCopy: slideInfo.copy === true,
+    coverUp,
   });
+  // The pickup board's grown, three-row strip (overlayFit.js footGrows): only
+  // while a long list is up AND the slide showing is ordinary copy that can
+  // refit (room.footMayGrow); the copy's own safe bottom steps up with the
+  // strip's top (CopyRoomContext). Any other slide keeps the two-row strip.
+  const boardLong = useFootTall(boardData?.entries, boardDecision.state === BOARD_NAMES);
+  const mayGrow = room.footMayGrow;
+  const copyBottomU = copyBottom(boardLong && mayGrow);
+  const copyRoom = useMemo(() => ({ bottom: copyBottomU }), [copyBottomU]);
 
   // One celebration at a time. Three milestone paths (night thresholds,
   // per-club, every-Nth) can fire in the same instant — and cluster exactly
@@ -1679,7 +1684,7 @@ export default function App() {
           src/lib/checkoutBoard.js for why it is gated. */}
       {room.board && (
         <ErrorBoundary label="checkout-board" eventKey={boardNow} onError={() => recordLayerFault('pickup board')}>
-          <CheckoutBoard decision={boardDecision} checkout={boardData} calm={config.panicMode === true} demo={boardDemo} />
+          <CheckoutBoard decision={boardDecision} checkout={boardData} calm={config.panicMode === true} demo={boardDemo} grow={room.footMayGrow} />
         </ErrorBoundary>
       )}
 

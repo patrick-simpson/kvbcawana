@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { test as pastFlagship } from './pastFlagship.js';
+import { test as pastFlagship, skipFlagship } from './pastFlagship.js';
 import { liveChannel } from './liveChannel.js';
 
 // The pickup board in the foot (owner, 2026-10-07: "The still remaining kids
@@ -221,6 +221,44 @@ for (const [width, height] of [[1920, 1080], [1280, 720], [640, 480]]) {
     });
   });
 }
+
+// The strip's third row is for ordinary slide words only (they refit above
+// it). Under the flagship welcome, whose line is not fitted copy, a long list
+// keeps the ordinary strip; the words slide after it gets the grown one, and
+// the words end clear of the strip by at least 1.4u.
+test.describe('a long list over the flagship, then over words', () => {
+  test.use({ viewport: { width: 1920, height: 1080 } });
+
+  test('grows the strip only once the words are up', async ({ page }) => {
+    const send = await liveChannel(page);
+    await page.clock.install();
+    await page.clock.setSystemTime(PICKUP_TIME);
+    await page.addInitScript((cfg) => {
+      localStorage.setItem('awanaSetupCardDismissed.v1', '1');
+      localStorage.setItem('awanaConfig.v1', JSON.stringify(cfg));
+    }, {
+      backgroundSource: 'manual', calendarEnabled: false, seasonPromos: false,
+      manualSlides: [{ id: 's_1', type: 'text', eyebrow: 'This week', text: 'Bring your handbook and a friend to Awana', theme: 'sky' }],
+      particleEffect: 'off', firstArrivalMoment: false, sharedScheduleUrl: '',
+    });
+    await page.goto('/index.html?lowPower=1');
+    await expect(page.locator('.stage .flagship')).toBeVisible();
+    await send('checkout', { entries: SIXTY.slice(0, 24), printed: 75, at: PICKUP_TIME.toISOString() });
+    await expect(page.locator('.stage .checkout-name__chip').first()).toBeVisible();
+    await page.evaluate(() => document.fonts.ready);
+    await page.waitForTimeout(300);
+    const flagship = await layout(page);
+    expect(flagship.tall).toBe(false);
+    expect(flagship.region.top).toBeGreaterThanOrEqual(flagship.frameTop + 45 * flagship.u - 1);
+    expect(await skipFlagship(page)).toBe(true);
+    await expect(page.locator('.stage .manual-slide-copy .lobby-headline')).toBeVisible();
+    await page.waitForTimeout(300);
+    const words = await layout(page);
+    expect(words.tall).toBe(true);
+    expect(words.region.top).toBeLessThan(flagship.region.top - 4 * words.u);
+    for (const row of words.rows) expect(words.region.top - row.bottom).toBeGreaterThanOrEqual(1.4 * words.u - 1);
+  });
+});
 
 pastFlagship.describe('a critical notice over the pickup list', () => {
   pastFlagship.use({ viewport: { width: 1280, height: 720 } });

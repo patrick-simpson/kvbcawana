@@ -31,6 +31,25 @@ describe('roomFor', () => {
   });
 });
 
+describe('roomFor: the pickup strip may grow a third row', () => {
+  const base = {
+    overlay: false, notice: null, noticeUp: false, boardState: BOARD_NAMES, checkInUp: false, leaveUp: false,
+  };
+  it('only over ordinary slide copy that can refit', () => {
+    expect(roomFor({ ...base, slideCopy: true }).footMayGrow).toBe(true);
+    // The flagship, a promo poster, a video or picture slide, a PowerPoint or
+    // any other background never report copy: the ordinary strip stays.
+    expect(roomFor({ ...base, slideCopy: false }).footMayGrow).toBe(false);
+    expect(roomFor(base).footMayGrow).toBe(false);
+  });
+  it('not under a cover (a promo preview, the ceremony mirror), a critical notice or an OBS feed', () => {
+    expect(roomFor({ ...base, slideCopy: true, coverUp: true }).footMayGrow).toBe(false);
+    expect(roomFor({ ...base, slideCopy: true, notice: { level: 'critical' }, noticeUp: true }).footMayGrow).toBe(false);
+    expect(roomFor({ ...base, slideCopy: true, notice: { level: 'info' }, noticeUp: true }).footMayGrow).toBe(true);
+    expect(roomFor({ ...base, slideCopy: true, overlay: true }).footMayGrow).toBe(false);
+  });
+});
+
 describe('tickerIsActive', () => {
   const room = { board: null, banner: null };
   it('is up only when nothing else holds the foot', () => {

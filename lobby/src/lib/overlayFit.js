@@ -78,7 +78,7 @@ import { BOARD_ANONYMOUS, BOARD_EMPTY, BOARD_NAMES, BOARD_STALE } from './checko
  */
 const FOOT = { top: 45, bottom: 1.8, gap: 1.2, chipLeft: 82 };
 export const OVERLAY = {
-  footTall: { extra: 4.4, below: 2, copyGap: 1.6 },
+  footTall: { extra: 4.4, below: 2, copyGap: 2.7 },
   band: { top: 1.4, width: 50, bottom: 10.4 },
   flags: { height: 2.5, gap: 0.6, width: 54 },
   centre: { top: 12, bottom: 46, width: 70 },
@@ -158,6 +158,11 @@ export function boardPlacement(state) {
  *    behind it), where it takes the top band. The board in the foot changes
  *    nothing about it: the two never meet (the centre ends above the strip).
  *  - The copy steps aside only for a critical notice in the centre.
+ *  - `footMayGrow`: the pickup strip's third row (footTall) only while the
+ *    slide showing is ordinary fitted copy (`slideCopy`, from
+ *    ManualSlideshow's onSlide) that can refit above it, nothing covers the
+ *    wall (`coverUp`: a promo preview, the ceremony mirror) and no critical
+ *    notice holds the middle. Anything else keeps the ordinary two rows.
  *  - A toast never shares the band with a critical notice: on a feed it drops
  *    below the notice. Nothing else holds the celebrations back here (a held
  *    slide does, in App).
@@ -168,9 +173,14 @@ export function boardPlacement(state) {
  *   boardState?: string,
  *   checkInUp?: boolean,
  *   leaveUp?: boolean,
+ *   slideCopy?: boolean,
+ *   coverUp?: boolean,
  * }} s
  */
-export function lobbyRoom({ overlay = false, criticalLive = false, boardState, checkInUp = false, leaveUp = false }) {
+export function lobbyRoom({
+  overlay = false, criticalLive = false, boardState, checkInUp = false, leaveUp = false,
+  slideCopy = false, coverUp = false,
+}) {
   // A "has checked out" banner borrows the foot from the board while it is up
   // (owner, 2026-10-08), and the board comes back after it.
   /** @type {'foot' | null} */
@@ -185,6 +195,13 @@ export function lobbyRoom({ overlay = false, criticalLive = false, boardState, c
     critical,
     copyAside: critical === 'centre',
     toastBelow: critical === 'band',
+    // The grown strip (footTall) may be used only while the words above it
+    // can refit: the ordinary slide copy is on screen, with nothing covering
+    // it (a preview poster, the ceremony mirror) and no critical notice in the
+    // middle. A flagship, a promo poster, a video or picture slide, a
+    // PowerPoint or any other background is NOT fitted copy: the taller strip
+    // would cover its content (the flagship's line, a poster's QR code).
+    footMayGrow: slideCopy && !coverUp && !overlay && critical !== 'centre',
   };
 }
 

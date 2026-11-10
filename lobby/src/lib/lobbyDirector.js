@@ -24,15 +24,18 @@ export function checkInsHeldNow({ overlay, slideSpecial, previewUp }) {
  * @param {{
  *   overlay: boolean, notice: { level?: string } | null, noticeUp: boolean,
  *   boardState: string, checkInUp: boolean, leaveUp: boolean,
+ *   slideCopy?: boolean, coverUp?: boolean,
  * }} q
  */
-export function roomFor({ overlay, notice, noticeUp, boardState, checkInUp, leaveUp }) {
+export function roomFor({ overlay, notice, noticeUp, boardState, checkInUp, leaveUp, slideCopy = false, coverUp = false }) {
   return lobbyRoom({
     overlay,
     criticalLive: noticeUp && notice?.level === 'critical',
     boardState,
     checkInUp,
     leaveUp,
+    slideCopy,
+    coverUp,
   });
 }
 

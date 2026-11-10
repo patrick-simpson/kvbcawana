@@ -146,7 +146,7 @@ describe('who holds which part of the room', () => {
     for (const state of [BOARD_NAMES, BOARD_ANONYMOUS, BOARD_STALE, BOARD_EMPTY]) {
       expect(boardPlacement(state)).toBe('foot');
       const room = lobbyRoom({ boardState: state });
-      expect(room).toEqual({ board: 'foot', banner: null, critical: null, copyAside: false, toastBelow: false });
+      expect(room).toEqual({ board: 'foot', banner: null, critical: null, copyAside: false, toastBelow: false, footMayGrow: false });
     }
     expect(boardPlacement(BOARD_HIDDEN)).toBeNull();
     expect(boardPlacement(undefined)).toBeNull();
@@ -154,11 +154,11 @@ describe('who holds which part of the room', () => {
 
   it('a critical notice takes the middle, the pickup list or not, and the copy steps aside for it alone', () => {
     expect(lobbyRoom({ criticalLive: true, boardState: BOARD_HIDDEN }))
-      .toEqual({ board: null, banner: null, critical: 'centre', copyAside: true, toastBelow: false });
+      .toEqual({ board: null, banner: null, critical: 'centre', copyAside: true, toastBelow: false, footMayGrow: false });
     // Over a live list it stays in its own place; the board keeps the foot.
     for (const state of [BOARD_NAMES, BOARD_ANONYMOUS, BOARD_STALE]) {
       expect(lobbyRoom({ criticalLive: true, boardState: state }))
-        .toEqual({ board: 'foot', banner: null, critical: 'centre', copyAside: true, toastBelow: false });
+        .toEqual({ board: 'foot', banner: null, critical: 'centre', copyAside: true, toastBelow: false, footMayGrow: false });
     }
   });
 
@@ -172,13 +172,13 @@ describe('who holds which part of the room', () => {
 
   it('on an OBS feed there is no board and the alert keeps to the band, with a toast below it', () => {
     expect(lobbyRoom({ overlay: true, criticalLive: true, boardState: BOARD_NAMES }))
-      .toEqual({ board: null, banner: null, critical: 'band', copyAside: false, toastBelow: true });
+      .toEqual({ board: null, banner: null, critical: 'band', copyAside: false, toastBelow: true, footMayGrow: false });
     expect(lobbyRoom({ overlay: true, boardState: BOARD_NAMES }).critical).toBeNull();
   });
 
   it('a "has checked out" banner borrows the foot from the board, and gives it back', () => {
     expect(lobbyRoom({ boardState: BOARD_NAMES, leaveUp: true }))
-      .toEqual({ board: null, banner: 'foot', critical: null, copyAside: false, toastBelow: false });
+      .toEqual({ board: null, banner: 'foot', critical: null, copyAside: false, toastBelow: false, footMayGrow: false });
     expect(lobbyRoom({ boardState: BOARD_NAMES, leaveUp: false }).board).toBe('foot');
     // A name at the door outranks it too, and an OBS feed never shows one.
     expect(lobbyRoom({ boardState: BOARD_NAMES, leaveUp: true, checkInUp: true })).toMatchObject({ board: null, banner: null });
@@ -191,7 +191,7 @@ describe('who holds which part of the room', () => {
 
   it('a name at the door outranks the pickup list, and moves nothing else', () => {
     expect(lobbyRoom({ checkInUp: true, boardState: BOARD_NAMES }))
-      .toEqual({ board: null, banner: null, critical: null, copyAside: false, toastBelow: false });
+      .toEqual({ board: null, banner: null, critical: null, copyAside: false, toastBelow: false, footMayGrow: false });
     expect(lobbyRoom({ checkInUp: true, criticalLive: true, boardState: BOARD_NAMES }).critical).toBe('centre');
   });
 });
@@ -537,6 +537,8 @@ describe('the pickup board in the foot (fitFoot)', () => {
     expect(copyBottom(false)).toBe(LAYOUT.safeBottom);
     expect(footTop(true)).toBe(OVERLAY.foot.top - OVERLAY.footTall.extra);
     expect(copyBottom(true)).toBeLessThan(footTop(true));
+    // A comfortable gap between the refitted words and the grown strip (>= 1.4u).
+    expect(footTop(true) - copyBottom(true)).toBeGreaterThanOrEqual(1.4);
     expect(copyBottom(true)).toBeGreaterThan(LAYOUT.top + 20);
     // The ordinary strip is untouched (the first-run card shares it).
     expect(OVERLAY.setup).toBe(OVERLAY.foot);
