@@ -24,9 +24,11 @@ describe('VeteransPromo', () => {
     expect(container.querySelector('.promo-slide.promo-slide--veterans.veterans')).not.toBeNull();
   });
 
-  it('says the kicker and the two headline lines, and nothing under them', () => {
+  it('says the two headline lines alone: no kicker over them, nothing under them', () => {
     const { container } = mount();
-    expect(container.querySelector('.veterans__kicker').textContent).toBe('Veterans Day · Wednesday, November 11');
+    // No small line naming the day and date (owner 2026-11-10).
+    expect(container.querySelector('.veterans__kicker')).toBeNull();
+    expect(container.textContent).not.toMatch(/Veterans Day|November/);
     expect([...container.querySelectorAll('.veterans__line')].map((l) => l.textContent)).toEqual(['Thank you,', 'veterans']);
     // No subtitle (owner 2026-11-10), no exclamation mark anywhere.
     expect(container.querySelector('.veterans__body, .veterans__sub, .veterans__read')).toBeNull();
@@ -38,7 +40,7 @@ describe('VeteransPromo', () => {
     const { container } = mount();
     const root = container.querySelector('.veterans');
     expect(root.getAttribute('role')).toBe('img');
-    expect(root.getAttribute('aria-label')).toBe('Veterans Day, Wednesday, November 11. Thank you, veterans.');
+    expect(root.getAttribute('aria-label')).toBe('Thank you, veterans.');
     expect(VETERANS_LABEL).toBe(root.getAttribute('aria-label'));
     for (const sel of ['.veterans__waves', '.veterans__tab', '.veterans__stage']) {
       expect(container.querySelector(sel).getAttribute('aria-hidden')).toBe('true');

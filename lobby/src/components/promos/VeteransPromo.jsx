@@ -3,13 +3,13 @@ import { landsAt, EASE_SLAM, EASE_OUT } from './kit.jsx';
 import LOGO_WHITE from '../../../../shared/brand/logos/kvbc-awana-two-line-white.svg';
 
 // ─────────────────────────────────────────────────────────────
-// Veterans Day: "Thank you, veterans." (owner 2026-11-10: no subtitle; it airs
+// Veterans Day: "Thank you, veterans." (owner 2026-11-10: no subtitle, and no
+// small line naming the day and date: the two headline lines alone; it airs
 // double time on Wednesday, November 11 and not after.) Which days it shows,
 // and its second showing that day, are decided in the pure src/lib/promos.js;
 // this is only the art.
 //
-// Not a printed poster, so it wears the lobby's own kit (Paytone One shout,
-// Londrina Solid label), never the posters' faces: every class is
+// Not a printed poster, so it wears the lobby's own kit (Paytone One shout), never the posters' faces: every class is
 // `.veterans*`, not `.promo-*` (src/lib/promoFonts.test.js). Flat: hard
 // offsets only, no gradient, blur or glow. Quiet: nothing loops, nothing
 // bounces, no confetti.
@@ -18,7 +18,6 @@ import LOGO_WHITE from '../../../../shared/brand/logos/kvbc-awana-two-line-white
 //   0.0  three bands of the flag's colours rise along the foot (white, red,
 //        navy, 0.08 s apart), in place by 0.6.
 //   0.4  the navy corner tab, with the church's logo, drops in; down by 0.9.
-//   0.8  the kicker "Veterans Day · Wednesday, November 11" fades up.
 //   0.9  THANK YOU, then 1.0 VETERANS land, in place by 1.4.
 //   1.6  the three white stars pop in one at a time (1.6, 1.8, 2.0), all in
 //        place by 2.4.
@@ -30,9 +29,8 @@ import LOGO_WHITE from '../../../../shared/brand/logos/kvbc-awana-two-line-white
 
 export const DETAILS = Object.freeze({ default: Object.freeze([]) });
 
-const KICKER = 'Veterans Day · Wednesday, November 11';
 const HEADLINE = Object.freeze(['Thank you,', 'veterans']);
-export const VETERANS_LABEL = 'Veterans Day, Wednesday, November 11. Thank you, veterans.';
+export const VETERANS_LABEL = 'Thank you, veterans.';
 
 // A five-point star on a 100 x 100 grid.
 const STAR = '50,0 61.76,33.82 97.55,34.55 69.02,56.18 79.39,90.45 50,70 20.61,90.45 30.98,56.18 2.45,34.55 38.24,33.82';
@@ -52,7 +50,6 @@ const BANDS = Object.freeze([
 
 const RISE = (at) => landsAt(at, 0.45, { opacity: [0, 1], y: ['40%', '0%'] }, EASE_OUT);
 const TAB = landsAt(0.4, 0.5, { opacity: [0, 1], y: ['-100%', '0%'] }, EASE_OUT);
-const KICKER_IN = landsAt(0.8, 0.4, { opacity: [0, 1], y: ['0.5em', '0em'] }, EASE_OUT);
 const LINE_IN = [0.9, 1.0].map((at) => landsAt(at, 0.4, { opacity: [0, 1], y: ['0.35em', '0em'] }, EASE_SLAM));
 
 export default function VeteransPromo() {
@@ -78,7 +75,6 @@ export default function VeteransPromo() {
 
       <div className="veterans__stage" aria-hidden="true">
         <div className="veterans__copy">
-          <M.div className="veterans__kicker" {...KICKER_IN}>{KICKER}</M.div>
           <div className="veterans__headline">
             {HEADLINE.map((line, i) => (
               <M.div key={line} className="veterans__line" {...LINE_IN[i]}>{line}</M.div>

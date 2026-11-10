@@ -1,7 +1,7 @@
 /* ── Veterans Day (VeteransPromo.jsx) ────────────────────────────────────
    "Thank you, veterans": Awana blue, the flag's three bands along the foot, a
    navy corner tab with the church's logo, three white stars. The lobby's own
-   kit (Paytone One, Londrina Solid), not a poster's faces, so every rule is
+   kit (Paytone One), not a poster's faces, so every rule is
    .veterans* (src/lib/promoFonts.test.js). Flat: hard offsets, no gradient,
    blur or glow. The component owns the timing; this file owns the look.
 
@@ -17,7 +17,6 @@
   --u: min(1vw, 1.7778vh);
   --vet-navy: #26366f;
   --vet-red: #b82b32;
-  --vet-cream: #ffe8c2;
   color: #ffffff;
 }
 
@@ -79,21 +78,11 @@
 .veterans__copy {
   position: absolute;
   left: calc(var(--u) * 6.25);
-  top: calc(var(--u) * 11.7);
-}
-.veterans__kicker {
-  font-family: var(--font-condensed);
-  font-size: calc(var(--u) * 2.6);
-  line-height: 1;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  white-space: nowrap;
-  color: var(--vet-cream);
+  top: calc(var(--u) * 13);
 }
 .veterans__headline {
-  margin-top: calc(var(--u) * 0.73);
   font-family: var(--font-shout);
-  font-size: calc(var(--u) * 9.8);
+  font-size: calc(var(--u) * 10.6);
   line-height: 0.98;
   letter-spacing: 0.005em;
   text-transform: uppercase;
