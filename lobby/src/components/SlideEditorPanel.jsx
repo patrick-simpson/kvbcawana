@@ -607,7 +607,9 @@ export default function SlideEditorPanel({ config, syncedDeck, onChange, onClose
             style={{ display: 'none' }}
             onChange={onVideoPick}
           />
-          <button className="ghost" onClick={exportSlides} disabled={slides.length === 0}>Export</button>
+          <span title={slides.length === 0 ? 'Add at least one slide to export' : undefined}>
+            <button className="ghost" onClick={exportSlides} disabled={slides.length === 0}>Export</button>
+          </span>
           <button className="ghost" onClick={() => fileRef.current?.click()}>Import</button>
           <input
             ref={fileRef}
