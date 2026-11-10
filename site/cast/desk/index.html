@@ -6,160 +6,280 @@
 <meta name="robots" content="noindex, nofollow">
 <meta name="color-scheme" content="light dark">
 <title>Cast control</title>
-<!-- The lobby computer's Cast control (owner 2026-11-09): KVBC Awana's back-of-house
-     window on the second monitor while Cast is on. Standard Windows 11 look (Fluent 2),
-     on purpose NOT the church's or Awana's: system font (Segoe UI Variable), Mica-like
-     neutral page, white cards, the Windows accent blue, 32 px controls, 14 px text,
-     focus rings, high contrast (forced-colors) and dark mode follow Windows. desk.js;
-     controls.js is the presenter page's own code. -->
+<!-- The lobby computer's Cast control (owner 2026-11-09, redone 2026-11-10: "Rich Windows 11
+     native screen"): KVBC Awana's back-of-house window on the second monitor while Cast is
+     on. Windows 11 Fluent 2, on purpose NOT the church's or Awana's: system font (Segoe UI
+     Variable), a Mica base layer (the app's real Mica when window.awanaCastHost.material is
+     'mica', else a solid Mica-like base), a navigation pane straight on it, one large
+     "layer" panel for the content with stroke-defined cards (no drop shadows), settings
+     cards, the Windows accent (AccentColor), InfoBars, a ProgressRing, a live miniature of
+     the TV (window.awanaCastHost.preview(), local only), light/dark and high contrast
+     (forced-colors) following Windows. desk.js; controls.js is the presenter page's own
+     code, so every id and class it reaches stays. -->
 <style>
   :root {
-    --page: #F3F3F3; --card: #FFFFFF; --stroke: #E5E5E5; --stroke-strong: #D1D1D1;
-    --text: #1A1A1A; --text-2: #5C5C5C; --accent: #0067C0; --accent-hover: #1975C5; --accent-press: #3183CA; --on-accent: #FFFFFF;
-    --subtle: rgba(0, 0, 0, .04); --subtle-press: rgba(0, 0, 0, .07); --nav-sel: rgba(0, 0, 0, .06);
-    --ok: #0F7B0F; --bad: #C42B1C;
-    --shadow: 0 2px 4px rgba(0, 0, 0, .04), 0 0 2px rgba(0, 0, 0, .06);
+    --base: #F3F3F3;
+    --wash: radial-gradient(1100px 700px at 0% 0%, rgba(205, 214, 228, .42), transparent 70%), radial-gradient(1000px 640px at 100% 100%, rgba(226, 219, 210, .4), transparent 70%);
+    --layer: rgba(255, 255, 255, .5); --layer-stroke: rgba(0, 0, 0, .058);
+    --card: rgba(255, 255, 255, .7); --stroke: rgba(0, 0, 0, .058); --stroke-strong: rgba(0, 0, 0, .1);
+    --text: #1A1A1A; --text-2: #5C5C5C; --text-3: #8A8A8A;
+    --ctl: rgba(255, 255, 255, .7); --ctl-hover: rgba(249, 249, 249, .5); --ctl-press: rgba(249, 249, 249, .3);
+    --ctl-stroke: rgba(0, 0, 0, .058); --ctl-edge: rgba(0, 0, 0, .16);
+    --subtle: rgba(0, 0, 0, .0373); --subtle-press: rgba(0, 0, 0, .0241); --nav-sel: rgba(0, 0, 0, .0373);
+    --accent: #005FB8; --on-accent: #FFFFFF;
+    --focus: #000000; --focus-in: #FFFFFF;
+    --info-bg: rgba(0, 0, 0, .037); --info-ic: #005FB8;
+    --ok-bg: #DFF6DD; --ok-ic: #0F7B0F; --warn-bg: #FFF4CE; --warn-ic: #9D5D00; --bad-bg: #FDE7E9; --bad-ic: #C42B1C;
+    --live: #C42B1C;
     --font: "Segoe UI Variable Text", "Segoe UI Variable", "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
     --font-display: "Segoe UI Variable Display", "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
+    --flyout-shadow: 0 8px 16px rgba(0, 0, 0, .14);
     color-scheme: light;
   }
+  @supports (color: AccentColor) { :root { --accent: AccentColor; --on-accent: AccentColorText; } }
   @media (prefers-color-scheme: dark) {
     :root {
-      --page: #202020; --card: #2B2B2B; --stroke: #3A3A3A; --stroke-strong: #4A4A4A;
-      --text: #FFFFFF; --text-2: #C5C5C5; --accent: #4CC2FF; --accent-hover: #47B1E8; --accent-press: #42A1D2; --on-accent: #000000;
-      --subtle: rgba(255, 255, 255, .06); --subtle-press: rgba(255, 255, 255, .04); --nav-sel: rgba(255, 255, 255, .08);
-      --ok: #6CCB5F; --bad: #FF99A4;
-      --shadow: 0 2px 4px rgba(0, 0, 0, .26), 0 0 2px rgba(0, 0, 0, .3);
+      --base: #202020;
+      --wash: radial-gradient(1100px 700px at 0% 0%, rgba(70, 78, 92, .3), transparent 70%), radial-gradient(1000px 640px at 100% 100%, rgba(84, 76, 68, .26), transparent 70%);
+      --layer: rgba(58, 58, 58, .3); --layer-stroke: rgba(0, 0, 0, .1);
+      --card: rgba(255, 255, 255, .051); --stroke: rgba(0, 0, 0, .1); --stroke-strong: rgba(255, 255, 255, .1);
+      --text: #FFFFFF; --text-2: #C5C5C5; --text-3: #9E9E9E;
+      --ctl: rgba(255, 255, 255, .0605); --ctl-hover: rgba(255, 255, 255, .0837); --ctl-press: rgba(255, 255, 255, .0326);
+      --ctl-stroke: rgba(255, 255, 255, .0698); --ctl-edge: rgba(255, 255, 255, .0698);
+      --subtle: rgba(255, 255, 255, .0605); --subtle-press: rgba(255, 255, 255, .0326); --nav-sel: rgba(255, 255, 255, .0605);
+      --accent: #60CDFF; --on-accent: #000000;
+      --focus: #FFFFFF; --focus-in: #000000;
+      --info-bg: rgba(255, 255, 255, .0605); --info-ic: #60CDFF;
+      --ok-bg: #393D1B; --ok-ic: #6CCB5F; --warn-bg: #433519; --warn-ic: #FCE100; --bad-bg: #442726; --bad-ic: #FF99A4;
+      --live: #E5584A;
+      --flyout-shadow: 0 8px 16px rgba(0, 0, 0, .28);
       color-scheme: dark;
     }
+    @supports (color: AccentColor) { :root { --accent: AccentColor; --on-accent: AccentColorText; } }
   }
-  *, *::before, *::after { box-sizing: border-box; }
+
+  /* Icons used as masks (Fluent System Icons style: 20 px grid, regular, 1.5 px rounded strokes). */
+  :root {
+    --m-play: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M6.6 4.7v10.6c0 .5.5.8.9.5l8.4-5.3a.6.6 0 0 0 0-1L7.5 4.2c-.4-.3-.9 0-.9.5z' fill='black'/%3E%3C/svg%3E");
+    --m-pause: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Crect x='5' y='4' width='3.6' height='12' rx='1.1' fill='black'/%3E%3Crect x='11.4' y='4' width='3.6' height='12' rx='1.1' fill='black'/%3E%3C/svg%3E");
+    --m-back: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4.2 10a5.8 5.8 0 1 0 1.9-4.3'/%3E%3Cpath d='M4 3.4v3.2h3.2'/%3E%3Cpath d='M8.4 8.6l1-.6v4.6'/%3E%3Crect x='11' y='8' width='2.8' height='4.6' rx='1.4'/%3E%3C/svg%3E");
+    --m-ahead: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M15.8 10a5.8 5.8 0 1 1-1.9-4.3'/%3E%3Cpath d='M16 3.4v3.2h-3.2'/%3E%3Cpath d='M6.4 8.6l1-.6v4.6'/%3E%3Crect x='9' y='8' width='2.8' height='4.6' rx='1.4'/%3E%3C/svg%3E");
+    --m-vol: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3.5 8v4h2.9l3.6 3V5L6.4 8z'/%3E%3Cpath d='M13 7.2a4 4 0 0 1 0 5.6'/%3E%3Cpath d='M15.2 5.2a7 7 0 0 1 0 9.6'/%3E%3C/svg%3E");
+    --m-mute: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3.5 8v4h2.9l3.6 3V5L6.4 8z'/%3E%3Cpath d='M13.2 7.8l4 4.4M17.2 7.8l-4 4.4'/%3E%3C/svg%3E");
+    --m-x: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round'%3E%3Cpath d='M5 5l10 10M15 5L5 15'/%3E%3C/svg%3E");
+    --m-copy: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='7' y='7' width='9' height='9' rx='1.8'/%3E%3Cpath d='M13 7V5.8A1.8 1.8 0 0 0 11.2 4H5.8A1.8 1.8 0 0 0 4 5.8v5.4A1.8 1.8 0 0 0 5.8 13H7'/%3E%3C/svg%3E");
+    --m-info: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round'%3E%3Ccircle cx='10' cy='10' r='7.25'/%3E%3Cpath d='M10 9v4.6'/%3E%3Ccircle cx='10' cy='6.6' r='.5' fill='black'/%3E%3C/svg%3E");
+    --m-ok: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='10' cy='10' r='7.25'/%3E%3Cpath d='M6.8 10.2l2.2 2.2 4.2-4.6'/%3E%3C/svg%3E");
+    --m-err: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round'%3E%3Ccircle cx='10' cy='10' r='7.25'/%3E%3Cpath d='M7.7 7.7l4.6 4.6M12.3 7.7l-4.6 4.6'/%3E%3C/svg%3E");
+    --m-chev: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5.5 7.8l4.5 4.5 4.5-4.5'/%3E%3C/svg%3E");
+  }
+
+  * { box-sizing: border-box; }
   [hidden] { display: none !important; }
-  html, body { margin: 0; height: 100%; }
-  body { background: var(--page); color: var(--text); font: 400 14px/20px var(--font); -webkit-font-smoothing: antialiased; }
-  h1, h2, h3 { margin: 0; font-family: var(--font-display); font-weight: 600; }
-  h1 { font-size: 20px; line-height: 28px; }
-  h2 { font-size: 14px; line-height: 20px; }
-  p { margin: 0; }
+  html, body { height: 100%; margin: 0; }
+  html { background: var(--base); }
+  body { background: var(--wash) fixed, var(--base); color: var(--text); font: 400 14px/20px var(--font); -webkit-font-smoothing: antialiased; overflow: hidden; }
+  /* The app's own Mica (window.awanaCastHost.material === 'mica'): let it show through the
+     pane and the page margins. */
+  html.mica, html.mica body { background: transparent; }
+  h1, h2, h3, p, figure, ul { margin: 0; padding: 0; }
+  h1, h2, h3 { font-family: var(--font-display); font-weight: 600; }
+  ul { list-style: none; }
+  b { font-weight: 600; }
 
-  /* Controls: Windows 11 sizes (32 px, 4 px radius). */
-  button, input, textarea, .file-pick { font: inherit; color: inherit; }
+  /* Controls: Windows 11 sizes (32 px, 4 px radius), the elevation edge on the bottom. */
+  button, input, textarea, .file-pick, summary { font: inherit; color: inherit; }
   button, .file-pick {
-    display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 32px; padding: 5px 12px;
-    border: 1px solid var(--stroke-strong); border-radius: 4px; background: var(--card); color: var(--text); cursor: default;
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 32px; padding: 4px 12px;
+    border: 1px solid var(--ctl-stroke); border-bottom-color: var(--ctl-edge); border-radius: 4px; background: var(--ctl); color: var(--text);
+    cursor: default; white-space: nowrap;
   }
-  button:hover, .file-pick:hover { background: var(--subtle); }
-  button:active, .file-pick:active { background: var(--subtle-press); color: var(--text-2); }
-  button:disabled { color: var(--text-2); opacity: .55; }
-  .primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); font-weight: 600; }
-  .primary:hover { background: var(--accent-hover); }
-  .primary:active { background: var(--accent-press); color: var(--on-accent); }
-  .quiet { background: var(--card); }
+  button:hover, .file-pick:hover { background: var(--ctl-hover); }
+  button:active, .file-pick:active { background: var(--ctl-press); color: var(--text-2); }
+  button:disabled { color: color-mix(in srgb, var(--text) 36%, transparent); background: var(--subtle); border-color: var(--ctl-stroke); }
+  .primary { background: var(--accent); border-color: color-mix(in srgb, var(--accent) 80%, white 10%); border-bottom-color: color-mix(in srgb, var(--accent) 60%, black); color: var(--on-accent); }
+  .primary:hover { background: color-mix(in srgb, var(--accent) 90%, var(--base)); }
+  .primary:active { background: color-mix(in srgb, var(--accent) 80%, var(--base)); color: var(--on-accent); opacity: .9; }
+  .primary:disabled { background: var(--subtle); color: color-mix(in srgb, var(--text) 36%, transparent); }
+  .quiet { background: var(--ctl); }
+  .bare { border-color: transparent; background: transparent; }
+  .bare:hover { background: var(--subtle); }
+  .bare:active { background: var(--subtle-press); }
   input[type=text], input[type=url], input[type=search], textarea {
-    width: 100%; min-height: 32px; padding: 5px 10px; border: 1px solid var(--stroke-strong); border-bottom-color: var(--text-2);
-    border-radius: 4px; background: var(--card);
+    width: 100%; min-height: 32px; padding: 5px 10px; border: 1px solid var(--ctl-stroke); border-bottom-color: color-mix(in srgb, var(--text) 54%, transparent);
+    border-radius: 4px; background: var(--ctl);
   }
+  input::placeholder, textarea::placeholder { color: var(--text-3); }
   textarea { min-height: 96px; resize: vertical; }
-  input:focus, textarea:focus { outline: none; border-bottom: 2px solid var(--accent); }
-  :focus-visible { outline: 2px solid var(--text); outline-offset: 2px; border-radius: 4px; }
-  label { display: block; margin: 12px 0 4px; }
-  .opt { color: var(--text-2); }
+  input:hover, textarea:hover { background: var(--ctl-hover); }
+  /* The 1 px bottom line becomes a 2 px accent line on focus (the border grows, the box does not). */
+  input:focus, textarea:focus { outline: none; border-bottom: 2px solid var(--accent); padding-bottom: 4px; background: var(--card); }
+  :focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; box-shadow: 0 0 0 1px var(--focus-in); border-radius: 4px; }
+  input:focus-visible, textarea:focus-visible { outline: none; box-shadow: none; }
+  input[type=radio] { accent-color: var(--accent); width: 16px; height: 16px; margin: 0; }
   .file-pick { position: relative; }
-  .file-pick input { position: absolute; inset: 0; opacity: 0; cursor: default; }
-  .row { display: flex; gap: 8px; }
-  .row input { flex: 1; }
-  .help { margin-top: 8px; color: var(--text-2); font-size: 12px; line-height: 16px; }
-  .note { min-height: 20px; margin-top: 8px; color: var(--text-2); }
-  .note.bad, #share-state.bad { color: var(--bad); }
-  .or { margin: 16px 0 4px; color: var(--text-2); font-size: 12px; }
-  .looks { display: flex; gap: 16px; }
-  .looks label { display: inline-flex; gap: 6px; align-items: center; margin: 0; }
-  .card { background: var(--card); border: 1px solid var(--stroke); border-radius: 8px; box-shadow: var(--shadow); padding: clamp(16px, 1.3vw, 28px); }
+  .file-pick input { position: absolute; inset: 0; opacity: 0; cursor: default; width: 100%; }
+  .file-pick:focus-within { outline: 2px solid var(--focus); outline-offset: 1px; box-shadow: 0 0 0 1px var(--focus-in); }
+  .svg-ic, .icon { flex: none; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+  .icon .f { fill: currentColor; stroke: none; opacity: 0; }
+  .row { display: flex; gap: 8px; width: 100%; }
+  .row input { flex: 1; min-width: 0; }
 
-  /* The window: title strip, then the navigation pane (full height) | the content area.
-     The content area fills the rest of the window with 24 px padding: the connection card
-     across the top (the hero, it scales with the window), then what to show (inputs capped
-     at a readable measure) beside "On the TV now", which takes the remaining width. Both
-     lower cards stretch to the window's foot and scroll inside themselves, so no blank
-     band is left to the right or below. */
-  #desk { display: grid; grid-template-rows: auto 1fr; height: 100%; }
-  .top { display: flex; align-items: center; gap: 12px; padding: 12px 24px; }
-  .cols { display: grid; grid-template-columns: 208px minmax(0, 1fr); gap: 24px; padding: 0 24px 24px; min-height: 0; }
-  .content { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); gap: 16px 24px; min-height: 0; min-width: 0; }
-  .hero { grid-column: 1 / -1; }
-  .choices { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
-  .choice { width: 100%; justify-content: flex-start; gap: 12px; border: 0; background: transparent; min-height: 36px; padding: 8px 12px; position: relative; text-align: left; }
+  /* Mask icons on buttons whose words controls.js rewrites (so they live in CSS, not in the text). */
+  .mi::before, .note::before, .chev::after {
+    content: ''; flex: none; width: 20px; height: 20px; background: currentColor;
+    -webkit-mask: var(--mi) center / contain no-repeat; mask: var(--mi) center / contain no-repeat;
+  }
+  .icon-btn { width: 40px; height: 40px; padding: 0; border-color: transparent; background: transparent; font-size: 0; line-height: 0; }
+  .icon-btn:hover { background: var(--subtle); }
+  .icon-btn:active { background: var(--subtle-press); }
+  .play { width: 48px; height: 48px; padding: 0; border-radius: 50%; font-size: 0; line-height: 0; }
+  .play::before { width: 22px; height: 22px; }
+  [data-op="seek"][data-by="-10"] { --mi: var(--m-back); }
+  [data-op="seek"][data-by="10"] { --mi: var(--m-ahead); }
+  #btn-play { --mi: var(--m-pause); }
+  #btn-play[data-paused="true"] { --mi: var(--m-play); }
+  #btn-mute { --mi: var(--m-vol); }
+  #btn-mute[data-op="unmute"] { --mi: var(--m-mute); }
+  #btn-down { --mi: var(--m-x); }
+  #btn-copy { --mi: var(--m-copy); }
+
+  /* Cards: stroke-defined, no drop shadow. */
+  .card, .group { background: var(--card); border: 1px solid var(--stroke); border-radius: 8px; }
+  .group { overflow: hidden; }
+  .card { padding: 20px; }
+
+  /* The window: the navigation pane sits straight on the base (Mica) layer; the content is
+     one large layer with a rounded top-left corner. */
+  #desk { display: grid; grid-template-columns: 280px minmax(0, 1fr); height: 100%; }
+  .pane { display: flex; flex-direction: column; min-height: 0; padding: 12px 8px 12px; gap: 8px; }
+  .apptitle { display: flex; align-items: center; gap: 12px; padding: 8px 12px 12px; }
+  .apptitle h1 { font-size: 20px; line-height: 28px; }
+  .apptitle .glyph { width: 24px; height: 24px; color: var(--accent); }
+  .navwrap { position: relative; }
+  .choices { display: flex; flex-direction: column; gap: 4px; }
+  .choice { width: 100%; justify-content: flex-start; gap: 12px; border: 0; background: transparent; min-height: 36px; padding: 0 12px; position: relative; text-align: left; border-radius: 4px; }
   .choice:hover { background: var(--subtle); }
-  .choice[aria-current="page"] { background: var(--nav-sel); font-weight: 600; }
-  .choice[aria-current="page"]::before { content: ''; position: absolute; left: 0; top: 10px; bottom: 10px; width: 3px; border-radius: 2px; background: var(--accent); }
-  .icon { flex: none; fill: none; stroke: currentColor; stroke-width: 1.25; stroke-linecap: round; stroke-linejoin: round; }
-  .choice b { font-weight: 400; }
-  .choice[aria-current="page"] b { font-weight: 600; }
-  .choice span { display: none; }
-  .main { display: flex; flex-direction: column; overflow: auto; min-height: 0; min-width: 0; height: min(100%, 760px); }
-  .main > .panel { flex: 1 0 auto; }
-  .panel > form, .panel > .row, .panel > .note, .panel > .help, .panel > .ready, .panel > .results, .panel > .or, .panel > label, .panel > .controls { max-width: 720px; }
-  .panel > .thumbs { max-width: 960px; }
-  .panel h2 { margin-bottom: 4px; font-size: 20px; line-height: 28px; }
-  .panel > .help:first-of-type { margin-top: 0; }
-  .side { display: flex; flex-direction: column; overflow: auto; min-height: 0; min-width: 0; height: min(100%, 760px); }
-  .side > .card { flex: 1 0 auto; }
+  .choice:active { background: var(--subtle-press); color: var(--text); }
+  .choice[aria-current="page"] { background: var(--nav-sel); }
+  .choice[aria-current="page"]:hover { background: color-mix(in srgb, var(--nav-sel) 100%, var(--subtle)); }
+  .choice[aria-current="page"] .f { opacity: .24; }
+  .choice b { font-weight: 400; overflow: hidden; text-overflow: ellipsis; }
+  .pill { position: absolute; left: 0; top: 0; width: 3px; height: 16px; border-radius: 3px; background: var(--accent); transform: translateY(var(--y, 10px)); pointer-events: none; }
+  .panefoot { margin-top: auto; display: grid; gap: 8px; padding: 12px 4px 0; border-top: 1px solid var(--stroke-strong); }
+  .presence { display: flex; align-items: center; gap: 10px; padding: 4px 8px; color: var(--text-2); }
+  .pdot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-3); flex: none; }
+  .presence[data-on="true"] { color: var(--text); }
+  .presence[data-on="true"] .pdot { background: var(--ok-ic); }
+  .panefoot button { width: 100%; justify-content: flex-start; }
 
-  /* The code: the hero, always shown here. It grows with the window (64 px code and
-     200 px QR at 1366 wide, about 120 px and 320 px at 2560) so it reads from a few feet. */
-  .hero { display: grid; grid-template-columns: auto auto minmax(0, 1fr); gap: 8px clamp(24px, 3vw, 72px); align-items: center; padding: clamp(20px, 1.6vw, 36px) clamp(24px, 2vw, 48px); }
-  .hero-words { display: grid; gap: 4px; align-content: center; min-width: 0; }
-  .hero-side { grid-column: 3; display: grid; gap: 8px; align-content: center; min-width: 0; padding-left: clamp(24px, 3vw, 72px); border-left: 1px solid var(--stroke); }
-  .hero .label { color: var(--text-2); }
-  .hero .label, #tv-h { display: flex; align-items: center; gap: 8px; }
-  #desk-code { font: 600 clamp(56px, 4.7vw, 124px)/1.1 var(--font-display); letter-spacing: .08em; word-spacing: .22em; font-variant-numeric: tabular-nums; white-space: nowrap; margin: 4px 0; }
-  .hero-help { color: var(--text-2); font-size: clamp(14px, .9vw, 20px); line-height: 1.45; }
-  #desk-qr-box { margin: 0; display: grid; justify-items: center; gap: 8px; }
-  #desk-qr { display: block; width: clamp(200px, 12.5vw, 330px); height: auto; aspect-ratio: 1; image-rendering: pixelated; border: 1px solid var(--stroke-strong); border-radius: 4px; }
-  #desk-addr { font-weight: 600; }
-  #desk-presenter { display: flex; align-items: center; gap: 8px; color: var(--text-2); font-size: clamp(14px, .9vw, 20px); }
-  #desk-presenter::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--text-2); flex: none; }
-  #desk-presenter[data-on="true"] { color: var(--ok); }
-  #desk-presenter[data-on="true"]::before { background: var(--ok); }
+  .layer {
+    min-width: 0; min-height: 0; overflow: auto; background: var(--layer); border: 1px solid var(--layer-stroke); border-right: 0; border-bottom: 0;
+    border-top-left-radius: 8px;
+  }
+  .cols { display: grid; grid-template-columns: minmax(520px, 1fr) clamp(420px, 26vw, 600px); gap: 24px; max-width: 2100px; margin: 0 auto; padding: 24px clamp(24px, 2.4vw, 56px) 40px; align-items: start; }
+  .left { min-width: 0; }
+  .right { position: sticky; top: 24px; display: grid; gap: 12px; min-width: 0; }
+  .pagehead { padding: 8px 0 16px; }
+  .pagehead h1 { font-size: 28px; line-height: 36px; }
+  .pagehead p { color: var(--text-2); margin-top: 2px; }
+  .main { display: block; }
+  .panel { display: grid; gap: 4px; align-content: start; }
+  .panel > * { min-width: 0; }
 
-  /* On the TV now. */
-  .tv-main { display: flex; gap: 12px; align-items: center; font: 600 clamp(20px, 1.5vw, 34px)/1.25 var(--font-display); margin-top: 8px; }
-  .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--text-2); flex: none; }
-  #tv[data-online="true"] .dot { background: var(--ok); }
-  .tv-sub { color: var(--text-2); margin-top: 2px; font-size: clamp(14px, 1vw, 22px); line-height: 1.4; }
-  .tv-sub:empty { display: none; }
-  .controls { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
-  #ctl-video { display: grid; grid-template-columns: repeat(3, minmax(112px, 168px)); gap: 8px; margin-top: 16px; }
-  #ctl-video[hidden] { display: none; }
-  #ctl-video .vol { grid-column: span 2; }
-  #ctl-video .vol-level { flex: 1; }
-  .vol { display: inline-flex; align-items: center; gap: 4px; }
-  .vol .quiet { min-width: 32px; padding: 5px 0; font-size: 16px; line-height: 20px; }
-  .vol-level { min-width: 112px; text-align: center; font-variant-numeric: tabular-nums; }
-  .room { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--stroke); }
-  .room .controls { margin-top: 0; }
-  #press-note { margin-top: 12px; }
+  /* Settings cards: icon, words on the left, the control on the right (or below). */
+  .setting { display: flex; align-items: center; gap: 16px; padding: 14px 16px; min-height: 64px; flex-wrap: wrap; }
+  .setting + .setting, .xbody { border-top: 1px solid var(--stroke); }
+  .setting > .svg-ic { color: var(--text); }
+  .txt { flex: 1 1 220px; min-width: 0; }
+  .txt label, .txt .t { display: block; font-weight: 400; color: var(--text); }
+  .txt small { display: block; color: var(--text-2); font-size: 12px; line-height: 16px; margin-top: 1px; }
+  .ctl { flex: 0 1 auto; min-width: 0; }
+  .stack .ctl { flex: 1 0 100%; padding-left: 36px; }
+  .actions { justify-content: flex-end; }
+  .expander summary { list-style: none; cursor: default; }
+  .expander summary::-webkit-details-marker { display: none; }
+  .expander summary:hover { background: var(--subtle); }
+  .expander .chev::after { --mi: var(--m-chev); width: 16px; height: 16px; margin-left: auto; }
+  .expander[open] .chev::after { transform: scaleY(-1); }
+  .xbody { padding: 4px 16px 16px 52px; display: grid; gap: 12px; }
+  .xbody .field { display: grid; gap: 4px; }
+  .xbody .help, .help { color: var(--text-2); font-size: 12px; line-height: 16px; }
+  .looks { display: flex; gap: 20px; }
+  .looks label { display: inline-flex; gap: 8px; align-items: center; margin: 0; }
+  .fieldrow { display: grid; gap: 4px; }
+
+  /* InfoBars: icon + words, severity by colour. The ProgressRing replaces the icon while working. */
+  .note { display: flex; align-items: flex-start; gap: 12px; padding: 10px 12px; border-radius: 4px; border: 1px solid var(--stroke); background: var(--info-bg); --mi: var(--m-info); }
+  .note:empty { display: none; }
+  .note::before { color: var(--info-ic); margin-top: 0; }
+  .note.bad { background: var(--bad-bg); --mi: var(--m-err); }
+  .note.bad::before { color: var(--bad-ic); }
+  #press-note[data-sev="ok"] { background: var(--ok-bg); --mi: var(--m-ok); }
+  #press-note[data-sev="ok"]::before { color: var(--ok-ic); }
+  .note.working::before { -webkit-mask: none; mask: none; background: none; width: 16px; height: 16px; margin: 2px 2px 0; border: 2px solid color-mix(in srgb, var(--accent) 25%, transparent); border-top-color: var(--accent); border-radius: 50%; }
 
   /* Search results, pictures, ready files. */
-  .results { list-style: none; margin: 8px 0 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 8px; }
+  .results li { display: contents; }
+  .results { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 4px; }
   .results:empty { display: none; }
-  .result { width: 100%; justify-content: flex-start; gap: 12px; padding: 6px; text-align: left; }
-  .result img { width: 96px; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 4px; flex: none; }
+  .result { width: 100%; justify-content: flex-start; gap: 12px; padding: 6px; text-align: left; white-space: normal; background: var(--card); border-color: var(--stroke); border-radius: 8px; min-height: 0; }
+  .result:hover { background: var(--subtle); }
+  .result img { width: 120px; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 4px; flex: none; }
   .result b { display: block; font-weight: 600; }
   .result span { color: var(--text-2); font-size: 12px; }
-  .thumbs { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px; margin-top: 12px; }
-  .thumb { aspect-ratio: 4 / 3; padding: 0; overflow: hidden; }
+  .thumbs { display: grid; grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: 8px; }
+  .thumbs:empty { display: none; }
+  .thumb { aspect-ratio: 4 / 3; padding: 0; overflow: hidden; border-radius: 8px; }
   .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
   .thumb[aria-pressed="true"] { outline: 2px solid var(--accent); outline-offset: 2px; }
-  .ready { margin-top: 12px; padding: 8px 12px; border: 1px solid var(--stroke); border-radius: 4px; display: flex; gap: 12px; align-items: center; justify-content: space-between; }
+  .ready { padding: 8px 12px 8px 16px; display: flex; gap: 12px; align-items: center; justify-content: space-between; }
+
+  /* The TV card: a miniature of the TV in a slim monitor bezel. */
+  .cardhead { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+  .cardhead h2 { font-size: 20px; line-height: 28px; }
+  .live { display: inline-flex; align-items: center; gap: 6px; padding: 1px 8px 1px 7px; border-radius: 4px; background: var(--live); color: #fff; font: 600 11px/18px var(--font); letter-spacing: .06em; }
+  .live::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: #fff; }
+  .monitor { display: grid; justify-items: center; }
+  .bezel { width: 100%; padding: 6px; border-radius: 8px; background: #1C1C1C; border: 1px solid rgba(0, 0, 0, .5); }
+  .screen { position: relative; aspect-ratio: 16 / 9; border-radius: 3px; overflow: hidden; background: #111; color: #9A9A9A; }
+  .screen img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; display: block; background: #000; }
+  .ph { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: 10px; background: #161616; }
+  .ph svg { width: 56px; height: 56px; display: none; fill: none; stroke: currentColor; stroke-width: 1.25; stroke-linecap: round; stroke-linejoin: round; }
+  .ph .cap { font-size: 12px; line-height: 16px; color: #8F8F8F; }
+  #tv-mini[data-kind="code"] .g-code, #tv-mini[data-kind="video"] .g-video, #tv-mini[data-kind="slides"] .g-slides, #tv-mini[data-kind="picture"] .g-picture,
+  #tv-mini[data-kind="text"] .g-text, #tv-mini[data-kind="share"] .g-share, #tv-mini[data-kind="off"] .g-off { display: block; }
+  .screen[data-shot="true"] .ph { display: none; }
+  .stand { width: 18%; height: 10px; background: #2B2B2B; clip-path: polygon(10% 0, 90% 0, 100% 100%, 0 100%); }
+  .stand::after { content: ''; display: block; }
+  .foot { width: 34%; height: 4px; border-radius: 2px; background: #2B2B2B; }
+  .tv-main { display: flex; gap: 10px; align-items: center; font: 600 16px/22px var(--font-display); margin-top: 16px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-3); flex: none; }
+  #tv[data-online="true"] .dot { background: var(--ok-ic); }
+  .tv-sub { color: var(--text-2); margin-top: 2px; }
+  .tv-sub:empty { display: none; }
+  .progress { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 12px; margin-top: 12px; color: var(--text-2); font-size: 12px; font-variant-numeric: tabular-nums; }
+  .track { position: relative; height: 4px; border-radius: 2px; background: color-mix(in srgb, var(--text) 54%, transparent); }
+  .track .fill { position: absolute; left: 0; top: 0; bottom: 0; width: var(--p, 0%); border-radius: 2px; background: var(--accent); }
+  .track .knob { position: absolute; top: 50%; left: var(--p, 0%); width: 20px; height: 20px; margin: -10px 0 0 -10px; border-radius: 50%; background: var(--card); border: 1px solid var(--stroke-strong); }
+  .track .knob::after { content: ''; position: absolute; inset: 4px; border-radius: 50%; background: var(--accent); }
+  #ctl-video { display: grid; gap: 8px; margin-top: 8px; }
+  .transport { display: flex; justify-content: center; align-items: center; gap: 16px; }
+  .volrow { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .vol { display: inline-flex; align-items: center; gap: 4px; }
+  .vol .quiet { min-width: 32px; padding: 4px 0; font-size: 16px; line-height: 20px; }
+  .vol-level { min-width: 124px; text-align: center; font-variant-numeric: tabular-nums; }
+  #btn-down { margin-top: 12px; width: 100%; }
+  #press-note { margin-top: 12px; }
 
   /* The slides on the TV (preview.js): this one, the next, every slide. */
-  .slides { margin-top: 12px; max-width: min(100%, 760px); }
+  .slides { margin-top: 12px; }
   .slide-now { position: relative; aspect-ratio: 16 / 9; background: #000; border-radius: 4px; overflow: hidden; }
   .slide-now canvas, .slide-next canvas { display: block; width: 100%; height: 100%; object-fit: contain; }
+  .tvcard[data-shot="true"] .slide-now { height: 0; aspect-ratio: auto; }
   .slides[data-preview="none"] .slide-now, .slides[data-preview="none"] .slide-next, .slides[data-preview="none"] .strip { display: none; }
   .slides[data-preview="loading"] .slide-now::after { content: 'Loading the slides…'; position: absolute; inset: 0; display: grid; place-items: center; color: #fff; }
-  .slide-row { display: grid; grid-template-columns: 45% 1fr; gap: 12px; margin-top: 8px; align-items: start; }
+  .slide-row { display: grid; grid-template-columns: 42% 1fr; gap: 12px; margin-top: 8px; align-items: start; }
   .slides[data-preview="none"] .slide-row { grid-template-columns: 1fr; }
   .slide-next canvas { aspect-ratio: 16 / 9; background: var(--subtle); border-radius: 4px; }
   .slide-cap { display: block; color: var(--text-2); font-size: 12px; margin-bottom: 4px; }
@@ -167,7 +287,7 @@
   .slide-next[data-end="true"] canvas { display: none; }
   .slide-next[data-end="true"] .slide-endword { display: grid; }
   .slide-buttons { display: grid; gap: 8px; }
-  .slides[data-preview="none"] .slide-buttons { grid-template-columns: repeat(2, minmax(0, 168px)); }
+  .slides[data-preview="none"] .slide-buttons { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .slides[data-preview="none"] .slide-label { grid-column: 1 / -1; }
   .slide-label { font-weight: 600; font-variant-numeric: tabular-nums; }
   .strip { display: flex; gap: 6px; overflow-x: auto; margin-top: 8px; padding-bottom: 6px; }
@@ -176,198 +296,312 @@
   .strip-slide span { position: absolute; left: 3px; bottom: 3px; padding: 0 4px; border-radius: 2px; background: rgba(0, 0, 0, .7); color: #fff; font-size: 11px; }
   .strip-slide[aria-current="true"] { outline: 2px solid var(--accent); outline-offset: 1px; }
 
-  /* Not in the app: a calm note. */
-  #desk-off { max-width: 520px; margin: 15vh auto 0; }
-  #desk-off h1 { margin-bottom: 8px; }
-  #desk-off p + p { margin-top: 12px; }
+  /* Connect a presenter: the code large, the QR on a white tile, the address with Copy. */
+  .conn-body { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px 20px; }
+  .eyebrow { color: var(--text-2); }
+  #desk-code { font: 600 clamp(40px, 2.9vw, 56px)/1.1 var(--font-display); letter-spacing: .06em; font-variant-numeric: tabular-nums; white-space: nowrap; margin-top: 2px; }
+  #desk-qr-box { margin: 0; }
+  .qrtile { padding: 10px; border-radius: 8px; background: #fff; border: 1px solid var(--stroke-strong); line-height: 0; }
+  #desk-qr { display: block; width: clamp(112px, 6.6vw, 148px); height: auto; aspect-ratio: 1; image-rendering: pixelated; }
+  .addr { display: flex; align-items: center; gap: 4px; margin-top: 16px; }
+  #desk-addr { font-weight: 600; word-break: break-all; }
+  #copy-note { color: var(--text-2); font-size: 12px; margin-left: 4px; }
+  .conn .help { margin-top: 4px; }
 
-  /* Smaller windows: the window scrolls as one page, the code first. */
+  /* Not in the app: an empty state. */
+  #desk-off { display: grid; justify-items: center; align-content: center; gap: 8px; height: 100%; padding: 32px; text-align: center; }
+  #desk-off svg { width: 64px; height: 64px; color: var(--text-3); margin-bottom: 8px; }
+  #desk-off h1 { font-size: 28px; line-height: 36px; }
+  #desk-off p { color: var(--text-2); max-width: 520px; }
+  #desk-off p b { color: var(--text); }
+
+  /* Narrower windows: the pane becomes a 48 px icon rail, and under 1100 px the right
+     column drops under the left. */
+  @media (max-width: 1365px) { .cols { grid-template-columns: minmax(480px, 1fr) 380px; } }
   @media (max-width: 1100px) {
-    html, body { height: auto; }
-    #desk { height: auto; min-height: 100%; }
-    .cols { grid-template-columns: minmax(0, 1fr); gap: 16px; }
-    .content { grid-template-columns: minmax(0, 1fr); grid-template-rows: none; }
-    .hero-side { padding-left: 0; border-left: 0; }
-    .choices { flex-direction: row; flex-wrap: wrap; }
-    .choice { width: auto; }
-    .main, .side { overflow: visible; }
+    body { overflow: auto; }
+    #desk { grid-template-columns: 56px minmax(0, 1fr); }
+    .pane { padding: 12px 4px; }
+    .apptitle { padding: 8px 8px 12px; justify-content: center; }
+    .apptitle h1, .choice b, .panefoot .lbl, .presence span:not(.pdot) { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+    .choice, .panefoot button { padding: 0; justify-content: center; }
+    .presence { justify-content: center; padding: 4px 0; }
+    .cols { grid-template-columns: minmax(0, 1fr); padding: 16px 16px 32px; }
+    .right { position: static; max-width: 640px; }
   }
-  @media (max-width: 1100px) { .hero { grid-template-columns: auto minmax(0, 1fr); } .hero-side { grid-column: 1 / -1; padding-top: 8px; } }
-  @media (max-width: 640px) { .hero { grid-template-columns: minmax(0, 1fr); } }
+  /* A short window: the code goes first, so it is on screen without scrolling. */
+  @media (min-width: 1101px) and (max-height: 880px) { .conn { order: -1; } }
+  @media (max-width: 640px) { .stack .ctl { padding-left: 0; } .row { flex-wrap: wrap; } }
+
+  /* Motion: Windows 11 timings (83 ms hover, 167 ms control state, 250 ms page entrance,
+     fast-out curve). Resting styles above are the final frame. Nothing loops but the
+     ProgressRing and a gentle LIVE dot. */
+  @media (prefers-reduced-motion: no-preference) {
+    button, .file-pick, .setting, .result, input, textarea { transition: background-color 83ms linear, border-color 83ms linear; }
+    .pill { transition: transform 167ms cubic-bezier(0, 0, 0, 1); }
+    .panel, .pagehead, #desk-off { animation: drill 250ms cubic-bezier(0, 0, 0, 1) backwards; }
+    .pagehead.again { animation: drill 250ms cubic-bezier(0, 0, 0, 1) backwards; }
+    .cols { animation: drill 333ms cubic-bezier(0, 0, 0, 1) backwards; }
+    .note.working::before { animation: ring 900ms linear infinite; }
+    .live::before { animation: pulse 2.4s ease-in-out infinite; }
+    .expander .chev::after { transition: transform 167ms cubic-bezier(0, 0, 0, 1); }
+    .track .fill, .track .knob { transition: width 1.8s linear, left 1.8s linear; }
+    @keyframes drill { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+    @keyframes ring { to { transform: rotate(360deg); } }
+    @keyframes pulse { 50% { opacity: .35; } }
+  }
 
   /* High contrast (forced colors): Windows' own colours, every control outlined. */
   @media (forced-colors: active) {
-    .card, button, .file-pick, input, textarea { border: 1px solid CanvasText; }
-    .primary { background: Highlight; color: HighlightText; forced-color-adjust: none; }
+    body, html { background: Canvas; }
+    .card, .group, .layer, button, .file-pick, input, textarea, .note, .bezel { border: 1px solid CanvasText; }
+    .primary { background: Highlight; color: HighlightText; border-color: Highlight; forced-color-adjust: none; }
     .choice[aria-current="page"] { outline: 2px solid Highlight; }
-    .choice[aria-current="page"]::before, .dot, #desk-presenter::before { background: CanvasText; forced-color-adjust: none; }
-    :focus-visible { outline: 2px solid Highlight; }
-    #desk-qr { forced-color-adjust: none; }
+    .pill { background: Highlight; forced-color-adjust: none; }
+    .dot, .pdot, .live { background: CanvasText; forced-color-adjust: none; }
+    .live { color: Canvas; }
+    .mi::before, .note::before, .chev::after { background: CanvasText; }
+    .note.working::before { border-color: GrayText; border-top-color: Highlight; }
+    .track { background: GrayText; } .track .fill, .track .knob::after { background: Highlight; }
+    :focus-visible { outline: 2px solid Highlight; box-shadow: none; }
+    #desk-qr, .qrtile { forced-color-adjust: none; }
+    .screen, .screen img, .ph { forced-color-adjust: none; }
   }
 </style>
 </head>
 <body>
-<!-- Not in KVBC Awana: a calm note. -->
-<main id="desk-off" class="card" hidden>
+<!-- Not in KVBC Awana: an empty state. -->
+<main id="desk-off" hidden>
+  <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3 6.2V5.5A1.5 1.5 0 0 1 4.5 4h11A1.5 1.5 0 0 1 17 5.5v9a1.5 1.5 0 0 1-1.5 1.5H11"/><path d="M3 9.2a6.8 6.8 0 0 1 6.8 6.8M3 12.4a3.6 3.6 0 0 1 3.6 3.6"/><circle cx="3.5" cy="15.5" r=".6" fill="currentColor"/></svg>
   <h1 id="desk-off-title">Open this on the lobby computer</h1>
   <p id="desk-off-words"></p>
   <p><b id="desk-off-addr">cast.kvbchurch.org</b></p>
 </main>
 
 <div id="desk" hidden>
-  <header class="top">
-    <h1>Cast control</h1>
-  </header>
-  <div class="cols">
+  <aside class="pane">
+    <div class="apptitle">
+      <svg class="glyph svg-ic" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="M3 6.2V5.5A1.5 1.5 0 0 1 4.5 4h11A1.5 1.5 0 0 1 17 5.5v9a1.5 1.5 0 0 1-1.5 1.5H11"/><path d="M3 9.2a6.8 6.8 0 0 1 6.8 6.8M3 12.4a3.6 3.6 0 0 1 3.6 3.6"/><circle cx="3.5" cy="15.5" r=".6" fill="currentColor"/></svg>
+      <h1>Cast control</h1>
+    </div>
     <nav aria-label="What to show">
-      <ul class="choices">
-        <li><button class="choice" type="button" aria-expanded="true" aria-current="page" aria-controls="p-video"><svg class="icon" viewBox="0 0 20 20" width="20" height="20" aria-hidden="true" focusable="false"><rect x="2.5" y="4" width="15" height="12" rx="3"/><path d="M8.5 7.6v4.8l4-2.4z"/></svg><b>YouTube</b><span>Search, or paste a link.</span></button></li>
-        <li><button class="choice" type="button" aria-expanded="false" aria-controls="p-fb"><svg class="icon" viewBox="0 0 20 20" width="20" height="20" aria-hidden="true" focusable="false"><rect x="2.5" y="5.5" width="10.5" height="9" rx="2"/><path d="M13 9l4.5-2.5v7L13 11z"/></svg><b>Facebook video</b><span>A public video.</span></button></li>
-        <li><button class="choice" type="button" aria-expanded="false" aria-controls="p-pdf"><svg class="icon" viewBox="0 0 20 20" width="20" height="20" aria-hidden="true" focusable="false"><path d="M3 4h14M4.5 4v8.5a1 1 0 001 1h9a1 1 0 001-1V4"/><path d="M10 13.5v3M7.5 16.5h5"/></svg><b>Slides</b><span>PowerPoint, PDF, Google Slides.</span></button></li>
-        <li><button class="choice" type="button" aria-expanded="false" aria-controls="p-pics"><svg class="icon" viewBox="0 0 20 20" width="20" height="20" aria-hidden="true" focusable="false"><rect x="3" y="3.5" width="14" height="13" rx="2.5"/><circle cx="7.5" cy="8" r="1.3"/><path d="M3.5 14l4-3.8 3 2.8 2.5-2.2 3.5 3.4"/></svg><b>Pictures</b><span>Pictures from this computer.</span></button></li>
-        <li><button class="choice" type="button" aria-expanded="false" aria-controls="p-clip"><svg class="icon" viewBox="0 0 20 20" width="20" height="20" aria-hidden="true" focusable="false"><path d="M5.5 2.5h6l4 4v9a2 2 0 01-2 2h-8a2 2 0 01-2-2v-11a2 2 0 012-2z"/><path d="M11.5 2.5v4h4"/><path d="M8.3 9.8v4l3.2-2z"/></svg><b>Video file</b><span>A video from this computer.</span></button></li>
-        <li><button class="choice" type="button" aria-expanded="false" aria-controls="p-text"><svg class="icon" viewBox="0 0 20 20" width="20" height="20" aria-hidden="true" focusable="false"><path d="M3.5 5.5h13M3.5 9.5h13M3.5 13.5h8"/></svg><b>Text</b><span>A verse or an announcement.</span></button></li>
-      </ul>
+      <div class="navwrap">
+        <span class="pill" id="nav-pill" aria-hidden="true"></span>
+        <ul class="choices">
+          <li><button class="choice" type="button" aria-expanded="true" aria-current="page" aria-controls="p-video" title="YouTube" data-title="YouTube" data-cap="Search YouTube, or paste a link, and play it on the TV."><svg class="icon" viewBox="0 0 20 20" width="20" height="20" aria-hidden="true" focusable="false"><rect class="f" x="2.5" y="4" width="15" height="12" rx="3"/><rect x="2.5" y="4" width="15" height="12" rx="3"/><path d="M8.5 7.6v4.8l4-2.4z"/></svg><b>YouTube</b></button></li>
+          <li><button class="choice" type="button" aria-expanded="false" aria-controls="p-fb" title="Facebook video" data-title="Facebook video" data-cap="Play a public Facebook video on the TV."><svg class="icon" viewBox="0 0 20 20" width="20" height="20" aria-hidden="true" focusable="false"><rect class="f" x="2.5" y="5.5" width="10.5" height="9" rx="2"/><rect x="2.5" y="5.5" width="10.5" height="9" rx="2"/><path d="M13 9l4.5-2.5v7L13 11z"/></svg><b>Facebook video</b></button></li>
+          <li><button class="choice" type="button" aria-expanded="false" aria-controls="p-pdf" title="Slides" data-title="Slides" data-cap="PowerPoint, PDF or Google Slides, stepped through from here."><svg class="icon" viewBox="0 0 20 20" width="20" height="20" aria-hidden="true" focusable="false"><rect class="f" x="3" y="3.5" width="14" height="9.5" rx="1.8"/><rect x="3" y="3.5" width="14" height="9.5" rx="1.8"/><path d="M10 13v3.5M7 16.5h6"/></svg><b>Slides</b></button></li>
+          <li><button class="choice" type="button" aria-expanded="false" aria-controls="p-pics" title="Pictures" data-title="Pictures" data-cap="Show pictures from this computer."><svg class="icon" viewBox="0 0 20 20" width="20" height="20" aria-hidden="true" focusable="false"><rect class="f" x="3" y="3.5" width="14" height="13" rx="2.5"/><rect x="3" y="3.5" width="14" height="13" rx="2.5"/><circle cx="7.5" cy="8" r="1.3"/><path d="M3.5 14l4-3.8 3 2.8 2.5-2.2 3.5 3.4"/></svg><b>Pictures</b></button></li>
+          <li><button class="choice" type="button" aria-expanded="false" aria-controls="p-clip" title="Video file" data-title="Video file" data-cap="Play a video from this computer."><svg class="icon" viewBox="0 0 20 20" width="20" height="20" aria-hidden="true" focusable="false"><path class="f" d="M5.5 2.5h6l4 4v9a2 2 0 01-2 2h-8a2 2 0 01-2-2v-11a2 2 0 012-2z"/><path d="M5.5 2.5h6l4 4v9a2 2 0 01-2 2h-8a2 2 0 01-2-2v-11a2 2 0 012-2z"/><path d="M11.5 2.5v4h4"/><path d="M8.3 9.8v4l3.2-2z"/></svg><b>Video file</b></button></li>
+          <li><button class="choice" type="button" aria-expanded="false" aria-controls="p-text" title="Text" data-title="Text" data-cap="A verse or an announcement, big on the TV."><svg class="icon" viewBox="0 0 20 20" width="20" height="20" aria-hidden="true" focusable="false"><rect class="f" x="2.5" y="3.5" width="15" height="13" rx="2.5"/><path d="M3.5 5.5h13M3.5 9.5h13M3.5 13.5h8"/></svg><b>Text</b></button></li>
+        </ul>
+      </div>
     </nav>
+    <div class="panefoot">
+      <div class="presence" id="presence" data-on="false" title="Presenter: none connected"><span class="pdot" aria-hidden="true"></span><span id="desk-presenter" data-on="false" role="status">Presenter: none connected</span></div>
+      <button class="quiet" type="button" id="btn-reveal"><svg class="svg-ic" viewBox="0 0 20 20" width="20" height="20" aria-hidden="true" focusable="false"><rect x="3" y="3" width="5" height="5" rx="1"/><rect x="12" y="3" width="5" height="5" rx="1"/><rect x="3" y="12" width="5" height="5" rx="1"/><path d="M12 12h2v2h-2zM15.5 15.5H17V17h-1.5z"/></svg><span class="lbl">Show the code on the TV</span></button>
+      <button class="quiet" type="button" id="btn-kick" disabled><svg class="svg-ic" viewBox="0 0 20 20" width="20" height="20" aria-hidden="true" focusable="false"><circle cx="8" cy="6.5" r="2.7"/><path d="M3 16c0-2.6 2.2-4.5 5-4.5 1 0 1.9.2 2.6.7"/><path d="M13 12l4 4M17 12l-4 4"/></svg><span class="lbl">Disconnect the presenter</span></button>
+    </div>
+  </aside>
 
-    <div class="content">
-      <section class="card hero" aria-labelledby="code-h">
-        <div class="hero-words">
-          <h2 id="code-h" class="label"><svg class="icon" viewBox="0 0 20 20" width="20" height="20" aria-hidden="true" focusable="false"><rect x="3" y="3" width="5" height="5" rx="1"/><rect x="12" y="3" width="5" height="5" rx="1"/><rect x="3" y="12" width="5" height="5" rx="1"/><path d="M12 12h2v2h-2zM15.5 15.5H17V17h-1.5z"/></svg><span>Connection code</span></h2>
-          <p id="desk-code" aria-label="No code yet">— — —</p>
-        </div>
-        <figure id="desk-qr-box" hidden>
-          <canvas id="desk-qr" aria-label="QR code: open the Cast page with this code"></canvas>
-          <figcaption id="desk-addr">cast.kvbchurch.org</figcaption>
-        </figure>
-        <div class="hero-side">
-          <p class="hero-help">Scan the QR code, or go to the address and type the code.</p>
-          <p id="desk-presenter" data-on="false" role="status">No presenter is connected.</p>
-        </div>
-      </section>
-
-      <main class="main">
-        <section class="panel card" id="p-video">
-          <h2>YouTube</h2>
-          <form id="yt-search-form" role="search">
-            <label for="yt-q">Search YouTube</label>
-            <div class="row">
-              <input type="search" id="yt-q" maxlength="100" autocomplete="off" placeholder="A song, a video, a channel">
-              <button class="primary" type="submit">Search</button>
+  <div class="layer">
+    <div class="cols">
+      <div class="left">
+        <header class="pagehead" id="pagehead"><h1 id="page-title">YouTube</h1><p id="page-cap">Search YouTube, or paste a link, and play it on the TV.</p></header>
+        <main class="main">
+          <section class="panel" id="p-video">
+            <div class="group">
+              <form id="yt-search-form" role="search" class="setting stack">
+                <svg class="svg-ic" viewBox="0 0 20 20" width="20" height="20" aria-hidden="true" focusable="false"><circle cx="8.5" cy="8.5" r="5"/><path d="M12.3 12.3L16.5 16.5"/></svg>
+                <div class="txt"><label for="yt-q">Search YouTube</label><small>A song, a video, a channel. Pick a result to play it.</small></div>
+                <div class="ctl"><div class="row">
+                  <input type="search" id="yt-q" maxlength="100" autocomplete="off" placeholder="A song, a video, a channel">
+                  <button class="primary" type="submit">Search</button>
+                </div></div>
+              </form>
             </div>
-          </form>
-          <p class="note" id="yt-note" role="status"></p>
-          <ul class="results" id="yt-results" aria-label="Search results"></ul>
-          <div class="or">Or paste a link</div>
-          <form id="video-form">
-            <label for="video-link">YouTube link</label>
-            <input type="url" id="video-link" placeholder="https://youtu.be/…" autocomplete="off">
-            <label for="video-title">Title <span class="opt">(optional)</span></label>
-            <input type="text" id="video-title" maxlength="60">
-            <p class="controls"><button class="primary" type="submit">Play on the TV</button></p>
-            <p class="help">A link with a start time (…?t=90) starts there.</p>
-          </form>
-        </section>
+            <p class="note" id="yt-note" role="status"></p>
+            <ul class="results" id="yt-results" aria-label="Search results"></ul>
+            <details class="group expander">
+              <summary class="setting chev">
+                <svg class="svg-ic" viewBox="0 0 20 20" width="20" height="20" aria-hidden="true" focusable="false"><path d="M8.2 11.8l3.6-3.6M7.6 9.2L6 10.8a2.9 2.9 0 0 0 4.1 4.1l1.6-1.6M12.4 10.8l1.6-1.6A2.9 2.9 0 0 0 9.9 5.1L8.3 6.7"/></svg>
+                <div class="txt"><span class="t">Or paste a link</span><small>Play a YouTube link directly.</small></div>
+              </summary>
+              <form id="video-form" class="xbody">
+                <div class="field"><label for="video-link">YouTube link</label><input type="url" id="video-link" placeholder="https://youtu.be/…" autocomplete="off"></div>
+                <div class="field"><label for="video-title">Title <span class="opt">(optional)</span></label><input type="text" id="video-title" maxlength="60"></div>
+                <p><button class="primary" type="submit">Play on the TV</button></p>
+                <p class="help">A link with a start time (…?t=90) starts there.</p>
+              </form>
+            </details>
+          </section>
 
-        <section class="panel card" id="p-fb" hidden>
-          <h2>Facebook video</h2>
-          <form id="fb-form">
-            <label for="fb-link">Facebook video link</label>
-            <input type="url" id="fb-link" placeholder="https://www.facebook.com/…/videos/…" autocomplete="off">
-            <label for="fb-title">Title <span class="opt">(optional)</span></label>
-            <input type="text" id="fb-title" maxlength="60">
-            <p class="controls"><button class="primary" type="submit">Play on the TV</button></p>
-            <p class="help">On the video, choose Share, then Copy link. Only public videos play.</p>
-          </form>
-        </section>
+          <section class="panel" id="p-fb" hidden>
+            <form id="fb-form" class="group">
+              <div class="setting stack">
+                <svg class="svg-ic" viewBox="0 0 20 20" width="20" height="20" aria-hidden="true" focusable="false"><path d="M8.2 11.8l3.6-3.6M7.6 9.2L6 10.8a2.9 2.9 0 0 0 4.1 4.1l1.6-1.6M12.4 10.8l1.6-1.6A2.9 2.9 0 0 0 9.9 5.1L8.3 6.7"/></svg>
+                <div class="txt"><label for="fb-link">Facebook video link</label><small>On the video, choose Share, then Copy link. Only public videos play.</small></div>
+                <div class="ctl"><input type="url" id="fb-link" placeholder="https://www.facebook.com/…/videos/…" autocomplete="off"></div>
+              </div>
+              <div class="setting stack">
+                <svg class="svg-ic" viewBox="0 0 20 20" width="20" height="20" aria-hidden="true" focusable="false"><path d="M3.5 5.5h13M3.5 9.5h13M3.5 13.5h8"/></svg>
+                <div class="txt"><label for="fb-title">Title <span class="opt">(optional)</span></label><small>What the TV calls it while it plays.</small></div>
+                <div class="ctl"><input type="text" id="fb-title" maxlength="60"></div>
+              </div>
+              <div class="setting actions"><button class="primary" type="submit">Play on the TV</button></div>
+            </form>
+          </section>
 
-        <section class="panel card" id="p-pdf" hidden>
-          <h2>Slides</h2>
-          <p class="controls"><label class="file-pick primary">Choose a PowerPoint or PDF…<input type="file" id="pdf-input"></label></p>
-          <label for="pdf-link">Or a Google Slides link</label>
-          <div class="row">
-            <input type="url" id="pdf-link" placeholder="https://docs.google.com/presentation/…" autocomplete="off">
-            <button class="quiet" type="button" id="pdf-copy">Get it</button>
-          </div>
-          <p class="note" id="pdf-note" role="status"></p>
-          <div class="ready" id="pdf-ready" hidden><span id="pdf-ready-words"></span><button class="primary" type="button" id="pdf-show">Show</button></div>
-          <p class="help">A PowerPoint takes about a minute to turn into slides; a PDF goes up at once. Google Slides must be shared as “Anyone with the link”. Step through the slides under On the TV.</p>
-        </section>
-
-        <section class="panel card" id="p-pics" hidden>
-          <h2>Pictures</h2>
-          <p class="controls"><label class="file-pick primary">Choose pictures…<input type="file" id="pic-input" accept="image/jpeg,image/png,image/gif,image/webp" multiple></label></p>
-          <p class="note" id="pic-note" role="status"></p>
-          <div class="thumbs" id="thumbs"></div>
-        </section>
-
-        <section class="panel card" id="p-clip" hidden>
-          <h2>Video file</h2>
-          <p class="controls"><label class="file-pick primary">Choose a video…<input type="file" id="clip-input" accept="video/mp4,video/quicktime,video/webm,.mp4,.mov,.m4v,.webm"></label></p>
-          <p class="note" id="clip-note" role="status"></p>
-          <div class="ready" id="clip-ready" hidden><span id="clip-ready-words"></span><button class="primary" type="button" id="clip-show">Play</button></div>
-          <p class="help">MP4, MOV or WebM, up to 200 MB.</p>
-        </section>
-
-        <section class="panel card" id="p-text" hidden>
-          <h2>Text</h2>
-          <form id="text-form">
-            <label for="text-heading">Heading <span class="opt">(optional)</span></label>
-            <input type="text" id="text-heading" maxlength="60">
-            <label for="text-body">Text <span class="opt">(up to 8 lines)</span></label>
-            <textarea id="text-body" maxlength="400"></textarea>
-            <label>Look</label>
-            <div class="looks">
-              <label><input type="radio" name="look" value="page" checked> Light page</label>
-              <label><input type="radio" name="look" value="board"> White on dark</label>
+          <section class="panel" id="p-pdf" hidden>
+            <div class="group">
+              <div class="setting">
+                <svg class="svg-ic" viewBox="0 0 20 20" width="20" height="20" aria-hidden="true" focusable="false"><path d="M5.5 2.5h6l4 4v9a2 2 0 01-2 2h-8a2 2 0 01-2-2v-11a2 2 0 012-2z"/><path d="M11.5 2.5v4h4"/></svg>
+                <div class="txt"><span class="t">PowerPoint or PDF</span><small>A PowerPoint takes about a minute to turn into slides; a PDF goes up at once.</small></div>
+                <div class="ctl"><label class="file-pick primary"><svg class="svg-ic" viewBox="0 0 20 20" width="20" height="20" aria-hidden="true" focusable="false"><path d="M10 13V4.5M6.5 8L10 4.5 13.5 8M4.5 13.5v1.2a1.8 1.8 0 0 0 1.8 1.8h7.4a1.8 1.8 0 0 0 1.8-1.8v-1.2"/></svg>Choose a PowerPoint or PDF…<input type="file" id="pdf-input"></label></div>
+              </div>
+              <div class="setting stack">
+                <svg class="svg-ic" viewBox="0 0 20 20" width="20" height="20" aria-hidden="true" focusable="false"><path d="M8.2 11.8l3.6-3.6M7.6 9.2L6 10.8a2.9 2.9 0 0 0 4.1 4.1l1.6-1.6M12.4 10.8l1.6-1.6A2.9 2.9 0 0 0 9.9 5.1L8.3 6.7"/></svg>
+                <div class="txt"><label for="pdf-link">Or a Google Slides link</label><small>It must be shared as “Anyone with the link”.</small></div>
+                <div class="ctl"><div class="row">
+                  <input type="url" id="pdf-link" placeholder="https://docs.google.com/presentation/…" autocomplete="off">
+                  <button class="quiet" type="button" id="pdf-copy">Get it</button>
+                </div></div>
+              </div>
             </div>
-            <p class="controls"><button class="primary" type="submit">Show on the TV</button></p>
-          </form>
-        </section>
-      </main>
+            <p class="note" id="pdf-note" role="status"></p>
+            <div class="card ready" id="pdf-ready" hidden><span id="pdf-ready-words"></span><button class="primary" type="button" id="pdf-show">Show</button></div>
+            <p class="help">Step through the slides under On the TV now.</p>
+          </section>
 
-    <aside class="side">
-      <section class="card" id="tv" data-online="false" aria-live="polite" aria-labelledby="tv-h">
-        <h2 id="tv-h" class="label"><svg class="icon" viewBox="0 0 20 20" width="20" height="20" aria-hidden="true" focusable="false"><rect x="2.5" y="3.5" width="15" height="10" rx="2"/><path d="M7 16.5h6M10 13.5v3"/></svg><span>On the TV now</span></h2>
-        <p class="tv-main"><span class="dot" aria-hidden="true"></span><span id="tv-main">Connecting…</span></p>
-        <p class="tv-sub" id="tv-sub"></p>
-        <div class="controls" id="ctl-video" hidden>
-          <button class="quiet" type="button" data-op="seek" data-by="-10">Back 10 s</button>
-          <button class="quiet" type="button" data-op="toggle" id="btn-play">Pause</button>
-          <button class="quiet" type="button" data-op="seek" data-by="10">Ahead 10 s</button>
-          <div class="vol" role="group" aria-label="Volume">
-            <button class="quiet" type="button" data-op="volume" data-step="-1" aria-label="Volume down">−</button>
-            <span class="vol-level" id="vol-level">Volume</span>
-            <button class="quiet" type="button" data-op="volume" data-step="1" aria-label="Volume up">+</button>
-          </div>
-          <button class="quiet" type="button" data-op="mute" id="btn-mute">Mute</button>
-        </div>
-        <div class="slides" id="ctl-pdf" data-preview="none" hidden>
-          <div class="slide-now"><canvas data-slide="now" aria-hidden="true"></canvas></div>
-          <div class="slide-row">
-            <div class="slide-next" data-slide-box="next" data-end="false">
-              <span class="slide-cap">Next</span>
-              <canvas data-slide="next" aria-hidden="true"></canvas>
-              <span class="slide-endword">End of the slides</span>
+          <section class="panel" id="p-pics" hidden>
+            <div class="group">
+              <div class="setting">
+                <svg class="svg-ic" viewBox="0 0 20 20" width="20" height="20" aria-hidden="true" focusable="false"><rect x="3" y="3.5" width="14" height="13" rx="2.5"/><circle cx="7.5" cy="8" r="1.3"/><path d="M3.5 14l4-3.8 3 2.8 2.5-2.2 3.5 3.4"/></svg>
+                <div class="txt"><span class="t">Pictures from this computer</span><small>Choose one or more, then pick one to show.</small></div>
+                <div class="ctl"><label class="file-pick primary"><svg class="svg-ic" viewBox="0 0 20 20" width="20" height="20" aria-hidden="true" focusable="false"><path d="M10 13V4.5M6.5 8L10 4.5 13.5 8M4.5 13.5v1.2a1.8 1.8 0 0 0 1.8 1.8h7.4a1.8 1.8 0 0 0 1.8-1.8v-1.2"/></svg>Choose pictures…<input type="file" id="pic-input" accept="image/jpeg,image/png,image/gif,image/webp" multiple></label></div>
+              </div>
             </div>
-            <div class="slide-buttons">
-              <p class="slide-label" data-slide-label aria-live="polite">Slide 1</p>
-              <button class="quiet" type="button" data-step="-1">Back</button>
-              <button class="primary" type="button" data-step="1">Next</button>
+            <p class="note" id="pic-note" role="status"></p>
+            <div class="thumbs" id="thumbs"></div>
+          </section>
+
+          <section class="panel" id="p-clip" hidden>
+            <div class="group">
+              <div class="setting">
+                <svg class="svg-ic" viewBox="0 0 20 20" width="20" height="20" aria-hidden="true" focusable="false"><path d="M5.5 2.5h6l4 4v9a2 2 0 01-2 2h-8a2 2 0 01-2-2v-11a2 2 0 012-2z"/><path d="M11.5 2.5v4h4"/><path d="M8.3 9.8v4l3.2-2z"/></svg>
+                <div class="txt"><span class="t">A video from this computer</span><small>MP4, MOV or WebM, up to 200 MB.</small></div>
+                <div class="ctl"><label class="file-pick primary"><svg class="svg-ic" viewBox="0 0 20 20" width="20" height="20" aria-hidden="true" focusable="false"><path d="M10 13V4.5M6.5 8L10 4.5 13.5 8M4.5 13.5v1.2a1.8 1.8 0 0 0 1.8 1.8h7.4a1.8 1.8 0 0 0 1.8-1.8v-1.2"/></svg>Choose a video…<input type="file" id="clip-input" accept="video/mp4,video/quicktime,video/webm,.mp4,.mov,.m4v,.webm"></label></div>
+              </div>
+            </div>
+            <p class="note" id="clip-note" role="status"></p>
+            <div class="card ready" id="clip-ready" hidden><span id="clip-ready-words"></span><button class="primary" type="button" id="clip-show">Play</button></div>
+          </section>
+
+          <section class="panel" id="p-text" hidden>
+            <form id="text-form" class="group">
+              <div class="setting stack">
+                <svg class="svg-ic" viewBox="0 0 20 20" width="20" height="20" aria-hidden="true" focusable="false"><path d="M4 5.5h12M10 5.5v10"/></svg>
+                <div class="txt"><label for="text-heading">Heading <span class="opt">(optional)</span></label><small>A short line above the text.</small></div>
+                <div class="ctl"><input type="text" id="text-heading" maxlength="60"></div>
+              </div>
+              <div class="setting stack">
+                <svg class="svg-ic" viewBox="0 0 20 20" width="20" height="20" aria-hidden="true" focusable="false"><path d="M3.5 5.5h13M3.5 9.5h13M3.5 13.5h8"/></svg>
+                <div class="txt"><label for="text-body">Text <span class="opt">(up to 8 lines)</span></label><small>A verse or an announcement.</small></div>
+                <div class="ctl"><textarea id="text-body" maxlength="400"></textarea></div>
+              </div>
+              <div class="setting stack">
+                <svg class="svg-ic" viewBox="0 0 20 20" width="20" height="20" aria-hidden="true" focusable="false"><rect x="3" y="3.5" width="14" height="13" rx="2.5"/><path d="M3.5 8.5h13"/></svg>
+                <div class="txt"><span class="t">Look</span><small>How the text appears on the TV.</small></div>
+                <div class="ctl looks">
+                  <label><input type="radio" name="look" value="page" checked> Light page</label>
+                  <label><input type="radio" name="look" value="board"> White on dark</label>
+                </div>
+              </div>
+              <div class="setting actions"><button class="primary" type="submit">Show on the TV</button></div>
+            </form>
+          </section>
+        </main>
+      </div>
+
+      <aside class="right">
+        <section class="card tvcard" id="tv" data-online="false" data-kind="code" aria-live="polite" aria-labelledby="tv-h">
+          <div class="cardhead"><h2 id="tv-h">On the TV now</h2><span class="live" id="tv-live" hidden>LIVE</span></div>
+          <div class="monitor" aria-hidden="false">
+            <div class="bezel"><div class="screen" id="tv-mini" data-kind="code" data-shot="false">
+              <img id="tv-shot" alt="A live picture of what the TV is showing" decoding="async" hidden>
+              <div class="ph" id="tv-ph">
+                <svg class="g-code" viewBox="0 0 48 48" aria-hidden="true" focusable="false"><rect x="7" y="7" width="13" height="13" rx="2.5"/><rect x="28" y="7" width="13" height="13" rx="2.5"/><rect x="7" y="28" width="13" height="13" rx="2.5"/><path d="M28 28h5v5h-5zM36 36h5v5h-5zM36 28h5M28 36h2"/></svg>
+                <svg class="g-video" viewBox="0 0 48 48" aria-hidden="true" focusable="false"><rect x="5" y="9" width="38" height="30" rx="7"/><path d="M20 18v12l10-6z"/></svg>
+                <svg class="g-slides" viewBox="0 0 48 48" aria-hidden="true" focusable="false"><rect x="6" y="8" width="36" height="25" rx="4"/><path d="M24 33v8M17 41h14M14 17h20M14 24h12"/></svg>
+                <svg class="g-picture" viewBox="0 0 48 48" aria-hidden="true" focusable="false"><rect x="6" y="8" width="36" height="32" rx="6"/><circle cx="17" cy="19" r="3.2"/><path d="M7 35l10-9.5 7.5 7 6-5.5 10.5 9"/></svg>
+                <svg class="g-text" viewBox="0 0 48 48" aria-hidden="true" focusable="false"><path d="M9 12h30M9 22h30M9 32h30M9 42h18"/></svg>
+                <svg class="g-share" viewBox="0 0 48 48" aria-hidden="true" focusable="false"><rect x="5" y="8" width="38" height="26" rx="4"/><path d="M24 29V16M18.5 21.5L24 16l5.5 5.5M16 41h16"/></svg>
+                <svg class="g-off" viewBox="0 0 48 48" aria-hidden="true" focusable="false"><rect x="5" y="8" width="38" height="26" rx="4"/><path d="M16 41h16M24 34v7M12 14l24 14"/></svg>
+                <span class="cap" id="tv-ph-label">Showing its code</span>
+              </div>
+            </div></div>
+            <div class="stand" aria-hidden="true"></div>
+            <div class="foot" aria-hidden="true"></div>
+          </div>
+          <p class="tv-main"><span class="dot" aria-hidden="true"></span><span id="tv-main">Connecting…</span></p>
+          <p class="tv-sub" id="tv-sub"></p>
+          <div class="progress" id="tv-progress" hidden>
+            <span id="pg-t">0:00</span>
+            <div class="track" id="pg-track" role="progressbar" aria-label="Position in the video" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div class="fill"></div><div class="knob"></div></div>
+            <span id="pg-d">0:00</span>
+          </div>
+          <div class="controls" id="ctl-video" hidden>
+            <div class="transport">
+              <button class="icon-btn mi" type="button" data-op="seek" data-by="-10" title="Back 10 s">Back 10 s</button>
+              <button class="primary play mi" type="button" data-op="toggle" id="btn-play" data-paused="false">Pause</button>
+              <button class="icon-btn mi" type="button" data-op="seek" data-by="10" title="Ahead 10 s">Ahead 10 s</button>
+            </div>
+            <div class="volrow">
+              <div class="vol" role="group" aria-label="Volume">
+                <button class="quiet" type="button" data-op="volume" data-step="-1" aria-label="Volume down">−</button>
+                <span class="vol-level" id="vol-level">Volume</span>
+                <button class="quiet" type="button" data-op="volume" data-step="1" aria-label="Volume up">+</button>
+              </div>
+              <button class="quiet mi" type="button" data-op="mute" id="btn-mute">Mute</button>
             </div>
           </div>
-          <div class="strip" data-slide-strip aria-label="Every slide"></div>
-        </div>
-        <div class="controls"><button class="quiet" type="button" id="btn-down" hidden>Take it down</button></div>
-        <div class="room">
-          <div class="controls">
-            <button class="quiet" type="button" id="btn-reveal">Show the code on the TV</button>
-            <button class="quiet" type="button" id="btn-kick" disabled>Disconnect the presenter</button>
+          <div class="slides" id="ctl-pdf" data-preview="none" hidden>
+            <div class="slide-now"><canvas data-slide="now" aria-hidden="true"></canvas></div>
+            <div class="slide-row">
+              <div class="slide-next" data-slide-box="next" data-end="false">
+                <span class="slide-cap">Next</span>
+                <canvas data-slide="next" aria-hidden="true"></canvas>
+                <span class="slide-endword">End of the slides</span>
+              </div>
+              <div class="slide-buttons">
+                <p class="slide-label" data-slide-label aria-live="polite">Slide 1</p>
+                <button class="quiet" type="button" data-step="-1">Back</button>
+                <button class="primary" type="button" data-step="1">Next</button>
+              </div>
+            </div>
+            <div class="strip" data-slide-strip aria-label="Every slide"></div>
           </div>
-        </div>
-        <p class="note" id="press-note" role="status"></p>
-      </section>
-    </aside>
+          <button class="quiet mi" type="button" id="btn-down" hidden>Take it down</button>
+          <p class="note" id="press-note" role="status"></p>
+        </section>
+
+        <section class="card conn" aria-labelledby="code-h">
+          <div class="cardhead"><h2 id="code-h">Connect a presenter</h2></div>
+          <div class="conn-body">
+            <div>
+              <p class="eyebrow">Connection code</p>
+              <p id="desk-code" aria-label="No code yet">— — —</p>
+            </div>
+            <figure id="desk-qr-box" hidden><div class="qrtile"><canvas id="desk-qr" aria-label="QR code: open the Cast page with this code"></canvas></div></figure>
+          </div>
+          <div class="addr">
+            <span id="desk-addr">cast.kvbchurch.org</span>
+            <button class="icon-btn mi bare" type="button" id="btn-copy" title="Copy the address" aria-label="Copy the address">Copy</button>
+            <span id="copy-note" role="status"></span>
+          </div>
+          <p class="help">Scan the QR code, or go to the address and type the code.</p>
+        </section>
+      </aside>
     </div>
   </div>
 </div>

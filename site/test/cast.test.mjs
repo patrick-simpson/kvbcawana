@@ -441,8 +441,18 @@ test('the desk page: every control the presenter has but the screen share, in th
   // Fluent 2 / Windows 11: the system font, the neutral page, the accent, 32 px controls,
   // 14 px text, focus rings, high contrast, dark mode. Not the church's kit, not Awana's.
   assert.match(deskPage, /"Segoe UI Variable Text", "Segoe UI Variable", "Segoe UI", system-ui/);
-  assert.match(deskPage, /--page: #F3F3F3; --card: #FFFFFF; --stroke: #E5E5E5;/);
-  assert.match(deskPage, /--accent: #0067C0;/);
+  // The Mica-like base, the Fluent layer and card fills (were --page/--card/--stroke flat tokens until 2026-11-10),
+  // and the Windows accent with its fallbacks (light #005FB8; dark #60CDFF with black text).
+  assert.match(deskPage, /--base: #F3F3F3;/);
+  assert.match(deskPage, /--base: #202020;/);
+  assert.match(deskPage, /--layer: rgba\(255, 255, 255, \.5\); --layer-stroke: rgba\(0, 0, 0, \.058\);/);
+  assert.match(deskPage, /--card: rgba\(255, 255, 255, \.7\); --stroke: rgba\(0, 0, 0, \.058\);/);
+  assert.match(deskPage, /--card: rgba\(255, 255, 255, \.051\);/);
+  assert.match(deskPage, /--accent: #005FB8;/);
+  assert.match(deskPage, /--accent: #60CDFF; --on-accent: #000000;/);
+  assert.match(deskPage, /@supports \(color: AccentColor\) \{ :root \{ --accent: AccentColor; --on-accent: AccentColorText; \} \}/);
+  assert.match(deskPage, /html\.mica, html\.mica body \{ background: transparent; \}/);
+  assert.ok(!/box-shadow: 0 [1-9]/.test(deskPage.replace(/--flyout-shadow[^;]*;/g, '')), 'cards are stroke-defined: no drop shadows');
   assert.match(deskPage, /min-height: 32px;/);
   assert.match(deskPage, /font: 400 14px\/20px var\(--font\);/);
   assert.match(deskPage, /:focus-visible \{ outline: 2px solid/);
@@ -450,6 +460,33 @@ test('the desk page: every control the presenter has but the screen share, in th
   assert.match(deskPage, /@media \(prefers-color-scheme: dark\)/);
   assert.ok(!/church\.css|Jost|Almarai|kvbc-logo|shared\/brand|Paytone|Londrina|fonts\.googleapis|@font-face/.test(deskPage));
   assert.match(deskPage, /<meta name="robots" content="noindex, nofollow">/);
+  // Windows 11 pieces: the nav pane with its gliding accent pill, InfoBars, the miniature's placeholder.
+  for (const id of ['nav-pill', 'tv-mini', 'tv-shot', 'tv-ph', 'tv-live', 'tv-progress', 'btn-copy', 'presence']) assert.match(deskPage, new RegExp(`id="${id}"`), id);
+  assert.match(deskPage, /\.pill \{ transition: transform 167ms cubic-bezier\(0, 0, 0, 1\); \}/);
+  assert.match(deskPage, /@media \(prefers-reduced-motion: no-preference\) \{[\s\S]*@keyframes ring/);
+  assert.match(deskPage, /#tv-mini\[data-kind="code"\] \.g-code/, 'a placeholder glyph per kind of thing on the TV');
+  assert.match(deskPage, /@media \(max-width: 1100px\)/);
   assert.match(deskPage, /<script type="module" src="desk\.js"><\/script>/);
   assert.ok(!/<script>/.test(deskPage), 'no inline script (the policy allows none it does not fingerprint)');
+});
+
+test('the desk: Mica when the app says so, and a live miniature of the TV that never breaks', () => {
+  const desk = read('cast', 'desk', 'desk.js');
+  // Mica only on the app's word.
+  assert.match(desk, /window\.awanaCastHost\.material === 'mica'\) document\.documentElement\.classList\.add\('mica'\)/);
+  // The miniature: the bridge's preview() only when it is a function, only while visible, one at a time,
+  // a JPEG/PNG data URL only, decoded before the swap; without it the placeholder shows.
+  assert.match(desk, /typeof host\.preview !== 'function'\) \{ showShot\(null\); return; \}/);
+  assert.match(desk, /if \(document\.hidden \|\| shotBusy\) return;/);
+  assert.match(desk, /SHOT_RE = \/\^data:image\\\/\(jpeg\|png\);base64,/);
+  assert.match(desk, /await probe\.decode\(\)/);
+  assert.match(desk, /function drawRoom\(body\) \{\n  drawTv\(body\);\n  void refreshShot\(\);/, 'asked with each good state answer: visible and not idle-paused, like the state poll');
+  assert.ok(!/setInterval|setTimeout\([^)]*refreshShot/.test(desk), 'no timer of its own for the miniature');
+  assert.ok(!/preview\(\)[^;]*fetch|fetch[^;]*preview\(\)/.test(desk), 'the miniature is local: no Worker call');
+  const deskPage = read('cast', 'desk', 'index.html');
+  assert.match(deskPage, /<img id="tv-shot"[^>]*hidden>/);
+  assert.match(deskPage, /\.screen\[data-shot="true"\] \.ph \{ display: none; \}/);
+  // The desk's CSP lets the data: picture in (img-src has data: already; nothing else was added for it).
+  const build = read('build.mjs');
+  assert.match(build, /const CAST_DESK_CSP = tvPagePolicy\(\{\n  origin: CAST_ORIGIN,\n  images: \['https:\/\/i\.ytimg\.com'\],/);
 });
