@@ -1,4 +1,17 @@
-﻿## [11.0.0] - 2026-11-09
+﻿## [11.1.0] - 2026-11-10
+The Cast control window becomes a proper Windows 11 screen.
+
+**A richer Cast control window** (owner 2026-11-10: "Rich Windows 11 native screen"). The back-of-house window that opens on the second monitor while Cast is on was plain. It is now laid out like a Windows 11 app: a navigation list on the left with the sliding accent marker, each source (YouTube, Facebook video, Slides, Pictures, Video file, Text) as settings-style cards, and on the right "On the TV now" and "Connect a presenter". It uses the computer's own Windows accent colour, follows dark mode and high contrast, and moves the way Windows does.
+
+**A live picture of the TV.** "On the TV now" shows a small live picture of what the lobby TV is showing, in a little monitor frame, with a progress bar and media buttons under it. The picture is taken on the computer itself about every two seconds while the window is in view; nothing is sent anywhere and it uses none of the sync service's daily requests. Where a picture cannot be taken (an older app, a plain browser, or Windows returning nothing) the frame shows a drawn symbol for what is up instead.
+
+**The real Windows 11 background.** On Windows 11 (22H2 and later) the window uses Mica, the soft see-through background Windows' own apps have. On Windows 10 it keeps a plain background.
+
+**Small and large monitors.** On a short screen (1366 x 768) the window puts "On the TV now" first while something is playing, so the controls are in reach, and the connection code first when nothing is up. On a wide screen the cards stop growing, like Windows Settings.
+
+Not checked on a real Windows computer: Mica, the Segoe UI font, and whether the live picture shows a playing video (Windows sometimes hands back black for video); the window falls back to the drawn symbol if not.
+
+## [11.0.0] - 2026-11-09
 Cast moves to its own address, cast.kvbchurch.org, gets a control window on the second screen, and KVBC Awana starts a new chapter.
 
 **Cast has its own address.** Presenters now go to cast.kvbchurch.org (the TV's code screen and its QR code say so). The old address, awana.kvbchurch.org/cast, still works: it sends people to the new one, with the code from a QR code kept. The Cast screen on the lobby computer now shows cast.kvbchurch.org/screen/.
