@@ -29,6 +29,7 @@ const { NO_OVERRIDES, decideVisibility, hide, showNow, tidy } = require('./visib
 const { findDisplay, rememberDisplay } = require('./displays');
 const { CHOOSABLE, castHostAllowed, isScreenPage, screenUrls } = require('./screens');
 const { createCastDesk } = require('./cast-desk');
+const { createCastPreview } = require('./cast-preview');
 const { hoursMinutes, moveToFourPm, normalizeSettings, parseTime, settingsForScreen } = require('./settings');
 const { shutdownDeadline, shutdownStep } = require('./shutdown');
 const { createPenWatch } = require('./pen-watch');
@@ -41,7 +42,7 @@ const RETRY_LOAD_MS = 30 * 1000;
 const CURSOR_IDLE_MS = 3000;
 // What the volunteer calls the monitor it goes on, in titles and the tray.
 const WHERE = { lobby: 'the lobby TV', projector: 'the projector', journey: 'the Journey screen', classroom: 'the downstairs classroom screen' };
-const IPC_HANDLES = ['configure:get', 'configure:set', 'cast:session'];
+const IPC_HANDLES = ['configure:get', 'configure:set', 'cast:session', 'cast:preview'];
 const IPC_EVENTS = ['card:cancel', 'chooser:choose', 'chooser:cancel', 'configure:choose-monitor', 'configure:reload-screen',
   'configure:reload-settings', 'configure:open-log', 'configure:cancel-shutdown'];
 
@@ -917,7 +918,37 @@ function createDisplay(opts) {
     return s;
   }
 
+  /**
+   * The desk's live TV miniature (cast-preview.js): a small JPEG of the Cast TV window, only
+   * for the desk window's top frame on /desk/ while Cast is the screen up; else null.
+   */
+  const castPreview = createCastPreview({
+    now: () => Date.now(),
+    capture: async () => {
+      if (!lobby || lobby.isDestroyed() || !lobby.isVisible() || lobby.isMinimized()) return null;
+      const img = await lobby.webContents.capturePage();
+      if (!img || img.isEmpty()) return null;
+      const size = img.getSize();
+      const small = size.width > 640 ? img.resize({ width: 640, quality: 'good' }) : img;
+      return 'data:image/jpeg;base64,' + small.toJPEG(70).toString('base64');
+    },
+  });
+  async function castPreviewFor(event) {
+    try {
+      const frame = event.senderFrame;
+      const allowed = castHostAllowed({
+        fromCastWindow: false,
+        fromDeskWindow: castDesk.isWindow(event.sender) && urls().screen.id === 'cast',
+        isTopFrame: Boolean(frame && !frame.parent),
+        frameUrl: frame ? frame.url : '',
+      });
+      if (!allowed) return null;
+      return await castPreview.get();
+    } catch { return null; }
+  }
+
   function wireIpc() {
+    ipcMain.handle('cast:preview', (event) => castPreviewFor(event));
     ipcMain.on('card:cancel', cancelShutdown);
     ipcMain.handle('cast:session', (event) => castSession(event));
     ipcMain.on('chooser:choose', (event) => {

@@ -16,10 +16,24 @@
 //   https://cast.kvbchurch.org/desk/, anything else opens in the browser.
 'use strict';
 
+const os = require('os');
 const { isScreenPage } = require('./screens');
 
 const DESK_URL = 'https://cast.kvbchurch.org/desk/';
 const DESK_TITLE = 'KVBC Awana – Cast control';
+
+/**
+ * The window material (owner 2026-11-09, a Windows 11 look): Mica on Windows 11 22H2 and
+ * later (OS build 22621+, from os.release() like "10.0.22631"), nothing anywhere else.
+ * @param {string} platform process.platform
+ * @param {string} release os.release()
+ * @returns {'mica' | null}
+ */
+function deskMaterial(platform, release) {
+  if (platform !== 'win32') return null;
+  const build = parseInt(String(release || '').split('.')[2], 10);
+  return Number.isFinite(build) && build >= 22621 ? 'mica' : null;
+}
 
 /**
  * Which monitor the desk goes on: null with fewer than two; else the primary, unless the
@@ -40,9 +54,10 @@ function deskDisplay(displays, primary, tvId) {
  *   BrowserWindow: any, screen: any, shell: any,
  *   preload: string, iconPath?: string, log: (...a: any[]) => void,
  *   tvDisplayId: () => number | null,
+ *   platform?: string, release?: string,
  * }} deps
  */
-function createCastDesk({ BrowserWindow, screen, shell, preload, iconPath, log, tvDisplayId }) {
+function createCastDesk({ BrowserWindow, screen, shell, preload, iconPath, log, tvDisplayId, platform = process.platform, release = os.release() }) {
   /** @type {any} */
   let win = null;
   let on = false;
@@ -66,6 +81,7 @@ function createCastDesk({ BrowserWindow, screen, shell, preload, iconPath, log, 
 
   function open(display) {
     const wa = display.workArea;
+    const material = deskMaterial(platform, release);
     win = new BrowserWindow({
       show: false,
       title: DESK_TITLE,
@@ -73,7 +89,7 @@ function createCastDesk({ BrowserWindow, screen, shell, preload, iconPath, log, 
       x: wa.x, y: wa.y, width: wa.width, height: wa.height,
       minWidth: 900, minHeight: 560,
       autoHideMenuBar: true,
-      backgroundColor: '#F3F3F3',
+      ...(material ? { backgroundMaterial: material, backgroundColor: '#00000000' } : { backgroundColor: '#F3F3F3' }),
       webPreferences: {
         partition: 'persist:lobby',
         preload,
@@ -81,6 +97,7 @@ function createCastDesk({ BrowserWindow, screen, shell, preload, iconPath, log, 
         sandbox: true,
         nodeIntegration: false,
         spellcheck: true,
+        ...(material ? { additionalArguments: [`--awana-cast-material=${material}`] } : {}),
       },
     });
     const wc = win.webContents;
@@ -143,4 +160,4 @@ function createCastDesk({ BrowserWindow, screen, shell, preload, iconPath, log, 
   };
 }
 
-module.exports = { createCastDesk, deskDisplay, DESK_URL, DESK_TITLE };
+module.exports = { createCastDesk, deskDisplay, deskMaterial, DESK_URL, DESK_TITLE };

@@ -11,5 +11,9 @@ const { contextBridge, ipcRenderer } = require('electron');
 if (window.location.origin === 'https://cast.kvbchurch.org') {
   contextBridge.exposeInMainWorld('awanaCastHost', {
     session: () => ipcRenderer.invoke('cast:session'),
+    // A JPEG data URL snapshot of the Cast TV (the desk window only), or null.
+    preview: () => ipcRenderer.invoke('cast:preview'),
+    // 'mica' when the desk window has the Mica material, else ''.
+    material: (process.argv.find((a) => a.startsWith('--awana-cast-material=')) || '').slice('--awana-cast-material='.length) === 'mica' ? 'mica' : '',
   });
 }
