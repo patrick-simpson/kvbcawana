@@ -227,7 +227,9 @@ export function ClubLabelCard({ church }) {
         />
       </div>
       <div className="laptop-actions">
-        <button type="button" className="primary" onClick={saveAll} disabled={readOnly || !draft.dirty}>Save label layouts</button>
+        <span title={!readOnly && !draft.dirty ? 'No changes to save' : undefined}>
+          <button type="button" className="primary" onClick={saveAll} disabled={readOnly || !draft.dirty}>Save label layouts</button>
+        </span>
         <button type="button" className="ghost" disabled={readOnly} onClick={() => edit({ ...templateToForm({}) })}>Reset this club</button>
         <button type="button" className="ghost" onClick={showPreview}>Show a preview</button>
       </div>
@@ -278,7 +280,9 @@ export function ClubNightCard({ church }) {
           </div>
         ))}
         <div className="laptop-actions">
-          <button type="button" className="ghost" disabled={readOnly || rows.value.length >= SPEC.schedule.maxRows} onClick={() => rows.set([...rows.value, { club: '', startTime: '', location: '', room: '' }])}>Add a slot</button>
+          <span title={rows.value.length >= SPEC.schedule.maxRows ? 'Maximum slots reached' : undefined}>
+            <button type="button" className="ghost" disabled={readOnly || rows.value.length >= SPEC.schedule.maxRows} onClick={() => rows.set([...rows.value, { club: '', startTime: '', location: '', room: '' }])}>Add a slot</button>
+          </span>
         </div>
       </div>
       <div className="field">
@@ -287,7 +291,9 @@ export function ClubNightCard({ church }) {
         <span className="hint">How long after a club starts a check-in still counts as on time.</span>
       </div>
       <div className="laptop-actions">
-        <button type="button" className="primary" onClick={saveSchedule} disabled={readOnly || !(rows.dirty || late.dirty)}>Save schedule</button>
+        <span title={!readOnly && !(rows.dirty || late.dirty) ? 'No changes to save' : undefined}>
+          <button type="button" className="primary" onClick={saveSchedule} disabled={readOnly || !(rows.dirty || late.dirty)}>Save schedule</button>
+        </span>
       </div>
       <Note note={note} />
     </PanelCard>

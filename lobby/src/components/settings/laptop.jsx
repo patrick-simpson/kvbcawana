@@ -369,7 +369,9 @@ export function NightCard({ cfg, save, api }) {
           <span className="hint">How long after a club starts a check-in still counts as on time.</span>
         </div>
         <div className="laptop-actions">
-          <button type="button" className="primary" onClick={saveSchedule} disabled={!rows}>Save schedule</button>
+          <span title={!rows ? 'Add at least one slot to save schedule' : undefined}>
+            <button type="button" className="primary" onClick={saveSchedule} disabled={!rows}>Save schedule</button>
+          </span>
         </div>
         <Note note={note} />
       </PanelCard>
