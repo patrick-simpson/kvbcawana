@@ -466,6 +466,11 @@ test('the desk page: every control the presenter has but the screen share, in th
   assert.match(deskPage, /@media \(prefers-reduced-motion: no-preference\) \{[\s\S]*@keyframes ring/);
   assert.match(deskPage, /#tv-mini\[data-kind="code"\] \.g-code/, 'a placeholder glyph per kind of thing on the TV');
   assert.match(deskPage, /@media \(max-width: 1100px\)/);
+  // Short windows: the order follows the state (nothing up: the code first; something up: the TV card
+  // first, miniature capped), and the left column is capped like Windows Settings.
+  assert.match(deskPage, /@media \(min-width: 1101px\) and \(max-height: 880px\) \{\n    \.right\[data-up="false"\] \.conn \{ order: -1; \}\n    \.monitor \.bezel \{ max-width: calc\(30vh \* 16 \/ 9 \+ 14px\); \}/);
+  assert.match(deskPage, /grid-template-columns: minmax\(520px, 760px\) clamp\(420px, 30vw, 560px\); justify-content: start;/);
+  assert.match(read('cast', 'desk', 'desk.js'), /document\.querySelector\('\.right'\)\.dataset\.up = String\(Boolean\(online && shown\)\)/);
   assert.match(deskPage, /<script type="module" src="desk\.js"><\/script>/);
   assert.ok(!/<script>/.test(deskPage), 'no inline script (the policy allows none it does not fingerprint)');
 });

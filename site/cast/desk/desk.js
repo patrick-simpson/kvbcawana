@@ -124,6 +124,8 @@ function drawTv(body) {
   $('tv-mini').dataset.kind = glyph;
   setText($('tv-ph-label'), GLYPH_WORDS[glyph]);
   $('tv-live').hidden = !(online && shown);
+  // Something up (or not): the short-window layout orders the right column by it.
+  document.querySelector('.right').dataset.up = String(Boolean(online && shown));
   // The video's progress (display only; the buttons below move it).
   const video = shown && now && now.button === shown.id ? now.video : null;
   const bar = $('pg-track');
