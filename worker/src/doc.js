@@ -26,7 +26,11 @@ export class Doc {
       this.loading = (async () => {
         const stored = await this.storage.get(this.key);
         if (this.data === null) this.data = stored ?? this.fresh();
-      })();
+        // A failed read is not kept (2026-11-10): the rejected promise used to stay
+        // cached, so ONE storage hiccup failed every later call on this document (the
+        // claims ledger, the print queue: every check-in a 500) until the object
+        // restarted. The next call reads again.
+      })().catch((err) => { this.loading = null; throw err; });
     }
     return this.loading;
   }

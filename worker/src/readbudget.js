@@ -90,7 +90,7 @@ export class ReadBudget {
       this.loading = (async () => {
         const v = this.storage ? await this.storage.get(KEY) : 0;
         if (typeof v === 'number' && Number.isFinite(v)) this.floor = Math.max(this.floor, v);
-      })();
+      })().catch((err) => { this.loading = null; throw err; });   // a failed load is tried again (doc.js)
     }
     return this.loading;
   }
