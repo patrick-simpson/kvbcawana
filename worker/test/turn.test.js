@@ -62,6 +62,26 @@ describe('the screen share relay', () => {
     expect(JSON.stringify(presenter.body)).not.toContain('secret-token');
   });
 
+  it('two asks for one share at the same moment share one set (IP-20261111-05)', async () => {
+    const s = await setup();
+    const id = await s.share();
+    const [presenter, tv] = await Promise.all([
+      s.call('GET', `/v1/cast/ice?id=${id}`, undefined, { auth: '', cast: s.token() }),
+      s.call('GET', `/v1/cast/screen/ice?id=${id}`),
+    ]);
+    expect(presenter.body.relay).toBe(true);
+    expect(tv.body.iceServers).toEqual(presenter.body.iceServers);
+    expect(s.asked).toHaveLength(1);   // one set made, so one set to revoke
+    expect(s.core.turn.pending.size).toBe(0);   // let go once it settled
+    // The hour's allowance counted it once.
+    expect(s.core.turn.mints.get(s.core.cast.engine.rtc.by)?.n).toBe(1);
+    // Several asks for different shares of one presenter at once never pass the hour's limit.
+    const t = s.core.turn;
+    const answers = await Promise.all(Array.from({ length: TURN_SHARES_PER_HOUR + 2 }, (_, i) => t.iceFor(`bshare${i}`, 'one-presenter')));
+    expect(answers.filter((a) => a.relay)).toHaveLength(TURN_SHARES_PER_HOUR);
+    expect(s.asked).toHaveLength(1 + TURN_SHARES_PER_HOUR);
+  });
+
   it('only for the share now up, and a presenter needs the token', async () => {
     const s = await setup();
     const id = await s.share();

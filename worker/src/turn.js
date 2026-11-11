@@ -73,6 +73,12 @@ export class Turn {
     this.byShare = new Map();
     /** Credential sets minted per starter this hour, memory only. @type {Map<string, { since: number, n: number }>} */
     this.mints = new Map();
+    /**
+     * A share's ask still waiting on Cloudflare, memory only (IP-20261111-05): the
+     * TV and the presenter often ask at the same moment, and both must get the ONE
+     * set this ask makes. @type {Map<string, Promise<any>>}
+     */
+    this.pending = new Map();
   }
 
   /**
@@ -81,6 +87,9 @@ export class Turn {
    * @param {string} shareId
    */
   async revoke(shareId) {
+    // A set still being made for this share is revoked once it is made.
+    const making = this.pending.get(shareId);
+    if (making) await making.catch(() => {});
     const kept = this.byShare.get(shareId);
     if (!kept) return;
     this.byShare.delete(shareId);
@@ -111,9 +120,29 @@ export class Turn {
     const kept = this.byShare.get(shareId);
     // One set per share: both ends get the same, and a share never mints a second.
     if (kept) return { iceServers: [stun, ...kept.servers], relay: true };
+    // An ask already on its way to Cloudflare for this share: wait for its answer.
+    // The check and the write below are one synchronous step (no await between).
+    const making = this.pending.get(shareId);
+    if (making) return making;
+    const p = this.mint(shareId, by, t, stun).finally(() => {
+      if (this.pending.get(shareId) === p) this.pending.delete(shareId);
+    });
+    this.pending.set(shareId, p);
+    return p;
+  }
+
+  /**
+   * Make one share's set (only from iceFor, which keeps one ask per share).
+   * @param {string} shareId @param {string} by @param {number} t @param {{ urls: string[] }} stun
+   */
+  async mint(shareId, by, t, stun) {
     let rate = this.mints.get(by);
     if (!rate || t - rate.since > 60 * 60 * 1000) rate = { since: t, n: 0 };
     if (rate.n >= TURN_SHARES_PER_HOUR) return { iceServers: [stun], relay: false, reason: 'too-many' };
+    // Counted before any wait, so asks for different shares at once cannot all pass.
+    // A Cloudflare failure below still uses one of the hour's shares.
+    this.mints.set(by, { ...rate, n: rate.n + 1 });
+    while (this.mints.size > 64) this.mints.delete(/** @type {string} */ (this.mints.keys().next().value));
     const month = this.monthOf();
     const doc = await this.storage.get(MONTH_KEY);
     const used = doc?.month === month ? Number(doc.hours) || 0 : 0;
@@ -136,8 +165,6 @@ export class Turn {
     }
     if (!servers.length) return { iceServers: [stun], relay: false, reason: 'cloudflare' };
     await this.storage.put(MONTH_KEY, { month, hours: used + cost });
-    this.mints.set(by, { ...rate, n: rate.n + 1 });
-    while (this.mints.size > 64) this.mints.delete(/** @type {string} */ (this.mints.keys().next().value));
     const users = [...new Set(servers.map((x) => x.username).filter((u) => typeof u === 'string'))];
     this.byShare.set(shareId, { at: t, servers, users });
     // Old shares' credentials expire anyway; keep the map small.
