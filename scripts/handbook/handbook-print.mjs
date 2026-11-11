@@ -8,7 +8,16 @@
 // every attachment. Not a club night: exits 0 quietly.
 //
 // Retries: up to ATTEMPTS (3) tries RETRY_MS (15 min) apart; the last failure
-// exits 1 with a plain reason, so GitHub emails the owner.
+// exits 1 with a plain reason, so GitHub emails the owner. Only a failure from
+// BEFORE the mail body was sent is tried again. If Gmail may already have taken
+// the mail (a timeout or a closed connection after the body), a second try
+// could print the sheets twice, so the job stops and says so (and writes
+// `maybe_sent=true` to the step output; the workflow then counts the day as
+// sent so the next half-hourly run does not print again).
+//
+// Deadline: NOT_AFTER (for example 17:00, New York time) is set on scheduled
+// runs. It is checked before every try and right before the mail goes, so a
+// scheduled run can never print after it. Hand-started runs leave it empty.
 //
 // PRIVACY: the sheets carry children's full names (the owner approved them on
 // paper via Epson's cloud). Nothing here logs a body, a file's text or the
@@ -18,8 +27,10 @@
 // Env: SITE_ORIGIN (default https://awana.kvbchurch.org), HANDBOOK_TOKEN,
 // GMAIL_USER, GMAIL_APP_PASSWORD, TO (default the Epson), DRY_RUN ('true':
 // email the PDFs to GMAIL_USER instead), ATTEMPTS, RETRY_MS, TWOTIMTWO_ORIGIN
-// (the report's <base>, default https://kvbchurch.twotimtwo.com/).
+// (the report's <base>, default https://kvbchurch.twotimtwo.com/), NOT_AFTER
+// ('HH:MM' New York time, empty = no deadline).
 
+import fs from 'node:fs';
 import { ADDRESS_RE, EPSON_ADDRESS, buildMessage, recipientAllowed, sendMail } from './smtp.mjs';
 
 export const EPSON = EPSON_ADDRESS;
@@ -33,6 +44,30 @@ const log = (/** @type {string} */ s) => console.log(s);
 
 /** A failure that another try 15 minutes later cannot fix. */
 class Fatal extends Error {}
+
+/** The Gmail may already have the mail: never send again. */
+class MaybeSent extends Error {}
+
+/** Past the deadline: stop without sending. */
+class TooLate extends Error {}
+
+/** The clock in New York as minutes after midnight. @param {Date} d */
+function easternMinutes(d) {
+  const parts = new Intl.DateTimeFormat('en-GB', { timeZone: 'America/New_York', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(d);
+  const get = (/** @type {string} */ t) => Number(parts.find((p) => p.type === t)?.value);
+  return get('hour') * 60 + get('minute');
+}
+
+/**
+ * Is it at or past the deadline? `notAfter` is 'HH:MM' in New York time; empty
+ * or unreadable means no deadline. Pure.
+ * @param {string|undefined} notAfter @param {Date} [now]
+ */
+export function pastDeadline(notAfter, now = new Date()) {
+  const m = /^(\d{1,2}):(\d\d)$/.exec(String(notAfter || '').trim());
+  if (!m) return false;
+  return easternMinutes(now) >= Number(m[1]) * 60 + Number(m[2]);
+}
 
 /** Today's date in Eastern time, YYYY-MM-DD. @param {Date} [d] */
 export function easternDate(d = new Date()) {
@@ -155,9 +190,9 @@ async function askWorker({ site, token, test }, club) {
 /**
  * One whole try: ask, make PDFs, send. Returns 'no-club' or 'sent'.
  * `send` is for the tests (smtp.mjs sendMail otherwise).
- * @param {Record<string, string|undefined>} env @param {{ send?: typeof sendMail }} [deps]
+ * @param {Record<string, string|undefined>} env @param {{ send?: typeof sendMail, now?: () => Date }} [deps]
  */
-export async function attempt(env, { send = sendMail } = {}) {
+export async function attempt(env, { send = sendMail, now = () => new Date() } = {}) {
   const site = env.SITE_ORIGIN || 'https://awana.kvbchurch.org';
   const token = env.HANDBOOK_TOKEN || '';
   const user = env.GMAIL_USER || '';
@@ -171,6 +206,8 @@ export async function attempt(env, { send = sendMail } = {}) {
   if (!ADDRESS_RE.test(to)) throw new Fatal('The "to" address is not a plain email address.');
   if (!recipientAllowed(to, user)) throw new Fatal('The "to" address must be the downstairs Epson or GMAIL_USER; nothing was sent.');
 
+  const tooLate = `It is past ${env.NOT_AFTER} in New York, so nothing was sent.`;
+  if (pastDeadline(env.NOT_AFTER, now())) throw new TooLate(tooLate);
   const date = easternDate();
   /** @type {{ name: string, bytes: Uint8Array }[]} */
   const files = [];
@@ -195,40 +232,58 @@ export async function attempt(env, { send = sendMail } = {}) {
     if (browser) await browser.close();
   }
 
+  // Asking the Worker and printing PDFs can take a while: look at the clock again.
+  if (pastDeadline(env.NOT_AFTER, now())) throw new TooLate(tooLate);
   const message = buildMessage({ from: user, to, subject: `${dry ? '[Dry run] ' : ''}Handbook sheets ${date}`, attachments: files });
   log(`Sending ${files.length} PDFs (${files.map((f) => f.bytes.length).join(', ')} bytes) to ${dry ? 'GMAIL_USER (dry run)' : to}.`);
   try {
     await send({ user, pass, from: user, to, message });
   } catch (e) {
     const why = String(/** @type {any} */ (e).message || 'smtp');
+    if (/** @type {any} */ (e).afterData) throw new MaybeSent(`Gmail went quiet after the message was sent (${why}). The sheets may already have printed, so this job will not try again. Look at the printer before printing by hand.`);
     if (/smtp auth 5\d\d/.test(why)) throw new Fatal(`Gmail refused the sign-in (${why}). Check GMAIL_USER and GMAIL_APP_PASSWORD (an app password, made under the Google account's Security → App passwords).`);
     throw new Error(`Gmail did not take the message (${why}).`);
   }
   return 'sent';
 }
 
-async function main() {
-  const env = process.env;
+/** Tell the workflow the mail may be out (a step output; nothing else). */
+function markMaybeSent(env) {
+  if (!env.GITHUB_OUTPUT) return;
+  try { fs.appendFileSync(env.GITHUB_OUTPUT, 'maybe_sent=true\n'); } catch { /* the log line is enough */ }
+}
+
+/**
+ * The whole job with its retries. Returns the exit code.
+ * `deps` is for the tests: send, sleep and now.
+ * @param {Record<string, string|undefined>} env @param {{ send?: typeof sendMail, sleep?: (ms: number) => Promise<void>, now?: () => Date }} [deps]
+ */
+export async function run(env, deps = {}) {
+  const wait = deps.sleep || sleep;
+  const now = deps.now || (() => new Date());
   const attempts = Math.max(1, Number(env.ATTEMPTS) || 3);
   const retryMs = Number.isFinite(Number(env.RETRY_MS)) && env.RETRY_MS !== '' && env.RETRY_MS !== undefined ? Number(env.RETRY_MS) : 15 * 60 * 1000;
   let last = '';
   for (let n = 1; n <= attempts; n++) {
     try {
-      const done = await attempt(env);
+      // Checked before every try, retries included.
+      if (pastDeadline(env.NOT_AFTER, now())) throw new TooLate(`It is past ${env.NOT_AFTER} in New York, so nothing was sent.`);
+      const done = await attempt(env, { send: deps.send, now });
       if (done === 'no-club') { log('No club tonight: nothing to print.'); return 0; }
       log(env.DRY_RUN === 'true' ? 'Dry run: the three sheets were emailed to GMAIL_USER.' : 'The three handbook sheets were emailed to the downstairs printer.');
       return 0;
     } catch (e) {
       last = String(/** @type {any} */ (e).message || e);
       log(`Try ${n} of ${attempts} failed: ${last}`);
-      if (e instanceof Fatal) break;
-      if (n < attempts) { log(`Trying again in ${Math.round(retryMs / 60000)} minutes.`); await sleep(retryMs); }
+      if (e instanceof MaybeSent) markMaybeSent(env);
+      if (e instanceof Fatal || e instanceof MaybeSent || e instanceof TooLate) break;
+      if (n < attempts) { log(`Trying again in ${Math.round(retryMs / 60000)} minutes.`); await wait(retryMs); }
     }
   }
-  console.log(`::error::The handbook sheets were NOT printed. ${last}`);
+  console.log(`::error::The handbook sheets were NOT printed (or may have printed once, see above). ${last}`);
   return 1;
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
-  process.exitCode = await main();
+  process.exitCode = await run(process.env);
 }

@@ -6,7 +6,7 @@ import http from 'node:http';
 import net from 'node:net';
 import fs from 'node:fs';
 import { test } from 'node:test';
-import { CLUBS, attempt, classify, easternDate, fileNameFor, withBase } from '../handbook-print.mjs';
+import { CLUBS, attempt, classify, easternDate, fileNameFor, pastDeadline, run, withBase } from '../handbook-print.mjs';
 import { buildMessage, recipientAllowed, sendMail } from '../smtp.mjs';
 
 const enc = (s) => new TextEncoder().encode(s);
@@ -173,4 +173,114 @@ test('an HTML report is printed to a PDF', { skip: CHROMIUM ? false : 'no Playwr
       assert.equal(Buffer.from(b64, 'base64').subarray(0, 5).toString(), '%PDF-');
     }
   } finally { w.server.close(); }
+});
+
+test('sendMail marks a failure after the body went (afterData), not one before', async () => {
+  // A server that takes the body and then says nothing, so the client times out.
+  const quiet = net.createServer((sock) => {
+    sock.write('220 hi\r\n');
+    let buf = ''; let inData = false;
+    sock.on('data', (d) => {
+      buf += d.toString();
+      let i;
+      while ((i = buf.indexOf('\r\n')) >= 0) {
+        const line = buf.slice(0, i); buf = buf.slice(i + 2);
+        if (inData) { continue; }
+        if (line.startsWith('EHLO')) sock.write('250 OK\r\n');
+        else if (line.startsWith('AUTH')) sock.write('235 ok\r\n');
+        else if (line.startsWith('MAIL') || line.startsWith('RCPT')) sock.write('250 ok\r\n');
+        else if (line === 'DATA') { inData = true; sock.write('354 go\r\n'); }
+      }
+    });
+  });
+  await new Promise((r) => quiet.listen(0, '127.0.0.1', r));
+  const port = /** @type {any} */ (quiet.address()).port;
+  try {
+    const err = await sendMail({ user: 'a@b.co', pass: 'x', from: 'a@b.co', to: 'c@d.co', message: 'x', timeoutMs: 300, connect: () => net.connect(port, '127.0.0.1') }).then(() => null, (e) => e);
+    assert.match(err.message, /smtp timeout/);
+    assert.equal(err.afterData, true);
+  } finally { quiet.close(); }
+  const bad = await fakeSmtp({ authCode: 535 });
+  try {
+    const err = await sendMail({ user: 'a@b.co', pass: 'x', from: 'a@b.co', to: 'c@d.co', message: 'x', connect: () => net.connect(bad.port, '127.0.0.1') }).then(() => null, (e) => e);
+    assert.equal(err.afterData, undefined);
+  } finally { bad.server.close(); }
+});
+
+const quietLog = async (fn) => {
+  const keep = { log: console.log };
+  console.log = () => {};
+  try { return await fn(); } finally { console.log = keep.log; }
+};
+
+test('a failure after the body is never retried and marks maybe_sent', async () => {
+  const w = await fakeWorker(() => ({ status: 200, type: 'application/pdf', body: PDF }));
+  const out = `${process.env.TMPDIR || '/tmp'}/hb-out-${process.pid}-${Date.now()}`;
+  let sends = 0; let sleeps = 0;
+  try {
+    const code = await quietLog(() => run({ ...ENV, SITE_ORIGIN: w.site, GITHUB_OUTPUT: out, RETRY_MS: '1' }, {
+      send: async () => { sends++; throw Object.assign(new Error('smtp timeout'), { afterData: true }); },
+      sleep: async () => { sleeps++; },
+    }));
+    assert.equal(code, 1);
+    assert.equal(sends, 1);
+    assert.equal(sleeps, 0);
+    assert.match(fs.readFileSync(out, 'utf8'), /maybe_sent=true/);
+  } finally { w.server.close(); fs.rmSync(out, { force: true }); }
+});
+
+test('a failure before the body is retried; the output is not marked', async () => {
+  const w = await fakeWorker(() => ({ status: 200, type: 'application/pdf', body: PDF }));
+  const out = `${process.env.TMPDIR || '/tmp'}/hb-out2-${process.pid}-${Date.now()}`;
+  let sends = 0;
+  try {
+    const code = await quietLog(() => run({ ...ENV, SITE_ORIGIN: w.site, GITHUB_OUTPUT: out, RETRY_MS: '1' }, {
+      send: async () => { sends++; if (sends < 2) throw new Error('smtp rcpt-to 451'); },
+      sleep: async () => {},
+    }));
+    assert.equal(code, 0);
+    assert.equal(sends, 2);
+    assert.equal(fs.existsSync(out), false);
+  } finally { w.server.close(); }
+});
+
+test('pastDeadline: 5 pm New York, summer and winter, no deadline when empty', () => {
+  assert.equal(pastDeadline('17:00', new Date('2026-07-15T20:59:00Z')), false); // 4:59 pm EDT
+  assert.equal(pastDeadline('17:00', new Date('2026-07-15T21:00:00Z')), true);  // 5:00 pm EDT
+  assert.equal(pastDeadline('17:00', new Date('2026-12-02T21:59:00Z')), false); // 4:59 pm EST
+  assert.equal(pastDeadline('17:00', new Date('2026-12-02T22:00:00Z')), true);  // 5:00 pm EST
+  assert.equal(pastDeadline('', new Date('2026-07-15T23:00:00Z')), false);
+  assert.equal(pastDeadline(undefined, new Date('2026-07-15T23:00:00Z')), false);
+});
+
+test('a scheduled run past the deadline sends nothing, retries included', async () => {
+  const w = await fakeWorker(() => ({ status: 200, type: 'application/pdf', body: PDF }));
+  let sends = 0;
+  try {
+    // Starts at 4:37 pm EDT; the first try fails before the body; the clock is past 5 pm when the retry is due.
+    const times = ['2026-07-15T20:37:00Z', '2026-07-15T20:37:00Z', '2026-07-15T20:37:00Z', '2026-07-15T21:10:00Z'];
+    let i = 0;
+    const now = () => new Date(times[Math.min(i++, times.length - 1)]);
+    const code = await quietLog(() => run({ ...ENV, SITE_ORIGIN: w.site, NOT_AFTER: '17:00', RETRY_MS: '1' }, {
+      send: async () => { sends++; throw new Error('smtp rcpt-to 451'); },
+      sleep: async () => {},
+      now,
+    }));
+    assert.equal(code, 1);
+    assert.equal(sends, 1);
+  } finally { w.server.close(); }
+  // Already past at the start: the Worker is not even asked.
+  const w2 = await fakeWorker(() => ({ status: 200, type: 'application/pdf', body: PDF }));
+  try {
+    const code = await quietLog(() => run({ ...ENV, SITE_ORIGIN: w2.site, NOT_AFTER: '17:00' }, { send: async () => { sends++; }, now: () => new Date('2026-07-15T21:30:00Z') }));
+    assert.equal(code, 1);
+    assert.equal(w2.asked.length, 0);
+    assert.equal(sends, 1);
+  } finally { w2.server.close(); }
+  // A hand-started run (no NOT_AFTER) sends at any hour.
+  const w3 = await fakeWorker(() => ({ status: 200, type: 'application/pdf', body: PDF }));
+  try {
+    const code = await quietLog(() => run({ ...ENV, SITE_ORIGIN: w3.site }, { send: async () => { sends++; }, now: () => new Date('2026-07-15T23:30:00Z') }));
+    assert.equal(code, 0);
+  } finally { w3.server.close(); }
 });

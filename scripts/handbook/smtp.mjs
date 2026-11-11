@@ -84,6 +84,9 @@ export function buildMessage({ from, to, subject, attachments, date = new Date()
  * Send one message. Resolves when the server accepted it (250 after DATA);
  * rejects with a plain reason (`smtp <step> <code>`) otherwise. The reason
  * carries the step and the reply code only, never the server's text.
+ * An error that happens after the body was written (a timeout, a closed
+ * connection, a bad reply to the final ".") has `afterData = true`: the mail
+ * may already have been taken, so the caller must not send it again.
  * `connect` is for the tests (a plain socket to a stand-in server).
  * @param {{ host?: string, port?: number, user: string, pass: string, from: string, to: string, message: string, timeoutMs?: number, connect?: () => import('node:net').Socket }} o
  */
@@ -95,12 +98,16 @@ export function sendMail({ host = 'smtp.gmail.com', port = 465, user, pass, from
     /** @type {((code: number) => void)|null} */
     let waiting = null;
     let done = false;
+    // True once the message body has gone onto the wire. From then on the
+    // server may already have taken the mail, so a failure is "unclear".
+    let bodyWritten = false;
     const finish = (/** @type {Error|null} */ err) => {
       if (done) return;
       done = true;
       clearTimeout(timer);
       socket.end();
       socket.destroy();
+      if (err && bodyWritten) /** @type {any} */ (err).afterData = true;
       if (err) reject(err); else resolve(undefined);
     };
     const timer = setTimeout(() => finish(new Error('smtp timeout')), timeoutMs);
@@ -130,6 +137,7 @@ export function sendMail({ host = 'smtp.gmail.com', port = 465, user, pass, from
       await step('DATA', [354], 'data');
       // Dot-stuffing: a line starting with "." gets one more.
       const body = message.replace(/\r?\n/g, '\r\n').replace(/^\./gm, '..');
+      bodyWritten = true;
       await step(`${body}${body.endsWith('\r\n') ? '' : '\r\n'}.`, [250], 'send');
       socket.write('QUIT\r\n');
       finish(null);
