@@ -42,12 +42,18 @@ export const LATE_MIN = 15;
 /** Tries per call per night. */
 export const TRIES = 3;
 const KEY = 'health:called';
+/**
+ * The longest the alarm waits for GitHub's answer (IP-20261111-03). The alarm
+ * also reads the report and wakes the stations, so a slow GitHub must not hold
+ * them up during check-in. No answer in time is a failed try like any other.
+ */
+export const DISPATCH_TIMEOUT_MS = 8000;
 
 export class HealthCall {
   /**
    * @param {{ storage: any, now: () => number, clubToday: () => Promise<any>,
    *   configured: () => boolean,
-   *   dispatch: (workflow: string, inputs: Record<string, string>) => Promise<{ok: boolean, status: number}> }} deps
+   *   dispatch: (workflow: string, inputs: Record<string, string>, opts?: { timeoutMs?: number }) => Promise<{ok: boolean, status: number}> }} deps
    */
   constructor({ storage, now, clubToday, configured, dispatch }) {
     this.storage = storage;
@@ -84,7 +90,7 @@ export class HealthCall {
         // Marked before GitHub is asked: one synchronous step, written through.
         this.state.calls[call.id] = { n: seen.n + 1, ok: true };
         await this.storage.put(KEY, this.state);
-        const r = await this.dispatch(HEALTH_WORKFLOW, { station: call.station ? 'true' : 'false' });
+        const r = await this.dispatch(HEALTH_WORKFLOW, { station: call.station ? 'true' : 'false' }, { timeoutMs: DISPATCH_TIMEOUT_MS });
         if (r && r.ok) { started.push(call.id); continue; }
         console.error(`[health] GitHub did not start the ${call.id} check (status ${r ? r.status : 0}); try ${seen.n + 1} of ${TRIES}`);
         this.state.calls[call.id] = { n: seen.n + 1, ok: false };

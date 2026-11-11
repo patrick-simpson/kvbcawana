@@ -91,12 +91,21 @@ export class Prints {
     return Boolean(token && m && safeEqual(m[1].trim(), token));
   }
 
-  /** Start a GitHub Actions job. @param {string} workflow @param {Record<string, string>} inputs */
-  async dispatch(workflow, inputs) {
+  /**
+   * Start a GitHub Actions job. `timeoutMs` gives up on a slow GitHub (an answer
+   * that never came counts as a failed dispatch). Only the health check's call
+   * from the alarm passes it (IP-20261111-03). The print path never does: a send
+   * that timed out may still have started the job, and a retry would print twice.
+   * @param {string} workflow @param {Record<string, string>} inputs
+   * @param {{ timeoutMs?: number }} [opts]
+   */
+  async dispatch(workflow, inputs, opts = {}) {
     if (!DISPATCH_WORKFLOWS.includes(workflow)) return { ok: false, status: 0, refused: true };
+    const timeoutMs = Number(opts?.timeoutMs);
     let res;
     try {
       res = await this.fetchFn(`https://api.github.com/repos/${GITHUB_REPO}/actions/workflows/${workflow}/dispatches`, {
+        ...(timeoutMs > 0 ? { signal: AbortSignal.timeout(timeoutMs) } : {}),
         method: 'POST',
         headers: {
           Authorization: `Bearer ${this.env().PRINT_DISPATCH_TOKEN}`,

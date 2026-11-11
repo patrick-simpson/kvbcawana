@@ -339,7 +339,7 @@ export class SyncCore {
     // The Wednesday health check, started on time from the alarm (healthcall.js).
     this.healthCall = new HealthCall({
       storage: this.storage, now: this.now, clubToday: () => this.watcher.clubToday(),
-      configured: () => this.prints.configured(), dispatch: (wf, inputs) => this.prints.dispatch(wf, inputs),
+      configured: () => this.prints.configured(), dispatch: (wf, inputs, opts) => this.prints.dispatch(wf, inputs, opts),
     });
     mountPrints(this.registry, this);   // /v1/prints/* (routes.md 10.16)
     // The change log (changes.js, routes.md 10.5): every write path below logs who
@@ -402,7 +402,7 @@ export class SyncCore {
     await this.history.flush().catch((err) => console.error('[history] flush failed', err));
     const r = await this.watcher.tick();
     await this.wakeStations();   // a TwoTimTwo-page check-in the tick queued
-    await this.healthCall.tick();   // 5:12 and 5:47 pm on a club night: start the health check job (never throws)
+    await this.healthCall.tick();   // 5:12, 5:47 and 6:15 pm on a club night: start the health check job (never throws, waits at most 8 s)
     return r;
   }
 

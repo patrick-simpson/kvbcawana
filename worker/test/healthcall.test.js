@@ -1,8 +1,8 @@
 // The Wednesday health check started on time by the Worker (healthcall.js):
 // GitHub's own scheduler started checkin-health.yml hours late, after club.
 import { describe, expect, it } from 'vitest';
-import { CALLS, HEALTH_WORKFLOW, HealthCall, LATE_MIN, TRIES } from '../src/healthcall.js';
-import { DISPATCH_WORKFLOWS } from '../src/prints.js';
+import { CALLS, DISPATCH_TIMEOUT_MS, HEALTH_WORKFLOW, HealthCall, LATE_MIN, TRIES } from '../src/healthcall.js';
+import { DISPATCH_WORKFLOWS, Prints } from '../src/prints.js';
 import { kid, rig } from './rig.js';
 
 const at = (hm) => Date.parse(`2026-11-11T${hm}:00-05:00`);   // a Wednesday, Eastern winter time
@@ -16,8 +16,8 @@ function make({ club = true, rehearsal = false, token = true, answers = [] } = {
     now: () => clock.t,
     clubToday: async () => ({ club, rehearsal }),
     configured: () => token,
-    dispatch: async (workflow, inputs) => {
-      asked.push({ at: clock.t, workflow, inputs, marked: structuredClone(store.get('health:called')) });
+    dispatch: async (workflow, inputs, opts) => {
+      asked.push({ at: clock.t, workflow, inputs, opts, marked: structuredClone(store.get('health:called')) });
       return answers.length ? answers.shift() : { ok: true, status: 204 };
     },
   });
@@ -101,5 +101,70 @@ describe('the health check is started on time', () => {
     r.core.healthCall.tick = async () => { ticks += 1; return []; };
     await r.core.alarm();
     expect(ticks).toBe(1);
+  });
+});
+
+// IP-20261111-03: the alarm waits for this call, so a slow GitHub must not hold
+// up the report read and the station wake behind it during check-in.
+describe('a slow GitHub never holds up the alarm', () => {
+  /** A Prints whose GitHub never answers until the request is given up on. */
+  function slowGitHub() {
+    const signals = [];
+    const prints = new Prints({
+      storage: new Map(), now: () => 0, env: () => ({ PRINT_DISPATCH_TOKEN: 'gh' }),
+      fetchFn: (url, init) => new Promise((_, reject) => {
+        signals.push(init.signal);
+        init.signal?.addEventListener('abort', () => reject(init.signal.reason));
+      }),
+    });
+    return { prints, signals };
+  }
+
+  it('the health call asks for a time limit of about 8 seconds', async () => {
+    const h = make();
+    await h.run(at('17:13'));
+    expect(h.asked[0].opts).toEqual({ timeoutMs: DISPATCH_TIMEOUT_MS });
+    expect(DISPATCH_TIMEOUT_MS).toBe(8000);
+  });
+
+  it('a dispatch with a time limit gives up, and that counts as a failed try', async () => {
+    const { prints, signals } = slowGitHub();
+    const r = await prints.dispatch(HEALTH_WORKFLOW, { station: 'false' }, { timeoutMs: 20 });
+    expect(r).toEqual({ ok: false, status: 0 });
+    expect(signals[0]).toBeInstanceOf(AbortSignal);
+    // Through the real HealthCall: marked tried, tried again on a later tick.
+    const store = new Map();
+    let t = at('17:12');
+    const call = new HealthCall({
+      storage: { get: async (k) => store.get(k), put: async (k, v) => { store.set(k, structuredClone(v)); } },
+      now: () => t, clubToday: async () => ({ club: true }), configured: () => true,
+      dispatch: (wf, inputs, opts) => prints.dispatch(wf, inputs, { ...opts, timeoutMs: 20 }),
+    });
+    expect(await call.tick()).toEqual([]);
+    expect(store.get('health:called').calls.early).toEqual({ n: 1, ok: false });
+    t += 30000;
+    await call.tick();
+    expect(store.get('health:called').calls.early).toEqual({ n: 2, ok: false });
+  });
+
+  it('the Worker wires the time limit through to GitHub', async () => {
+    const r = await rig({ start: at('17:11'), kids: [kid('7351922', 'Sparks', 'Zebedee Quillfeather')] });
+    const seen = [];
+    r.core.prints.dispatch = async (wf, inputs, opts) => { seen.push(opts); return { ok: true, status: 204 }; };
+    r.core.prints.configured = () => true;
+    r.core.healthCall.clubToday = async () => ({ club: true });
+    r.core.healthCall.now = () => at('17:12');
+    await r.core.healthCall.tick();
+    expect(seen).toEqual([{ timeoutMs: DISPATCH_TIMEOUT_MS }]);
+  });
+
+  it('the print path never sets a time limit (a send that timed out could print twice)', async () => {
+    const seen = [];
+    const prints = new Prints({
+      storage: new Map(), now: () => 0, env: () => ({ PRINT_DISPATCH_TOKEN: 'gh' }),
+      fetchFn: async (url, init) => { seen.push(init.signal); return new Response(null, { status: 204 }); },
+    });
+    await prints.dispatch('letterhead-print.yml', {});
+    expect(seen).toEqual([undefined]);
   });
 });
