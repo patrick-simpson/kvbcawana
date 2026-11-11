@@ -1,4 +1,13 @@
-﻿## [11.1.1] - 2026-11-10
+﻿## [11.2.0] - 2026-11-11
+Three Cast fixes from the first weekly code review.
+
+**Cast turns itself off when a club night starts.** Cast stays on until someone unticks it, and it comes back after a restart. If it was left on after a Sunday, the lobby TV would have shown the Cast screen on Wednesday instead of the welcomes. Now, when a club night's hours begin and Cast is still the chosen screen, the app turns Cast off by itself (the same as unticking it in the tray) and the screen from before comes back. Cast switched on by hand during the club night stays on.
+
+**Turning Cast off no longer resets the classroom computer.** On the downstairs classroom computer, turning Cast off put the classroom's first-time settings back: hours 4 to 8 pm and the 8 pm shutdown switched on, even if someone had changed them. Cast on and off now leaves hours and shutdown exactly as they were.
+
+**The taskbar menu says "Cast", not "Presentation".** While Cast was up the menu read "Showing: Presentation: on screen now", the name of a screen removed in 10.13.0.
+
+## [11.1.1] - 2026-11-10
 A safety fix for churches with two print stations.
 
 **No second label from a slow batch.** A print station takes up to ten labels from the sync service at once and prints them in order. The service gives each label to that station for 90 seconds, and the station only kept renewing the one it was printing. If the printer was slow (a retry, the backup printer), a label near the end of the batch could pass its 90 seconds, be handed to a SECOND station, and print on both. Now a label that has waited more than 45 seconds for its turn asks the service first "is this still mine?". If the answer is no (another station has it, or it is already done), this station leaves it alone. If the service cannot be reached at all, the label prints as before: a label is never held up waiting for the internet. With one print station nothing changes.
