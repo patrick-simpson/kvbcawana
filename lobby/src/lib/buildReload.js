@@ -146,6 +146,24 @@ export function projectorIdle(state, now = Date.now()) {
 }
 
 /**
+ * Is the projector too busy to reload? Besides the schedule (projectorIdle),
+ * a scored game holds it: a club up on the scoreboard, a winner screen
+ * playing, or a stopwatch or timer running. The scoreboard shows whatever
+ * the schedule says, so the schedule alone would miss a game scored off hours.
+ * @param {{mode: string, target?: Date}|null} state
+ * @param {{ board?: {active?: string|null, clock?: {startedAt?: number|null}|null}|null, finale?: unknown }} [score]
+ * @param {number} [now]
+ * @returns {boolean}
+ */
+export function projectorBusy(state, score = {}, now = Date.now()) {
+  const { board = null, finale = null } = score;
+  if (board?.active != null) return true;
+  if (finale != null) return true;
+  if (board?.clock && board.clock.startedAt != null) return true;
+  return !projectorIdle(state, now);
+}
+
+/**
  * Is somebody typing right now? A reload would eat the words mid-sentence,
  * so this holds the page whatever else it is doing.
  * @param {Document} [doc]

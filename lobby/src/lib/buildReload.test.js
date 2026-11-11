@@ -9,6 +9,7 @@ import {
   pageBuild,
   parseVersion,
   probeUrl,
+  projectorBusy,
   projectorIdle,
 } from './buildReload.js';
 
@@ -176,5 +177,30 @@ describe('isTyping', () => {
     document.body.innerHTML = '<div id="f" contenteditable="true" tabindex="0"></div>';
     document.getElementById('f').focus();
     expect(isTyping()).toBe(true);
+  });
+});
+
+describe('projectorBusy', () => {
+  const now = Date.parse('2026-11-11T12:00:00Z');
+  const idle = { mode: 'SHUTDOWN' };
+  const board = (extra = {}) => ({ active: null, clock: null, ...extra });
+
+  it('is the schedule answer when nothing is being scored', () => {
+    expect(projectorBusy(idle, { board: board(), finale: null }, now)).toBe(false);
+    expect(projectorBusy({ mode: 'GAME_TIME' }, { board: board(), finale: null }, now)).toBe(true);
+    expect(projectorBusy(idle, undefined, now)).toBe(false);
+  });
+
+  it('a club up on the scoreboard holds it, even when the schedule is idle', () => {
+    expect(projectorBusy(idle, { board: board({ active: 'tnt' }) }, now)).toBe(true);
+  });
+
+  it('a winner screen playing holds it', () => {
+    expect(projectorBusy(idle, { board: board(), finale: { id: 1 } }, now)).toBe(true);
+  });
+
+  it('a running stopwatch or timer holds it, a stopped one does not', () => {
+    expect(projectorBusy(idle, { board: board({ clock: { startedAt: 5 } }) }, now)).toBe(true);
+    expect(projectorBusy(idle, { board: board({ clock: { startedAt: null } }) }, now)).toBe(false);
   });
 });

@@ -12,7 +12,7 @@ import { useRealtime } from './hooks/useRealtime.js';
 import { useWakeLock } from '../hooks/useWakeLock.js';
 import { useBuildReload } from '../hooks/useBuildReload.js';
 import { selfReload } from '../lib/reloadLedger.js';
-import { projectorIdle } from '../lib/buildReload.js';
+import { projectorBusy } from '../lib/buildReload.js';
 import { ViewErrorBoundary, ErrorScreen } from './components/ViewErrorBoundary.jsx';
 import { ChurchMark } from './components/ChurchMark.jsx';
 import { ResumePill } from './components/ResumePill.jsx';
@@ -177,7 +177,7 @@ export const App = () => {
   // The rule itself lives in the shared pure helper; here it is just "not
   // idle means busy".
   // The configure page never reloads itself under the operator's typing.
-  const buildReloadBusy = useCallback(() => CONFIGURE || !projectorIdle(state), [state]);
+  const buildReloadBusy = useCallback(() => CONFIGURE || projectorBusy(state, { board, finale }), [state, board, finale]);
   useBuildReload(buildReloadBusy);
 
   // A deliberately bare wall (the opening's closing blackout, the shutdown
