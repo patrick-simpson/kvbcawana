@@ -164,6 +164,20 @@ function cleanFinale(f) {
 }
 
 /**
+ * Is this board tonight's? A board stamped with another night is last night's
+ * (the Worker starts a new night only when someone asks), so a screen shows no
+ * board. A board with no usable `night` (an older Worker) is not dropped.
+ * `ms` is the Worker's clock when known, else the device's.
+ * @param {{night?: unknown}|null} board @param {number} ms
+ */
+export function boardIsTonight(board, ms) {
+  if (!board) return false;
+  if (typeof board.night !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(board.night)) return true;
+  if (!Number.isFinite(ms)) return true;
+  return board.night === nightOf(ms);
+}
+
+/**
  * A board as anything sent it (the Worker's answer, a doorbell's payload,
  * storage), cleaned to the shape above, or null when it is not one.
  * @param {any} b

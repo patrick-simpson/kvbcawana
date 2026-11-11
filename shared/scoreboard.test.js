@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  boardIsTonight,
   leadChange,
   SCORE_ALL_TEAMS,
   SCORE_SETUPS,
@@ -114,6 +115,21 @@ describe('the stopwatch and timer', () => {
     sync.add(3000, 3300, 7400);   // rtt 300
     expect(sync.offset()).toBe(4000);
     expect(sync.known()).toBe(true);
+  });
+});
+
+describe('which night a board is from', () => {
+  // 2026-11-12 03:30 UTC is still the evening of 11-11 in Eastern time.
+  const lateEastern = Date.parse('2026-11-12T03:30:00Z');
+  it('compares in Eastern time, as the Worker does', () => {
+    expect(boardIsTonight({ night: '2026-11-11' }, lateEastern)).toBe(true);
+    expect(boardIsTonight({ night: '2026-11-12' }, lateEastern)).toBe(false);
+    expect(boardIsTonight({ night: '2026-11-11' }, Date.parse('2026-11-12T06:00:00Z'))).toBe(false);
+  });
+  it('keeps a board with no night, and with no board there is none', () => {
+    expect(boardIsTonight({}, lateEastern)).toBe(true);
+    expect(boardIsTonight({ night: 5 }, lateEastern)).toBe(true);
+    expect(boardIsTonight(null, lateEastern)).toBe(false);
   });
 });
 

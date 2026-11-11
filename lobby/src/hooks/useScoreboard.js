@@ -16,7 +16,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { onSyncDoorbell, syncAuthed, useSync } from './useSync.js';
-import { FINALE_FRESH_MS, FINALE_MS, cleanBoard, createClockSync } from '../../../shared/scoreboard.js';
+import { FINALE_FRESH_MS, FINALE_MS, boardIsTonight, cleanBoard, createClockSync } from '../../../shared/scoreboard.js';
 import { clubEveningNow } from '../../../shared/clubNight.js';
 
 /** The safety-net read while the screen is up on the club evening. */
@@ -96,6 +96,17 @@ export function useScoreboard({ enabled }) {
     return () => window.clearTimeout(t);
   }, [finale]);
 
+  // A board from another night reads as no board (owner's night = the church's
+  // Eastern date, the Worker's own rule). The Worker's clock when a timed read
+  // gave it, else this device's. A local minute tick lets a screen left up past
+  // midnight notice; it makes no request.
+  const [, setMinute] = useState(0);
+  useEffect(() => {
+    if (!live) return undefined;
+    const t = window.setInterval(() => setMinute((m) => m + 1), 60 * 1000);
+    return () => window.clearInterval(t);
+  }, [live]);
   const serverNow = useCallback(() => wallNow() + sync.offset(), [sync]);
-  return { board: live ? board : null, finale: live ? finale : null, serverNow };
+  const tonight = board && boardIsTonight(board, serverNow()) ? board : null;
+  return { board: live ? tonight : null, finale: live ? finale : null, serverNow };
 }
