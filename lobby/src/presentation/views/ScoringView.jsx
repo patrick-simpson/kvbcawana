@@ -63,7 +63,10 @@ export const ScoringView = ({ now, club, scores, teams = SCORE_TEAMS, clock, ser
   const lowPower = useLowPower();
   const info = CLUBS[club];
   const gameWindow = useMemo(
-    () => (windows || []).find((w) => w.kind === 'game' && Array.isArray(w.clubs) && w.clubs.includes(club)) || null,
+    () => {
+      if (!windows) return null;
+      return windows.find((w) => w.kind === 'game' && Array.isArray(w.clubs) && w.clubs.includes(club)) || null;
+    },
     [windows, club],
   );
   const clubIds = gameWindow ? gameWindow.clubs : [club];
