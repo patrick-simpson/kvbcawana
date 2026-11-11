@@ -9,8 +9,8 @@
 // Only files committed under one of these folders can be served that way:
 // Journey's public files (/journey/, functions/journey), the home page's
 // film (/reel/, functions/reel; printer/public/reel, made by printer/reel/)
-// the lobby's 3D intro (/lobby/intro/, functions/lobby/intro;
-// lobby/public/intro, made by video/awana-intro/) and the lobby's promo
+// the lobby's intro film (/lobby/intro/, functions/lobby/intro;
+// lobby/public/intro, made by video/lobby-intro/) and the lobby's promo
 // videos (/lobby/promos/, functions/lobby/promos; lobby/public/promos, the
 // Grand Prix made by video/grand-prix/), and the opening ceremony's films
 // (/lobby/welcome/, functions/lobby/welcome; lobby/public/welcome, made by

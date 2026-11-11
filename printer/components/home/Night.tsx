@@ -6,8 +6,8 @@ import { Twin, TwinHandle } from './Twin';
  * Wednesday evening at Kennebec Valley Baptist Church, played on the REAL
  * screens (Twin.tsx), with the time of night as its spine:
  *
- *   #welcome   5:45  the lobby TV's welcome: the church's logo and the 3D intro
- *                    video (owner 2026-11-01: "the new welcome graphics"), then
+ *   #welcome   5:45  the lobby TV's welcome: the church's logo and the intro
+ *                    film (owner 2026-11-01: "the new welcome graphics"), then
  *                    every season poster (the lobby's own list: the Grand Prix
  *                    video too; 5:55 "Coming up" folded in here 2026-11-09)
  *   #doors     5:50  the check-in page on a phone (the reader taps names, or it
@@ -191,7 +191,7 @@ const Doors: React.FC = () => {
 // ONE lobby TV (owner 2026-11-09: the home page was twice its length; 5:55
 // "Coming up" folded in here). It opens on the lobby's welcome (owner,
 // 2026-11-01: the new welcome graphics): the flagship slide, the church's logo
-// landing big in the middle, carrying on into the 3D intro video and back, on
+// landing big in the middle, carrying on into the intro film and back, on
 // every pass of this twin (`intro`; lobby/src/lib/flagship.js showcaseIntro).
 // After WELCOME_MS it plays every poster the lobby has (owner, 2026-10-16: "a
 // section for the promos that plays all of them on loop. Then any new ones can

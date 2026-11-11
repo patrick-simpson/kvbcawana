@@ -41,7 +41,7 @@ interface Props {
   onEvent?: (what: string, data: Record<string, unknown>) => void;
   onReady?: () => void;
   className?: string;
-  /** The lobby twin plays the flagship's 3D intro every pass (the welcome scene; site/showcase/stub.js). */
+  /** The lobby twin plays the flagship's intro film every pass (the welcome scene; site/showcase/stub.js). */
   intro?: boolean;
   /** The projector twin has T&T's game up on the scoreboard (the 6:05 scene; site/showcase/stub.js). */
   score?: boolean;

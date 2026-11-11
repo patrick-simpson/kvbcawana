@@ -17,7 +17,7 @@
 // trademark line.
 //
 // Owner, 2026-11-01: add the new welcome graphics (the projector's grand
-// welcome, the lobby's 3D intro video) and the Grand Prix promo, keep
+// welcome, the lobby's intro film) and the Grand Prix promo, keep
 // everything else, keep it a minute: Settings and the every-screen grid give
 // up a bar each.
 //

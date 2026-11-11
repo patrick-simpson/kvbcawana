@@ -52,7 +52,7 @@ import twoLineSvg from '../../../shared/brand/logos/kvbc-awana-two-line.svg?raw'
 //           after  the glad line lands
 // Nothing moves after the last landing: about 3 s in (bounce, pop), 6.2 s (parade).
 //
-// The 3D intro (`intro`, ManualSlideshow's choice, now and then): the bounce
+// The intro film (`intro`, ManualSlideshow's choice, now and then): the bounce
 // + glad showing (FLAGSHIP_INTRO_PICK) without taking this screen's turn,
 // then FlagshipIntro.jsx carries it on into the video and back; it owns the
 // showing's end (`onFinished`) and tells the scene when to hand its tab and
@@ -368,7 +368,7 @@ function Parade({ sheet }) {
 /**
  * The flagship welcome slide, full-bleed behind the check-in moment.
  * `pick` fixes the style and wording (tests); without it each showing takes
- * this screen's next turn. `intro` plays the 3D intro (see above); `paused`
+ * this screen's next turn. `intro` plays the intro film (see above); `paused`
  * is names on screen, for it.
  * @param {{
  *   pick?: { style: 'bounce' | 'pop' | 'parade', version: 'glad' | 'welcome' },

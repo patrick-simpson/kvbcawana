@@ -181,7 +181,7 @@
   display: block;
 }
 
-/* The 3D intro (FlagshipIntro.jsx): the video over the whole slide, unseen
+/* The intro film (FlagshipIntro.jsx): the video over the whole slide, unseen
    until its first frame, which is this slide at rest, so fading it in (and
    out at its end, on the same frame) changes nothing on screen. Over the
    logo and its line, under the scene's tab and waves (app.css hands those

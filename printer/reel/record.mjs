@@ -23,7 +23,7 @@ export async function record(names, { fps = 60 } = {}) {
   if (!existsSync(path.join(SITE, 'lobby', 'index.html'))) {
     throw new Error('site/dist is not built: run `SITE_ORIGIN=https://awana.kvbchurch.org node site/build.mjs` at the repo root first');
   }
-  // The lobby's own video files (the flagship's 3D intro, the Grand Prix promo):
+  // The lobby's own video files (the flagship's intro film, the Grand Prix promo):
   // the screen draws them full frame, the first and last frames ARE the lobby,
   // so their frames are the footage, taken straight from the file the lobby
   // plays (a <video> does not run on the virtual clock).
