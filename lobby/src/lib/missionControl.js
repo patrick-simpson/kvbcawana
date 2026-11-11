@@ -139,6 +139,9 @@ export function alertsFrom(overview, now = Date.now()) {
     const who = oldOnes.length === 1 ? `station ${oldOnes[0]} is` : `stations ${oldOnes.join(', ')} are`;
     out.push({ id: 'slips-held', tone: 'warn', text: `Award slips are waiting: ${who} on an old app. Its Chrome extension prints them; update it to KVBC Awana 10.0.0 so the service prints them.` });
   }
+  // A child checked in on TwoTimTwo's own page whose label could not be made (a number only).
+  const lost = Number(print.labelsLost) || 0;
+  if (lost > 0) out.push({ id: 'labels-lost', tone: 'warn', text: `${lost} name tag${lost === 1 ? '' : 's'} could not be made tonight for ${lost === 1 ? 'a child' : 'children'} checked in on TwoTimTwo's own page. Reprint ${lost === 1 ? 'it' : 'them'} from the check-in page's + menu.` });
   if (overview.history?.pending > 0) out.push({ id: 'history', tone: 'warn', text: `${overview.history.pending} saved-history batch${overview.history.pending === 1 ? ' is' : 'es are'} still waiting to be stored.` });
   const church = overview.church;
   const savedAt = atMs(church?.savedAt);

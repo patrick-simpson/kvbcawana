@@ -123,6 +123,15 @@ describe('mission control: alerts', () => {
     const two = alertsFrom({ ...ok, feeds: { slipsHeld: 1, oldStations: [{ name: 'A' }, { name: 'B' }] } }, now).find((x) => x.id === 'slips-held');
     expect(two.text).toContain('stations A, B are on an old app');
   });
+  it('name tags the service gave up on, as a count (IP-20261111-23)', () => {
+    const one = alertsFrom({ ...ok, print: { ...(ok.print || {}), labelsLost: 1 } }, now).find((x) => x.id === 'labels-lost');
+    expect(one).toMatchObject({ tone: 'warn' });
+    expect(one.text).toContain('1 name tag could not be made tonight');
+    const three = alertsFrom({ ...ok, print: { ...(ok.print || {}), labelsLost: 3 } }, now).find((x) => x.id === 'labels-lost');
+    expect(three.text).toContain('3 name tags could not be made tonight');
+    expect(ids({ ...ok, print: { ...(ok.print || {}), labelsLost: 0 } })).not.toContain('labels-lost');
+    expect(ids(ok)).not.toContain('labels-lost');
+  });
   it('nothing in a missing overview', () => expect(alertsFrom(null, now)).toEqual([]));
 });
 
