@@ -588,6 +588,24 @@ describe('Cast: what a guest may keep in the room', () => {
     expect(full.body.reason).toBe('room-full');
   });
 
+  it("a dropped big upload gives its bytes back to the hour's allowance, so the retry gets in (IP-20261111-24)", async () => {
+    const s = await presenter();
+    const t = await s.join();
+    const start = (bytes, type = 'video/mp4') => s.call('POST', '/v1/cast/files', { type, bytes }, { auth: '', cast: t });
+    const big = 200 * 1024 * 1024;
+    const first = await start(big);
+    expect(first.status).toBe(200);
+    // Still uploading: a second 200 MB would pass the hour's 300 MB.
+    expect((await start(big)).body.reason).toBe('too-many');
+    // The phone lost the Wi-Fi. A few quiet minutes later the retry is taken.
+    s.tick(CAST_UPLOAD_QUIET_MS + 60 * 1000);
+    const retry = await start(big);
+    expect(retry.status).toBe(200);
+    expect((await files(s)).map((m) => m.id)).toEqual([retry.body.id]);
+    // The allowance now holds the retry alone: a third is still too much.
+    expect((await start(big)).body.reason).toBe('too-many');
+  });
+
   it('a dropped upload stops holding the room; one still sending parts keeps it (IP-20261111-06)', async () => {
     const s = await presenter();
     const t = await s.join();

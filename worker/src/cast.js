@@ -205,6 +205,23 @@ export class Cast {
   }
 
   /**
+   * Uploads that were dropped (no part for CAST_UPLOAD_QUIET_MS; never what is on
+   * the TV) are cleared, and their bytes go back to this hour's allowance: they
+   * never reached the TV, so the retry must not be refused as too much
+   * (IP-20261111-24). Run before the allowance is looked at.
+   */
+  async dropQuietUploads() {
+    const t = this.now();
+    const shown = (await this.engine.stage()).show?.button?.file || null;
+    for (const [, m] of await this.storage.list({ prefix: 'castmeta:' })) {
+      if (!m?.id || m.done || m.id === shown) continue;
+      if (t - (Number(m.lastAt) || Number(m.at) || 0) < CAST_UPLOAD_QUIET_MS) continue;
+      await this.engine.deleteFile(m);
+      if ((m.at || 0) >= this.roomBytes.since) this.roomBytes.n = Math.max(0, this.roomBytes.n - (Number(m.bytes) || 0));
+    }
+  }
+
+  /**
    * Room for `bytes` more in the room: dropped uploads (no part for
    * CAST_UPLOAD_QUIET_MS) go first, then the oldest finished files not on the TV,
    * until it fits. False when it cannot (what is up, or still uploading, fills it).
@@ -241,6 +258,7 @@ export class Cast {
     // Anything the engine would refuse anyway (type, empty, too big) gets its own answer.
     const typeOk = CLASSROOM_FILE_TYPES.includes(body?.type) || isClipType(body?.type);
     if (!isLink && (!typeOk || !Number.isInteger(bytes) || bytes < 1 || bytes > fileLimits(body.type).max)) return this.engine.startFile(body);
+    await this.dropQuietUploads();
     const left = this.roomBytesLeft();
     if ((isLink ? 1 : bytes) > left) return fail('That is a lot sent to the TV this hour. Wait a while, or share your screen instead.', 429, { reason: 'too-many' });
     if (!(await this.makeRoom(Math.min(bytes, left)))) return fail('The TV is holding as much as it can. Take down what is up, then try again.', 413, { reason: 'room-full' });
