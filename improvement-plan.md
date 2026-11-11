@@ -102,13 +102,49 @@ history keeps them).
 
 ## Open findings
 
+### IP-20261111-08: The home page film is out of date and cannot be rebuilt as it stands
+- Severity: Medium
+- Where: printer/reel/shots.mjs:157 and :163, printer/reel/film/film.js:507 (after commits 50200cd, 40c79c2)
+- What: The film's recipe still films the BARF Night poster, which was deleted, and asks for 9 seconds of an intro video that is now 8 seconds. The committed film still shows that poster and the old 3D intro.
+- Why it matters: The public home page shows things the lobby no longer does. A rebuild today would film ordinary slides and label them BARF Night, with no error.
+- Suggested fix: Remove the BARF shot and its cut, set the intro to 8 seconds and re-pick its moment, then the owner runs `npm run reel` (it needs his music file).
+- Status: Open. The recipe is fixed (2082381). The film itself is still the old one until the owner runs `npm run reel` with his music file.
+
+
+### IP-20261111-23: The lost-label count is not shown on the settings page
+- Severity: Low
+- Where: lobby/src/lib/missionControl.js `alertsFrom`, worker `labelsLost` (added in 4d01df4)
+- What: The Worker now reports `labelsLost` on the tonight overview and the print status, but no page reads it yet.
+- Why it matters: A label given up on is still only visible to someone who reads the raw answer.
+- Suggested fix: Add a Needs a look alert on /settings Tonight when `labelsLost` is above 0, with a test.
+- Status: Open
+
+### IP-20261111-24: Cast: a dropped big upload still uses up the hour's allowance
+- Severity: Low
+- Where: worker/src/cast.js (the 300 MB hourly allowance, counted when an upload starts)
+- What: A 200 MB video whose upload dropped has already been counted, so a retry within the hour is refused as too many.
+- Why it matters: The presenter cannot retry a big video for up to an hour, though the room has space again.
+- Suggested fix: Count the bytes when the upload finishes, or give them back when a dropped upload is cleared.
+- Status: Open
+
+### IP-20261111-25: Relay hours for the month can be undercounted
+- Severity: Low
+- Where: worker/src/turn.js `mint` (`turn:month` is read, then written after a wait)
+- What: Two different shares starting at the same moment both read the same month total and each writes its own.
+- Why it matters: The monthly cap of 120 relay hours could be passed by a little. Cloudflare's free allowance is far larger, so no cost.
+- Suggested fix: Add the cost to an in-memory total in one step, and write that through.
+- Status: Open
+
+## Closed findings
+
 ### IP-20261111-01: Cast stays on until someone turns it off by hand
 - Severity: High
 - Where: printer/electron-app/src/display/display.js:513 (commit d9e8676)
 - What: Cast is saved as the chosen screen and comes back after a restart. Nothing ends it when a club night starts or after it sits idle.
 - Why it matters: If Cast is left ticked after a Sunday, the lobby TV shows the Cast screen on Wednesday instead of the welcomes, until someone unticks it. The TV page also reads the Worker every 30 seconds around the clock, about 5,800 of the 100,000 daily requests.
 - Suggested fix: When a club night's hours begin and the screen is Cast, turn Cast off (`castOff()`), with a test in `display.test.cjs`. Owner's call: also slow the TV's safety read to 60 seconds.
-- Status: Open
+- Status: Fixed in d688c43 (KVBC Awana 11.2.0)
+
 
 ### IP-20261111-02: Turning Cast off on the classroom computer resets its hours and re-arms the 8 pm shutdown
 - Severity: Medium
@@ -116,7 +152,8 @@ history keeps them).
 - What: Cast off goes back through `setScreen`, which treats the classroom as newly chosen and applies its defaults again (hours 4 to 8 pm, shutdown on).
 - Why it matters: CLAUDE.md says those defaults apply once. After one Cast on and off there, changed hours are lost and a shutdown someone switched off is on again, so that PC powers off at 8 pm on a club night.
 - Suggested fix: In `castOff`, put the screen id back without the defaults, or remember the whole settings from before Cast. Add a test.
-- Status: Open
+- Status: Fixed in 77a0165 (KVBC Awana 11.2.0)
+
 
 ### IP-20261111-03: The health-check call can hold up the check-in alarm
 - Severity: Medium
@@ -124,7 +161,8 @@ history keeps them).
 - What: The Worker's alarm waits for the GitHub call that starts the health check at 5:12, 5:47 and 6:15 pm, and that call has no time limit.
 - Why it matters: If GitHub answers slowly, the next report read, label hand-off and station wake wait behind it, during check-in.
 - Suggested fix: Give that one dispatch a time limit of about 8 seconds, or do not wait for it in the alarm. Do not add a time limit to the print path (a timed-out send could print twice).
-- Status: Open
+- Status: Fixed in 56aa2d9
+
 
 ### IP-20261111-04: The projector can reload itself in the middle of a scored game
 - Severity: Medium
@@ -132,7 +170,8 @@ history keeps them).
 - What: The self-update's busy check looks only at the schedule. The scoreboard shows whatever the schedule says, so a game scored off-schedule does not count as busy.
 - Why it matters: A deploy during a game scored before 5:30 pm, on another day, or left up into the shutdown screen reloads the wall mid-game. Scores survive; a takeover or finale on screen is lost.
 - Suggested fix: Count a club up or a finale as busy: `CONFIGURE || scoringClub != null || finale != null || !projectorIdle(state)`, with one test.
-- Status: Open
+- Status: Fixed in d78b1d5
+
 
 ### IP-20261111-05: Screen-share relay credentials: asks at the same moment each get their own set
 - Severity: Medium
@@ -140,7 +179,8 @@ history keeps them).
 - What: The check for an existing set and the write that records one have two waits between them, so parallel asks for one share each make a set.
 - Why it matters: The hourly limit is passed, and only the last set is revoked when the share ends; the others live two hours. CLAUDE.md says one set per share. The presenter and the TV asking together hit a mild form of this.
 - Suggested fix: Keep one in-flight promise per share, set before the first wait, and count the hourly use before the fetch. Add a test with two asks at once.
-- Status: Open
+- Status: Fixed in f264347
+
 
 ### IP-20261111-06: Cast: an interrupted upload is never cleared and can block the next one
 - Severity: Medium
@@ -148,7 +188,8 @@ history keeps them).
 - What: `makeRoom` counts unfinished uploads against the 12 file and 240 MB caps but only removes finished ones. Cast has no sweep for unfinished uploads.
 - Why it matters: A big video whose upload dropped (phone lost Wi-Fi) blocks the retry with 'room full' while nothing is up, until the tray's reset.
 - Suggested fix: In `makeRoom`, also remove an unfinished upload older than a few minutes. Add a test.
-- Status: Open
+- Status: Fixed in 7fb5ba9
+
 
 ### IP-20261111-07: The tray's Show Cast code does not tell the TV when nothing is up
 - Severity: Medium
@@ -156,15 +197,8 @@ history keeps them).
 - What: `reset()` records that the code should show but rings no doorbell unless something was on the stage. The desk's own button does ring.
 - Why it matters: The usual click is on an idle room, so the TV shows the code up to 30 seconds late.
 - Suggested fix: Ring the doorbell after the write in `reset()`, as `deskReveal` does. Add a test on an idle room.
-- Status: Open
+- Status: Fixed in a81fff0
 
-### IP-20261111-08: The home page film is out of date and cannot be rebuilt as it stands
-- Severity: Medium
-- Where: printer/reel/shots.mjs:157 and :163, printer/reel/film/film.js:507 (after commits 50200cd, 40c79c2)
-- What: The film's recipe still films the BARF Night poster, which was deleted, and asks for 9 seconds of an intro video that is now 8 seconds. The committed film still shows that poster and the old 3D intro.
-- Why it matters: The public home page shows things the lobby no longer does. A rebuild today would film ordinary slides and label them BARF Night, with no error.
-- Suggested fix: Remove the BARF shot and its cut, set the intro to 8 seconds and re-pick its moment, then the owner runs `npm run reel` (it needs his music file).
-- Status: Open
 
 ### IP-20261111-09: A label given up on is counted, but nobody is told
 - Severity: Low
@@ -172,7 +206,8 @@ history keeps them).
 - What: After three failed tries to make a print job the Worker adds one to `lost`, and nothing reads that number.
 - Why it matters: A child checked in on TwoTimTwo's own page gets no label and the only trace is a Worker log line.
 - Suggested fix: Put the count in the check-in health report and Tonight's Needs a look, or remove the counter and say it is log only.
-- Status: Open
+- Status: Fixed in 4d01df4
+
 
 ### IP-20261111-10: The Worker README describes token wiring that does not exist
 - Severity: Low
@@ -180,7 +215,8 @@ history keeps them).
 - What: It says `PRINT_FETCH_TOKEN` and `CAST_CONVERT_TOKEN` are pushed by ci.yml and handed to the jobs. ci.yml does not push them and both workflows send `HANDBOOK_TOKEN`. It also says three workflows can be started; there are four. The comment at sync.js:405 leaves out 6:15 pm.
 - Why it matters: Setting either secret by hand, as the README invites, makes every print-from-page or PowerPoint job fail with 401.
 - Suggested fix: Either wire the two secrets (ci.yml's list, and `secrets.X || secrets.HANDBOOK_TOKEN` in the two workflows) or cut the README down to what is true. In `worker/`, so not fixed by the review.
-- Status: Open
+- Status: Fixed in 0c4b07e
+
 
 ### IP-20261111-11: A screen left open overnight keeps last night's scoreboard
 - Severity: Low
@@ -188,7 +224,8 @@ history keeps them).
 - What: No screen checks the board's night. The Worker starts a new night only when asked, and the backup read runs only on the club evening.
 - Why it matters: If nobody presses End, a TV left on in a plain browser keeps the club and score bar up after midnight. The KVBC Awana app closes its window, so it is not affected.
 - Suggested fix: In the hook, treat a board from another night as no board. It costs no request.
-- Status: Open
+- Status: Fixed in 38875cf
+
 
 ### IP-20261111-12: The tray says Presentation while Cast is on
 - Severity: Low
@@ -196,7 +233,8 @@ history keeps them).
 - What: The status line for an always-on screen still reads 'Presentation: on screen now'. Cast is the only such screen now.
 - Why it matters: The taskbar menu names a screen that was removed.
 - Suggested fix: Use the screen's own short name, and pin the words in `display.test.cjs`. Needs an app release.
-- Status: Open
+- Status: Fixed in 987fc00 (KVBC Awana 11.2.0)
+
 
 ### IP-20261111-16: A scheduled handbook run can still print after 5 pm in summer time
 - Severity: Low
@@ -204,7 +242,8 @@ history keeps them).
 - What: The 5 pm rule is checked once at the start. A run that starts at 4:37 pm and fails its first try waits 15 minutes and tries twice more.
 - Why it matters: Sheets could come out at about 5:10 or 5:25 pm. It cannot happen on winter time; the first chance is March.
 - Suggested fix: Give scheduled runs a deadline that is checked before each retry, with a test.
-- Status: Open
+- Status: Fixed in b23d79d
+
 
 ### IP-20261111-17: Several link copies at once could use up the Worker's memory
 - Severity: Low
@@ -212,7 +251,8 @@ history keeps them).
 - What: Each copy from a link holds up to 20 MB in memory, and the room's limits are checked before the fetch, so parallel copies all pass.
 - Why it matters: Seven or more at once could restart the Worker: every screen reconnects and TwoTimTwo signs in again. It needs someone with the TV code doing it on purpose. Reasoned from the code, not run.
 - Suggested fix: Allow one link copy at a time per room.
-- Status: Open
+- Status: Fixed in 255d9c6
+
 
 ### IP-20261111-18: Three PowerPoints close together: the waiting conversion is cancelled without a word
 - Severity: Low
@@ -220,7 +260,8 @@ history keeps them).
 - What: The job's concurrency group keeps one waiting run, so a third start cancels the second, which never reports back. The 10 minute job limit is also shorter than two 5 minute tries.
 - Why it matters: The page waits its full 6 minutes and the record counts against the three allowed for an hour. Rare.
 - Suggested fix: Drop the concurrency group, and raise the job limit to 15 minutes.
-- Status: Open
+- Status: Fixed in cdb98e9
+
 
 ### IP-20261111-19: Stopwatch: a doorbell's time guess can outrank real readings for 10 minutes
 - Severity: Low
@@ -228,7 +269,8 @@ history keeps them).
 - What: A ring that lands before the first timed read is stored as a perfect sample, and the sync always prefers the sample with the shortest round trip.
 - Why it matters: The wall's stopwatch can run a little behind the phone until that sample ages out.
 - Suggested fix: Use the ring's guess only while there is no real sample.
-- Status: Open
+- Status: Fixed in e2b690d
+
 
 ### IP-20261111-20: Left over from the removed posters: unused styles and two font packages
 - Severity: Low
@@ -236,7 +278,8 @@ history keeps them).
 - What: No poster uses `.promo-wordmark`, `.promo-chip`, `.promo-headline` or `.promo-detail` any more, and Oswald and Lilita One are loaded only for them. The comment in main.jsx says to drop the imports after 2026-11-05.
 - Why it matters: Every lobby screen downloads two fonts nothing draws. CLAUDE.md says these stay on purpose, pinned by `promoFonts.test.js`, so it is the owner's call.
 - Suggested fix: Either delete the rules, the two imports and trim the test, or correct the comment to say they are kept.
-- Status: Open
+- Status: Fixed in 12cb7f9
+
 
 ### IP-20261111-21: Two visible lines that are no longer true
 - Severity: Low
@@ -244,7 +287,8 @@ history keeps them).
 - What: The scoreboard phone says 'Offline: taps will not reach the projector', but taps are now kept and sent again. The home page's lobby frame is titled 'the 3D intro video'.
 - Why it matters: Words people (or a screen reader) see, so not fixed by the review.
 - Suggested fix: 'Offline: taps will be sent when the signal is back' (check the tests that pin it), and 'the intro film'.
-- Status: Open
+- Status: Fixed in cbdcefa and 8766667
+
 
 ### IP-20261111-22: Handbook sheets retry after an unclear mail failure
 - Severity: Low
@@ -252,9 +296,8 @@ history keeps them).
 - What: A send that timed out or closed after the message body went is retried 15 minutes later, and the next half-hourly run may print again.
 - Why it matters: Gmail may already have taken the first one, so the three full-name sheets could print twice. The letterhead job forbids retries for this reason.
 - Suggested fix: Retry only failures from before the body was sent, or record in CLAUDE.md that a second set of sheets is accepted.
-- Status: Open
+- Status: Fixed in b23d79d
 
-## Closed findings
 
 ### IP-20261111-13: The Grand welcome rule still said the other screens show the switching card
 - Severity: Medium
@@ -284,3 +327,4 @@ history keeps them).
 
 - 2026-11-11: set up. Starting point 58721b9 (2026-11-03), so the first review covers the week before. No review run yet.
 - 2026-11-11: first review, by Fable with four Fable helpers (the owner asked for Fable this once). 58721b9..331b5cc, 171 commits (about 165 without the bots). 22 findings: 1 High, 8 Medium, 13 Low. Fixed 3 (13, 14, 15: stale words in docs and comments). Nothing weakened a privacy rule; no paid-plan risk found.
+- 2026-11-11, later: the owner said to build them all. 18 findings fixed the same day (see Closed); IP-08 half done (the film needs the owner's rebuild). Three small follow-ups found while fixing: IP-23, IP-24, IP-25. The club-evening deploy hold was removed at the owner's word (0036b72).
