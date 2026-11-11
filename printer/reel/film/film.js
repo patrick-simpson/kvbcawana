@@ -275,7 +275,7 @@ function plate(parent, footage, { w, h, outline = '#fff', face = '#000' }) {
 
 const F = {};
 for (const name of ['lobby-open', 'lobby-run', 'lobby-milestone', 'lobby-pickup', 'projector-countdown',
-  'journey-slides', 'remote', 'phone', 'settings', 'promo-barf', 'promo-snow',
+  'journey-slides', 'remote', 'phone', 'settings', 'promo-snow',
   'flagship-intro', 'promo-grandprix', 'score-wall', 'score-phone', 'lobby-scorebar']) F[name] = new Footage(name);
 
 /* ── The night, cut to the music (owner, 2026-10-16) ──────────────────
@@ -496,16 +496,17 @@ function build() {
   cut('lead', 64, 68, { clip: 'score-wall', at: (t) => 4.8 + t, label: 'Game time · the lead', field: C.sparks });
   // The stopwatch, to the tenth, on the Worker's clock.
   cut('stopwatch', 68, 72, { clip: 'score-wall', at: (t) => 9.0 + t, label: 'Game time · stopwatch', field: '#000' });
-  // The lobby's welcome video: the club's friends fly through (video 2.4 s on).
-  cut('flagship-intro', 72, 76, { clip: 'flagship-intro', at: (t) => 2.4 + t * 1.3, label: 'Lobby TV · welcome', field: C.sky });
+  // The lobby's intro film: six club-colour doors with their marks are closed
+  // (video 1.8-4.4 s), then lift away from the middle out (4.4-5.5 s).
+  cut('flagship-intro', 72, 76, { clip: 'flagship-intro', at: (t) => 2.9 + t * 1.3, label: 'Lobby TV · welcome', field: C.sky });
   // The chorus breathes (song beats 124-127): the lobby's score bar, green +1 on beat 1.
   cut('scorebar', 76, 80, { clip: 'lobby-scorebar', at: (t) => 0.8 + t, label: 'Lobby TV · the score', field: C.sun });
   // The third phrase (song beat 128): End game, RED WINS! on its first hit.
   cut('winner', 80, 84, { clip: 'score-wall', at: (t) => 12.9 + t, label: 'Game time · the winner', field: C.sparks });
-  // The season's posters: BARF Night, the Grand Prix tearing open (video 1.8-2.4 s)
-  // on beat 1, then the snow alerts as the chorus breathes again (song 140-143).
-  cut('promo-barf', 84, 88, { clip: 'promo-barf', at: (t) => 4.6 + t * 1.4, label: 'Lobby TV · BARF Night', field: '#5B2C83' });
-  cut('promo-grandprix', 88, 92, { clip: 'promo-grandprix', at: (t) => 1.2 + t * 1.4, label: 'Lobby TV · Grand Prix', field: '#17151c' });
+  // The season's posters: the Grand Prix tearing open (video 1.8-2.4 s, about
+  // beat 2) over eight beats, then the snow alerts as the chorus breathes again
+  // (song 140-143). The BARF Night poster was removed from the lobby (IP-20261111-08).
+  cut('promo-grandprix', 84, 92, { clip: 'promo-grandprix', at: (t) => 0.6 + t * 1.4, label: 'Lobby TV · Grand Prix', field: '#17151c' });
   cut('promo-snow', 92, 96, { clip: 'promo-snow', at: (t) => 5.6 + t, label: 'Lobby TV · snow alerts', field: '#1B2F66' });
   // The last phrase (song beat 144): Journey with the leader's remote, each Next
   // (clip 1.0 s, 2.92 s) settling on beats 2 and 6.

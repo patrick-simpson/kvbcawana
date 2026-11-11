@@ -154,13 +154,16 @@ export const SHOTS = {
   // The season's posters (owner, 2026-10-16: "the promos like barf, snow day and
   // poster contest and parents night"), played the way the Settings window's
   // Preview the promos plays them on a TV: a relay on the lobby's own channel.
-  'promo-barf': promoShot('friend', 15.5),
+  // Only posters still in the lobby's PREVIEW_PROMOS may be listed here (the BARF
+  // Night poster was removed 2026-11-10, IP-20261111-08).
   'promo-snow': promoShot('snowAlertsStorm', 20.5),
   // The new welcome graphics and the Grand Prix (owner, 2026-11-01): the lobby's
   // two videos, taken from the very files it plays (record.mjs; their first and
   // last frames are the lobby itself). `from` and `seconds`: the part the film uses.
-  // The flagship's 3D intro: the club's friends fly through, the logo comes back.
-  'flagship-intro': { video: 'lobby/public/intro/awana-intro.mp4', from: 0, seconds: 9 },
+  // The flagship's intro film (SIX DOORS, 8.0 s): six club-colour doors close over
+  // the slide with their club marks (about 1.8 to 4.4 s), lift away from the
+  // middle out (4.4 to 5.5 s), and the logo is back by 7.1 s.
+  'flagship-intro': { video: 'lobby/public/intro/awana-intro.mp4', from: 0, seconds: 8 },
   // The Awana Grand Prix: the lobby strains and tears open on the race's logo.
   'promo-grandprix': { video: 'lobby/public/promos/grand-prix.mp4', from: 0, seconds: 7 },
   // The projector: the countdown runs out at 6:00 and the grand welcome plays
