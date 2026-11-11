@@ -269,7 +269,7 @@ const Welcome: React.FC = () => {
         <div className="kv-scene__stage">
           <figure className="kv-device kv-device--tv">
             <Twin ref={tv} kind="lobby" at={wall('17:45:00')} width={1600} height={900} intro onEvent={onEvent}
-              title="The lobby TV: the church's logo and the 3D intro video, then the season's posters, one after another" />
+              title="The lobby TV: the church's logo and the intro film, then the season's posters, one after another" />
             <figcaption><Tag>{now ? `Lobby TV · ${now.label}` : 'Lobby TV · welcome'}</Tag></figcaption>
           </figure>
         </div>
