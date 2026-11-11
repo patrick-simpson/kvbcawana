@@ -31,6 +31,19 @@ async function setup() {
   return { core, frames, session, raw, call, tick: (ms) => { t += ms; } };
 }
 
+describe('the tray\'s Show Cast code on an idle room (IP-20261111-07)', () => {
+  it('rings the TV at once, so the code shows without waiting for its safety read', async () => {
+    const s = await setup();
+    const { code } = (await s.call('POST', '/v1/cast/open', {})).body;
+    s.tick(1000);
+    s.frames.length = 0;
+    const reset = await s.call('POST', '/v1/cast/reset', {});
+    expect(reset.body).toEqual({ ok: true, code });
+    expect(s.frames.some((f) => f.e === 'changed' && f.d?.what === 'cast')).toBe(true);
+    expect((await s.call('GET', '/v1/cast/screen')).body.revealAt).toBeGreaterThan(0);
+  });
+});
+
 describe('the shared rules Cast adds', () => {
   it('a Google Slides or Docs link is its PDF export; other links are unchanged', () => {
     expect(fileLinkFrom('https://docs.google.com/presentation/d/1AbCdEfGhIjKlMn/edit?usp=sharing')).toBe('https://docs.google.com/presentation/d/1AbCdEfGhIjKlMn/export/pdf');

@@ -363,6 +363,9 @@ export class Cast {
     const room = await this.roomDoc();
     await this.storage.put(ROOM_KEY, { ...room, tokens: [], revealAt: this.now() });
     this.seen.clear();
+    // The TV shows its code now, as the desk's reveal does (IP-20261111-07): on an idle
+    // room clear() changed nothing on the stage, so nothing else rings.
+    this.ring({ what: 'cast', rev: (await this.engine.stage()).rev });
     return json({ ok: true, code: room.code });
   }
 
