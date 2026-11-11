@@ -176,6 +176,34 @@
   .dur { display: flex; align-items: center; gap: 8px; }
   .dur input, .dur select { width: 72px; }
   select:hover { background: var(--ctl-hover); }
+  /* The line-up (owner 2026-11-11): a list view in a card, the next one on the TV card. */
+  .lu-list { display: block; }
+  .lu-row { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; align-items: center; gap: 12px; min-height: 60px; padding: 8px 12px 8px 12px; }
+  .lu-row + .lu-row { border-top: 1px solid var(--stroke); }
+  .lu-row[data-state="on"] { background: color-mix(in srgb, var(--accent) 9%, transparent); }
+  .lu-n { color: var(--text-2); text-align: right; font-variant-numeric: tabular-nums; }
+  .lu-row[data-state="on"] .lu-n { color: var(--accent); font-weight: 600; }
+  .lu-words { min-width: 0; }
+  .lu-kind { display: block; color: var(--text-2); font-size: 12px; line-height: 16px; }
+  .lu-title { display: block; font-weight: 400; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .lu-tag { display: inline-block; margin-top: 3px; padding: 0 6px; border-radius: 4px; background: var(--subtle); color: var(--text-2); font-size: 11px; line-height: 18px; font-weight: 600; }
+  .lu-row[data-state="on"] .lu-tag { background: var(--accent); color: var(--on-accent); }
+  .lu-row[data-state="next"] .lu-tag { color: var(--text); border: 1px solid var(--stroke-strong); line-height: 16px; }
+  .lu-acts { display: flex; align-items: center; gap: 4px; }
+  .lu-icon { width: 32px; padding: 0; border-color: transparent; background: transparent; }
+  .lu-icon:hover { background: var(--subtle); }
+  .lu-icon:disabled { background: transparent; border-color: transparent; }
+  .lu-ic { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+  .lu-list.xbody { display: block; padding: 0; }
+  .lu-empty.xbody { display: block; padding: 12px 16px 16px 52px; color: var(--text-2); }
+  .lu-count { color: var(--text-2); font-variant-numeric: tabular-nums; }
+  .lunext { margin-top: 8px; }
+  .lu-next { width: 100%; display: grid; justify-items: start; gap: 0; min-height: 52px; padding: 7px 16px; text-align: left; white-space: normal; }
+  .lu-next span { max-width: 100%; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .lu-next small { font-size: 12px; line-height: 16px; opacity: .86; }
+  .actions .quiet + .primary { margin-left: 0; }
+  .results li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px; }
+  .result-add { align-self: stretch; border-radius: 8px; }
   .navsep { height: 1px; margin: 4px 8px; background: var(--stroke-strong); }
   .pill { position: absolute; left: 0; top: 0; width: 3px; height: 16px; border-radius: 3px; background: var(--accent); transform: translateY(var(--y, 10px)); pointer-events: none; }
   .panefoot { margin-top: auto; display: grid; gap: 8px; padding: 12px 4px 0; border-top: 1px solid var(--stroke-strong); }
@@ -232,7 +260,6 @@
   .note.working::before { -webkit-mask: none; mask: none; background: none; width: 16px; height: 16px; margin: 2px 2px 0; border: 2px solid color-mix(in srgb, var(--accent) 25%, transparent); border-top-color: var(--accent); border-radius: 50%; }
 
   /* Search results, pictures, ready files. */
-  .results li { display: contents; }
   .results { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 4px; }
   .results:empty { display: none; }
   .result { width: 100%; justify-content: flex-start; gap: 12px; padding: 6px; text-align: left; white-space: normal; background: var(--card); border-color: var(--stroke); border-radius: 8px; min-height: 0; }
@@ -417,6 +444,7 @@
           <li><button class="choice" type="button" aria-expanded="false" aria-controls="p-timer" title="Countdown" data-title="Countdown" data-cap="Count down to the start, big on the TV."><svg class="icon" viewBox="0 0 20 20" width="20" height="20" aria-hidden="true" focusable="false"><circle class="f" cx="10" cy="11" r="6.25"/><circle cx="10" cy="11" r="6.25"/><path d="M10 7.8V11l2.1 1.4M8 2.6h4"/></svg><b>Countdown</b></button></li>
           <li><button class="choice" type="button" aria-expanded="false" aria-controls="p-clock" title="Clock" data-title="Clock" data-cap="The time and the date, big on the TV."><svg class="icon" viewBox="0 0 20 20" width="20" height="20" aria-hidden="true" focusable="false"><circle class="f" cx="10" cy="10" r="7.25"/><circle cx="10" cy="10" r="7.25"/><path d="M10 5.8V10l3 1.9"/></svg><b>Clock</b></button></li>
           <li class="navsep" role="separator"></li>
+          <li><button class="choice" type="button" aria-expanded="false" aria-controls="p-lineup" title="Line-up" data-title="Line-up" data-cap="Things loaded ahead, off the TV. Next puts them up in order."><svg class="icon" viewBox="0 0 20 20" width="20" height="20" aria-hidden="true" focusable="false"><rect class="f" x="3" y="3.5" width="14" height="13" rx="2.5"/><path d="M7.5 6.5h8M7.5 10h8M7.5 13.5h8"/><path d="M4.5 6.5h.5M4.5 10h.5M4.5 13.5h.5"/></svg><b>Line-up</b></button></li>
           <li><button class="choice" type="button" aria-expanded="false" aria-controls="p-house" title="House slide" data-title="House slide" data-cap="What the TV shows when nothing is up."><svg class="icon" viewBox="0 0 20 20" width="20" height="20" aria-hidden="true" focusable="false"><rect class="f" x="2.5" y="3.5" width="15" height="13" rx="2.5"/><rect x="2.5" y="3.5" width="15" height="13" rx="2.5"/><circle cx="10" cy="8.4" r="2.4"/><path d="M6.5 13.4h7"/></svg><b>House slide</b></button></li>
         </ul>
       </div>
@@ -454,7 +482,7 @@
               <form id="video-form" class="xbody">
                 <div class="field"><label for="video-link">YouTube link</label><input type="url" id="video-link" placeholder="https://youtu.be/…" autocomplete="off"></div>
                 <div class="field"><label for="video-title">Title <span class="opt">(optional)</span></label><input type="text" id="video-title" maxlength="60"></div>
-                <p><button class="primary" type="submit">Play on the TV</button></p>
+                <p class="row"><button class="primary" type="submit">Play on the TV</button><button class="quiet" type="button" data-lineup="video">Add to line-up</button></p>
                 <p class="help">A link with a start time (…?t=90) starts there.</p>
               </form>
             </details>
@@ -472,7 +500,7 @@
                 <div class="txt"><label for="fb-title">Title <span class="opt">(optional)</span></label><small>What the TV calls it while it plays.</small></div>
                 <div class="ctl"><input type="text" id="fb-title" maxlength="60"></div>
               </div>
-              <div class="setting actions"><button class="primary" type="submit">Play on the TV</button></div>
+              <div class="setting actions"><button class="quiet" type="button" data-lineup="fb">Add to line-up</button><button class="primary" type="submit">Play on the TV</button></div>
             </form>
           </section>
 
@@ -481,7 +509,7 @@
               <div class="setting">
                 <svg class="svg-ic" viewBox="0 0 20 20" width="20" height="20" aria-hidden="true" focusable="false"><path d="M5.5 2.5h6l4 4v9a2 2 0 01-2 2h-8a2 2 0 01-2-2v-11a2 2 0 012-2z"/><path d="M11.5 2.5v4h4"/></svg>
                 <div class="txt"><span class="t">PowerPoint or PDF</span><small>A PowerPoint takes about a minute to turn into slides; a PDF goes up at once.</small></div>
-                <div class="ctl"><label class="file-pick primary"><svg class="svg-ic" viewBox="0 0 20 20" width="20" height="20" aria-hidden="true" focusable="false"><path d="M10 13V4.5M6.5 8L10 4.5 13.5 8M4.5 13.5v1.2a1.8 1.8 0 0 0 1.8 1.8h7.4a1.8 1.8 0 0 0 1.8-1.8v-1.2"/></svg>Choose a PowerPoint or PDF…<input type="file" id="pdf-input"></label></div>
+                <div class="ctl"><label class="file-pick primary"><svg class="svg-ic" viewBox="0 0 20 20" width="20" height="20" aria-hidden="true" focusable="false"><path d="M10 13V4.5M6.5 8L10 4.5 13.5 8M4.5 13.5v1.2a1.8 1.8 0 0 0 1.8 1.8h7.4a1.8 1.8 0 0 0 1.8-1.8v-1.2"/></svg>Choose a PowerPoint or PDF…<input type="file" id="pdf-input"></label> <label class="file-pick">For the line-up…<input type="file" id="pdf-input-lineup" data-dest="lineup"></label></div>
               </div>
               <div class="setting stack">
                 <svg class="svg-ic" viewBox="0 0 20 20" width="20" height="20" aria-hidden="true" focusable="false"><path d="M8.2 11.8l3.6-3.6M7.6 9.2L6 10.8a2.9 2.9 0 0 0 4.1 4.1l1.6-1.6M12.4 10.8l1.6-1.6A2.9 2.9 0 0 0 9.9 5.1L8.3 6.7"/></svg>
@@ -489,6 +517,7 @@
                 <div class="ctl"><div class="row">
                   <input type="url" id="pdf-link" placeholder="https://docs.google.com/presentation/…" autocomplete="off">
                   <button class="quiet" type="button" id="pdf-copy">Get it</button>
+                  <button class="quiet" type="button" id="pdf-copy-lineup" data-dest="lineup">For the line-up</button>
                 </div></div>
               </div>
             </div>
@@ -502,7 +531,7 @@
               <div class="setting">
                 <svg class="svg-ic" viewBox="0 0 20 20" width="20" height="20" aria-hidden="true" focusable="false"><rect x="3" y="3.5" width="14" height="13" rx="2.5"/><circle cx="7.5" cy="8" r="1.3"/><path d="M3.5 14l4-3.8 3 2.8 2.5-2.2 3.5 3.4"/></svg>
                 <div class="txt"><span class="t">Pictures from this computer</span><small>Choose one or more, then pick one to show.</small></div>
-                <div class="ctl"><label class="file-pick primary"><svg class="svg-ic" viewBox="0 0 20 20" width="20" height="20" aria-hidden="true" focusable="false"><path d="M10 13V4.5M6.5 8L10 4.5 13.5 8M4.5 13.5v1.2a1.8 1.8 0 0 0 1.8 1.8h7.4a1.8 1.8 0 0 0 1.8-1.8v-1.2"/></svg>Choose pictures…<input type="file" id="pic-input" accept="image/jpeg,image/png,image/gif,image/webp" multiple></label></div>
+                <div class="ctl"><label class="file-pick primary"><svg class="svg-ic" viewBox="0 0 20 20" width="20" height="20" aria-hidden="true" focusable="false"><path d="M10 13V4.5M6.5 8L10 4.5 13.5 8M4.5 13.5v1.2a1.8 1.8 0 0 0 1.8 1.8h7.4a1.8 1.8 0 0 0 1.8-1.8v-1.2"/></svg>Choose pictures…<input type="file" id="pic-input" accept="image/jpeg,image/png,image/gif,image/webp" multiple></label> <label class="file-pick">For the line-up…<input type="file" id="pic-input-lineup" data-dest="lineup" accept="image/jpeg,image/png,image/gif,image/webp" multiple></label></div>
               </div>
             </div>
             <p class="note" id="pic-note" role="status"></p>
@@ -514,7 +543,7 @@
               <div class="setting">
                 <svg class="svg-ic" viewBox="0 0 20 20" width="20" height="20" aria-hidden="true" focusable="false"><path d="M5.5 2.5h6l4 4v9a2 2 0 01-2 2h-8a2 2 0 01-2-2v-11a2 2 0 012-2z"/><path d="M11.5 2.5v4h4"/><path d="M8.3 9.8v4l3.2-2z"/></svg>
                 <div class="txt"><span class="t">A video from this computer</span><small>MP4, MOV or WebM, up to 200 MB.</small></div>
-                <div class="ctl"><label class="file-pick primary"><svg class="svg-ic" viewBox="0 0 20 20" width="20" height="20" aria-hidden="true" focusable="false"><path d="M10 13V4.5M6.5 8L10 4.5 13.5 8M4.5 13.5v1.2a1.8 1.8 0 0 0 1.8 1.8h7.4a1.8 1.8 0 0 0 1.8-1.8v-1.2"/></svg>Choose a video…<input type="file" id="clip-input" accept="video/mp4,video/quicktime,video/webm,.mp4,.mov,.m4v,.webm"></label></div>
+                <div class="ctl"><label class="file-pick primary"><svg class="svg-ic" viewBox="0 0 20 20" width="20" height="20" aria-hidden="true" focusable="false"><path d="M10 13V4.5M6.5 8L10 4.5 13.5 8M4.5 13.5v1.2a1.8 1.8 0 0 0 1.8 1.8h7.4a1.8 1.8 0 0 0 1.8-1.8v-1.2"/></svg>Choose a video…<input type="file" id="clip-input" accept="video/mp4,video/quicktime,video/webm,.mp4,.mov,.m4v,.webm"></label> <label class="file-pick">For the line-up…<input type="file" id="clip-input-lineup" data-dest="lineup" accept="video/mp4,video/quicktime,video/webm,.mp4,.mov,.m4v,.webm"></label></div>
               </div>
             </div>
             <p class="note" id="clip-note" role="status"></p>
@@ -541,7 +570,7 @@
                   <label><input type="radio" name="look" value="board"> White on dark</label>
                 </div>
               </div>
-              <div class="setting actions"><button class="primary" type="submit">Show on the TV</button></div>
+              <div class="setting actions"><button class="quiet" type="button" data-lineup="text">Add to line-up</button><button class="primary" type="submit">Show on the TV</button></div>
             </form>
           </section>
 
@@ -566,7 +595,7 @@
                 <div class="txt"><label for="timer-title">Title <span class="opt">(optional)</span></label><small>A line above the time, such as Starting in.</small></div>
                 <div class="ctl"><input type="text" id="timer-title" maxlength="60" placeholder="Starting in"></div>
               </div>
-              <div class="setting actions"><button class="primary" type="submit">Start on the TV</button></div>
+              <div class="setting actions"><button class="quiet" type="button" data-lineup="timer">Add to line-up</button><button class="primary" type="submit">Start on the TV</button></div>
             </form>
             <p class="help">At 0:00 it stays up, silent, until you take it down or show something else.</p>
           </section>
@@ -576,9 +605,23 @@
               <div class="setting">
                 <svg class="svg-ic" viewBox="0 0 20 20" width="20" height="20" aria-hidden="true" focusable="false"><circle cx="10" cy="10" r="7.25"/><path d="M10 5.8V10l3 1.9"/></svg>
                 <div class="txt"><span class="t">The time of day</span><small>This computer’s time, such as 6:05 pm, with the date under it.</small></div>
-                <div class="ctl"><button class="primary" type="button" id="clock-show">Show the clock</button></div>
+                <div class="ctl row"><button class="quiet" type="button" data-lineup="clock">Add to line-up</button><button class="primary" type="button" id="clock-show">Show the clock</button></div>
               </div>
             </div>
+          </section>
+
+          <!-- The line-up (owner 2026-11-11): loaded ahead, off the TV; Next is on the TV card. -->
+          <section class="panel" id="p-lineup" hidden>
+            <div class="group">
+              <div class="setting">
+                <svg class="svg-ic" viewBox="0 0 20 20" width="20" height="20" aria-hidden="true" focusable="false"><path d="M7.5 6.5h8M7.5 10h8M7.5 13.5h8M4.5 6.5h.5M4.5 10h.5M4.5 13.5h.5"/></svg>
+                <div class="txt"><span class="t">In order</span><small>Add to line-up on any source puts it here without showing it. Next in line-up, under On the TV now, puts up the next one.</small></div>
+                <div class="ctl lu-count" id="lineup-count"></div>
+              </div>
+              <ol class="lu-list xbody" id="lineup-list" aria-label="The line-up, in order" hidden></ol>
+              <p class="lu-empty xbody" id="lineup-empty">Nothing yet. Load a video, slides, a picture or a countdown ahead with Add to line-up.</p>
+            </div>
+            <p class="note" id="lineup-note" role="status"></p>
           </section>
 
           <!-- The house slide (owner 2026-11-11): what the TV shows with nothing up. Set here only. -->
@@ -662,6 +705,9 @@
           <div class="tvactions">
             <button class="quiet mi" type="button" id="btn-black" aria-pressed="false">Black</button>
             <button class="quiet mi" type="button" id="btn-down" hidden>Take it down</button>
+          </div>
+          <div class="lunext" id="lineup-next-box" hidden>
+            <button class="primary lu-next" type="button" id="lineup-next" disabled><span id="lineup-next-words">Next in line-up</span><small id="lineup-next-sub"></small></button>
           </div>
           <p class="note" id="press-note" role="status"></p>
         </section>

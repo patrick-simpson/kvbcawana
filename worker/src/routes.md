@@ -1750,7 +1750,9 @@ each good for `TOKEN_TTL_MS` (8 h).
 | `POST /v1/cast/join` | public | `{code}` (spaces ignored) | `{ok, token, ttlMs}`; 403 `off`; 403 `refused` for BOTH a wrong code and a right code while another presenter's token is live and was used within `PRESENTER_IDLE_MS` 30 min (ONE presenter at a time, owner 2026-11-08; one answer so a busy room never confirms a guess, security review 2026-11-09); 429 `locked` for a network (IPv4 address, IPv6 /64) with `JOIN_NET_FAILS_MAX` 10 wrong codes in `JOIN_WINDOW_MS` 10 min. `JOIN_FAILS_MAX` 20 wrong codes from anywhere in the window ROTATE the code (rings `changed {what: 'cast'}`, the TV reads the new one; the presenter stays connected). Counts are stored (`cast:fails`) |
 | `POST /v1/cast/leave` | public + token | `{takeDown?: true}` | `{ok}`: this presenter's token is dropped (the room is free); `takeDown` puts the TV back to its code first (the page's "Display code") |
 | `GET /v1/cast/youtube?q=` | public + token | | `{ok, results: [{youtube, title, channel, seconds}]}` (at most 8; YouTube Data API with secret `YOUTUBE_API_KEY`, safe search strict, embeddable only; kept 10 min; `YOUTUBE_PER_HOUR` 60); 503 `not-configured`, 502 `youtube`, 429 `too-many` |
-| `GET /v1/cast/state` | public + token | | as `GET /v1/classroom/remote/state` (reading it is watching) |
+| `GET /v1/cast/state` | public + token | | as `GET /v1/classroom/remote/state` (reading it is watching) plus `lineup` (the line-up, below) |
+| `PUT /v1/cast/lineup` | public + token | `{baseRev, entries: [{id, item}]}` (the whole list, in order) | `{ok, lineup}`; 409 `stale` with `lineup` as it is now; 400 `full` (more than `CAST_LINEUP_MAX` 12, or `CAST_LINEUP_CHARS_MAX`), `entry`, `file-missing`; 429 (the press pace) |
+| `POST /v1/cast/lineup/show` | public + token | `{id}` or `{next: true}` | as `POST /v1/cast/press` `item` (`button`, `rev`, `screenOnline`) plus `lineup`; 404 `no-entry`; 409 `end` / `empty` |
 | `POST /v1/cast/press` | public + token | as `POST /v1/classroom/remote`; `item {item}` puts a video, text, picture or PDF up directly (its file a finished file of this room, else 400 `file-missing`), `screen {title?}` puts a shared screen up, `black {on: true\|false}` makes the TV black over whatever is up or shows it again (Black, below); an `item` may also be a countdown `{kind: 'timer', seconds, title?}` or the clock `{kind: 'clock'}` (below) | as 10.13 plus `button` (the new stage button's id) for `item`/`screen`; `black` that changes nothing answers `{ok, already: true, rev}` |
 | `POST /v1/cast/files`, `PUT /v1/cast/files/:id/:n`, `POST /v1/cast/files/:id/done` | public + token | as 10.13 (a `{url}` copy too: a Google Slides/Docs link is copied as its PDF export) | as 10.13. The room holds at most `CAST_FILES_MAX` 12 files and `CAST_BYTES_MAX` 240 MB (one clip + two 20 MB files, unfinished uploads counted); a new one past either first deletes the room's dropped uploads (unfinished, no part for `CAST_UPLOAD_QUIET_MS` 3 min) and then its oldest finished files, never one on the TV, else 413 `room-full`. 429 `too-many`: past `CAST_FILES_PER_HOUR` 30 starts per token an hour, or the room's `CAST_UPLOAD_BYTES_PER_HOUR` 300 MB (whoever sends; a new token does not reset it). A `{url}` copy while another is still running in the room: 429 `busy`. Rates are memory only |
 | `POST /v1/cast/signal` | public + token | `{signal: {type: 'offer', id, sdp}}` (id = the screen button's) | `{ok}`; 409 `ended` |
@@ -1781,11 +1783,12 @@ screen-share signal or ICE routes (it is the TV's own computer).
 
 | Route | Auth | Request | Answer |
 | --- | --- | --- | --- |
-| `GET /v1/cast/desk/state` | session | | as `GET /v1/cast/state` (reading it is watching) plus `code` (always, whether or not the TV shows it), `presenter` (a phone is connected and not idle) and `house {line}` (the house slide's line, so the desk's field fills itself) |
+| `GET /v1/cast/desk/state` | session | | as `GET /v1/cast/state` (reading it is watching) plus `code` (always, whether or not the TV shows it), `presenter` (a phone is connected and not idle), `house {line}` (the house slide's line, so the desk's field fills itself) and `lineup` |
 | `GET /v1/cast/desk/house` | session | | `{ok, house: {line, savedAt}}` (`''` and `null` when never set) |
 | `PUT /v1/cast/desk/house` | session | `{line}` (a string; cleaned to ONE line of at most `CAST_HOUSE_LINE_MAX` 60 with the shared `oneLine`; `''` = the logo alone) | `{ok, house: {line, savedAt}}`; rings `changed {what: 'cast', rev, house: true}` so the TV reads it at once; 400 `line` when it is not a string |
 | `POST /v1/cast/desk/reveal` | session | `{}` | `{ok}`: the TV shows its code for `REVEAL_MS` (`revealAt`); nobody is let go, nothing taken down |
 | `POST /v1/cast/desk/press` | session | as `POST /v1/cast/press` | as `POST /v1/cast/press` (Back takes down what is up) |
+| `PUT /v1/cast/desk/lineup`, `POST /v1/cast/desk/lineup/show` | session | as the presenter's | as the presenter's (ONE line-up for the room: the desk and the phone edit the same list) |
 | `GET /v1/cast/desk/youtube?q=` | session | | as `GET /v1/cast/youtube` |
 | `POST /v1/cast/desk/files`, `PUT /v1/cast/desk/files/:id/:n`, `POST /v1/cast/desk/files/:id/done`, `GET /v1/cast/desk/files/:id` | session | as the presenter's | as the presenter's (the same room, caps and rates; the caller `DESK`) |
 | `POST /v1/cast/desk/convert`, `PUT /v1/cast/desk/convert/:id/:n`, `POST /v1/cast/desk/convert/:id/start`, `GET /v1/cast/desk/convert/:id` | session | as the presenter's | as the presenter's |
@@ -1800,6 +1803,25 @@ by the TV inside `GET /v1/cast/screen`. `open`, `close`, `reset`, `kick` and `le
 One write, the last one wins. A computer with one monitor has no desk window: the logo alone.
 Rules `shared/classroomRemote.js` (`CAST_HOUSE_LINE_MAX`, `sanitizeHouse`). Tests
 `worker/test/cast.test.js` ("Cast: the house slide line").
+
+The line-up (owner 2026-11-11: "Load several things before the event (a video, the slides, a picture)
+and tap through them in order. Today each one goes up the moment you send it"): storage `cast:lineup
+{rev, savedAt, entries: [{id, item}], on, button}` (`worker/src/doc.js`, so the rev check and the write
+are one synchronous step). An entry's `item` is exactly what an `item` press takes (a YouTube video,
+a clip, a Facebook video, a picture, slides, text, a countdown, the clock; never a shared screen; a
+countdown's `endsAt` is left off and set when it goes up); a file must be a finished file of the room.
+At most `CAST_LINEUP_MAX` 12 entries and `CAST_LINEUP_CHARS_MAX` 96 KiB of items (shared
+`cleanLineupEntries`, all or nothing; reads through `sanitizeLineup`). An edit is the WHOLE list with
+the rev it was read at (add, move and remove are the page's new list; a 409 hands back the list and
+the page makes its change again once). Loading puts nothing on the TV and rings nothing: only the
+control pages read the line-up, inside the state they already read every 2 s. `show {id}` and
+`show {next: true}` put one entry up as an ORDINARY `item` press (the press bucket; Black cleared and
+Back as for any item); `on` = the entry put up last (Next goes on after it, wherever it now is in the
+list; removing it hands `on` to the nearest entry before it), claimed in one synchronous step so two
+quick Nexts never show one entry twice; `button` = the stage button it made, so a page tells "on the TV
+now" from "shown last". The room's: cleared with the files by `open`, `close` and `reset`; its files
+are never taken by `makeRoom`. Tests `worker/test/cast.test.js` ("Cast: the line-up"),
+`shared/classroomRemote.test.js`, `site/test/cast.test.mjs`.
 
 A countdown and the clock (owner 2026-11-11: "All of those sound fantastic. Let's build them"):
 two more item kinds, Cast only (`CAST_ONLY_KINDS`; the classroom room answers 400 `not-here` and its

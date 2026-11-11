@@ -31,6 +31,14 @@
 //   left under "On the TV now" ticks HERE, from the `endsAt` the state already carries and
 //   this device's clock corrected by the Worker's (`serverNow`, logic.js createSkew): a
 //   local half-second redraw, never a request.
+// - The line-up (owner 2026-11-11: "Load several things before the event (a video, the
+//   slides, a picture) and tap through them in order"): every source but a shared screen
+//   has "Add to line-up" beside its own send. The list is the room's (the Worker keeps it,
+//   PUT /v1/cast/lineup with the rev it was read at; a 409 hands back the list as it is and
+//   the change is made again on it, once); it rides the state already read every 2 s, so
+//   the phone and the desk see each other's edits with no request of their own. "Next in
+//   line-up" puts the next entry up as an ordinary item press (POST /v1/cast/lineup/show).
+//   A file chosen for the line-up is uploaded and added, never put on the TV.
 // - Slides on the TV: the phone's preview (preview.js): this slide, the next, every slide.
 // - "On the TV now": the state every 2 s while the page is visible (which is also what
 //   makes the TV report), nothing while hidden, and it stops after 30 minutes with no
@@ -44,6 +52,7 @@ import {
   CONVERT_GIVE_UP_MS, CONVERT_POLL_MS, SLIDES_ACCEPT, convertWords, slidesChoice,
   clock, facebookPress, resultPress, volumeWords,
   clockPress, createSkew, timerPress,
+  lineupAdd, lineupEntryFrom, lineupMove, lineupRemove, lineupView,
 } from './logic.js';
 import { createPreview } from './preview.js';
 
@@ -69,7 +78,8 @@ export function createControls(conn) {
   const base = conn.base;
   // "Tap" on a phone, "Click" at the desk's mouse.
   const VERB = conn.verb || 'Tap';
-  let state = null; // { stage, now, screenOnline }
+  let state = null; // { stage, now, screenOnline, lineup }
+  let lineupKey = ''; // what the drawn line-up list shows
   let failures = 0;
   let pollTimer = 0;
   let lastTouch = Date.now();
@@ -127,7 +137,7 @@ export function createControls(conn) {
     if (r.ok && r.body) {
       failures = 0;
       skew.add(sentAt, Date.now(), r.body.serverNow);
-      state = { stage: R.sanitizeStage(r.body.stage), now: R.sanitizeClassroomNow(r.body.now), screenOnline: r.body.screenOnline === true };
+      state = { stage: R.sanitizeStage(r.body.stage), now: R.sanitizeClassroomNow(r.body.now), screenOnline: r.body.screenOnline === true, lineup: R.sanitizeLineup(r.body.lineup) };
       if (conn.onState) conn.onState(r.body);
       // Someone else put something up over this page's share: stop sending the picture.
       if (shareId && !(state.stage.show && state.stage.show.button.id === shareId)) endShareHere('Your screen was replaced by something else on the TV.');
@@ -174,6 +184,7 @@ export function createControls(conn) {
     if ($('vol-level')) setText($('vol-level'), volumeWords(video));
     $('btn-mute').dataset.op = video && video.muted ? 'unmute' : 'mute';
     for (const t of document.querySelectorAll('.thumb')) t.setAttribute('aria-pressed', String(Boolean(shown && shown.file && shown.file === t.dataset.file)));
+    renderLineup();
   }
 
   /* ── Presses ── */
@@ -187,6 +198,144 @@ export function createControls(conn) {
     else setText($('press-note'), errorWords(r.status, r.body));
     poll();
     return r;
+  }
+
+  /* ── The line-up ── */
+
+  const SVG_NS = 'http://www.w3.org/2000/svg';
+  const LU_ICONS = { up: 'M5 12.5l5-5 5 5', down: 'M5 7.5l5 5 5-5', remove: 'M5.5 5.5l9 9M14.5 5.5l-9 9' };
+
+  function luIcon(name) {
+    const svg = document.createElementNS(SVG_NS, 'svg');
+    svg.setAttribute('viewBox', '0 0 20 20');
+    svg.setAttribute('aria-hidden', 'true');
+    svg.setAttribute('focusable', 'false');
+    svg.setAttribute('class', 'lu-ic');
+    const path = document.createElementNS(SVG_NS, 'path');
+    path.setAttribute('d', LU_ICONS[name]);
+    svg.append(path);
+    return svg;
+  }
+
+  function luButton(act, row, label, icon) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = icon ? 'quiet lu-icon' : 'quiet lu-show';
+    b.dataset.act = act;
+    b.dataset.id = row.id;
+    b.setAttribute('aria-label', `${label}: ${row.title}`);
+    if (icon) { b.append(luIcon(icon)); b.title = label; } else b.textContent = label;
+    return b;
+  }
+
+  const LU_TAGS = { on: 'On the TV', last: 'Shown last', next: 'Up next' };
+
+  /** The list and the Next button, redrawn only when what they say changed. */
+  function renderLineup() {
+    if (!state || !$('lineup-list')) return;
+    const view = lineupView(state.lineup, state.stage);
+    const key = JSON.stringify(view);
+    if (key === lineupKey) return;
+    lineupKey = key;
+    $('lineup-list').replaceChildren(...view.rows.map((row) => {
+      const li = document.createElement('li');
+      li.className = 'lu-row';
+      li.dataset.state = row.state;
+      const n = document.createElement('span');
+      n.className = 'lu-n';
+      n.textContent = String(row.n);
+      const words = document.createElement('div');
+      words.className = 'lu-words';
+      const kind = document.createElement('span');
+      kind.className = 'lu-kind';
+      kind.textContent = row.kind;
+      const title = document.createElement('b');
+      title.className = 'lu-title';
+      title.textContent = row.title;
+      words.append(kind, title);
+      if (row.state) {
+        const tag = document.createElement('span');
+        tag.className = 'lu-tag';
+        tag.textContent = LU_TAGS[row.state];
+        words.append(tag);
+      }
+      const acts = document.createElement('div');
+      acts.className = 'lu-acts';
+      const up = luButton('up', row, 'Move up', 'up');
+      up.disabled = row.first;
+      const down = luButton('down', row, 'Move down', 'down');
+      down.disabled = row.last;
+      acts.append(luButton('show', row, 'Show now'), up, down, luButton('remove', row, 'Remove', 'remove'));
+      li.append(n, words, acts);
+      return li;
+    }));
+    $('lineup-empty').hidden = view.count > 0;
+    $('lineup-list').hidden = view.count === 0;
+    setText($('lineup-count'), view.count ? `${view.count} of ${R.CAST_LINEUP_MAX}` : '');
+    setText($('lineup-next-words'), view.nextWords);
+    setText($('lineup-next-sub'), view.nextSub);
+    $('lineup-next').disabled = !view.next;
+    if ($('lineup-next-box')) $('lineup-next-box').hidden = view.count === 0;
+  }
+
+  /**
+   * One change to the list: `change(entries)` makes the new list from the one the Worker
+   * holds. Sent with the rev it was read at; a 409 (someone else changed it) makes the
+   * same change again, once, on the list the Worker sent back.
+   */
+  async function editLineup(change, said) {
+    touch();
+    const note = $('lineup-note');
+    let lineup = state ? state.lineup : R.sanitizeLineup(null);
+    for (let tries = 0; tries < 2; tries += 1) {
+      const out = change(lineup.entries);
+      if (!out.ok) { setText(note, out.error); note.classList.add('bad'); return false; }
+      const r = await request('/v1/cast/lineup', { method: 'PUT', body: { baseRev: lineup.rev, entries: out.entries } });
+      if (r.status === 401) return false;
+      if (r.ok && r.body) {
+        if (state) state.lineup = R.sanitizeLineup(r.body.lineup);
+        note.classList.remove('bad');
+        setText(note, said);
+        render();
+        return true;
+      }
+      if (r.status === 409 && r.body && r.body.lineup) { lineup = R.sanitizeLineup(r.body.lineup); if (state) state.lineup = lineup; continue; }
+      setText(note, errorWords(r.status, r.body));
+      note.classList.add('bad');
+      return false;
+    }
+    setText(note, 'The line-up keeps changing somewhere else. Try again.');
+    note.classList.add('bad');
+    return false;
+  }
+
+  /** An item press (what Show would send) added at the end of the line-up instead. */
+  function addToLineup(out, title) {
+    const made = lineupEntryFrom(out, R);
+    if (!made.ok) { setText($('lineup-note'), made.error); $('lineup-note').classList.add('bad'); return Promise.resolve(false); }
+    const words = title || made.entry.item.title || 'It';
+    return editLineup((entries) => lineupAdd(entries, made.entry, R), `Added to the line-up: ${words}. Nothing went on the TV.`);
+  }
+
+  async function showFromLineup(body, said) {
+    touch();
+    setText($('press-note'), 'Sending…');
+    const r = await request('/v1/cast/lineup/show', { method: 'POST', body });
+    if (r.status === 401) return;
+    if (state && r.body && r.body.lineup) state.lineup = R.sanitizeLineup(r.body.lineup);
+    if (r.ok && r.body) setText($('press-note'), r.body.screenOnline === false ? `${said}. The TV will show it when it answers.` : said);
+    else setText($('press-note'), errorWords(r.status, r.body));
+    poll();
+  }
+
+  function onLineupList(e) {
+    const b = e.target.closest('[data-act]');
+    if (!b || b.disabled) return;
+    const id = b.dataset.id;
+    if (b.dataset.act === 'show') showFromLineup({ id }, 'Going up from the line-up');
+    else if (b.dataset.act === 'up') editLineup((entries) => ({ ok: true, entries: lineupMove(entries, id, -1) }), 'Moved up.');
+    else if (b.dataset.act === 'down') editLineup((entries) => ({ ok: true, entries: lineupMove(entries, id, 1) }), 'Moved down.');
+    else if (b.dataset.act === 'remove') editLineup((entries) => ({ ok: true, entries: lineupRemove(entries, id) }), 'Removed from the line-up.');
   }
 
   /** The choices list: one open at a time (a navigation pane: one always open). */
@@ -212,9 +361,31 @@ export function createControls(conn) {
     setTimeout(() => { if (panel.classList.contains('is-closing')) { panel.hidden = true; panel.classList.remove('is-closing'); } }, 170);
   }
 
+  /** What each form would send: the same press goes up now, or into the line-up. */
+  const FORMS = {
+    video: () => videoPress({ link: $('video-link').value, title: $('video-title').value }, R),
+    fb: () => facebookPress({ link: $('fb-link').value, title: $('fb-title').value }, R),
+    text: () => {
+      const look = document.querySelector('input[name="look"]:checked');
+      return textPress({ heading: $('text-heading').value, text: $('text-body').value, look: look ? look.value : 'page' }, R);
+    },
+    timer: () => timerPress({ minutes: $('timer-min').value, seconds: $('timer-sec').value, title: $('timer-title').value }, R),
+    clock: () => clockPress(R),
+  };
+  const CLEARS = { video: ['video-link', 'video-title'], fb: ['fb-link', 'fb-title'] };
+
+  /** "Add to line-up" beside a form's own send (data-lineup names the form). */
+  function addForm(e) {
+    const b = e.target.closest('[data-lineup]');
+    if (!b || !FORMS[b.dataset.lineup]) return;
+    const out = FORMS[b.dataset.lineup]();
+    if (!out.ok) { setText($('lineup-note'), out.error); $('lineup-note').classList.add('bad'); setText($('press-note'), out.error); return; }
+    addToLineup(out).then((ok) => { if (ok) for (const id of CLEARS[b.dataset.lineup] || []) $(id).value = ''; });
+  }
+
   function sendVideo(e) {
     e.preventDefault();
-    const out = videoPress({ link: $('video-link').value, title: $('video-title').value }, R);
+    const out = FORMS.video();
     if (!out.ok) { setText($('press-note'), out.error); return; }
     press(out.press.action, out.press.data, 'The video is going up').then((r) => { if (r && r.ok) { $('video-link').value = ''; $('video-title').value = ''; } });
   }
@@ -259,14 +430,21 @@ export function createControls(conn) {
         if (!out.ok) { setText($('press-note'), out.error); return; }
         press(out.press.action, out.press.data, 'The video is going up');
       });
-      li.append(b);
+      // Beside it: into the line-up instead (nothing goes on the TV).
+      const add = document.createElement('button');
+      add.type = 'button';
+      add.className = 'quiet result-add';
+      add.textContent = 'Add to line-up';
+      add.setAttribute('aria-label', `Add ${String(v.title || 'this video')} to the line-up`);
+      add.addEventListener('click', () => addToLineup(resultPress({ youtube: v.youtube, title: String(v.title || '').slice(0, R.CLASSROOM_TITLE_MAX) }, R)));
+      li.append(b, add);
       list.append(li);
     }
   }
 
   function sendFacebook(e) {
     e.preventDefault();
-    const out = facebookPress({ link: $('fb-link').value, title: $('fb-title').value }, R);
+    const out = FORMS.fb();
     if (!out.ok) { setText($('press-note'), out.error); return; }
     press(out.press.action, out.press.data, 'The Facebook video is going up').then((r) => { if (r && r.ok) { $('fb-link').value = ''; $('fb-title').value = ''; } });
   }
@@ -275,6 +453,7 @@ export function createControls(conn) {
 
   async function sendClip(e) {
     touch();
+    const forLineup = e.target.dataset.dest === 'lineup';
     const file = e.target.files && e.target.files[0];
     e.target.value = '';
     if (!file) return;
@@ -287,6 +466,11 @@ export function createControls(conn) {
     if (problem) { setText(note, problem); note.classList.add('bad'); return; }
     const done = await upload(typed, (w) => setText(note, w));
     if (!done) { note.classList.add('bad'); return; }
+    if (forLineup) {
+      setText(note, '');
+      await addToLineup(filePress(done, titleFromName(file.name), R), titleFromName(file.name) || 'The video');
+      return;
+    }
     clipFile = { file: done, title: titleFromName(file.name) };
     setText(note, '');
     setText($('clip-ready-words'), `${clipFile.title || 'Video'} · ${size(done.bytes || file.size)}`);
@@ -303,8 +487,7 @@ export function createControls(conn) {
 
   function sendText(e) {
     e.preventDefault();
-    const look = document.querySelector('input[name="look"]:checked');
-    const out = textPress({ heading: $('text-heading').value, text: $('text-body').value, look: look ? look.value : 'page' }, R);
+    const out = FORMS.text();
     if (!out.ok) { setText($('press-note'), out.error); return; }
     press(out.press.action, out.press.data, 'The text is going up');
   }
@@ -327,7 +510,7 @@ export function createControls(conn) {
 
   function sendTimer(e) {
     e.preventDefault();
-    const out = timerPress({ minutes: $('timer-min').value, seconds: $('timer-sec').value, title: $('timer-title').value }, R);
+    const out = FORMS.timer();
     if (!out.ok) { setText($('press-note'), out.error); return; }
     press(out.press.action, out.press.data, 'The countdown is going up');
   }
@@ -362,6 +545,7 @@ export function createControls(conn) {
 
   async function addPictures(e) {
     touch();
+    const forLineup = e.target.dataset.dest === 'lineup';
     const files = [...(e.target.files || [])];
     e.target.value = '';
     const note = $('pic-note');
@@ -374,11 +558,15 @@ export function createControls(conn) {
       const done = await upload(file, (w) => say(files.length > 1 ? `Picture ${i + 1} of ${files.length}. ${w}` : w));
       if (!done) { note.classList.add('bad'); if (!conn.live()) return; continue; }
       const pic = { file: done, url: URL.createObjectURL(file), title: titleFromName(file.name) };
+      if (forLineup && !(await addToLineup(filePress(done, pic.title, R), pic.title || 'A picture'))) { note.classList.add('bad'); continue; }
       pictures.push(pic);
       $('thumbs').append(thumb(pic));
       added += 1;
     }
-    if (added && !note.classList.contains('bad')) say(added === 1 ? `Ready. ${VERB} it to show it on the TV.` : `${added} ready. ${VERB} one to show it on the TV.`);
+    if (added && !note.classList.contains('bad')) {
+      if (forLineup) say(added === 1 ? 'Added to the line-up.' : `${added} added to the line-up.`);
+      else say(added === 1 ? `Ready. ${VERB} it to show it on the TV.` : `${added} ready. ${VERB} one to show it on the TV.`);
+    }
     render();
   }
 
@@ -404,6 +592,7 @@ export function createControls(conn) {
 
   async function sendPdfFile(e) {
     touch();
+    const dest = e.target.dataset.dest === 'lineup' ? 'lineup' : 'tv';
     const file = e.target.files && e.target.files[0];
     e.target.value = '';
     if (!file) return;
@@ -411,11 +600,11 @@ export function createControls(conn) {
     note.classList.remove('bad');
     const choice = slidesChoice(file, R);
     if (!choice.ok) { setText(note, choice.error); note.classList.add('bad'); return; }
-    if (choice.kind === 'pptx') { await convertPptx(file); return; }
+    if (choice.kind === 'pptx') { await convertPptx(file, dest); return; }
     const done = await upload(file, (w) => setText(note, w));
     if (!done) { note.classList.add('bad'); return; }
     if (preview) preview.remember(done.id, file);
-    pdfReady(done, titleFromName(file.name));
+    pdfReady(done, titleFromName(file.name), dest);
   }
 
   /* ── A PowerPoint: scrambled here, made into slides by the GitHub job ── */
@@ -433,7 +622,7 @@ export function createControls(conn) {
     return { bytes: out, key: b64 };
   }
 
-  async function convertPptx(file) {
+  async function convertPptx(file, dest = 'tv') {
     const note = $('pdf-note');
     const say = (w, bad) => { setText(note, w); note.classList.toggle('bad', Boolean(bad)); };
     if (converting) { say('Slides are already being made from another file. Wait for them first.', true); return; }
@@ -465,7 +654,7 @@ export function createControls(conn) {
         const st = await request(`/v1/cast/convert/${id}`);
         if (st.status === 401) return;
         if (!st.ok || !st.body) { if (st.status === 404) { say(convertWords('failed', 'convert'), true); return; } continue; }
-        if (st.body.status === 'done' && st.body.file) { pdfReady(st.body.file, titleFromName(file.name)); return; }
+        if (st.body.status === 'done' && st.body.file) { pdfReady(st.body.file, titleFromName(file.name), dest); return; }
         if (st.body.status === 'failed') { say(convertWords('failed', st.body.error), true); return; }
         say(convertWords(st.body.status, '', seconds));
       }
@@ -484,8 +673,9 @@ export function createControls(conn) {
     }
   }
 
-  async function copyPdfLink() {
+  async function copyPdfLink(e) {
     touch();
+    const dest = e && e.currentTarget && e.currentTarget.dataset && e.currentTarget.dataset.dest === 'lineup' ? 'lineup' : 'tv';
     const note = $('pdf-note');
     note.classList.remove('bad');
     const link = linkToCopy($('pdf-link').value, R);
@@ -502,11 +692,16 @@ export function createControls(conn) {
     }
     if (r.body.kind !== 'pdf' && r.body.kind !== 'image') { setText(note, 'That link was not a PDF or a picture.'); note.classList.add('bad'); return; }
     $('pdf-link').value = '';
-    pdfReady(r.body, titleFromName(r.body.name || '') || (link.google ? 'Google Slides' : ''));
+    pdfReady(r.body, titleFromName(r.body.name || '') || (link.google ? 'Google Slides' : ''), dest);
   }
 
-  /** A PDF is stored in the room: put it up now, and keep a Show button for later. */
-  function pdfReady(file, title) {
+  /** A PDF is stored in the room: put it up now (or into the line-up), and keep a Show button for later. */
+  function pdfReady(file, title, dest = 'tv') {
+    if (dest === 'lineup') {
+      setText($('pdf-note'), '');
+      addToLineup(filePress(file, title, R), title || 'The slides');
+      return;
+    }
     pdfFile = { file, title };
     setText($('pdf-note'), '');
     setText($('pdf-ready-words'), `${title || 'Slides'} · ${size(file.bytes || 0)}`);
@@ -631,6 +826,7 @@ export function createControls(conn) {
     clearInterval(timerTick);
     timerTick = 0;
     state = null;
+    lineupKey = '';
   }
 
   /** Refused (a 401): stop sending and forget the state. */
@@ -639,6 +835,7 @@ export function createControls(conn) {
     clearInterval(timerTick);
     timerTick = 0;
     state = null;
+    lineupKey = '';
   }
 
   /* ── Wiring ── */
@@ -651,6 +848,15 @@ export function createControls(conn) {
     document.querySelector('.choices').addEventListener('click', onChoice);
     $('video-form').addEventListener('submit', sendVideo);
     $('text-form').addEventListener('submit', sendText);
+    // The line-up: "Add to line-up" beside each send, its list, and Next.
+    document.addEventListener('click', addForm);
+    $('lineup-list').addEventListener('click', onLineupList);
+    $('lineup-next').addEventListener('click', () => showFromLineup({ next: true }, 'The next one is going up'));
+    $('clip-input-lineup').addEventListener('change', sendClip);
+    $('pic-input-lineup').addEventListener('change', addPictures);
+    $('pdf-input-lineup').addEventListener('change', sendPdfFile);
+    $('pdf-input-lineup').setAttribute('accept', SLIDES_ACCEPT);
+    $('pdf-copy-lineup').addEventListener('click', copyPdfLink);
     $('timer-form').addEventListener('submit', sendTimer);
     $('timer-picks').addEventListener('click', pickTimer);
     $('timer-min').addEventListener('input', markPicks);

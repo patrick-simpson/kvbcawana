@@ -72,3 +72,39 @@ describe('a countdown and the clock (Cast): two more items', () => {
     expect(list.items.map((i) => i.kind)).toEqual(['text']);
   });
 });
+
+describe('the line-up (Cast): entries as an item press takes them, capped', () => {
+  const text = (id, words = 'Hello') => ({ id, item: { id, kind: 'text', text: words } });
+
+  it('an entry is {id, item}: never a shared screen, a countdown without its end', () => {
+    expect(R.sanitizeLineupEntry(text('bentryone1'))).toEqual({ id: 'bentryone1', item: { id: 'bentryone1', kind: 'text', title: 'Hello', text: 'Hello', look: 'page' } });
+    expect(R.sanitizeLineupEntry({ id: 'bentryone1', item: { id: 'bentryone1', kind: 'video', youtube: 'dQw4w9WgXcQ' } }).item).toMatchObject({ kind: 'video', youtube: 'dQw4w9WgXcQ', title: 'Video' });
+    expect(R.sanitizeLineupEntry({ id: 'bentryone1', item: { id: 'bentryone1', kind: 'timer', seconds: 120, endsAt: 99 } }).item).toEqual({ id: 'bentryone1', kind: 'timer', title: '', seconds: 120 });
+    for (const bad of [null, {}, { id: 'x', item: text('bentryone1').item }, { id: 'bentryone1', item: { id: 'bentryone1', kind: 'screen' } }, { id: 'bentryone1', item: { id: 'bentryone1', kind: 'text', text: '' } }]) {
+      expect(R.sanitizeLineupEntry(bad)).toBeNull();
+    }
+  });
+
+  it('an edit is all or nothing: too many, too much, a repeat or a bad entry is refused', () => {
+    expect(R.CAST_LINEUP_MAX).toBe(12);
+    const ok = R.cleanLineupEntries([text('bentryone1'), text('bentrytwo2')]);
+    expect(ok.problem).toBe('');
+    expect(ok.entries.map((e) => e.id)).toEqual(['bentryone1', 'bentrytwo2']);
+    expect(R.cleanLineupEntries([]).problem).toBe('');
+    expect(R.cleanLineupEntries(Array.from({ length: 13 }, (_, i) => text(`bentry${String(i).padStart(4, '0')}`))).problem).toBe('full');
+    expect(R.cleanLineupEntries([text('bentryone1'), text('bentryone1')]).problem).toBe('entry');
+    expect(R.cleanLineupEntries([text('bentryone1'), { id: 'nope' }]).problem).toBe('entry');
+    expect(R.cleanLineupEntries('x').problem).toBe('entry');
+    // Twelve of the longest text items still fit the characters cap.
+    const long = 'x'.repeat(R.CLASSROOM_TEXT_MAX);
+    const heavy = Array.from({ length: 12 }, (_, i) => text(`bentry${String(i).padStart(4, '0')}`, long));
+    expect(R.cleanLineupEntries(heavy).problem).toBe('');
+  });
+
+  it('a read keeps what it can: bad entries dropped, `on` only when it is in the list', () => {
+    const lu = R.sanitizeLineup({ rev: 4, savedAt: '2026-11-11T20:00:00Z', entries: [text('bentryone1'), { id: 'bad' }, text('bentryone1'), text('bentrytwo2')], on: 'bentrytwo2', button: 'bstagebtn01' });
+    expect(lu).toEqual({ rev: 4, savedAt: '2026-11-11T20:00:00Z', entries: [R.sanitizeLineupEntry(text('bentryone1')), R.sanitizeLineupEntry(text('bentrytwo2'))], on: 'bentrytwo2', button: 'bstagebtn01' });
+    expect(R.sanitizeLineup({ entries: [text('bentryone1')], on: 'bgone00001', button: 'bstagebtn01' })).toMatchObject({ on: null, button: null, rev: 0, savedAt: null });
+    expect(R.sanitizeLineup(null)).toEqual({ rev: 0, savedAt: null, entries: [], on: null, button: null });
+  });
+});

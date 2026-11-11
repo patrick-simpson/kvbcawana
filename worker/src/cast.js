@@ -17,6 +17,10 @@
 //   cast:room                   {code, at, tokens: [{hash, at}]}
 // Opening (a new code) or closing the room clears the stage, every file and every
 // token: nothing a guest put up outlives their session.
+//   cast:lineup                 {rev, savedAt, entries: [{id, item}], on, button}: the
+//                               LINE-UP (owner 2026-11-11): things loaded ahead and put
+//                               up in order with Next. The room's, so it is cleared with
+//                               the files; its files are never evicted to make room.
 //   cast:house                  {line, savedAt}: the HOUSE SLIDE's one optional line
 //                               (owner 2026-11-11). With nothing up the TV shows the
 //                               church's logo and this line. It is the church's own, set
@@ -72,11 +76,19 @@
 // a presenter, with an allowance of its own.
 
 import { Classroom, linkCopyBusy, newId } from './classroom.js';
+import { Doc } from './doc.js';
+import { takeToken } from './journeyRemote.js';
 import { netOf } from './netof.js';
 import { fail, json } from './http.js';
-import { CLASSROOM_CLIP_MAX_BYTES, CLASSROOM_FILE_MAX_BYTES, CLASSROOM_FILE_TYPES, fileLimits, isClipType, sanitizeHouse } from '../../shared/classroomRemote.js';
+import {
+  CAST_LINEUP_CHARS_MAX, CAST_LINEUP_MAX, CLASSROOM_CLIP_MAX_BYTES, CLASSROOM_FILE_MAX_BYTES, CLASSROOM_FILE_TYPES,
+  cleanLineupEntries, fileLimits, filesOf, isClipType, sanitizeHouse, sanitizeLineup,
+} from '../../shared/classroomRemote.js';
 
 const ROOM_KEY = 'cast:room';
+/** The line-up: the room's, cleared with its files. */
+const LINEUP_KEY = 'cast:lineup';
+const freshLineup = () => ({ rev: 0, savedAt: null, entries: [], on: null, button: null });
 /** The house slide's line: church-wide, kept across rooms. */
 const HOUSE_KEY = 'cast:house';
 
@@ -191,6 +203,10 @@ export class Cast {
     this.rates = new Map();
     /** Bytes the room took this hour, whoever sent them. */
     this.roomBytes = { n: 0, since: 0 };
+    /** The line-up (one document: an edit's rev check is one synchronous step). */
+    this.lineup = new Doc(storage, LINEUP_KEY, freshLineup);
+    /** Line-up edits per caller (the press bucket's pace), memory only. @type {Map<string, any>} */
+    this.lineupBuckets = new Map();
   }
 
   /** This token's counts for the hour. @param {string} who */
@@ -238,13 +254,15 @@ export class Cast {
   async makeRoom(bytes) {
     const metas = [...(await this.storage.list({ prefix: 'castmeta:' })).values()].filter((m) => m?.id);
     const shown = (await this.engine.stage()).show?.button?.file || null;
+    // The line-up's files were loaded to be shown later: never taken to make room.
+    const queued = await this.lineupFiles();
     const t = this.now();
     let count = metas.length;
     let used = metas.reduce((n, m) => n + (Number(m.bytes) || 0), 0);
     const fits = () => count + 1 <= CAST_FILES_MAX && used + bytes <= CAST_BYTES_MAX;
     if (fits()) return true;
     const dropped = (/** @type {any} */ m) => !m.done && t - (Number(m.lastAt) || Number(m.at) || 0) >= CAST_UPLOAD_QUIET_MS;
-    const old = metas.filter((m) => (m.done || dropped(m)) && m.id !== shown)
+    const old = metas.filter((m) => (m.done || dropped(m)) && m.id !== shown && !queued.has(m.id))
       .sort((a, b) => (Number(dropped(b)) - Number(dropped(a))) || ((a.at || 0) - (b.at || 0)));
     for (const m of old) {
       if (fits()) break;
@@ -296,6 +314,7 @@ export class Cast {
     for (const [, conv] of convs) if (conv?.id) await this.dropConvert(conv, true);
     this.converts = { n: 0, since: 0 };
     this.roomBytes = { n: 0, since: 0 };
+    await this.lineup.drop();
     const stage = await this.engine.stage();
     if (stage.show || stage.preview || stage.black) await this.engine.saveStage({ ...stage, show: null, preview: null, cmds: [], black: false });
   }
@@ -411,6 +430,107 @@ export class Cast {
     return json({ ok: true, disconnected: had > 0 });
   }
 
+  /* ── The line-up (owner 2026-11-11: "Load several things before the event (a video,
+     the slides, a picture) and tap through them in order") ── */
+
+  /** The line-up as the pages read it. */
+  async lineupNow() {
+    await this.lineup.load();
+    return sanitizeLineup(this.lineup.data);
+  }
+
+  /** Every file the line-up names (kept by makeRoom). */
+  async lineupFiles() {
+    const { entries } = await this.lineupNow();
+    return filesOf({ items: entries.map((e) => e.item) });
+  }
+
+  /**
+   * GET /v1/cast/state (the presenter): the engine's state plus the line-up, so the
+   * page's 2 s read carries it (no request of its own).
+   */
+  async state() {
+    const body = await (await this.engine.remoteState()).json();
+    return json({ ...body, lineup: await this.lineupNow() });
+  }
+
+  /**
+   * PUT /v1/cast/lineup {baseRev, entries} (a presenter or the desk): the whole list, in
+   * order (an add, a move or a remove is the page's new list). Every file an entry names
+   * must be a finished file of the room. The rev check and the write are one synchronous
+   * step (a second edit from an older copy is 409 `stale`, with the list as it is now).
+   * `on` (where Next goes on from) follows its entry; when that entry was removed, the
+   * nearest one before it that is still there takes its place. Nothing is rung: only the
+   * control pages read the line-up, on their own 2 s read.
+   * @param {string} who @param {any} body
+   */
+  async putLineup(who, body) {
+    const t = this.now();
+    const taken = takeToken(this.lineupBuckets.get(who), t);
+    this.lineupBuckets.delete(who);
+    this.lineupBuckets.set(who, taken.bucket);
+    while (this.lineupBuckets.size > 64) this.lineupBuckets.delete(/** @type {string} */ (this.lineupBuckets.keys().next().value));
+    if (!taken.ok) return fail('Too many changes at once. Wait a moment.', 429, { retryAfterMs: taken.retryMs });
+    const { entries, problem } = cleanLineupEntries(body?.entries);
+    if (problem === 'full') return fail(`The line-up holds ${CAST_LINEUP_MAX} things at most. Remove one first.`, 400, { reason: 'full', max: CAST_LINEUP_MAX, chars: CAST_LINEUP_CHARS_MAX });
+    if (problem) return fail('That line-up could not be read. Reload the page and try again.', 400, { reason: 'entry' });
+    if (!Number.isInteger(body?.baseRev)) return fail('That line-up could not be read. Reload the page and try again.', 400, { reason: 'entry' });
+    for (const f of filesOf({ items: entries.map((e) => e.item) })) {
+      const meta = await this.storage.get(`castmeta:${f}`);
+      if (!meta?.done) return fail('A picture, video or PDF in it is still uploading, or was removed. Add it again.', 400, { reason: 'file-missing' });
+    }
+    await this.lineup.load();
+    // From here to the assignment: no await (the check and the write are one step).
+    const doc = this.lineup.data;
+    if (body.baseRev !== doc.rev) return fail('The line-up was just changed somewhere else. It has been reloaded.', 409, { reason: 'stale', lineup: sanitizeLineup(doc) });
+    const ids = new Set(entries.map((e) => e.id));
+    let on = null;
+    if (doc.on && ids.has(doc.on)) on = doc.on;
+    else if (doc.on) {
+      const old = (doc.entries || []).map((/** @type {any} */ e) => e.id);
+      for (let i = old.indexOf(doc.on) - 1; i >= 0 && !on; i -= 1) if (ids.has(old[i])) on = old[i];
+    }
+    this.lineup.data = { rev: doc.rev + 1, savedAt: new Date(t).toISOString(), entries, on, button: on && on === doc.on ? doc.button : null };
+    await this.lineup.save();
+    return json({ ok: true, lineup: sanitizeLineup(this.lineup.data) });
+  }
+
+  /**
+   * POST /v1/cast/lineup/show {id} | {next: true} (a presenter or the desk): one entry up
+   * as an ORDINARY item press (the press bucket, Black and Back exactly as for any item; a
+   * countdown counts from now). `next` = the entry after the one shown last (the first
+   * when none); past the last: 409 `end`. Which entry is claimed in one synchronous step,
+   * so two quick Nexts put up two entries, never one twice; a press that is refused hands
+   * the mark back.
+   * @param {string} who @param {any} body
+   */
+  async lineupShow(who, body) {
+    await this.lineup.load();
+    const doc = this.lineup.data;
+    const entries = doc.entries || [];
+    let at;
+    if (body?.next === true) {
+      at = doc.on ? entries.findIndex((/** @type {any} */ e) => e.id === doc.on) + 1 : 0;
+      if (at >= entries.length) return fail(entries.length ? 'That was the last thing in the line-up.' : 'The line-up is empty.', 409, { reason: entries.length ? 'end' : 'empty' });
+    } else {
+      at = typeof body?.id === 'string' ? entries.findIndex((/** @type {any} */ e) => e.id === body.id) : -1;
+      if (at < 0) return fail('That is no longer in the line-up. It has been reloaded.', 404, { reason: 'no-entry', lineup: sanitizeLineup(doc) });
+    }
+    const entry = entries[at];
+    const before = { on: doc.on || null, button: doc.button || null };
+    this.lineup.data = { ...doc, on: entry.id, button: null };
+    const res = await this.engine.press(who, { action: 'item', data: { item: { ...entry.item, id: entry.id } } });
+    const out = await res.clone().json();
+    const cur = this.lineup.data;
+    if (!res.ok) {
+      if (cur.on === entry.id && !cur.button) this.lineup.data = { ...cur, ...before };
+      return res;
+    }
+    if (cur.on === entry.id) this.lineup.data = { ...cur, button: out.button || null };
+    await this.lineup.save();
+    return json({ ...out, lineup: sanitizeLineup(this.lineup.data) });
+  }
+
   /** GET /v1/cast/youtube?q= (the presenter): YouTube's videos for the words. @param {string | null} q */
   async youtube(q) {
     const key = String(this.env()?.YOUTUBE_API_KEY || '');
@@ -468,7 +588,7 @@ export class Cast {
     const body = await (await this.engine.remoteState()).json();
     const t = this.now();
     const presenter = room.tokens.some((x) => t - x.at <= TOKEN_TTL_MS && t - (this.seen.get(x.hash) ?? x.at) <= PRESENTER_IDLE_MS);
-    return json({ ...body, code: room.code, presenter, house: sanitizeHouse(await this.houseDoc()) });
+    return json({ ...body, code: room.code, presenter, house: sanitizeHouse(await this.houseDoc()), lineup: await this.lineupNow() });
   }
 
   /** The house slide: its line, and when it was saved. @returns {Promise<{ line: string, savedAt: string | null }>} */
@@ -685,7 +805,10 @@ export function mountCast(registry, core) {
   registry.add('POST', '/v1/cast/join', 'public', async ({ body, ip }) => c().join(await body(), ip));
   registry.add('POST', '/v1/cast/leave', 'public', presenter(async ({ body }, who) => c().leave(who, await body())));
   registry.add('GET', '/v1/cast/youtube', 'public', presenter(async ({ url }) => c().youtube(url.searchParams.get('q'))));
-  registry.add('GET', '/v1/cast/state', 'public', presenter(async () => c().engine.remoteState()));
+  registry.add('GET', '/v1/cast/state', 'public', presenter(async () => c().state()));
+  // The line-up (owner 2026-11-11): the whole list as one edit, and one entry up (or Next).
+  registry.add('PUT', '/v1/cast/lineup', 'public', presenter(async ({ body }, who) => c().putLineup(who, await body())));
+  registry.add('POST', '/v1/cast/lineup/show', 'public', presenter(async ({ body }, who) => c().lineupShow(who, await body())));
   registry.add('POST', '/v1/cast/press', 'public', presenter(async ({ body }, who) => c().engine.press(who, await body())));
   registry.add('POST', '/v1/cast/files', 'public', presenter(async ({ body }, who) => c().fileStart(who, await body())));
   registry.add('PUT', '/v1/cast/files/:id/:n', 'public', presenter(async ({ params, request }) => c().engine.putPart(params.id, params.n, request)));
@@ -720,6 +843,8 @@ export function mountCast(registry, core) {
   registry.add('PUT', '/v1/cast/desk/house', 'session', async ({ body }) => c().putHouse(await body()));
   registry.add('GET', '/v1/cast/desk/youtube', 'session', async ({ url }) => c().youtube(url.searchParams.get('q')));
   registry.add('POST', '/v1/cast/desk/press', 'session', async ({ body }) => c().engine.press(DESK, await body()));
+  registry.add('PUT', '/v1/cast/desk/lineup', 'session', async ({ body }) => c().putLineup(DESK, await body()));
+  registry.add('POST', '/v1/cast/desk/lineup/show', 'session', async ({ body }) => c().lineupShow(DESK, await body()));
   registry.add('POST', '/v1/cast/desk/files', 'session', async ({ body }) => c().fileStart(DESK, await body()));
   registry.add('PUT', '/v1/cast/desk/files/:id/:n', 'session', async ({ params, request }) => c().engine.putPart(params.id, params.n, request));
   registry.add('POST', '/v1/cast/desk/files/:id/done', 'session', async ({ params }) => c().engine.finishFile(params.id));

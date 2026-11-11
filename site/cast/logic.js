@@ -194,6 +194,87 @@ export function createSkew({ max = 8 } = {}) {
   };
 }
 
+/* ── The line-up (owner 2026-11-11: "Load several things before the event (a video, the
+   slides, a picture) and tap through them in order") ── */
+
+/** What each kind is called in the line-up's rows. */
+const LINEUP_KINDS = { video: 'YouTube', clip: 'Video', facebook: 'Facebook', image: 'Picture', pdf: 'Slides', text: 'Text', timer: 'Countdown', clock: 'Clock', scripture: 'Scripture' };
+
+/**
+ * One row's words: its kind and its title (a countdown says its length; the clock has none).
+ * @param {any} item
+ */
+export function entryWords(item) {
+  const kind = LINEUP_KINDS[item && item.kind] || 'Item';
+  let title = item && typeof item.title === 'string' ? item.title : '';
+  if (item && item.kind === 'timer') title = [minSec(item.seconds), item.title].filter(Boolean).join(' · ');
+  if (item && item.kind === 'clock') title = 'The time and the date';
+  return { kind, title: title || kind };
+}
+
+/**
+ * An item press (what a page would send to put it up now) as a line-up entry, through the
+ * shared rules, or the problem in words.
+ * @param {{ ok: boolean, press?: any, error?: string }} out @param {any} R
+ */
+export function lineupEntryFrom(out, R) {
+  if (!out || !out.ok) return { ok: false, error: (out && out.error) || 'That cannot go in the line-up.' };
+  const item = out.press && out.press.data && out.press.data.item;
+  const entry = R.sanitizeLineupEntry({ id: item && item.id, item });
+  return entry ? { ok: true, entry } : { ok: false, error: 'That cannot go in the line-up.' };
+}
+
+/** The list with one more at the end, or why not. @param {any[]} entries @param {any} entry @param {any} R */
+export function lineupAdd(entries, entry, R) {
+  if (entries.length >= R.CAST_LINEUP_MAX) return { ok: false, error: `The line-up holds ${R.CAST_LINEUP_MAX} things at most. Remove one first.` };
+  const next = [...entries, entry];
+  return R.cleanLineupEntries(next).problem ? { ok: false, error: 'That is more than the line-up can hold. Remove something first.' } : { ok: true, entries: next };
+}
+
+/** The list with one moved up (-1) or down (1); unchanged at an end. @param {any[]} entries @param {string} id @param {number} dir */
+export function lineupMove(entries, id, dir) {
+  const i = entries.findIndex((e) => e.id === id);
+  const j = i + (dir < 0 ? -1 : 1);
+  if (i < 0 || j < 0 || j >= entries.length) return entries;
+  const next = [...entries];
+  [next[i], next[j]] = [next[j], next[i]];
+  return next;
+}
+
+/** The list without one. @param {any[]} entries @param {string} id */
+export function lineupRemove(entries, id) {
+  return entries.filter((e) => e.id !== id);
+}
+
+/**
+ * The line-up as the pages draw it: each row's number, words and state ('on' = on the TV
+ * now, 'last' = shown last but something else is up, 'next' = what Next puts up), and
+ * the Next button's words.
+ * @param {any} lineup the Worker's (R.sanitizeLineup) @param {any} stage
+ */
+export function lineupView(lineup, stage) {
+  const entries = (lineup && lineup.entries) || [];
+  const onAt = lineup && lineup.on ? entries.findIndex((e) => e.id === lineup.on) : -1;
+  const live = Boolean(onAt >= 0 && lineup.button && stage && stage.show && stage.show.button.id === lineup.button);
+  const nextAt = onAt + 1 < entries.length ? onAt + 1 : -1;
+  const rows = entries.map((e, i) => ({
+    id: e.id,
+    n: i + 1,
+    ...entryWords(e.item),
+    state: i === onAt ? (live ? 'on' : 'last') : i === nextAt ? 'next' : '',
+    first: i === 0,
+    last: i === entries.length - 1,
+  }));
+  const next = nextAt >= 0 ? rows[nextAt] : null;
+  return {
+    rows,
+    count: entries.length,
+    next,
+    nextWords: !entries.length ? 'The line-up is empty' : next ? `Next: ${next.title}` : 'End of the line-up',
+    nextSub: !entries.length ? '' : next ? `${next.n} of ${entries.length} · ${next.kind}` : `All ${entries.length} shown`,
+  };
+}
+
 /** Cast's own address (owner 2026-11-09): the presenter page at its root, the TV at /screen/. */
 export const CAST_HOME = 'https://cast.kvbchurch.org/';
 

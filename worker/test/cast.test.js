@@ -279,6 +279,133 @@ describe('Cast: a countdown and the clock', () => {
   });
 });
 
+// Owner 2026-11-11: "Load several things before the event (a video, the slides, a picture)
+// and tap through them in order" (the line-up).
+describe('Cast: the line-up', () => {
+  const text = (id, words) => ({ id, item: { id, kind: 'text', text: words } });
+  async function joined() {
+    const s = await setup();
+    const { code } = (await s.call('POST', '/v1/cast/open', {})).body;
+    const token = (await s.call('POST', '/v1/cast/join', { code }, { auth: '' })).body.token;
+    const as = { auth: '', cast: token };
+    const state = async () => (await s.call('GET', '/v1/cast/state', undefined, as)).body;
+    const put = (baseRev, entries, opts = as) => s.call('PUT', '/v1/cast/lineup', { baseRev, entries }, opts);
+    const show = (body, opts = as) => s.call('POST', '/v1/cast/lineup/show', body, opts);
+    const screen = async () => (await s.call('GET', '/v1/cast/screen')).body;
+    const uploadPng = async () => {
+      const start = await s.call('POST', '/v1/cast/files', { type: 'image/png', bytes: PNG.length, name: 'Welcome.png' }, as);
+      await s.call('PUT', `/v1/cast/files/${start.body.id}/0`, PNG, { ...as, type: 'application/octet-stream' });
+      return (await s.call('POST', `/v1/cast/files/${start.body.id}/done`, {}, as)).body;
+    };
+    return { ...s, token, as, state, put, show, screen, uploadPng };
+  }
+
+  it('loading entries puts nothing on the TV; every state read carries the list', async () => {
+    const s = await joined();
+    const pic = await s.uploadPng();
+    s.frames.length = 0;
+    const r = await s.put(0, [text('bentryone1', 'Welcome'), { id: 'bentrytwo2', item: { id: 'bentrytwo2', kind: 'image', file: pic.id, type: 'image/png', title: 'Welcome' } }, { id: 'bentry0003', item: { id: 'bentry0003', kind: 'timer', seconds: 300, endsAt: 5 } }]);
+    expect(r.status).toBe(200);
+    expect(r.body.lineup).toMatchObject({ rev: 1, on: null, button: null });
+    expect(r.body.lineup.entries.map((e) => e.item.kind)).toEqual(['text', 'image', 'timer']);
+    expect('endsAt' in r.body.lineup.entries[2].item).toBe(false);
+    // The TV shows nothing and is not rung (only the control pages read the line-up).
+    expect((await s.screen()).stage.show).toBeNull();
+    expect(s.frames.some((f) => f.e === 'changed' && f.d?.what === 'cast')).toBe(false);
+    expect((await s.state()).lineup.entries).toHaveLength(3);
+    expect((await s.call('GET', '/v1/cast/desk/state')).body.lineup.rev).toBe(1);
+  });
+
+  it('Next puts each entry up in order as an ordinary item press, and stops at the end', async () => {
+    const s = await joined();
+    await s.put(0, [text('bentryone1', 'One'), text('bentrytwo2', 'Two'), { id: 'bentry0003', item: { id: 'bentry0003', kind: 'timer', seconds: 60 } }]);
+    const a = await s.show({ next: true });
+    expect(a.status).toBe(200);
+    expect((await s.screen()).stage.show.button).toMatchObject({ kind: 'text', text: 'One', id: a.body.button });
+    expect(a.body.lineup).toMatchObject({ on: 'bentryone1', button: a.body.button });
+    await s.show({ next: true });
+    s.tick(4000);
+    const c = await s.show({ next: true });
+    // A countdown counts from when it went up.
+    expect((await s.screen()).stage.show.button).toMatchObject({ kind: 'timer', endsAt: Date.parse('2026-11-08T21:00:00Z') + 4000 + 60000 });
+    expect(c.body.lineup.on).toBe('bentry0003');
+    const end = await s.show({ next: true });
+    expect(end.status).toBe(409);
+    expect(end.body.reason).toBe('end');
+    // Black and Back behave as for any item; Next goes on from the entry shown last.
+    await s.call('POST', '/v1/cast/press', { action: 'black', data: { on: true } }, s.as);
+    const shown = await s.show({ id: 'bentryone1' });
+    expect(shown.status).toBe(200);
+    const st = (await s.screen()).stage;
+    expect(st.black).toBeUndefined();
+    expect(st.show.button.text).toBe('One');
+    await s.call('POST', '/v1/cast/press', { action: 'back' }, s.as);
+    expect((await s.state()).lineup).toMatchObject({ on: 'bentryone1' });
+    await s.show({ next: true });
+    expect((await s.screen()).stage.show.button.text).toBe('Two');
+    expect((await s.show({ id: 'bnotthere1' })).status).toBe(404);
+  });
+
+  it('an edit from an older copy is 409 stale with the list as it is; the desk and the phone share one list', async () => {
+    const s = await joined();
+    expect((await s.put(0, [text('bentryone1', 'One')])).status).toBe(200);
+    const stale = await s.put(0, [text('bentrytwo2', 'Two')]);
+    expect(stale.status).toBe(409);
+    expect(stale.body.reason).toBe('stale');
+    expect(stale.body.lineup.entries.map((e) => e.id)).toEqual(['bentryone1']);
+    // The desk edits the same list, with its own sign-in.
+    const desk = await s.call('PUT', '/v1/cast/desk/lineup', { baseRev: 1, entries: [text('bentryone1', 'One'), text('bentrytwo2', 'Two')] });
+    expect(desk.status).toBe(200);
+    expect((await s.state()).lineup.entries.map((e) => e.id)).toEqual(['bentryone1', 'bentrytwo2']);
+    const next = await s.call('POST', '/v1/cast/desk/lineup/show', { next: true });
+    expect(next.body.lineup.on).toBe('bentryone1');
+  });
+
+  it('removing the entry shown last keeps Next going from where it was', async () => {
+    const s = await joined();
+    await s.put(0, [text('bentryone1', 'One'), text('bentrytwo2', 'Two'), text('bentry0003', 'Three')]);
+    await s.show({ next: true });
+    await s.show({ next: true });
+    const r = await s.put(1, [text('bentryone1', 'One'), text('bentry0003', 'Three')]);
+    expect(r.body.lineup.on).toBe('bentryone1');
+    await s.show({ next: true });
+    expect((await s.screen()).stage.show.button.text).toBe('Three');
+    // Moved: Next follows the new order.
+    const moved = await s.put(2, [text('bentry0003', 'Three'), text('bentryone1', 'One')]);
+    expect(moved.body.lineup.on).toBe('bentry0003');
+  });
+
+  it('at most 12 entries, every one a real entry, every file a finished file of the room', async () => {
+    const s = await joined();
+    const many = Array.from({ length: 13 }, (_, i) => text(`bentry${String(i).padStart(4, '0')}`, `No. ${i}`));
+    const full = await s.put(0, many);
+    expect(full.status).toBe(400);
+    expect(full.body.reason).toBe('full');
+    expect((await s.put(0, many.slice(0, 12))).status).toBe(200);
+    expect((await s.put(1, [text('bentryone1', 'One'), text('bentryone1', 'Again')])).body.reason).toBe('entry');
+    expect((await s.put(1, [{ id: 'bentryone1', item: { id: 'bentryone1', kind: 'screen' } }])).body.reason).toBe('entry');
+    const missing = await s.put(1, [{ id: 'bentryone1', item: { id: 'bentryone1', kind: 'image', file: 'fabcdefghijklmnop', type: 'image/png' } }]);
+    expect(missing.body.reason).toBe('file-missing');
+    expect((await s.state()).lineup.entries).toHaveLength(12);
+  });
+
+  it('a line-up file is never taken to make room, and a new code clears the line-up', async () => {
+    const s = await joined();
+    const pic = await s.uploadPng();
+    await s.put(0, [{ id: 'bentryone1', item: { id: 'bentryone1', kind: 'image', file: pic.id, type: 'image/png' } }]);
+    expect(await s.core.cast.lineupFiles()).toEqual(new Set([pic.id]));
+    // Room for a file the size of the whole room: the line-up's picture stays.
+    await s.core.cast.makeRoom(1);
+    for (let i = 0; i < 12; i += 1) await s.uploadPng();
+    expect(await s.core.cast.storage.get(`castmeta:${pic.id}`)).toMatchObject({ done: true });
+    await s.call('POST', '/v1/cast/reset', {});
+    const after = (await s.call('GET', '/v1/cast/desk/state')).body.lineup;
+    expect(after).toMatchObject({ entries: [], on: null });
+    await s.call('POST', '/v1/cast/open', {});
+    expect((await s.call('GET', '/v1/cast/desk/state')).body.lineup.entries).toEqual([]);
+  });
+});
+
 describe('Cast: one link copy at a time (IP-20261111-17)', () => {
   it('a second copy while one runs is 429 busy, counted against nothing; the next one after is fine', async () => {
     let release;

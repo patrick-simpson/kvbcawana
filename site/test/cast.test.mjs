@@ -16,6 +16,7 @@ import {
   SLIDES_ACCEPT, convertWords, isPresentation, slideView, slidesChoice,
   codeFromHash, facebookPress, resultPress, CAST_HOME, presenterUrl, addressWords,
   clockPress, clockWords, createSkew, minSec, timerLeft, timerPress,
+  entryWords, lineupAdd, lineupEntryFrom, lineupMove, lineupRemove, lineupView,
 } from '../cast/logic.js';
 
 const SITE = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
@@ -484,6 +485,80 @@ test('a countdown and the clock: on the TV, in the words, and as choices on both
   const render = controls.slice(controls.indexOf('  function render() {'), controls.indexOf('  /* ── Presses ── */'));
   assert.ok(!/request\(|fetch\(|poll\(/.test(render), 'drawing asks the Worker nothing');
   assert.match(read('cast', 'desk', 'desk.js'), /timer: 'A countdown is up', clock: 'The clock is up'/);
+});
+
+// Owner 2026-11-11: "Load several things before the event (a video, the slides, a picture)
+// and tap through them in order" (the line-up).
+test('the line-up: an item press becomes an entry; add, move and remove make the new list', () => {
+  const made = lineupEntryFrom(textPress({ text: 'Welcome' }, R), R);
+  assert.ok(made.ok);
+  assert.equal(made.entry.id, made.entry.item.id);
+  assert.equal(made.entry.item.kind, 'text');
+  assert.ok(!lineupEntryFrom({ ok: false, error: 'Type something to show first.' }, R).ok);
+  assert.equal(lineupEntryFrom({ ok: false, error: 'Type something to show first.' }, R).error, 'Type something to show first.');
+  // A countdown loads without an end: the Worker sets it when it goes up.
+  const t = lineupEntryFrom(timerPress({ minutes: '5', seconds: '0' }, R), R);
+  assert.deepEqual(Object.keys(t.entry.item).sort(), ['id', 'kind', 'seconds', 'title']);
+  const e = (id) => ({ id, item: { id, kind: 'text', title: id, text: id, look: 'page' } });
+  const list = [e('baaaaaaa1'), e('baaaaaaa2'), e('baaaaaaa3')];
+  assert.deepEqual(lineupMove(list, 'baaaaaaa3', -1).map((x) => x.id), ['baaaaaaa1', 'baaaaaaa3', 'baaaaaaa2']);
+  assert.deepEqual(lineupMove(list, 'baaaaaaa1', -1), list, 'the first cannot move up');
+  assert.deepEqual(lineupMove(list, 'baaaaaaa3', 1), list, 'the last cannot move down');
+  assert.deepEqual(lineupRemove(list, 'baaaaaaa2').map((x) => x.id), ['baaaaaaa1', 'baaaaaaa3']);
+  assert.deepEqual(lineupAdd(list, e('baaaaaaa4'), R).entries.map((x) => x.id), ['baaaaaaa1', 'baaaaaaa2', 'baaaaaaa3', 'baaaaaaa4']);
+  const full = Array.from({ length: R.CAST_LINEUP_MAX }, (_, i) => e(`bfull${String(i).padStart(4, '0')}`));
+  assert.match(lineupAdd(full, e('baaaaaaa4'), R).error, /12 things at most/);
+});
+
+test('the line-up as the pages draw it: on the TV, shown last, up next, and the Next button', () => {
+  const lineup = R.sanitizeLineup({
+    rev: 3,
+    entries: [
+      { id: 'bentryone1', item: { id: 'bentryone1', kind: 'video', youtube: 'dQw4w9WgXcQ', title: 'Welcome video' } },
+      { id: 'bentrytwo2', item: { id: 'bentrytwo2', kind: 'pdf', file: 'fabcdefghijkl', type: 'application/pdf', title: 'Sermon slides' } },
+      { id: 'bentry0003', item: { id: 'bentry0003', kind: 'timer', seconds: 300, title: 'Starting in' } },
+    ],
+    on: 'bentryone1',
+    button: 'bstagebtn01',
+  });
+  const up = { show: { button: { id: 'bstagebtn01', kind: 'video' }, at: 1, page: 1 } };
+  const v = lineupView(lineup, up);
+  assert.deepEqual(v.rows.map((r) => [r.n, r.kind, r.title, r.state]), [
+    [1, 'YouTube', 'Welcome video', 'on'],
+    [2, 'Slides', 'Sermon slides', 'next'],
+    [3, 'Countdown', '5:00 · Starting in', ''],
+  ]);
+  assert.equal(v.nextWords, 'Next: Sermon slides');
+  assert.equal(v.nextSub, '2 of 3 · Slides');
+  // Something else went up since: the entry is "shown last"; Next still goes on from it.
+  assert.equal(lineupView(lineup, { show: null }).rows[0].state, 'last');
+  assert.equal(lineupView({ ...lineup, on: null, button: null }, { show: null }).next.n, 1);
+  const done = lineupView({ ...lineup, on: 'bentry0003' }, { show: null });
+  assert.equal(done.next, null);
+  assert.equal(done.nextWords, 'End of the line-up');
+  assert.equal(lineupView(R.sanitizeLineup(null), { show: null }).nextWords, 'The line-up is empty');
+  assert.deepEqual(entryWords({ kind: 'clock', title: '' }), { kind: 'Clock', title: 'The time and the date' });
+});
+
+test('the line-up on both control pages: Add to line-up beside every send but a shared screen, the list, and Next', () => {
+  const deskPage = read('cast', 'desk', 'index.html');
+  for (const src of [page, deskPage]) {
+    for (const id of ['lineup-list', 'lineup-empty', 'lineup-count', 'lineup-note', 'lineup-next', 'lineup-next-box', 'lineup-next-words', 'lineup-next-sub', 'pic-input-lineup', 'clip-input-lineup', 'pdf-input-lineup', 'pdf-copy-lineup']) assert.match(src, new RegExp(`id="${id}"`), id);
+    assert.deepEqual([...src.matchAll(/data-lineup="([a-z]+)"/g)].map((m) => m[1]).sort(), ['clock', 'fb', 'text', 'timer', 'video']);
+    for (const id of ['pic-input-lineup', 'clip-input-lineup', 'pdf-input-lineup']) assert.match(src, new RegExp(`id="${id}" data-dest="lineup"`));
+  }
+  // A shared screen only exists live: no line-up there.
+  assert.ok(!/data-lineup|-lineup"/.test(page.slice(page.indexOf('id="p-screen"'), page.indexOf('id="li-noshare"'))));
+  // One copy of the wiring; the list rides the state already read (no request of its own).
+  assert.match(controls, /lineup: R\.sanitizeLineup\(r\.body\.lineup\)/);
+  assert.match(controls, /request\('\/v1\/cast\/lineup', \{ method: 'PUT', body: \{ baseRev: lineup\.rev, entries: out\.entries \} \}\)/);
+  assert.match(controls, /request\('\/v1\/cast\/lineup\/show', \{ method: 'POST', body \}\)/);
+  assert.match(controls, /\$\('lineup-next'\)\.addEventListener\('click', \(\) => showFromLineup\(\{ next: true \}/);
+  // A file chosen for the line-up is added, never put up.
+  assert.match(controls, /if \(forLineup\) \{\n\s+setText\(note, ''\);\n\s+await addToLineup\(/);
+  assert.match(controls, /if \(dest === 'lineup'\) \{\n\s+setText\(\$\('pdf-note'\), ''\);\n\s+addToLineup\(/);
+  assert.ok(!/setInterval|setTimeout\(poll/.test(controls.slice(controls.indexOf('/* ── The line-up ── */'), controls.indexOf('  /** The choices list'))), 'no timer of its own');
+  assert.match(deskPage, /aria-controls="p-lineup"/);
 });
 
 // Owner 2026-11-08: "Everything this does should have professional animations and

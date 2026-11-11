@@ -46,6 +46,12 @@
 // `endsAt` from its own clock when it takes the press, and every screen counts down to
 // it. Kind `clock {}`: the time of day, drawn by the TV from its own clock. Neither is a
 // Sparks button, and the classroom room refuses them (CAST_ONLY_KINDS).
+// THE LINE-UP (owner 2026-11-11: "Load several things before the event (a video, the
+// slides, a picture) and tap through them in order"): a short ordered list the room keeps
+// (worker/src/cast.js `cast:lineup`), each entry `{id, item}` with the item exactly as an
+// `item` press takes it (never a shared screen; a countdown's `endsAt` is set only when it
+// goes up). At most CAST_LINEUP_MAX entries and CAST_LINEUP_CHARS_MAX characters of items.
+// Cleaned by cleanLineupEntries (an edit: all or nothing) and sanitizeLineup (a read).
 
 export const CLASSROOM_VIDEOS_MAX = 4;
 export const CLASSROOM_ITEMS_MAX = 8;
@@ -91,6 +97,9 @@ export const CAST_ONLY_KINDS = Object.freeze(['timer', 'clock']);
 export const CAST_TIMER_MIN_S = 15;
 export const CAST_TIMER_MAX_S = 60 * 60;
 export const CAST_TIMER_STEP_S = 15;
+/** Cast's line-up: at most this many entries, and this many characters of items in all (it is stored as one value). */
+export const CAST_LINEUP_MAX = 12;
+export const CAST_LINEUP_CHARS_MAX = 96 * 1024;
 /** The kinds a video press works on: YouTube, an uploaded clip, a Facebook video. */
 export const CLASSROOM_PLAYABLE_KINDS = Object.freeze(['video', 'clip', 'facebook']);
 /** Everything a remote (or /settings) may ask. */
@@ -316,6 +325,78 @@ export function sanitizeShown(v) {
     return video ? { ...video, kind: 'video' } : null;
   }
   return sanitizeItem(v);
+}
+
+/**
+ * One line-up entry (Cast): `{id, item}`, the item as an `item` press takes it (a video or
+ * an item; never a shared screen, which only exists live). A countdown's `endsAt` is left
+ * off: the Worker sets it when the entry goes up. Null when it is not one.
+ * @param {unknown} v
+ */
+export function sanitizeLineupEntry(v) {
+  if (!isObj(v) || !isButtonId(v.id)) return null;
+  const item = /** @type {Record<string, any> | null} */ (sanitizeShown(v.item));
+  if (!item || item.kind === 'screen') return null;
+  const rest = { ...item };
+  delete rest.endsAt;
+  return { id: v.id, item: rest };
+}
+
+/** The characters an entry's item costs against CAST_LINEUP_CHARS_MAX. @param {{ item: unknown }} e */
+const lineupChars = (e) => JSON.stringify(e.item).length;
+
+/**
+ * A line-up as an edit sends it (the whole list, in order): all or nothing. `problem`
+ * is '' (clean), 'full' (more than CAST_LINEUP_MAX entries or CAST_LINEUP_CHARS_MAX
+ * characters) or 'entry' (one is not an entry, or an id is repeated).
+ * @param {unknown} list
+ * @returns {{ entries: { id: string, item: Record<string, any> }[], problem: '' | 'full' | 'entry' }}
+ */
+export function cleanLineupEntries(list) {
+  if (!Array.isArray(list)) return { entries: [], problem: 'entry' };
+  if (list.length > CAST_LINEUP_MAX) return { entries: [], problem: 'full' };
+  const seen = new Set();
+  const entries = [];
+  let chars = 0;
+  for (const raw of list) {
+    const e = sanitizeLineupEntry(raw);
+    if (!e || seen.has(e.id)) return { entries: [], problem: 'entry' };
+    seen.add(e.id);
+    chars += lineupChars(e);
+    if (chars > CAST_LINEUP_CHARS_MAX) return { entries: [], problem: 'full' };
+    entries.push(e);
+  }
+  return { entries, problem: '' };
+}
+
+/**
+ * The line-up as the Worker answers it (read forgivingly: a bad entry is dropped, the
+ * caps hold). `on` = the entry last put up from it (Next goes on from there); `button` =
+ * the stage button that put up, so a page can tell "on the TV now" from "shown last".
+ * @param {unknown} v
+ * @returns {{ rev: number, savedAt: string | null, entries: { id: string, item: Record<string, any> }[], on: string | null, button: string | null }}
+ */
+export function sanitizeLineup(v) {
+  const s = isObj(v) ? v : {};
+  const seen = new Set();
+  const entries = [];
+  let chars = 0;
+  for (const raw of Array.isArray(s.entries) ? s.entries : []) {
+    const e = sanitizeLineupEntry(raw);
+    if (!e || seen.has(e.id)) continue;
+    chars += lineupChars(e);
+    if (entries.length >= CAST_LINEUP_MAX || chars > CAST_LINEUP_CHARS_MAX) break;
+    seen.add(e.id);
+    entries.push(e);
+  }
+  const on = typeof s.on === 'string' && seen.has(s.on) ? s.on : null;
+  return {
+    rev: Number.isInteger(s.rev) && s.rev >= 0 ? s.rev : 0,
+    savedAt: typeof s.savedAt === 'string' ? s.savedAt.slice(0, 40) : null,
+    entries,
+    on,
+    button: on && isButtonId(s.button) ? s.button : null,
+  };
 }
 
 /**
