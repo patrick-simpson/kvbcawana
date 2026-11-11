@@ -1,16 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { buildShake, keyframes, landsAt, seeded, SHOWREEL_SEC } from './kit.jsx';
-import { PROMO_DURATION_SEC } from '../../lib/promos.js';
+import { keyframes, landsAt, seeded } from './kit.jsx';
 
 // The timing helpers every showreel poster is built from. What matters is the
 // shape of what they hand framer-motion: one clock per element, and a LAST
 // keyframe that is the resting value ?lowPower=1 freezes on.
-
-describe('SHOWREEL_SEC', () => {
-  it('is the hold promos.js gives every poster', () => {
-    expect(SHOWREEL_SEC).toBe(PROMO_DURATION_SEC);
-  });
-});
 
 describe('landsAt', () => {
   it('holds on the first value until the beat, then lands on the last', () => {
@@ -61,16 +54,6 @@ describe('keyframes', () => {
 
   it('refuses a timeline that does not start at 0', () => {
     expect(() => keyframes([[1, { opacity: 0 }]])).toThrow();
-  });
-});
-
-describe('buildShake', () => {
-  it('starts and ends at rest', () => {
-    const s = buildShake([{ at: 1, amp: 6 }, { at: 3, amp: 9 }], 15);
-    expect([s.x[0], s.y[0], s.x.at(-1), s.y.at(-1)]).toEqual([0, 0, 0, 0]);
-    expect(s.times[0]).toBe(0);
-    expect(s.times.at(-1)).toBe(1);
-    expect(s.times.length).toBe(s.x.length);
   });
 });
 

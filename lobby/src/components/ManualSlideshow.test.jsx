@@ -231,15 +231,16 @@ describe('ManualSlideshow video slides', () => {
 
   // ── The season promo slot (#promos) ───────────────────────────────────
   // ONE slide in the deck, a different promo on each lap through it — see
-  // src/lib/promos.js for why the four posters share a slot.
+  // src/lib/promos.js for why the promos share a slot. The two promos here are
+  // two real, different ones (the Veterans Day poster and the snow slide).
   describe('the promo slot', () => {
     const promoSlot = {
       id: 'season_promo',
       type: 'promo',
       durationSec: 12,
       promos: [
-        { id: 'promo_contest', kind: 'contest', eventDate: '2026-10-14', tonight: false, countdown: '3 club nights left', afterContest: false },
-        { id: 'promo_friend', kind: 'friend', eventDate: '2026-10-14', tonight: false, countdown: '3 club nights left', afterContest: false },
+        { id: 'promo_veterans', kind: 'veterans', eventDate: '2026-11-11', tonight: false, countdown: '3 club nights left' },
+        { id: 'promo_snow_alerts', kind: 'snowAlerts', eventDate: '', tonight: false, countdown: null, snow: null },
       ],
     };
     const withPromo = [deck[0], promoSlot];
@@ -247,17 +248,17 @@ describe('ManualSlideshow video slides', () => {
     it('shows promo A on the first lap and promo B on the next', () => {
       const { container } = render(<ManualSlideshow slides={withPromo} slideshowDelaySec={5} />);
       act(() => vi.advanceTimersByTime(5000)); // text slide → the promo slot
-      expect(container.querySelector('.promo-slide--contest')).not.toBeNull();
+      expect(container.querySelector('.promo-slide--veterans')).not.toBeNull();
 
       act(() => vi.advanceTimersByTime(12000)); // the slot's own 12s → lap 2
       expect(shows('First slide')).toBe(true);
       act(() => vi.advanceTimersByTime(5000));
-      expect(container.querySelector('.promo-slide--friend')).not.toBeNull();
+      expect(container.querySelector('.promo-slide--snow')).not.toBeNull();
 
       // …and round again to the first promo, not off the end of the list.
       act(() => vi.advanceTimersByTime(12000));
       act(() => vi.advanceTimersByTime(5000));
-      expect(container.querySelector('.promo-slide--contest')).not.toBeNull();
+      expect(container.querySelector('.promo-slide--veterans')).not.toBeNull();
     });
 
     it('honours the slot\'s own hold rather than the global delay', () => {
@@ -272,20 +273,20 @@ describe('ManualSlideshow video slides', () => {
 
     it('a promo-only deck renders the first promo and never throws', () => {
       const { container } = render(<ManualSlideshow slides={[promoSlot]} slideshowDelaySec={5} />);
-      expect(container.querySelector('.promo-slide--contest')).not.toBeNull();
+      expect(container.querySelector('.promo-slide--veterans')).not.toBeNull();
       act(() => vi.advanceTimersByTime(600000));
-      expect(container.querySelector('.promo-slide--contest')).not.toBeNull();
+      expect(container.querySelector('.promo-slide--veterans')).not.toBeNull();
     });
 
-    // The posters are not the same length of read: the slime cut of BARF
-    // Night runs a 15 second beat sheet and the others say their piece in 8.
-    // The slot holds for the ONE it is showing.
+    // The promos are not the same length of read: here the second runs 15
+    // seconds and the first says its piece in 8. The slot holds for the ONE it
+    // is showing.
     describe('a per-promo hold', () => {
       const mixed = {
         ...promoSlot,
         promos: [
           { ...promoSlot.promos[0], durationSec: 8 },
-          { ...promoSlot.promos[1], kind: 'barfEpic', id: 'promo_barf_epic', durationSec: 15 },
+          { ...promoSlot.promos[1], durationSec: 15 },
         ],
       };
       const deckWith = [deck[0], mixed];
@@ -293,21 +294,21 @@ describe('ManualSlideshow video slides', () => {
       it('holds lap 0 for its promo\'s 8 seconds, not the slot\'s 12', () => {
         const { container } = render(<ManualSlideshow slides={deckWith} slideshowDelaySec={5} />);
         act(() => vi.advanceTimersByTime(5000)); // text slide → the slot
-        expect(container.querySelector('.promo-slide--contest')).not.toBeNull();
+        expect(container.querySelector('.promo-slide--veterans')).not.toBeNull();
         act(() => vi.advanceTimersByTime(7999));
-        expect(container.querySelector('.promo-slide--contest')).not.toBeNull();
+        expect(container.querySelector('.promo-slide--veterans')).not.toBeNull();
         act(() => vi.advanceTimersByTime(1));
         expect(shows('First slide')).toBe(true);
       });
 
-      it('holds the slime cut\'s lap for its own 15 seconds', () => {
+      it('holds the second promo\'s lap for its own 15 seconds', () => {
         const { container } = render(<ManualSlideshow slides={deckWith} slideshowDelaySec={5} />);
         act(() => vi.advanceTimersByTime(5000)); // → the slot, lap 0
         act(() => vi.advanceTimersByTime(8000)); // → text slide
         act(() => vi.advanceTimersByTime(5000)); // → the slot, lap 1
-        expect(container.querySelector('.promo-slide--barf-epic')).not.toBeNull();
+        expect(container.querySelector('.promo-slide--snow')).not.toBeNull();
         act(() => vi.advanceTimersByTime(14999));
-        expect(container.querySelector('.promo-slide--barf-epic')).not.toBeNull();
+        expect(container.querySelector('.promo-slide--snow')).not.toBeNull();
         act(() => vi.advanceTimersByTime(1));
         expect(shows('First slide')).toBe(true);
       });
@@ -319,9 +320,9 @@ describe('ManualSlideshow video slides', () => {
         };
         const { container } = render(<ManualSlideshow slides={[deck[0], noOwn]} slideshowDelaySec={5} />);
         act(() => vi.advanceTimersByTime(5000));
-        expect(container.querySelector('.promo-slide--contest')).not.toBeNull();
+        expect(container.querySelector('.promo-slide--veterans')).not.toBeNull();
         act(() => vi.advanceTimersByTime(11999));
-        expect(container.querySelector('.promo-slide--contest')).not.toBeNull();
+        expect(container.querySelector('.promo-slide--veterans')).not.toBeNull();
         act(() => vi.advanceTimersByTime(1));
         expect(shows('First slide')).toBe(true);
       });
@@ -366,7 +367,7 @@ describe('ManualSlideshow as the lobby director sees it (rebrand stage 4)', () =
     const onSlide = vi.fn();
     const promoSlot = {
       id: 'season_promo', type: 'promo', durationSec: 12,
-      promos: [{ id: 'promo_contest', kind: 'contest', eventDate: '2026-10-14', tonight: false, countdown: '3 club nights left', afterContest: false }],
+      promos: [{ id: 'promo_veterans', kind: 'veterans', eventDate: '2026-11-11', tonight: false, countdown: '3 club nights left' }],
     };
     render(<ManualSlideshow slides={[deck[0], promoSlot]} slideshowDelaySec={5} onSlide={onSlide} />);
     expect(onSlide).toHaveBeenLastCalledWith(expect.objectContaining({ poster: false, copy: true }));
@@ -416,7 +417,7 @@ describe('ManualSlideshow on the lobby scene (rebrand stage 4b)', () => {
     { id: 's_2', eyebrow: 'Next club night', text: 'Making bookmarks', theme: 'sky', durationSec: 0 },
   ];
   const held = { id: 's_h', eyebrow: 'Important', text: 'Pick-up is at the gym doors', theme: 'sky', durationSec: 5, holdCheckIns: true };
-  const promo = { id: 'season_promo', type: 'promo', durationSec: 8, promos: [{ id: 'promo_contest', kind: 'contest', eventDate: '2026-10-14', tonight: false, countdown: '3 club nights left', afterContest: false }] };
+  const promo = { id: 'season_promo', type: 'promo', durationSec: 8, promos: [{ id: 'promo_veterans', kind: 'veterans', eventDate: '2026-11-11', tonight: false, countdown: '3 club nights left' }] };
 
   it('says when the slide up is the promo poster, which the band notice steps aside for', () => {
     const onSlide = vi.fn();
@@ -543,7 +544,7 @@ describe('ManualSlideshow: a promo slot that sits out a lap', () => {
     vi.useRealTimers();
   });
 
-  const snow = { id: 'promo_snow_alerts', kind: 'snowAlerts', eventDate: '', tonight: false, countdown: null, afterContest: true, durationSec: 20, snow: null };
+  const snow = { id: 'promo_snow_alerts', kind: 'snowAlerts', eventDate: '', tonight: false, countdown: null, durationSec: 20, snow: null };
   const slot = { id: 'season_promo', type: 'promo', durationSec: 15, promos: [snow, null, null] };
   const two = [deck[0], deck[1], slot];
   // Zero animation: exits are instant, so the DOM holds only what is on
@@ -948,7 +949,7 @@ describe('ManualSlideshow: a promo that ends on the lobby (the Grand Prix video)
   });
 
   it('an ordinary poster still wipes out, and keeps the field it came in on', () => {
-    const poster = { id: 'season_promo', type: 'promo', durationSec: 8, promos: [{ id: 'promo_contest', kind: 'contest', eventDate: '2026-10-14', tonight: false, countdown: '3 club nights left', afterContest: false }] };
+    const poster = { id: 'season_promo', type: 'promo', durationSec: 8, promos: [{ id: 'promo_veterans', kind: 'veterans', eventDate: '2026-11-11', tonight: false, countdown: '3 club nights left' }] };
     render(<ManualSlideshow slides={[before, poster, after]} slideshowDelaySec={5} />);
     at(5000);
     expect(document.querySelector('.catalog-scene--night')).not.toBeNull();

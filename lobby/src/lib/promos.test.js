@@ -1,8 +1,6 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import {
   promoForLap,
-  CONTEST_DATE,
-  PARENTS_DATE,
   PROMO_DURATION_SEC,
   SEASON_PROMOS,
   buildPromoSlot,
@@ -33,6 +31,33 @@ const season = [
   club('2026-11-04', "Parent's Night - Poster Voting"),
   club('2026-11-11'),
 ];
+
+// The fall 2026 promos are gone from the real table (removed 2026-11-10), but
+// the mechanism that showed them (windows, countdowns, laps, holds) is still
+// the one running Veterans Day, the Grand Prix and the snow slide. So these
+// tests put five TEST-LOCAL descriptors into SEASON_PROMOS, with the same dates
+// and holds the old posters had, around each test and take them out after.
+// Kinds are testA..testE (A and B and D end October 14, C and E end November 4;
+// E opens October 28 and holds 21 s), listed in the table order the posters had.
+const TEST_PROMOS = [
+  { id: 'promo_test_a', kind: 'testA', eventDate: '2026-10-14', showFrom: '2026-09-01', durationSec: 15 },
+  { id: 'promo_test_b', kind: 'testB', eventDate: '2026-10-14', showFrom: '2026-09-01', durationSec: 15 },
+  { id: 'promo_test_c', kind: 'testC', eventDate: '2026-11-04', showFrom: '2026-09-01', durationSec: 15 },
+  { id: 'promo_test_d', kind: 'testD', eventDate: '2026-10-14', showFrom: '2026-09-01', durationSec: 15 },
+  { id: 'promo_test_e', kind: 'testE', eventDate: '2026-11-04', showFrom: '2026-10-28', durationSec: 21 },
+];
+
+/** Puts TEST_PROMOS ahead of the real table for the tests in the enclosing describe. */
+function withTestPromos() {
+  let real = [];
+  beforeEach(() => {
+    real = SEASON_PROMOS.slice();
+    SEASON_PROMOS.splice(0, SEASON_PROMOS.length, ...TEST_PROMOS, ...real);
+  });
+  afterEach(() => {
+    SEASON_PROMOS.splice(0, SEASON_PROMOS.length, ...real);
+  });
+}
 
 describe('isPromoSlide', () => {
   it('recognises only the promo slot', () => {
@@ -107,22 +132,20 @@ describe('countdownLabel', () => {
 });
 
 describe('the promo holds', () => {
-  // Every poster is a 15 second showreel whose beat sheet is written against
-  // this clock (src/components/promos/kit.jsx). Changing it means re-timing
-  // all four, so pin the number here.
+  // The slot's fallback hold (each descriptor carries its own).
   it('holds a promo for 15 seconds', () => {
     expect(PROMO_DURATION_SEC).toBe(15);
   });
 
   // A promo still carries its OWN hold, which is what the slideshow reads.
   it('gives every descriptor in the table its own duration', () => {
-    // The finalists' showreel is 21 s: six posters take their bow (each with its zoom) before the call.
     // The Grand Prix is a 33.68 s video (the torn cut, 2021 frames at 60 fps).
-    expect(SEASON_PROMOS.map((p) => p.durationSec)).toEqual([15, 15, 15, 15, 21, 2021 / 60, VETERANS_SEC]);
+    expect(SEASON_PROMOS.map((p) => p.durationSec)).toEqual([2021 / 60, VETERANS_SEC]);
   });
 });
 
 describe('buildPromoSlot', () => {
+  withTestPromos();
   const slot = (todayStr, opts) => buildPromoSlot(season, todayStr, opts);
   const kinds = (s) => (s ? s.promos.map((p) => p.kind) : null);
 
@@ -131,25 +154,25 @@ describe('buildPromoSlot', () => {
     expect(s.id).toBe('season_promo');
     expect(s.type).toBe('promo');
     expect(s.durationSec).toBe(PROMO_DURATION_SEC);
-    expect(kinds(s)).toEqual(['contest', 'friend', 'parents', 'barfEpic']);
+    expect(kinds(s)).toEqual(['testA', 'testB', 'testC', 'testD']);
     // Stable across calls — the slideshow picks by index each lap.
-    expect(kinds(slot('2026-09-24'))).toEqual(['contest', 'friend', 'parents', 'barfEpic']);
+    expect(kinds(slot('2026-09-24'))).toEqual(['testA', 'testB', 'testC', 'testD']);
   });
 
   it('honours each promo\'s showFrom', () => {
-    // All three open together on Sep 1; the day before, nothing shows.
+    // These four open together on Sep 1; the day before, nothing shows.
     expect(slot('2026-08-31')).toBeNull();
-    expect(kinds(slot('2026-09-01'))).toEqual(['contest', 'friend', 'parents', 'barfEpic']);
-    expect(kinds(slot('2026-09-13'))).toEqual(['contest', 'friend', 'parents', 'barfEpic']);
+    expect(kinds(slot('2026-09-01'))).toEqual(['testA', 'testB', 'testC', 'testD']);
+    expect(kinds(slot('2026-09-13'))).toEqual(['testA', 'testB', 'testC', 'testD']);
   });
 
-  it('shows the October three ON October 14 and retires them on the 15th', () => {
-    expect(kinds(slot('2026-10-14'))).toEqual(['contest', 'friend', 'parents', 'barfEpic']);
-    expect(kinds(slot('2026-10-15'))).toEqual(['parents']);
+  it('shows the October event dates ON October 14 and retires them on the 15th', () => {
+    expect(kinds(slot('2026-10-14'))).toEqual(['testA', 'testB', 'testC', 'testD']);
+    expect(kinds(slot('2026-10-15'))).toEqual(['testC']);
   });
 
-  it('shows Parents\' Night (and the finalists to vote on) ON November 4 and nothing at all on the 5th', () => {
-    expect(kinds(slot('2026-11-04'))).toEqual(['parents', 'finalists']);
+  it('shows a later event (and one opened late) ON its date and nothing at all on the day after', () => {
+    expect(kinds(slot('2026-11-04'))).toEqual(['testC', 'testE']);
     expect(slot('2026-11-05')).toBeNull();
     // ...and nothing again until the Grand Prix opens on New Year's Day.
     expect(slot('2026-12-31')).toBeNull();
@@ -163,27 +186,21 @@ describe('buildPromoSlot', () => {
     const eve = slot('2026-10-07').promos;
     expect(eve.every((p) => p.tonight === false)).toBe(true);
     const night = slot('2026-10-14').promos;
-    expect(night.filter((p) => p.tonight).map((p) => p.kind)).toEqual(['contest', 'friend', 'barfEpic']);
-    // Parents' Night is still weeks away on the same evening.
-    expect(night.find((p) => p.kind === 'parents').tonight).toBe(false);
+    expect(night.filter((p) => p.tonight).map((p) => p.kind)).toEqual(['testA', 'testB', 'testD']);
+    // The November event is still weeks away on the same evening.
+    expect(night.find((p) => p.kind === 'testC').tonight).toBe(false);
   });
 
   it('carries each promo\'s own countdown line', () => {
     const s = slot('2026-09-23');
-    expect(s.promos.find((p) => p.kind === 'contest').countdown).toBe('3 club nights left');
-    expect(s.promos.find((p) => p.kind === 'parents').countdown).toBe('6 club nights left');
-    expect(slot('2026-10-14').promos.find((p) => p.kind === 'friend').countdown).toBe('Tonight!');
+    expect(s.promos.find((p) => p.kind === 'testA').countdown).toBe('3 club nights left');
+    expect(s.promos.find((p) => p.kind === 'testC').countdown).toBe('6 club nights left');
+    expect(slot('2026-10-14').promos.find((p) => p.kind === 'testB').countdown).toBe('Tonight!');
   });
 
   it('counts around a shared-schedule break week', () => {
     const s = slot('2026-09-23', { specialDates: { '2026-09-30': { noClub: true, label: 'Fall Break' } } });
-    expect(s.promos.find((p) => p.kind === 'contest').countdown).toBe('2 club nights left');
-  });
-
-  it('flips afterContest the day after the posters are due', () => {
-    expect(slot('2026-10-14').promos.every((p) => p.afterContest === false)).toBe(true);
-    expect(slot('2026-10-15').promos.every((p) => p.afterContest === true)).toBe(true);
-    expect(CONTEST_DATE).toBe('2026-10-14');
+    expect(s.promos.find((p) => p.kind === 'testA').countdown).toBe('2 club nights left');
   });
 
   it('needs a feed: no events means no slot, never a blank counter', () => {
@@ -195,7 +212,7 @@ describe('buildPromoSlot', () => {
   it('is off when the operator turns it off', () => {
     expect(slot('2026-09-23', { enabled: false })).toBeNull();
     expect(kinds(slot('2026-09-23', { enabled: true })))
-      .toEqual(['contest', 'friend', 'parents', 'barfEpic']);
+      .toEqual(['testA', 'testB', 'testC', 'testD']);
   });
 
   it('refuses an unusable date key rather than guessing', () => {
@@ -203,9 +220,10 @@ describe('buildPromoSlot', () => {
     expect(buildPromoSlot(season, 'tomorrow')).toBeNull();
   });
 
-  it('every descriptor in the table is one of the seven known kinds', () => {
-    expect(SEASON_PROMOS.map((p) => p.kind).sort())
-      .toEqual(['barfEpic', 'contest', 'finalists', 'friend', 'grandPrix', 'parents', 'veterans']);
+  it('every descriptor in the real table is one of the two known kinds', () => {
+    expect(TEST_PROMOS.every((t) => SEASON_PROMOS.includes(t))).toBe(true);
+    expect(SEASON_PROMOS.filter((p) => !TEST_PROMOS.includes(p)).map((p) => p.kind).sort())
+      .toEqual(['grandPrix', 'veterans']);
   });
 
   // The Grand Prix video (owner 2026-10-29: "Get that one set to show up on
@@ -244,27 +262,27 @@ describe('buildPromoSlot', () => {
     expect(s.promos.map((p) => (p ? p.kind : null))).toEqual(['snowAlerts', 'grandPrix', 'grandPrix', 'grandPrix', 'grandPrix', 'grandPrix']);
   });
 
-  it('shows the finalists from the day they were picked through the vote at Parents’ Night, inclusive', () => {
+  it('shows a promo that opens late from its showFrom day through its event date, inclusive, with its own hold', () => {
     const kinds = (day) => (slot(day)?.promos ?? []).filter(Boolean).map((p) => p.kind);
-    expect(kinds('2026-10-27')).not.toContain('finalists');
-    expect(kinds('2026-10-28')).toContain('finalists');
-    expect(kinds('2026-11-04')).toContain('finalists');
-    expect(kinds('2026-11-05')).not.toContain('finalists');
-    const f = slot('2026-11-04').promos.find((p) => p && p.kind === 'finalists');
-    expect(f).toMatchObject({ tonight: true, countdown: 'Tonight!', durationSec: 21, eventDate: PARENTS_DATE });
+    expect(kinds('2026-10-27')).not.toContain('testE');
+    expect(kinds('2026-10-28')).toContain('testE');
+    expect(kinds('2026-11-04')).toContain('testE');
+    expect(kinds('2026-11-05')).not.toContain('testE');
+    const f = slot('2026-11-04').promos.find((p) => p && p.kind === 'testE');
+    expect(f).toMatchObject({ tonight: true, countdown: 'Tonight!', durationSec: 21, eventDate: '2026-11-04' });
   });
 
   it('carries each promo\'s own hold onto the slot entry', () => {
     const s = slot('2026-09-23');
     expect(s.promos.map((p) => [p.kind, p.durationSec])).toEqual([
-      ['contest', 15], ['friend', 15], ['parents', 15], ['barfEpic', 15],
+      ['testA', 15], ['testB', 15], ['testC', 15], ['testD', 15],
     ]);
     // The slot keeps one too, as the fallback.
     expect(s.durationSec).toBe(PROMO_DURATION_SEC);
   });
 
-  it('shows the slime cut through October 14 and never on the 15th', () => {
-    const live = (d) => (kinds(slot(d)) || []).includes('barfEpic');
+  it('shows a promo through its event date (October 14) and never on the day after', () => {
+    const live = (d) => (kinds(slot(d)) || []).includes('testD');
     expect(live('2026-09-01')).toBe(true);
     expect(live('2026-10-13')).toBe(true);
     expect(live('2026-10-14')).toBe(true);
@@ -278,6 +296,7 @@ describe('buildPromoSlot', () => {
 // when snow is forecast near club night. Null entries are laps the slot sits
 // out, which ManualSlideshow steps past.
 describe('buildPromoSlot with the snow-alerts slide', () => {
+  withTestPromos();
   const winter = [...season, club('2026-11-18'), club('2026-11-25'), club('2026-12-02'), club('2026-12-09')];
   const kinds = (s) => (s ? s.promos.map((p) => (p ? p.kind : null)) : null);
   const dry = { time: ['2026-11-29', '2026-11-30', '2026-12-01', '2026-12-02'], inches: [0, 0, 0, 0] };
@@ -296,17 +315,17 @@ describe('buildPromoSlot with the snow-alerts slide', () => {
     expect(s.promos[0].durationSec).toBe(20);
   });
 
-  it('shares its off laps with a fall poster that is still live', () => {
-    // Nov 1 to 4: Parents' Night and the finalists are still up, so they take the other laps in turn.
-    expect(kinds(snowSlot('2026-11-02'))).toEqual(['snowAlerts', 'parents', 'finalists', 'parents', 'finalists', 'parents']);
+  it('shares its off laps with other promos that are still live', () => {
+    // Nov 2 to 4: testC and testE are still up, so they take the other laps in turn.
+    expect(kinds(snowSlot('2026-11-02'))).toEqual(['snowAlerts', 'testC', 'testE', 'testC', 'testE', 'testC']);
   });
 
-  it('alternates with a live poster in a snow week', () => {
-    // Snow forecast for Wed Nov 4, Parents' Night itself: every other lap, the
-    // two live posters taking the laps between in turn.
+  it('alternates with live promos in a snow week', () => {
+    // Snow forecast for Wed Nov 4, the event night itself: every other lap, the
+    // two live promos taking the laps between in turn.
     const nov = { time: ['2026-11-02', '2026-11-03', '2026-11-04'], inches: [0, 0, 2] };
     const s = buildPromoSlot(winter, '2026-11-02', { snowAlerts: true, snowForecast: nov });
-    expect(kinds(s)).toEqual(['snowAlerts', 'parents', 'snowAlerts', 'finalists']);
+    expect(kinds(s)).toEqual(['snowAlerts', 'testC', 'snowAlerts', 'testE']);
     expect(s.promos[0].snow?.when).toBe('later');
   });
 
@@ -316,7 +335,7 @@ describe('buildPromoSlot with the snow-alerts slide', () => {
   });
 
   it('is off unless asked for, and goes with the rest when promos are switched off', () => {
-    expect(kinds(buildPromoSlot(winter, '2026-11-02'))).toEqual(['parents', 'finalists']);
+    expect(kinds(buildPromoSlot(winter, '2026-11-02'))).toEqual(['testC', 'testE']);
     expect(snowSlot('2026-12-10', null, { enabled: false })).toBeNull();
   });
 
@@ -335,17 +354,18 @@ describe('buildPromoSlot with the snow-alerts slide', () => {
 });
 
 describe('previewPromo: Settings → Slides → Preview the promos', () => {
-  it('offers every poster and both snow versions', () => {
-    expect(PREVIEW_PROMOS.map((p) => p.key)).toEqual(['contest', 'friend', 'barfEpic', 'parents', 'finalists', 'grandPrix', 'snowAlerts', 'snowAlertsStorm']);
+  withTestPromos();
+  it('offers every promo and both snow versions', () => {
+    expect(PREVIEW_PROMOS.map((p) => p.key)).toEqual(['grandPrix', 'snowAlerts', 'snowAlertsStorm']);
     for (const p of PREVIEW_PROMOS) expect(previewPromo(p.key, season, '2026-10-01')).not.toBeNull();
     expect(previewPromo('nope', season, '2026-10-01')).toBeNull();
   });
 
-  it('counts a fall poster down from the real calendar while its night is ahead', () => {
-    const d = previewPromo('contest', season, '2026-10-01');
-    expect(d).toMatchObject({ id: 'promo_contest', kind: 'contest', eventDate: '2026-10-14', tonight: false, durationSec: 15 });
+  it('counts a dated promo down from the real calendar while its night is ahead', () => {
+    const d = previewPromo('testA', season, '2026-10-01');
+    expect(d).toMatchObject({ id: 'promo_test_a', kind: 'testA', eventDate: '2026-10-14', tonight: false, durationSec: 15 });
     expect(d.countdown).toBe(countdownLabel(nightsUntil(season, '2026-10-01', '2026-10-14'), '2026-10-01', '2026-10-14'));
-    expect(previewPromo('friend', season, '2026-10-14')).toMatchObject({ tonight: true, countdown: 'Tonight!' });
+    expect(previewPromo('testB', season, '2026-10-14')).toMatchObject({ tonight: true, countdown: 'Tonight!' });
   });
 
   it('previews the Grand Prix video long before January, with its seamless ending', () => {
@@ -355,8 +375,8 @@ describe('previewPromo: Settings → Slides → Preview the promos', () => {
     });
   });
 
-  it('plays a poster whose night has passed, naming its date instead of a count', () => {
-    const d = previewPromo('barfEpic', season, '2026-12-01');
+  it('plays a promo whose night has passed, naming its date instead of a count', () => {
+    const d = previewPromo('testD', season, '2026-12-01');
     expect(d.tonight).toBe(false);
     expect(d.countdown).toMatch(/October/);
     expect(d.countdown).not.toMatch(/left|Next|Tonight/);

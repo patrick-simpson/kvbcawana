@@ -235,14 +235,14 @@ describe('slides chunk specifics (contract v5)', () => {
     const out = sanitizeSlidesChunk({
       ...base,
       slides: [
-        { type: 'promo', promos: [{ kind: 'contest', countdown: 'Tonight!' }], text: 'Poster contest' },
+        { type: 'promo', promos: [{ kind: 'veterans', countdown: 'Tonight!' }], text: 'Thank you, veterans' },
         { text: 'Kept' },
       ],
     });
     expect(out.slides).toHaveLength(1);
     expect(out.slides[0].text).toBe('Kept');
     expect(JSON.stringify(out)).not.toContain('promo');
-    expect(JSON.stringify(out)).not.toContain('Poster contest');
+    expect(JSON.stringify(out)).not.toContain('Thank you, veterans');
   });
 
   it('a chunk with no dates has exactly the pre-#345 entry shape', () => {

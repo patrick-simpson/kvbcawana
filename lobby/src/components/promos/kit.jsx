@@ -1,20 +1,15 @@
-import { useContext, useEffect, useState } from 'react';
-import { AnimatePresence } from 'framer-motion';
-import { M, ZeroAnimationContext } from '../../lib/motion.jsx';
-import { PROMO_DURATION_SEC } from '../../lib/promos.js';
-import LOGO_WHITE from '../../../../shared/brand/logos/kvbc-awana-two-line-white.svg';
-import LOGO_INK from '../../../../shared/brand/logos/kvbc-awana-two-line-ink.svg';
-
 // ─────────────────────────────────────────────────────────────
-// The promo kit: what every fall showreel poster is built from.
+// The promo kit: the timing helpers the season promos are built from.
 //
-// Each poster (ContestPromo, FriendPromo, BarfEpicPromo, ParentsPromo in
-// this folder) is a 15 second piece of motion design that ends on its own
-// finished printed poster. The pieces below are the parts they share: the
-// timing helpers, the church's logo, the countdown chip, the one rotating
-// detail line and the depth layers.
+// Each showreel poster is a piece of motion design that ends on its own
+// finished printed poster (the Veterans Day poster and the snow-alerts slide
+// are the ones in this folder today). What they share is below: the easing
+// curves, the beat helpers and a seeded random. The fall 2026 posters had
+// more parts here (the church wordmark, the countdown chip, the rotating
+// detail line, the grain and vignette layers, a screen shake, the slime
+// splat); they went with those posters on 2026-11-10 and are in git history.
 //
-// Rules every poster keeps (CLAUDE.md, "Season promo slides"):
+// Rules every poster keeps (CLAUDE.md, "Season promos, snow alerts, flagship"):
 //   • Every animated element is M.* from src/lib/motion.jsx, never
 //     framer-motion's `motion`, so ?lowPower=1 freezes it.
 //   • Beats are KEYFRAMES (landsAt / keyframes below), never `initial` plus
@@ -26,15 +21,10 @@ import LOGO_INK from '../../../../shared/brand/logos/kvbc-awana-two-line-ink.svg
 //     mode jumps straight there, and that is the frame the Pi sits on.
 // ─────────────────────────────────────────────────────────────
 
-/** Every showreel runs for this long; promos.js holds the slide for it. */
-export const SHOWREEL_SEC = PROMO_DURATION_SEC;
-
 // The expo-out curve most things land on: fast in, hard stop.
 export const EASE_SLAM = [0.16, 1, 0.3, 1];
 // A softer out-curve for things that settle rather than slam.
 export const EASE_OUT = [0.22, 1, 0.36, 1];
-// In-out for moves that leave as well as arrive (camera pushes, wipes).
-export const EASE_INOUT = [0.65, 0, 0.35, 1];
 
 /**
  * ONE BEAT, as keyframes: hold at the first value until `at` seconds into the
@@ -105,37 +95,6 @@ export function keyframes(frames, ease = EASE_OUT) {
 }
 
 /**
- * A screen shake: one x/y jitter per beat, as one keyframe list for a single
- * wrapper transform. Starts and ends at 0, the resting position.
- *
- * @param {ReadonlyArray<{at: number, amp: number}>} beats amp in px
- * @param {number} total seconds
- */
-export function buildShake(beats, total) {
-  const shape = [
-    [0.00, 1.00, -0.62],
-    [0.06, -0.80, 0.52],
-    [0.12, 0.50, -0.34],
-    [0.18, -0.26, 0.18],
-    [0.25, 0, 0],
-  ];
-  const times = [0];
-  const x = [0];
-  const y = [0];
-  for (const beat of beats) {
-    for (const [offset, fx, fy] of shape) {
-      times.push((beat.at + offset) / total);
-      x.push(Math.round(beat.amp * fx * 10) / 10);
-      y.push(Math.round(beat.amp * fy * 10) / 10);
-    }
-  }
-  times.push(1);
-  x.push(0);
-  y.push(0);
-  return { times, x, y };
-}
-
-/**
  * A tiny seeded LCG, so procedural art (splats, star fields, particle
  * layouts) is identical on every device and in every screenshot. Never
  * Math.random in a poster.
@@ -149,145 +108,4 @@ export function seeded(seed) {
     s = (s * 1103515245 + 12345) % 2147483647;
     return (s < 0 ? s + 2147483647 : s) / 2147483647;
   };
-}
-
-/**
- * A splat: a closed blob with `arms` long points between short ones,
- * smoothed through its own midpoints so the arms read as thrown goo
- * rather than a star, in a 100x100 box. `seed` is the only variation.
- *
- * @param {number} seed
- * @param {number} arms
- * @returns {string}
- */
-export function splatPath(seed, arms = 7) {
-  const rnd = seeded(seed);
-  const pts = [];
-  const count = arms * 2;
-  for (let i = 0; i < count; i += 1) {
-    const long = i % 2 === 0;
-    const r = long ? 32 + rnd() * 15 : 21 + rnd() * 7;
-    const a = (Math.PI * 2 * i) / count + (rnd() - 0.5) * 0.28;
-    pts.push([50 + r * Math.cos(a), 50 + r * Math.sin(a)]);
-  }
-  const mid = (a, b) => `${((a[0] + b[0]) / 2).toFixed(1)} ${((a[1] + b[1]) / 2).toFixed(1)}`;
-  let d = `M${mid(pts[count - 1], pts[0])}`;
-  for (let i = 0; i < count; i += 1) {
-    const p = pts[i];
-    d += ` Q${p[0].toFixed(1)} ${p[1].toFixed(1)} ${mid(p, pts[(i + 1) % count])}`;
-  }
-  return `${d}z`;
-}
-
-/**
- * The church's own logo at the top of every poster (owner 2026-10-13; it
- * replaced the Awana Clubs wordmark): two-line, ONE colour picked by the
- * poster's field (`tone`: white on a dark or strong one, ink on a light one),
- * never a shadow or an outline. It does not move: at `at` (seconds) it simply
- * fades up, and it rests fully lit. If the art fails to load it is not there.
- * @param {{ at?: number, className?: string, tone?: 'white' | 'ink' }} props
- */
-export function Wordmark({ at = 0, className = '', tone = 'white' }) {
-  const [broken, setBroken] = useState(false);
-  if (broken) return null;
-  return (
-    <div className={`promo-wordmark-slot ${className}`}>
-      <M.img
-        className={`promo-wordmark promo-wordmark--${tone}`}
-        src={tone === 'ink' ? LOGO_INK : LOGO_WHITE}
-        alt="Kennebec Valley Baptist Church Awana Clubs"
-        draggable="false"
-        onError={() => setBroken(true)}
-        {...landsAt(at, 0.45, { opacity: [0, 1] }, EASE_OUT)}
-      />
-    </div>
-  );
-}
-
-/**
- * The live counter ("3 club nights left" / "Next club night" / "Tonight!").
- * It lands at `at` and pulses once at each second in `pulses`. The slot owns
- * the landing and the pill owns the pulse, so they never share a transform.
- * A poster that wants the chip somewhere else styles `.promo-chip-slot`
- * under its own `.promo-slide--*` class.
- */
-export function CountdownChip({ label, at = 1.2, pulses = [] }) {
-  if (!label) return null;
-  const pulse = pulses.length
-    ? keyframes([
-      [0, { scale: 1 }],
-      ...pulses.flatMap((t) => [[t, { scale: 1 }], [t + 0.18, { scale: 1.14 }], [t + 0.5, { scale: 1 }]]),
-    ], 'easeInOut')
-    : {};
-  return (
-    <M.div
-      className="promo-chip-slot"
-      {...landsAt(at, 0.5, { opacity: [0, 1], scale: [0.6, 1.08, 1] })}
-    >
-      <M.div className="promo-chip" {...pulse}>{label}</M.div>
-    </M.div>
-  );
-}
-
-/**
- * The one supporting line on a poster, at full size, one string at a
- * time, fading in at `startMs` and turning over every `stepMs` until it
- * stops on the last string.
- *
- * `lines` must be a stable array (the DETAILS tables), because it keys the
- * timer chain. Timers are cleared on unmount. Under zero animation it
- * shows the LAST string at once and never rotates: that is the finished
- * poster ?lowPower=1 freezes on.
- */
-export function RotatingDetail({ lines, startMs = 1600, stepMs = 2200 }) {
-  // Under zero animation the poster IS its finished frame, so the line is
-  // already on the last string it would have stopped on, with no timers.
-  const still = useContext(ZeroAnimationContext);
-  const [index, setIndex] = useState(0);
-
-  useEffect(() => {
-    if (still || lines.length < 2) return undefined;
-    let timer = 0;
-    let shown = 0;
-    const step = () => {
-      shown += 1;
-      setIndex(shown);
-      if (shown < lines.length - 1) timer = setTimeout(step, stepMs);
-    };
-    timer = setTimeout(step, startMs + stepMs);
-    return () => clearTimeout(timer);
-  }, [still, lines, startMs, stepMs]);
-
-  if (!lines.length) return null;
-  const line = still ? lines[lines.length - 1] : lines[index];
-
-  return (
-    <M.div
-      className="promo-detail-slot"
-      {...landsAt(startMs / 1000, 0.4, { opacity: [0, 1] }, 'easeOut')}
-    >
-      <AnimatePresence mode="wait" initial={false}>
-        <M.span
-          key={line}
-          className="promo-detail"
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -10 }}
-          transition={{ duration: 0.35, ease: 'easeOut' }}
-        >
-          {line}
-        </M.span>
-      </AnimatePresence>
-    </M.div>
-  );
-}
-
-/** The two static depth layers every poster sits on: grain and vignette. */
-export function PosterDepth() {
-  return (
-    <>
-      <div className="promo-texture" aria-hidden="true" />
-      <div className="promo-vignette" aria-hidden="true" />
-    </>
-  );
 }

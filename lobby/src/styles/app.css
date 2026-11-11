@@ -15,11 +15,6 @@
 /* The fall promo showreels, one stylesheet per poster (the shared poster
    rules, .promo-slide and friends, stay below in this file). Same font
    border as everywhere else: src/lib/promoFonts.test.js reads these too. */
-@import './promos/contest.css';
-@import './promos/friend.css';
-@import './promos/barf-epic.css';
-@import './promos/parents.css';
-@import './promos/finalists.css';
 @import './promos/snow-alerts.css';
 @import './promos/grand-prix.css';
 @import './promos/veterans.css';

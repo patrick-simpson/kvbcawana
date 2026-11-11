@@ -13,7 +13,7 @@ afterEach(cleanup);
 
 const promo = (snow = null) => ({
   id: 'promo_snow_alerts', kind: 'snowAlerts', eventDate: snow ? snow.date : '',
-  tonight: snow?.when === 'tonight', countdown: null, afterContest: true, durationSec: 20, snow,
+  tonight: snow?.when === 'tonight', countdown: null, durationSec: 20, snow,
 });
 const storm = (when = 'later') => promo({ date: '2026-12-02', when, weekday: 'Wednesday', inches: 3 });
 

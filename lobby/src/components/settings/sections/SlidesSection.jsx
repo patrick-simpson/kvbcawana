@@ -47,10 +47,10 @@ export function PreviewPromosCard({ onPreviewPromo }) {
         wait and then play in full, as they do for the real thing. Click the screen or press Esc to stop early.
       </p>
       {[
-        { id: 'fall', label: 'Fall posters', keys: PREVIEW_PROMOS.filter((p) => !p.key.startsWith('snow') && p.key !== 'grandPrix') },
+        { id: 'posters', label: 'Event posters', keys: PREVIEW_PROMOS.filter((p) => !p.key.startsWith('snow') && p.key !== 'grandPrix') },
         { id: 'grand-prix', label: 'Awana Grand Prix (January to race day)', keys: PREVIEW_PROMOS.filter((p) => p.key === 'grandPrix') },
         { id: 'snow', label: 'Snow alerts (November to March)', keys: PREVIEW_PROMOS.filter((p) => p.key.startsWith('snow')) },
-      ].map((g) => (
+      ].filter((g) => g.keys.length).map((g) => (
         <div className="field" key={g.id}>
           <span className="field-label" id={`preview-${g.id}`}>{g.label}</span>
           <div className="preview-promos" role="group" aria-labelledby={`preview-${g.id}`}>

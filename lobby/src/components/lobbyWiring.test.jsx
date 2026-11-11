@@ -117,7 +117,7 @@ const sky = [
   { id: 's_2', eyebrow: 'Next club night', text: 'Making bookmarks', theme: 'sky', durationSec: 0 },
 ];
 const held = { id: 's_h', eyebrow: 'Important', text: 'Pick-up is at the gym doors', theme: 'sky', durationSec: 5, holdCheckIns: true };
-const promo = { id: 'season_promo', type: 'promo', durationSec: 8, promos: [{ id: 'promo_contest', kind: 'contest', eventDate: '2026-10-14', tonight: false, countdown: '3 club nights left', afterContest: false }] };
+const promo = { id: 'season_promo', type: 'promo', durationSec: 8, promos: [{ id: 'promo_veterans', kind: 'veterans', eventDate: '2026-11-11', tonight: false, countdown: '3 club nights left' }] };
 const video = { id: 's_v', type: 'video', videoId: 'v_1', videoName: 'a.mp4', videoSize: 1, durationSec: 3 };
 
 beforeEach(() => {

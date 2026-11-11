@@ -85,7 +85,7 @@ test('the promos section loops the lobby\'s own list of posters, so a new one jo
   assert.match(stub, /tell\('promos', \{ list: list \}\)/);
   const night = readFileSync(path.join(ROOT, 'printer/components/home/Night.tsx'), 'utf8');
   const keys = [...app.matchAll(/key: '([a-zA-Z]+)'/g)].map((m) => m[1]);
-  for (const key of ['contest', 'friend', 'barfEpic', 'parents', 'snowAlerts', 'snowAlertsStorm']) {
+  for (const key of ['grandPrix', 'snowAlerts', 'snowAlertsStorm']) {
     assert.doesNotMatch(night, new RegExp(`'${key}'`), `the home page never lists ${key} itself`);
   }
   assert.ok(Array.isArray(keys));

@@ -1,40 +1,28 @@
-import ContestPromo, { DETAILS as CONTEST_DETAILS } from './promos/ContestPromo.jsx';
-import FriendPromo, { DETAILS as FRIEND_DETAILS } from './promos/FriendPromo.jsx';
-import BarfEpicPromo, { DETAILS as BARF_EPIC_DETAILS } from './promos/BarfEpicPromo.jsx';
-import ParentsPromo, { DETAILS as PARENTS_DETAILS } from './promos/ParentsPromo.jsx';
 import SnowAlertsPromo, { DETAILS as SNOW_ALERTS_DETAILS } from './promos/SnowAlertsPromo.jsx';
-import FinalistsPromo, { DETAILS as FINALISTS_DETAILS } from './promos/FinalistsPromo.jsx';
 import GrandPrixPromo, { DETAILS as GRAND_PRIX_DETAILS } from './promos/GrandPrixPromo.jsx';
 import VeteransPromo, { DETAILS as VETERANS_DETAILS } from './promos/VeteransPromo.jsx';
 
-export { RotatingDetail, splatPath, landsAt, keyframes } from './promos/kit.jsx';
-
 // ─────────────────────────────────────────────────────────────
-// The fall 2026 event promos: four 15 second showreel pieces, one per
-// poster (the DEFEND poster contest, BARF Night, the BARF Night slime cut
-// and Parents' Night), each one a full motion-design sequence that lands
-// on its own finished printed poster. Which one shows, when, and what its
-// countdown says is decided in the pure src/lib/promos.js; each poster's
-// art lives in its own file under ./promos/, built from ./promos/kit.jsx.
-// This file is only the index. The snow-alerts slide (Nov to Mar, the
-// text-message sign-up) rides the same slot on its own cadence and wears the
-// lobby's kit rather than a poster's faces; see src/lib/snowAlerts.js. The
-// Awana Grand Prix (January to race day, 2027) is a video, not a showreel,
-// that ends on the lobby's own screen (./promos/GrandPrixPromo.jsx). The
-// Veterans Day poster (Wednesday, November 11, 2026 only, twice per pass) is a quiet 10
-// seconds in the lobby's kit (./promos/VeteransPromo.jsx).
+// The season promos. Which one shows, when, and what its countdown says is
+// decided in the pure src/lib/promos.js; each poster's art lives in its own
+// file under ./promos/, built from ./promos/kit.jsx. This file is only the
+// index. The fall 2026 posters (the DEFEND poster contest, BARF Night, its
+// slime cut, Parents' Night and the poster finalists) were removed on
+// 2026-11-10 after their dates passed; git history has them. What is here
+// now: the snow-alerts slide (Nov to Mar, the text-message sign-up) rides the
+// same slot on its own cadence and wears the lobby's kit rather than a
+// poster's faces; see src/lib/snowAlerts.js. The Awana Grand Prix (January
+// to race day, 2027) is a video, not a showreel, that ends on the lobby's own
+// screen (./promos/GrandPrixPromo.jsx). The Veterans Day poster (Wednesday,
+// November 11, 2026 only, twice per pass) is a quiet 10 seconds in the
+// lobby's kit (./promos/VeteransPromo.jsx).
 // ─────────────────────────────────────────────────────────────
 
-// Every line each poster says in its one rotating detail slot, in order.
+// The detail lines each promo carries (the words of its end card), in order.
 // Each poster owns its own table (next to its art), and this is the one
 // place they are gathered, so tests and detailsFor see them all.
 export const PROMO_DETAILS = Object.freeze({
-  contest: CONTEST_DETAILS,
-  friend: FRIEND_DETAILS,
-  barfEpic: BARF_EPIC_DETAILS,
-  parents: PARENTS_DETAILS,
   snowAlerts: SNOW_ALERTS_DETAILS,
-  finalists: FINALISTS_DETAILS,
   grandPrix: GRAND_PRIX_DETAILS,
   veterans: VETERANS_DETAILS,
 });
@@ -42,28 +30,23 @@ export const PROMO_DETAILS = Object.freeze({
 const NO_DETAILS = Object.freeze([]);
 
 /**
- * Which set of lines a promo descriptor gets. Tonight wins over
- * afterContest: on Parents' Night itself both are true and the room is
- * standing in front of the posters.
+ * Which set of lines a promo descriptor gets: the table's `tonight` lines on
+ * its night when it has them, else its `default` lines. `tables` is only a
+ * seam for tests (no promo today has a `tonight` set).
  *
- * @param {{ kind?: string, tonight?: boolean, afterContest?: boolean }|null|undefined} promo
+ * @param {{ kind?: string, tonight?: boolean }|null|undefined} promo
+ * @param {Record<string, any>} [tables]
  * @returns {ReadonlyArray<string>}
  */
-export function detailsFor(promo) {
-  const table = promo && PROMO_DETAILS[promo.kind];
+export function detailsFor(promo, tables = PROMO_DETAILS) {
+  const table = promo && tables[promo.kind];
   if (!table) return NO_DETAILS;
   if (promo.tonight && table.tonight) return table.tonight;
-  if (promo.afterContest && table.afterContest) return table.afterContest;
   return table.default;
 }
 
 const SCENES = {
-  contest: ContestPromo,
-  friend: FriendPromo,
-  barfEpic: BarfEpicPromo,
-  parents: ParentsPromo,
   snowAlerts: SnowAlertsPromo,
-  finalists: FinalistsPromo,
   grandPrix: GrandPrixPromo,
   veterans: VeteransPromo,
 };

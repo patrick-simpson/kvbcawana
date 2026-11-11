@@ -10,7 +10,7 @@ afterEach(cleanup);
 
 const promo = (tonight = true) => ({
   id: 'promo_veterans', kind: 'veterans', eventDate: '2026-11-11', tonight,
-  countdown: tonight ? 'Tonight!' : 'Next club night', afterContest: true, durationSec: 10,
+  countdown: tonight ? 'Tonight!' : 'Next club night', durationSec: 10,
 });
 const mount = (still = false) => render(
   <ZeroAnimationContext.Provider value={still}>

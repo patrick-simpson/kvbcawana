@@ -750,12 +750,14 @@ describe('Preview the promos', () => {
   it('lists every promo, and a click hands that one to the screen', () => {
     const props = { ...happyProps(), initialTab: 'slides', onPreviewPromo: vi.fn() };
     render(<SettingsPanel {...props} />);
-    const names = ['Poster contest', 'BARF Night', 'BARF Night: slime cut', 'Parents’ Night', 'Poster finalists: vote', 'Grand Prix (video)', 'Snow alerts', 'Snow alerts: snow week'];
+    const names = ['Grand Prix (video)', 'Snow alerts', 'Snow alerts: snow week'];
     for (const n of names) expect(screen.getByRole('button', { name: n })).toBeTruthy();
-    // It is the first card in Slides, the fall posters grouped apart from the snow slide.
+    // It is the first card in Slides, the Grand Prix and the snow slide in groups of their own;
+    // a group with no promo in it (no dated event poster is live in this build) is not drawn.
     expect(document.querySelector('.panel-body .panel-card .section').textContent).toBe('Preview the promos');
-    const fall = screen.getByRole('group', { name: 'Fall posters' });
-    expect([...fall.querySelectorAll('button')].map((b) => b.textContent)).toEqual(names.slice(0, 5));
+    expect(screen.queryByRole('group', { name: 'Event posters' })).toBeNull();
+    const snow = screen.getByRole('group', { name: 'Snow alerts (November to March)' });
+    expect([...snow.querySelectorAll('button')].map((b) => b.textContent)).toEqual(names.slice(1));
     // The Grand Prix video (January to race day) in a group of its own.
     const gp = screen.getByRole('group', { name: 'Awana Grand Prix (January to race day)' });
     expect([...gp.querySelectorAll('button')].map((b) => b.textContent)).toEqual(['Grand Prix (video)']);
@@ -763,8 +765,8 @@ describe('Preview the promos', () => {
     expect(props.onPreviewPromo).toHaveBeenLastCalledWith('grandPrix');
     fireEvent.click(screen.getByRole('button', { name: 'Snow alerts: snow week' }));
     expect(props.onPreviewPromo).toHaveBeenCalledWith('snowAlertsStorm');
-    fireEvent.click(screen.getByRole('button', { name: 'Poster contest' }));
-    expect(props.onPreviewPromo).toHaveBeenLastCalledWith('contest');
+    fireEvent.click(screen.getByRole('button', { name: 'Snow alerts' }));
+    expect(props.onPreviewPromo).toHaveBeenLastCalledWith('snowAlerts');
   });
 });
 

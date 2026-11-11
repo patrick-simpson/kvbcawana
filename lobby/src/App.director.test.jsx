@@ -266,10 +266,11 @@ describe('the lobby director, end to end', { timeout: 20_000 }, () => {
       [...document.querySelectorAll('[role="tab"]')].find((t) => t.textContent.includes('Slides')).click();
     });
     await act(async () => {
-      [...document.querySelectorAll('button')].find((b) => b.textContent === 'Poster contest').click();
+      [...document.querySelectorAll('button')].find((b) => b.textContent === 'Snow alerts').click();
     });
     expect(document.querySelector('[data-testid="promo-preview"]')).not.toBeNull();
-    await tick(14_500);
+    // The snow slide holds for its own 20 s (SNOW_ALERT_SEC).
+    await tick(19_500);
     expect(document.querySelector('[data-testid="promo-preview"]')).not.toBeNull();
     await tick(750);
     expect(document.querySelector('[data-testid="promo-preview"]')).toBeNull();

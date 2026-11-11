@@ -1,13 +1,15 @@
 // @ts-check
 // ─────────────────────────────────────────────────────────────
-// Season promo slides — fall 2026. Pure date math, no React.
+// Season promo slides. Pure date math, no React.
 //
-// The church printed three posters for this fall (the DEFEND poster
-// contest, BARF Night, and Parents' Night). These are the animated
-// lobby-TV recreations of them, plus a fourth the printer never made (the
-// slime cut of BARF Night), and this module is the only place that decides
-// WHICH of them a screen may show today and WHAT the counter under each
-// one says.
+// The animated lobby-TV promos for the church's events: the Veterans Day
+// poster (November 11, 2026 only), the Awana Grand Prix video (January to race
+// day, 2027), and the snow-alerts slide, which rides the same slot on its own
+// clock (snowAlerts.js). The five fall 2026 promos (the DEFEND poster contest,
+// BARF Night and its slime cut, Parents' Night, the poster finalists) were
+// removed on 2026-11-10 after their dates passed; git history has them. This
+// module is the only place that decides WHICH promo a screen may show today
+// and WHAT the counter under each one says.
 //
 // House rules, same as the rest of the calendar code:
 //   • Every comparison is a bare local YYYY-MM-DD key. Never
@@ -23,9 +25,9 @@
 //     and "no nights left" are opposite facts.
 //
 // These descriptors are DELIBERATELY hardcoded (owner's choice,
-// 2026-09-13): the art is a recreation of specific printed posters, so
-// next season's promos mean editing this table and PromoSlide.jsx
-// together, not typing dates into Settings.
+// 2026-09-13): the art is made for specific events, so a new promo means
+// editing this table and PromoSlide.jsx together, not typing dates into
+// Settings.
 // ─────────────────────────────────────────────────────────────
 
 import { clubNights, formatLongDate } from './calendarLogic.js';
@@ -36,7 +38,7 @@ import { dateKey } from './time.js';
 /**
  * @typedef {Object} SeasonPromo
  * @property {string} id
- * @property {string} kind 'contest' | 'friend' | 'parents' | 'barfEpic' | 'finalists' | 'grandPrix' | 'veterans'
+ * @property {string} kind 'grandPrix' | 'veterans'
  * @property {string} eventDate Last day the promo shows, inclusive.
  * @property {string} showFrom First day the promo may show.
  * @property {number} durationSec How long the slideshow holds THIS poster.
@@ -65,21 +67,8 @@ export const GRAND_PRIX_SEC = 2021 / 60;
 // The Veterans Day poster's hold: a quiet 10 s (VeteransPromo.jsx).
 export const VETERANS_SEC = 10;
 
-// Parents' Night, where the finalists are voted on (PARENTS_DATE below is the same day).
-const PARENTS_NIGHT = '2026-11-04';
-
 /** @type {ReadonlyArray<SeasonPromo>} */
 export const SEASON_PROMOS = [
-  { id: 'promo_contest', kind: 'contest', eventDate: '2026-10-14', showFrom: '2026-09-01', durationSec: 15 },
-  { id: 'promo_friend', kind: 'friend', eventDate: '2026-10-14', showFrom: '2026-09-01', durationSec: 15 },
-  { id: 'promo_parents', kind: 'parents', eventDate: '2026-11-04', showFrom: '2026-09-01', durationSec: 15 },
-  // The slime-soaked hype cut of BARF Night, the fourth poster the printer
-  // never made.
-  { id: 'promo_barf_epic', kind: 'barfEpic', eventDate: '2026-10-14', showFrom: '2026-09-01', durationSec: 15 },
-  // The contest's six finalists, "vote for your favorite" (owner 2026-10-28):
-  // from the day they were picked through the vote at Parents' Night. Its own
-  // 21 s: six posters take their bow, each with its epic zoom, before the call (FinalistsPromo.jsx).
-  { id: 'promo_finalists', kind: 'finalists', eventDate: PARENTS_NIGHT, showFrom: '2026-10-28', durationSec: 21 },
   // The Awana Grand Prix, a 33.68 s video (owner 2026-10-29: "The flat brand one
   // is the one that I wanted to keep. Get that one set to show up on the
   // displays starting in January."; restyled the same day in Awana's official
@@ -105,19 +94,10 @@ export const SEASON_PROMOS = [
  */
 export const SEAMLESS_GRACE_SEC = 4;
 
-// The poster-contest deadline. Parents' Night says something different
-// about the voting once the posters are actually in.
-export const CONTEST_DATE = '2026-10-14';
-
-// Parents' Night, named once here so the contest promo can point at it
-// without a second copy of the date (the two events are chained).
-export const PARENTS_DATE = PARENTS_NIGHT;
-
-// Every poster is a 15 second showreel (owner's call, 2026-09-28): a full
-// motion-design sequence that lands on the finished printed poster. Each
-// descriptor still carries its OWN durationSec, which is what the
-// slideshow actually holds for; this is the slot's fallback and the clock
-// every poster's beat sheet is written against (promos/kit.jsx).
+// The showreel posters were 15 seconds (owner's call, 2026-09-28): a full
+// motion-design sequence that lands on the finished poster. Each descriptor
+// carries its OWN durationSec, which is what the slideshow actually holds
+// for; this is the slot's fallback.
 export const PROMO_DURATION_SEC = 15;
 
 /**
@@ -194,7 +174,6 @@ export function countdownLabel(n, todayStr, eventDate) {
  * @property {string} eventDate
  * @property {boolean} tonight
  * @property {string|null} countdown
- * @property {boolean} afterContest
  * @property {number} durationSec
  * @property {'seamless'} [exit] see SeasonPromo
  * @property {'seamless'} [enter] see SeasonPromo
@@ -228,7 +207,7 @@ export function countdownLabel(n, todayStr, eventDate) {
  * The snow-alerts slide (src/lib/snowAlerts.js) rides the same slot, on its
  * own clock: in the snow season it takes one lap in SNOW_CADENCE.calm, or one
  * in SNOW_CADENCE.storm when snow is forecast near club night, however many
- * fall posters are live. The fall posters fill the other laps, and a lap with
+ * other promos are live. The other promos fill the other laps, and a lap with
  * nothing to fill it is a null entry: ManualSlideshow steps straight past the
  * slot that lap, so a lone snow slide is still rare. `snowAlerts` turns it on
  * (App always does; the tests that predate it leave it off) and
@@ -250,7 +229,6 @@ export function buildPromoSlot(events, todayStr, opts = {}) {
   const today = showDate(todayStr);
   if (!today) return null;
 
-  const afterContest = today > CONTEST_DATE;
   const promos = SEASON_PROMOS
     // Same inclusive window semantics as a typed slide's showFrom/showUntil:
     // the event date still shows, the day after is gone.
@@ -261,13 +239,12 @@ export function buildPromoSlot(events, todayStr, opts = {}) {
       eventDate: p.eventDate,
       tonight: today === p.eventDate,
       countdown: countdownLabel(nightsUntil(events, today, p.eventDate, specialDates), today, p.eventDate),
-      afterContest,
       durationSec: p.durationSec,
       ...ending(p),
     }));
 
   const lapped = snowAlerts && inSnowSeason(today)
-    ? withSnowAlerts(promos, snowOutlook(events, today, snowForecast, specialDates), afterContest)
+    ? withSnowAlerts(promos, snowOutlook(events, today, snowForecast, specialDates))
     : promos;
   if (!lapped.length) return null;
   return { id: 'season_promo', type: 'promo', durationSec: PROMO_DURATION_SEC, promos: lapped };
@@ -303,7 +280,6 @@ export function buildEncoreSlot(events, todayStr, opts = {}) {
       eventDate: p.eventDate,
       tonight: true,
       countdown: countdownLabel(nightsUntil(events, today, p.eventDate, specialDates), today, p.eventDate),
-      afterContest: today > CONTEST_DATE,
       durationSec: p.durationSec,
       ...ending(p),
     }],
@@ -312,16 +288,15 @@ export function buildEncoreSlot(events, todayStr, opts = {}) {
 
 /**
  * The snow slide on its own cadence: [S, x, x, x, x, x] on a calm week and
- * [S, x] when snow is coming, where each x is the next fall poster in turn, or
+ * [S, x] when snow is coming, where each x is the next other promo in turn, or
  * null (no promo that lap) when none is live. Enough rounds that every live
  * poster still gets its turn.
  *
  * @param {PromoDescriptor[]} fall
  * @param {import('./snowAlerts.js').SnowOutlook|null} outlook
- * @param {boolean} afterContest
  * @returns {Array<PromoDescriptor|null>}
  */
-function withSnowAlerts(fall, outlook, afterContest) {
+function withSnowAlerts(fall, outlook) {
   /** @type {PromoDescriptor} */
   const snow = {
     id: 'promo_snow_alerts',
@@ -329,7 +304,6 @@ function withSnowAlerts(fall, outlook, afterContest) {
     eventDate: outlook ? outlook.date : '',
     tonight: outlook?.when === 'tonight',
     countdown: null,
-    afterContest,
     durationSec: SNOW_ALERT_SEC,
     snow: outlook,
   };
@@ -355,11 +329,6 @@ function withSnowAlerts(fall, outlook, afterContest) {
  * snow week, because those read differently.
  */
 export const PREVIEW_PROMOS = Object.freeze([
-  Object.freeze({ key: 'contest', label: 'Poster contest' }),
-  Object.freeze({ key: 'friend', label: 'BARF Night' }),
-  Object.freeze({ key: 'barfEpic', label: 'BARF Night: slime cut' }),
-  Object.freeze({ key: 'parents', label: 'Parents’ Night' }),
-  Object.freeze({ key: 'finalists', label: 'Poster finalists: vote' }),
   Object.freeze({ key: 'grandPrix', label: 'Grand Prix (video)' }),
   Object.freeze({ key: 'snowAlerts', label: 'Snow alerts' }),
   Object.freeze({ key: 'snowAlertsStorm', label: 'Snow alerts: snow week' }),
@@ -367,7 +336,7 @@ export const PREVIEW_PROMOS = Object.freeze([
 
 /**
  * The descriptor a preview plays: the same shape buildPromoSlot() makes, so
- * the poster draws exactly what the room would see. A fall poster counts down
+ * the poster draws exactly what the room would see. A dated promo counts down
  * from the real calendar while its night is ahead, and names its date once it
  * has passed (or with no feed). The snow week names the next club night, or
  * the next Wednesday without a feed. Unknown keys give null.
@@ -380,7 +349,6 @@ export const PREVIEW_PROMOS = Object.freeze([
  */
 export function previewPromo(key, events, todayStr, specialDates = null) {
   const today = showDate(todayStr) || todayStr;
-  const afterContest = today > CONTEST_DATE;
   if (key === 'snowAlerts' || key === 'snowAlertsStorm') {
     const storm = key === 'snowAlertsStorm';
     const night = storm ? nextClubNightOrWednesday(events, today, specialDates) : '';
@@ -390,7 +358,6 @@ export function previewPromo(key, events, todayStr, specialDates = null) {
       eventDate: night,
       tonight: false,
       countdown: null,
-      afterContest,
       durationSec: SNOW_ALERT_SEC,
       snow: storm
         ? { date: night, when: night === today ? 'tonight' : 'later', weekday: weekdayName(night), inches: 3 }
@@ -408,7 +375,6 @@ export function previewPromo(key, events, todayStr, specialDates = null) {
     countdown: ahead
       ? countdownLabel(nightsUntil(events, today, p.eventDate, specialDates), today, p.eventDate)
       : formatLongDate(p.eventDate) || null,
-    afterContest,
     durationSec: p.durationSec,
     ...ending(p),
   };
