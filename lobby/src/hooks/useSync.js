@@ -126,7 +126,7 @@ export function ringSyncDoorbell(payload) {
   // checks the id); they ride the live channel only. 'classroom' is the
   // Sparks remote's (routes.md 10.13), for the downstairs classroom host only.
   // 'scoreboard' carries the game time scoreboard (routes.md 10.17), for the
-  // projector only (hooks/useScoreboard.js cleans it with shared/scoreboard.js).
+  // projector and the lobby's score bar (hooks/useScoreboard.js cleans it with shared/scoreboard.js).
   if (!['calendar', 'journey', 'template', 'screen', 'screen-action', 'classroom', 'scoreboard'].includes(what)) return;
   doorbellListeners.forEach((fn) => fn(what, payload));
   if (what === 'template') syncNow();

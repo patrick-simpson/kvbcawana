@@ -1,12 +1,12 @@
 // The letterhead print job (owner 2026-10-28; .github/workflows/letterhead-print.yml):
 // plain newsletter text in, the Awana letterhead (shared/letterhead.js, the same
-// drawing as awana.kvbchurch.org/letterhead/) printed to a Letter PDF in
+// drawing as awana.kvbchurch.org/tools/print/) printed to a Letter PDF in
 // Chromium, repeated COPIES times in ONE PDF (Epson Connect email print takes
 // no copy count from the mail), and emailed with the handbook job's own SMTP
 // client from the owner's Gmail to the downstairs Epson. No text body: the
 // Epson would print it as a page of its own.
 //
-// Started by hand (Actions → "Print a letterhead") or by the Claude routine
+// Started by hand (Actions → "Print to the downstairs Epson") or by the Claude routine
 // that turns a MailChimp newsletter into this text.
 //
 // Or a ready-made PDF instead of a letter (owner 2026-11-04: "50 sheets of the
