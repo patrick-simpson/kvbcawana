@@ -82,6 +82,19 @@ describe('the screen share relay', () => {
     expect(s.asked).toHaveLength(1 + TURN_SHARES_PER_HOUR);
   });
 
+  it('two different shares starting together are both counted in the month (IP-20261111-25)', async () => {
+    const s = await setup();
+    const t = s.core.turn;
+    const cost = (TURN_TTL_S / 3600) * 2;
+    const [a, b] = await Promise.all([t.iceFor('monthA', 'presenter-a'), t.iceFor('monthB', 'presenter-b')]);
+    expect(a.relay).toBe(true);
+    expect(b.relay).toBe(true);
+    expect((await s.core.storage.get('turn:month')).hours).toBe(2 * cost);
+    // A third, later, adds to both.
+    expect((await t.iceFor('monthC', 'presenter-c')).relay).toBe(true);
+    expect((await s.core.storage.get('turn:month')).hours).toBe(3 * cost);
+  });
+
   it('only for the share now up, and a presenter needs the token', async () => {
     const s = await setup();
     const id = await s.share();

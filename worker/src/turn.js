@@ -79,6 +79,8 @@ export class Turn {
      * set this ask makes. @type {Map<string, Promise<any>>}
      */
     this.pending = new Map();
+    /** The month's relay hours as this object last counted them (memory; storage holds the same). @type {{ month: string, hours: number } | null} */
+    this.monthMem = null;
   }
 
   /**
@@ -145,9 +147,13 @@ export class Turn {
     while (this.mints.size > 64) this.mints.delete(/** @type {string} */ (this.mints.keys().next().value));
     const month = this.monthOf();
     const doc = await this.storage.get(MONTH_KEY);
-    const used = doc?.month === month ? Number(doc.hours) || 0 : 0;
+    // The month's hours so far: the stored count, or this object's own newer one
+    // (two shares starting together both read the same stored count; the memory
+    // copy below is what keeps the second from writing over the first, IP-20261111-25).
+    const stored = doc?.month === month ? Number(doc.hours) || 0 : 0;
+    const used = () => Math.max(stored, this.monthMem?.month === month ? this.monthMem.hours : 0);
     const cost = (TURN_TTL_S / 3600) * 2;
-    if (used + cost > TURN_HOURS_PER_MONTH) return { iceServers: [stun], relay: false, reason: 'month-cap' };
+    if (used() + cost > TURN_HOURS_PER_MONTH) return { iceServers: [stun], relay: false, reason: 'month-cap' };
     let servers;
     try {
       const e = this.env();
@@ -164,7 +170,9 @@ export class Turn {
       return { iceServers: [stun], relay: false, reason: 'cloudflare' };
     }
     if (!servers.length) return { iceServers: [stun], relay: false, reason: 'cloudflare' };
-    await this.storage.put(MONTH_KEY, { month, hours: used + cost });
+    // Read and added in one step with no wait between, then written through.
+    this.monthMem = { month, hours: used() + cost };
+    await this.storage.put(MONTH_KEY, { month, hours: this.monthMem.hours });
     const users = [...new Set(servers.map((x) => x.username).filter((u) => typeof u === 'string'))];
     this.byShare.set(shareId, { at: t, servers, users });
     // Old shares' credentials expire anyway; keep the map small.
