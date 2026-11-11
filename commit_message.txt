@@ -1,5 +1,0 @@
-Fix: Ensure devDependencies are installed in CI
-
-Cloudflare Pages sets NODE_ENV=production by default, which causes
-npm ci to skip devDependencies. This breaks builds that require Vite.
-Added .npmrc with include=dev to app directories to fix this.
