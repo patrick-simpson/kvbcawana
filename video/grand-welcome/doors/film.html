@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<title>Grand welcome: six doors</title>
+<!--
+  The gym projector's 6:00 pm grand welcome in the "Six doors" style (owner
+  2026-11-11: the Blender films were "cheesy": too busy, the mascots, the 3D
+  look itself). The partner of the lobby's intro (video/lobby-intro/), drawn
+  the same way: one 1920x1080 stage from TIME ALONE (window.setTime(seconds)),
+  photographed frame by frame by video/lobby-intro/render.mjs --film.
+
+  The brief still holds (../BRIEF.md): it starts on the countdown's "0:00"
+  alone on black (../projector-zero.png, pixel for pixel), ends on black (the
+  US Pledge slide's first frame), is silent, has no mascots, and by its end
+  has shown WELCOME, the church's full logo with its tagline, and the six
+  club marks (official art, never redrawn).
+
+  THE STORY (seconds)
+     0.00  "0:00" on black, still (the countdown has just reached it)
+     0.60  six club-colour doors come down, left to right, and cover it; each
+           carries its club's white mark, which settles as it lands
+     3.00  the marks nod once, left to right
+     4.30  the doors drop, from the middle outward, and stop as a low wall
+           along the foot of the screen; each club's mark stands on its own
+     4.75  above them, on black: WELCOME TO, then the church's logo line by
+           line, each rising from behind its own baseline
+    13.00  the lines sink back, the wall sinks away, left to right
+    14.30  black, to the end
+    15.00  end
+
+  Flat like the kit: solid colour, hard edges, no blur, glow, gradient or 3D.
+-->
+<style>
+  @font-face { font-family: 'Paytone One'; src: url('../../../shared/brand/fonts/paytone-one-full-400-normal.woff2') format('woff2'); }
+  @font-face { font-family: 'Londrina Solid'; src: url('../../../shared/brand/fonts/londrina-solid-full-400-normal.woff2') format('woff2'); }
+  html, body { margin: 0; background: #000; }
+  #stage { position: relative; width: 1920px; height: 1080px; overflow: hidden; background: #000; }
+  #zero { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; }
+  .line { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; overflow: hidden; }
+  .line > * { position: absolute; will-change: transform; }
+  #welcome { left: 0; width: 1920px; text-align: center; font: 400 104px/1 'Paytone One', sans-serif; letter-spacing: 0.05em; color: #fff; }
+  .door { position: absolute; top: 0; width: 320px; height: 1080px; will-change: transform; }
+  .door::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 16px; background: var(--deep); }
+  .door > img { position: absolute; left: 50%; will-change: transform; height: auto; }
+  .door > img.big { top: 50%; }
+  .door > .egg { position: absolute; right: 14px; top: 222px; font: 400 13px/1 'Londrina Solid', sans-serif; letter-spacing: 0.08em; color: var(--deep); }
+</style>
+<div id="stage">
+  <img id="zero" src="../projector-zero.png" alt="">
+  <div class="line" id="l-welcome"><div id="welcome">WELCOME TO</div></div>
+  <div class="line" id="l-church"><img class="logo" src="../../../shared/brand/logos/kvbc-awana-full-white.svg" alt=""></div>
+  <div class="line" id="l-awana"><img class="logo" src="../../../shared/brand/logos/kvbc-awana-full-white.svg" alt=""></div>
+  <div class="line" id="l-tagline"><img class="logo" src="../../../shared/brand/logos/kvbc-awana-full-white.svg" alt=""></div>
+  <div id="doors"></div>
+</div>
+<script>
+  // ── the kit ───────────────────────────────────────────────────────────
+  // w: the mark as a banner running up the door (as in the lobby's film).
+  // s: the same mark standing on the low wall, upright. Both keep the marks'
+  // approved balance, by painted area (GrandWelcomeClassic.jsx MARK_WIDTH_U).
+  const CLUBS = [
+    { id: 'puggles', primary: '#1DB6D9', deep: '#1A627C', w: 430, s: 189, turn: true },
+    { id: 'cubbies', primary: '#4C72B8', deep: '#2F4F8A', w: 563, s: 246, turn: true },
+    { id: 'sparks', primary: '#F04A4B', deep: '#B82B32', w: 518, s: 227, turn: true },
+    { id: 'tnt', primary: '#58BD79', deep: '#2F8A4E', w: 215, s: 94, turn: false },
+    { id: 'trek', primary: '#047E71', deep: '#02554C', w: 482, s: 211, turn: true },
+    { id: 'journey', primary: '#8A649D', deep: '#56467F', w: 555, s: 243, turn: true },
+  ];
+
+  // ── the layout (px on the 1920x1080 wall) ─────────────────────────────
+  const WALL = 250;                     // the low wall's height
+  const DROP = 1080 - WALL;             // how far a door drops to become it
+  const LOGO = { x: 330, y: 318, w: 1260 };
+  LOGO.h = LOGO.w * 487 / 1910;
+  // The logo's three lines, as shares of its height (cut in the gaps between them).
+  const CUTS = { church: [0, 0.181], awana: [0.181, 0.839], tagline: [0.839, 1] };
+  const WELCOME = { top: 150, bottom: 262 };
+
+  // ── time ──────────────────────────────────────────────────────────────
+  const T = {
+    still: 0.6,
+    down: 0.6, downGap: 0.09, downDur: 0.72,
+    markAfter: 0.42, markDur: 0.62,
+    nod: 3.0, nodGap: 0.075, nodDur: 0.7,
+    swap: 2.4,            // under the doors: the 0:00 is taken away
+    drop: 4.3, dropGap: 0.14, dropDur: 0.9,
+    stand: 0.62, standDur: 0.6,   // each small mark, after its own door starts to drop
+    welcome: 4.75, church: 5.0, awana: 5.14, tagline: 5.56,
+    out: 13.0, outGap: 0.08, outDur: 0.5,
+    sink: 13.3, sinkGap: 0.06, sinkDur: 0.62,
+    end: 15.0,
+  };
+  window.FILM = { fps: 60, seconds: T.end, still: T.still };
+
+  function bezier(x1, y1, x2, y2) {
+    const cx = 3 * x1; const bx = 3 * (x2 - x1) - cx; const ax = 1 - cx - bx;
+    const cy = 3 * y1; const by = 3 * (y2 - y1) - cy; const ay = 1 - cy - by;
+    const fx = (t) => ((ax * t + bx) * t + cx) * t;
+    const fy = (t) => ((ay * t + by) * t + cy) * t;
+    return (x) => {
+      if (x <= 0) return 0;
+      if (x >= 1) return 1;
+      let lo = 0; let hi = 1; let t = x;
+      for (let i = 0; i < 40; i += 1) {
+        const v = fx(t);
+        if (Math.abs(v - x) < 1e-7) break;
+        if (v < x) lo = t; else hi = t;
+        t = (lo + hi) / 2;
+      }
+      return fy(t);
+    };
+  }
+  const WIPE = bezier(0.76, 0, 0.24, 1);
+  const SETTLE = bezier(0.16, 1, 0.3, 1);
+  const p = (t, start, dur) => Math.max(0, Math.min(1, (t - start) / dur));
+
+  // ── the pieces ────────────────────────────────────────────────────────
+  const zero = document.getElementById('zero');
+  const doorsEl = document.getElementById('doors');
+  const doors = CLUBS.map((c, i) => {
+    const d = document.createElement('div');
+    d.className = 'door';
+    d.style.left = `${i * 320}px`;
+    d.style.background = c.primary;
+    d.style.setProperty('--deep', c.deep);
+    const big = document.createElement('img');
+    big.className = 'big';
+    big.src = `../../../shared/brand/logos/${c.id}-white.svg`;
+    big.style.width = `${c.w}px`;
+    const small = document.createElement('img');
+    small.src = big.src;
+    small.style.width = `${c.s}px`;
+    small.style.top = `${WALL / 2}px`;   // the wall is the door's TOP 250 px once it has dropped
+    d.append(big, small);
+    if (c.id === 'journey') {
+      // The brief's easter egg: the club's verse, tiny, for whoever looks.
+      const egg = document.createElement('span');
+      egg.className = 'egg';
+      egg.textContent = '2 TIM 2:15';
+      d.appendChild(egg);
+    }
+    doorsEl.appendChild(d);
+    return { el: d, big, small, turn: c.turn, egg: d.querySelector('.egg') };
+  });
+  const rank = [2, 1, 0, 0, 1, 2];   // from the middle outward
+
+  const lines = {};
+  function line(name, top, bottom, child) {
+    const wrap = document.getElementById(`l-${name}`);
+    const pad = 10;
+    wrap.style.clipPath = `inset(${top - pad}px 0 ${1080 - bottom - pad}px 0)`;
+    lines[name] = { wrap, el: child, travel: bottom - top + pad * 2 };
+  }
+  const welcome = document.getElementById('welcome');
+  welcome.style.top = `${WELCOME.top}px`;
+  line('welcome', WELCOME.top, WELCOME.bottom, welcome);
+  for (const name of ['church', 'awana', 'tagline']) {
+    const img = document.querySelector(`#l-${name} > img`);
+    img.style.left = `${LOGO.x}px`; img.style.top = `${LOGO.y}px`; img.style.width = `${LOGO.w}px`;
+    line(name, LOGO.y + LOGO.h * CUTS[name][0], LOGO.y + LOGO.h * CUTS[name][1], img);
+  }
+  // The three lines are one picture (the logo's own file, never redrawn), so
+  // each copy is cut down to its own line: a line on its way in or out must
+  // not carry its neighbours through its window.
+  for (const name of ['church', 'awana', 'tagline']) {
+    const [a, b] = CUTS[name];
+    lines[name].el.style.clipPath = `inset(${(a * 100).toFixed(2)}% 0 ${((1 - b) * 100).toFixed(2)}% 0)`;
+  }
+  const IN_DUR = { welcome: 0.7, church: 0.7, awana: 0.85, tagline: 0.62 };
+  const OUT_ORDER = ['tagline', 'awana', 'church', 'welcome'];
+
+  window.setTime = (t) => {
+    zero.style.visibility = t < T.swap ? 'visible' : 'hidden';
+
+    doors.forEach((d, i) => {
+      const down = WIPE(p(t, T.down + i * T.downGap, T.downDur));
+      const dropAt = T.drop + rank[i] * T.dropGap;
+      const drop = WIPE(p(t, dropAt, T.dropDur));
+      const sink = WIPE(p(t, T.sink + i * T.sinkGap, T.sinkDur));
+      const y = -1096 * (1 - down) + DROP * drop + (WALL + 2) * sink;
+      d.el.style.transform = `translate3d(0, ${y.toFixed(2)}px, 0)`;
+      d.el.style.visibility = (down <= 0 || sink >= 1) ? 'hidden' : 'visible';
+
+      const land = SETTLE(p(t, T.down + i * T.downGap + T.markAfter, T.markDur));
+      const n = p(t, T.nod + i * T.nodGap, T.nodDur);
+      const nod = n > 0 && n < 1 ? Math.sin(Math.PI * SETTLE(n < 0.5 ? n * 2 : 1) * (n < 0.5 ? 0.5 : 1)) * (n < 0.5 ? 1 : 1 - SETTLE((n - 0.5) * 2)) : 0;
+      const my = 46 * (1 - land) - 12 * nod;
+      const ms = 0.9 + 0.1 * land;
+      d.big.style.opacity = String(Math.min(1, land * 1.6));
+      d.big.style.transform = `translate(-50%, -50%) translate3d(0, ${my.toFixed(2)}px, 0)${d.turn ? ' rotate(-90deg)' : ''} scale(${ms.toFixed(4)})`;
+
+      // The mark that stands on the low wall: it rises into place as its door settles.
+      const stand = SETTLE(p(t, dropAt + T.stand, T.standDur));
+      d.small.style.opacity = String(Math.min(1, stand * 1.6));
+      if (d.egg) d.egg.style.opacity = String(stand);
+      d.small.style.transform = `translate(-50%, -50%) translate3d(0, ${(34 * (1 - stand)).toFixed(2)}px, 0) scale(${(0.92 + 0.08 * stand).toFixed(4)})`;
+    });
+
+    for (const [name, l] of Object.entries(lines)) {
+      const k = SETTLE(p(t, T[name], IN_DUR[name]));
+      const out = WIPE(p(t, T.out + OUT_ORDER.indexOf(name) * T.outGap, T.outDur));
+      l.el.style.transform = `translate3d(0, ${(l.travel * (1 - k) + l.travel * out).toFixed(2)}px, 0)`;
+      l.wrap.style.opacity = k > 0 && out < 1 ? '1' : '0';
+    }
+  };
+  window.setTime(0);
+  window.ready = Promise.all([document.fonts.load("104px 'Paytone One'"), document.fonts.load("13px 'Londrina Solid'"), ...[...document.images].map((im) => im.decode().catch(() => {}))]).then(() => true);
+</script>
+</html>
