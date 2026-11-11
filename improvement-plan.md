@@ -7,8 +7,8 @@ its record. It lives on `main`; the next review reads its starting point from he
 
 ## State
 
-- Last review date: 2026-11-11
-- Last reviewed commit: cd18f53
+- Last review date: 2026-11-04
+- Last reviewed commit: 58721b9
 - Reviews done: 0 (the line above is the starting point; nothing before it has been reviewed)
 
 ## Instructions for the reviewer
@@ -20,7 +20,9 @@ sections for the apps the changes touch before judging them.
 
 1. `git fetch origin main` and work from the newest `main`.
 2. List the commits after "Last reviewed commit" (`git log <commit>..origin/main`).
-   If that commit is missing, use the commits since "Last review date".
+   A fresh checkout holds only the newest 50 commits: first run
+   `git fetch --shallow-since=<two days before Last review date> origin main`.
+   If the commit is still missing, use the commits since "Last review date".
 3. Leave out the nightly bots' commits (calendar, Journey lesson, release feeds) unless
    one looks wrong.
 4. No commits to review: write a one-line entry in the Review log, update State, stop.
@@ -108,4 +110,4 @@ None yet.
 
 ## Review log
 
-- 2026-11-11: set up. Starting point cd18f53. No review run.
+- 2026-11-11: set up. Starting point 58721b9 (2026-11-03), so the first review covers the week before. No review run yet.
