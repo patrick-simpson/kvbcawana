@@ -1,4 +1,7 @@
-﻿## [11.2.0] - 2026-11-11
+﻿## [11.2.1] - 2026-11-11
+**A sign-in item for Cast.** Cast uses this computer's own sign-in, not the lobby screen's. On a computer that was never signed in, turning Cast on showed "This screen needs to be signed in" with nowhere to do it. The taskbar menu now shows "Cast needs this computer signed in: sign in..." at the top and "Sign this computer in (needed for Cast)..." first in the Cast menu. Both open the setup window, where the church passphrase is typed. The Cast screen's own message now gives the same steps.
+
+## [11.2.0] - 2026-11-11
 Three Cast fixes from the first weekly code review.
 
 **Cast turns itself off when a club night starts.** Cast stays on until someone unticks it, and it comes back after a restart. If it was left on after a Sunday, the lobby TV would have shown the Cast screen on Wednesday instead of the welcomes. Now, when a club night's hours begin and Cast is still the chosen screen, the app turns Cast off by itself (the same as unticking it in the tray) and the screen from before comes back. Cast switched on by hand during the club night stays on.

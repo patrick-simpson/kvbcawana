@@ -489,6 +489,12 @@ function buildTray(config) {
   if (dev && dev.state === 'signed-out') {
     template.push({ label: '⚠ Signed out of the settings page: sign in again...', click: () => openWizard() });
   }
+  // Cast takes this computer's own sign-in (not the lobby page's). Without one its TV
+  // screen can only say "needs to be signed in", so say where to do it, here and in the
+  // Cast menu (owner 2026-11-11: "there's no option to sign it in").
+  const castNeedsSignIn = Boolean(groups && roles.setupDone && roles.display && !(dev && dev.state === 'signed-out') && !deviceSession());
+  const castSignIn = { label: '⚠ Cast needs this computer signed in: sign in...', click: () => openWizard() };
+  if (castNeedsSignIn) template.push(castSignIn);
   if (failed) {
     template.push({ label: '⚠ Print server NOT RUNNING — open its status', click: () => createSetupWindow() });
   }
@@ -503,6 +509,7 @@ function buildTray(config) {
   if (groups) {
     template.push(groups.settingsItem);
     template.push({ label: 'Screen', submenu: groups.screen });
+    if (castNeedsSignIn) groups.cast.unshift({ label: 'Sign this computer in (needed for Cast)...', click: () => openWizard() }, { type: 'separator' });
     template.push({ label: 'Cast', submenu: groups.cast });
     template.push({ type: 'separator' });
   }

@@ -243,6 +243,17 @@ describe('the tray menu is grouped (owner 2026-11-08: "redesign the context menu
     assert.match(tray.slice(last), /^template\.push\(\{\n\s+label: 'Quit'/);
   });
 
+  it('says where to sign in when Cast has no sign-in to use (owner 2026-11-11)', () => {
+    // Only a set-up display computer with no sign-in of its own, and not when the
+    // "signed out" warning already says it.
+    assert.match(tray, /const castNeedsSignIn = Boolean\(groups && roles\.setupDone && roles\.display && !\(dev && dev\.state === 'signed-out'\) && !deviceSession\(\)\);/);
+    assert.match(tray, /if \(castNeedsSignIn\) template\.push\(castSignIn\);/);
+    assert.match(tray, /label: '⚠ Cast needs this computer signed in: sign in\.\.\.', click: \(\) => openWizard\(\)/);
+    // Top-level with the other warnings, and first in the Cast menu.
+    assert.ok(tray.indexOf('castNeedsSignIn) template.push') < tray.indexOf("label: 'Screen'"));
+    assert.match(tray, /if \(castNeedsSignIn\) groups\.cast\.unshift\(\{ label: 'Sign this computer in \(needed for Cast\)\.\.\.', click: \(\) => openWizard\(\) \}, \{ type: 'separator' \}\);/);
+  });
+
   it('the display hands main.js its groups', () => {
     assert.match(display, /function menuGroups\(\)/);
     assert.match(display, /\{ label: 'Screen', submenu: g\.screen \}/);
