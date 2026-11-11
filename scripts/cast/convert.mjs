@@ -65,7 +65,9 @@ export async function openUpload(raw, key) {
  */
 export function presentationKind(b) {
   if (b.length >= 4 && b[0] === 0x50 && b[1] === 0x4b && b[2] === 0x03 && b[3] === 0x04) {
-    // A zip: a PowerPoint names presentationml in [Content_Types].xml; an .odp says so in its mimetype.
+    // A zip. An .odp says so in its mimetype file (stored plain, so it can be read here). A PowerPoint's
+    // [Content_Types].xml is compressed, so its type cannot be read cheaply: any other zip goes to
+    // LibreOffice, which refuses what is not a presentation (reported as a 'convert' failure).
     const head = Buffer.from(b.subarray(0, Math.min(b.length, 64 * 1024))).toString('latin1');
     if (head.includes('application/vnd.oasis.opendocument.presentation')) return 'odp';
     return 'pptx';

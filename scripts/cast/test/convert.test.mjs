@@ -102,3 +102,10 @@ test('LibreOffice gets only PATH, HOME, locale and temp: never the job token', (
     PRINT_FETCH_TOKEN: 'secret', GITHUB_TOKEN: 'gh', ACTIONS_RUNTIME_TOKEN: 'rt', JOB: 'x.y', SITE_ORIGIN: 'https://e' });
   assert.deepEqual(env, { PATH: '/usr/bin', HOME: '/home/runner', LANG: 'C.UTF-8', TMPDIR: '/tmp' });
 });
+
+test('the workflow has no concurrency group and allows two tries (IP-20261111-18)', async () => {
+  const { readFileSync } = await import('node:fs');
+  const yml = readFileSync(new URL('../../../.github/workflows/cast-convert.yml', import.meta.url), 'utf8');
+  assert.doesNotMatch(yml, /^concurrency:/m);
+  assert.match(yml, /timeout-minutes: 15/);
+});

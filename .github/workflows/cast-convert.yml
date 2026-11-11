@@ -23,15 +23,15 @@ on:
 
 permissions: {}
 
-concurrency:
-  group: cast-convert
-  cancel-in-progress: false
+# No concurrency group: conversions are independent, and a group that keeps one
+# waiting run cancelled the second of three close starts without a word
+# (IP-20261111-18). Each run has its own runner.
 
 jobs:
   convert:
     name: PowerPoint to PDF
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - name: Hide the key from the log
         env:
