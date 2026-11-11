@@ -142,4 +142,18 @@ export async function checkinHealth(core) {
 /** @param {import('./registry.js').Registry} registry @param {any} core the SyncCore */
 export function mountHealth(registry, core) {
   registry.add('GET', '/v1/health/checkin', 'public', async () => json(await checkinHealth(core)));
+  registry.add('GET', '/v1/health/build', 'public', async () => json(buildInfo(core)));
+}
+
+/**
+ * Which commit of this (public) repo the running Worker was deployed from
+ * (routes.md 10.10a): ci.yml's deploy passes it as the var BUILD_COMMIT and
+ * reads it back to decide whether the Worker's sources changed since, so a
+ * deploy it HELD on a club evening is made by the next run after it. Nothing
+ * else: no read, no storage. null when deployed by hand.
+ * @param {any} core the SyncCore
+ */
+export function buildInfo(core) {
+  const c = String(core.env?.BUILD_COMMIT || '').trim().toLowerCase();
+  return { v: 1, commit: /^[0-9a-f]{40}$/.test(c) ? c : null };
 }

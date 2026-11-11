@@ -1450,6 +1450,21 @@ paid). Code: `health.js`, test `test/health.test.js`.
   `calendar` and `stations` from storage, the client's memory. Like `GET
   /v1/cloud/status` it arms the watcher's alarm (the cron's safety net).
 
+
+### 10.10a Which build is running? (BUILT 2026-11-10)
+
+| Route | Auth | Answer |
+| --- | --- | --- |
+| `GET /v1/health/build` | public | `{ v: 1, commit }` |
+
+`commit` is the 40-character commit of this (public) repository the running
+Worker was deployed from (the var `BUILD_COMMIT`, set by ci.yml's
+`wrangler deploy --var`), or `null` when it was deployed by hand. Nothing
+else, no storage, no read. ci.yml's "Did the Worker change?" compares the
+Worker's sources with that commit, which is what lets it HOLD a Worker deploy
+on a club evening (Wednesday 3:30 to 10 pm Eastern) and make it in the next
+run afterwards. Code `health.js buildInfo`, test `test/health.test.js`.
+
 ### 10.11 The handbook form (setup aid; BUILT, owner 2026-10-18)
 
 Step 1 of printing TwoTimTwo's handbook check-off report

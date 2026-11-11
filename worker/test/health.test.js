@@ -32,6 +32,18 @@ async function ask(r) {
   return { status: res.status, body: await res.json() };
 }
 
+describe('GET /v1/health/build', () => {
+  it('names the commit the Worker was deployed from, with no passphrase, and nothing else', async () => {
+    const r = await rig({ start: SUNDAY, kids: KIDS });
+    const get = async () => (await r.core.handle(new Request('https://sync.test/v1/health/build'))).json();
+    expect(await get()).toEqual({ v: 1, commit: null });   // deployed by hand: no commit on record
+    r.core.env.BUILD_COMMIT = 'AB12'.repeat(10);
+    expect(await get()).toEqual({ v: 1, commit: 'ab12'.repeat(10) });
+    r.core.env.BUILD_COMMIT = 'not a commit <script>';
+    expect(await get()).toEqual({ v: 1, commit: null });   // only ever 40 hex characters
+  });
+});
+
 describe('GET /v1/health/checkin', () => {
   it('5:15 on a club night after the watcher ran from 4:30: everything ready, no passphrase needed', async () => {
     const r = await rig({ start: WED_4PM, kids: KIDS });
