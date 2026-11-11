@@ -605,11 +605,16 @@ jobs:
           # Realtime TURN key's id and API token. Optional, like the others.
           CF_TURN_KEY_ID: ${{ secrets.CF_TURN_KEY_ID }}
           CF_TURN_API_TOKEN: ${{ secrets.CF_TURN_API_TOKEN }}
+          # Separate machine tokens for the print job's PDF routes and Cast's converter
+          # (worker/README.md, prints.js machineToken). Optional: while one is not set,
+          # HANDBOOK_TOKEN does its job; the two workflows send the same choice.
+          PRINT_FETCH_TOKEN: ${{ secrets.PRINT_FETCH_TOKEN }}
+          CAST_CONVERT_TOKEN: ${{ secrets.CAST_CONVERT_TOKEN }}
         run: |
           node -e '
             const names = ["INITIAL_PASSPHRASE",
               "TWOTIMTWO_USERNAME", "TWOTIMTWO_PASSWORD", "TWOTIMTWO_HOST"];
-            const optional = ["HANDBOOK_TOKEN", "PRESENTATION_TOKEN", "PRINT_DISPATCH_TOKEN", "YOUTUBE_API_KEY", "CF_TURN_KEY_ID", "CF_TURN_API_TOKEN"];
+            const optional = ["HANDBOOK_TOKEN", "PRESENTATION_TOKEN", "PRINT_DISPATCH_TOKEN", "YOUTUBE_API_KEY", "CF_TURN_KEY_ID", "CF_TURN_API_TOKEN", "PRINT_FETCH_TOKEN", "CAST_CONVERT_TOKEN"];
             const out = {};
             for (const n of [...names, ...optional]) if (process.env[n]) out[n] = process.env[n];
             const missing = names.filter((n) => !out[n]);

@@ -10,7 +10,8 @@ name: Print to the downstairs Epson
 # private). The one print job (owner 2026-11-04: "merge the two print jobs").
 # Or pdf_job, an upload from the letterhead page's "Print a PDF" (owner 2026-11-04;
 # the sync Worker starts this job, worker/src/prints.js, routes.md 10.16): the
-# PDF scrambled in the browser, read from the Worker with HANDBOOK_TOKEN, opened
+# PDF scrambled in the browser, read from the Worker with PRINT_FETCH_TOKEN (when
+# that secret exists, else HANDBOOK_TOKEN), opened
 # with the key in pdf_job, deleted from the Worker afterwards.
 # Started by hand, or by the Claude routine that turns a MailChimp newsletter
 # (Gmail label "Letterhead") into this text. It prints at once, by the owner's
@@ -89,7 +90,8 @@ jobs:
           PDF_FILE: ${{ inputs.pdf_file }}
           PDF_JOB: ${{ inputs.pdf_job }}
           SITE_ORIGIN: ${{ vars.SITE_ORIGIN || 'https://awana.kvbchurch.org' }}
-          PRINT_FETCH_TOKEN: ${{ secrets.HANDBOOK_TOKEN }}
+          # The PDF routes' own machine token when set (worker/README.md), else the handbook's.
+          PRINT_FETCH_TOKEN: ${{ secrets.PRINT_FETCH_TOKEN || secrets.HANDBOOK_TOKEN }}
           COPIES: ${{ inputs.copies }}
           TO: ${{ inputs.to || 'kvbcdownstairs@print.epsonconnect.com' }}
           DRY_RUN: ${{ inputs.dry_run == true && 'true' || 'false' }}

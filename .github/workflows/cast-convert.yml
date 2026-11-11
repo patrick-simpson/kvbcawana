@@ -4,7 +4,8 @@ name: Cast - turn a PowerPoint into slides
 # (the exact copy, about a minute). The sync Worker starts this job for a presenter
 # on cast.kvbchurch.org (worker/src/cast.js, routes.md 10.18) with ONE input,
 # job = <id>.<key>: the PowerPoint was scrambled in the presenter's browser; the job
-# reads it from the Worker with the machine token (HANDBOOK_TOKEN), opens it with the
+# reads it from the Worker with the machine token (CAST_CONVERT_TOKEN when that
+# secret exists, else HANDBOOK_TOKEN), opens it with the
 # key, LibreOffice Impress makes the PDF, and the PDF goes back to the Worker as a
 # file of the Cast room (scripts/cast/convert.mjs). The Worker deletes the scrambled
 # upload once the job answers. Not meant to be run by hand.
@@ -56,5 +57,6 @@ jobs:
         env:
           JOB: ${{ inputs.job }}
           SITE_ORIGIN: ${{ vars.SITE_ORIGIN || 'https://awana.kvbchurch.org' }}
-          PRINT_FETCH_TOKEN: ${{ secrets.HANDBOOK_TOKEN }}
+          # The converter's own machine token when set (worker/README.md), else the handbook's.
+          PRINT_FETCH_TOKEN: ${{ secrets.CAST_CONVERT_TOKEN || secrets.HANDBOOK_TOKEN }}
         run: node convert.mjs

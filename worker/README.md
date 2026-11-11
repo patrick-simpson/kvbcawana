@@ -180,16 +180,21 @@ so the Worker needs a GitHub token that may start this repo's jobs and nothing e
 
 When it expires, the page says GitHub refused the token: make a new one the same way.
 
-The Worker starts only three workflow files with it (`letterhead-print.yml`,
-`handbook-print.yml`, `cast-convert.yml`); any other is refused.
+The Worker starts only four workflow files with it (`letterhead-print.yml`,
+`handbook-print.yml`, `cast-convert.yml`, and `checkin-health.yml`, the Wednesday
+health check it starts on time); any other is refused.
 
 Optional, separate machine tokens: the print job reads and deletes the uploaded PDF,
 and Cast's PowerPoint job reads its upload and sends the slides back, with
 `HANDBOOK_TOKEN` today. Two optional Worker secrets split them: `PRINT_FETCH_TOKEN`
 (the PDF routes) and `CAST_CONVERT_TOKEN` (the converter's routes). When one is set,
-ONLY it works on its routes; when it is not, `HANDBOOK_TOKEN` does, as before. Each
-needs the same value as a GitHub secret, pushed by ci.yml and handed to the job by
-its workflow, and the Worker deployed with it before the workflow uses it.
+ONLY it works on its routes; when it is not, `HANDBOOK_TOKEN` does, as before. To
+use one, add a GitHub secret of that name: ci.yml's "Set the Worker's secrets" pushes
+it to the Worker, and its workflow (`letterhead-print.yml` for `PRINT_FETCH_TOKEN`,
+`cast-convert.yml` for `CAST_CONVERT_TOKEN`) sends it instead of `HANDBOOK_TOKEN`
+from then on. ci.yml pushes secrets only on a run that deploys the Worker (its
+files changed, or "Redeploy the sync Worker" ticked), so run that before the next
+print or PowerPoint job: until the Worker has it, that job is refused 401.
 
 ## Developing
 
