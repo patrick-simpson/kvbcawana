@@ -57,6 +57,21 @@ export const WATCH_FAST_MS = 10 * 1000;
 export const WATCH_FAST_FROM_MIN = 17 * 60;
 export const WATCH_FAST_UNTIL_MIN = 18 * 60;
 
+/**
+ * In the arrival rush the report is ALSO read in any slot nothing else wants
+ * (owner 2026-11-10: a receptionist checks children in on TwoTimTwo's OWN page
+ * on the desk laptop, and its label waited up to 10 s; picked "Push to 5
+ * seconds"). The 10 s pace above stays the guarantee and its reserved slot is
+ * untouched; the slot between still goes FIRST to every other read that is due
+ * (the check-in page, a households catch-up, the Checkout page, the stations'
+ * feeds, the phones' roster read ahead). Only when none of them wants it does
+ * the report take it too: with a quiet clock that is a report every
+ * WATCH_RUSH_MS (the vendor's limit, one read per 5 s), a label about 3 to 8 s
+ * after the tap. Giving the report every slot outright starved those reads
+ * (14 tests said so), so it is opportunistic, never a reservation.
+ */
+export const WATCH_RUSH_MS = READ_INTERVAL_MS;
+
 /** How often the report is read at this moment. @param {number} now */
 export function watchIntervalAt(now) {
   const m = zonedParts(new Date(now), TIME_ZONE).minutes;
@@ -492,6 +507,9 @@ export class Watcher {
       } else if (this.budget.peek(false) === 0 && feeds && feeds.readDue(false)
         && await feeds.step(false).catch((err) => { console.error('[feeds] read failed', err); return false; })) {
         // The completed books (one club a slot) and the meeting report, in a slot nothing above wanted.
+      } else if (this.rushReadWanted(before)) {
+        // The arrival rush: a slot nothing above wanted goes to the report too (WATCH_RUSH_MS).
+        try { await this.read(); } catch (err) { console.error('[cloud] watcher read failed', err); }
       } else if (this.ym && this.ym.due() && await this.ym.step().catch((err) => { console.error('[cloud] youth check-out failed', err); return false; })) {
         // A Checkout page read or ONE check-out post (at most one every 15 s, ymcheckout.js).
       } else if (this.publisher) {
@@ -507,6 +525,11 @@ export class Watcher {
       // The free slot between reports, for the watcher's other reads.
       const other = this.otherWakeInMs(s);
       if (other !== null) next = Math.min(next, Math.max(other, this.budget.peek(false), 1000));
+      // The arrival rush: wake for the spare slot too (rushReadWanted).
+      if (watchIntervalAt(this.now()) === WATCH_FAST_MS) {
+        const spare = this.lastWatcherRead(s) + WATCH_RUSH_MS - this.now();
+        next = Math.min(next, Math.max(spare, this.budget.peek(false), 1000));
+      }
       // Jobs still waiting to be sealed: the next tick (not the next read) seals one.
       if (this.adopt && this.adopt.pending() > 0) next = Math.min(next, SPILL_MS);
       if (feeds && feeds.sealDue()) next = Math.min(next, SPILL_MS);
@@ -552,6 +575,18 @@ export class Watcher {
   }
 
   /** When the watcher last read the report (ms; 0 never). @param {{ lastReadAt?: string|null }} status */
+  /**
+   * The arrival rush's extra report: only in the 10 s hour, only when a
+   * non-reserved read may start now, and never sooner than one slot after the
+   * last report. @param {any} status
+   */
+  rushReadWanted(status) {
+    const now = this.now();
+    return watchIntervalAt(now) === WATCH_FAST_MS
+      && this.budget.peek(false) === 0
+      && now - this.lastWatcherRead(status) >= WATCH_RUSH_MS;
+  }
+
   lastWatcherRead(status) {
     const own = status.lastReadAt ? Date.parse(status.lastReadAt) : 0;
     return Number.isFinite(own) ? own : 0;
