@@ -66,7 +66,7 @@ async function refused() {
   }
   session = '';
   ui.forget();
-  off('This computer is not signed in', 'Sign the lobby computer in from KVBC Awana’s Settings, then turn Cast off and on again.');
+  off('This computer is not signed in', 'Right-click the KVBC Awana icon by the clock, choose App, then “Set up this computer…”, and type the church passphrase. Then turn Cast off and on again.');
 }
 
 function off(title, words) {

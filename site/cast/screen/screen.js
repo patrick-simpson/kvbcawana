@@ -218,7 +218,10 @@ async function refused() {
 }
 
 function signedOut() {
-  calm('This screen needs to be signed in', 'Sign the lobby computer in from KVBC Awana’s Settings, then Cast will show a code here.');
+  // Say exactly where: the app's sign-in is in its setup window, reached from the tray icon
+  // (owner 2026-11-11: "there's no option to sign it in"). A plain browser has no app to sign in.
+  if (window.awanaCastHost) calm('This computer needs to be signed in', 'Right-click the KVBC Awana icon by the clock, choose App, then “Set up this computer…”, and type the church passphrase. Then turn Cast off and on again.');
+  else calm('Cast’s TV screen runs in the KVBC Awana app', 'Turn Cast on from the KVBC Awana icon on the lobby computer. This page does nothing in a plain browser.');
   closeLive();
 }
 
