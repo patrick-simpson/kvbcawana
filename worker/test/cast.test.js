@@ -44,6 +44,47 @@ describe('the tray\'s Show Cast code on an idle room (IP-20261111-07)', () => {
   });
 });
 
+describe('Cast: one link copy at a time (IP-20261111-17)', () => {
+  it('a second copy while one runs is 429 busy, counted against nothing; the next one after is fine', async () => {
+    let release;
+    const gate = new Promise((r) => { release = r; });
+    const asked = [];
+    const PDF = new TextEncoder().encode('%PDF-1.4\n' + 'x'.repeat(400));
+    const core = new SyncCore({
+      storage: memoryStore(),
+      env: { INITIAL_PASSPHRASE: 'kennebec' },
+      now: () => Date.parse('2026-11-08T21:00:00Z'),
+      fetchFn: async (url) => {
+        asked.push(String(url));
+        if (String(url).includes('slow')) await gate;
+        return new Response(PDF, { headers: { 'content-type': 'application/pdf' } });
+      },
+      broadcast: () => 1,
+      liveScreens: () => new Set(),
+    });
+    const session = (await signInV2(core)).body.session;
+    const call = async (path, body, headers) => {
+      const res = await core.handle(new Request(`https://sync.test${path}`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...headers }, body: JSON.stringify(body) }), '10.0.0.9');
+      return { status: res.status, body: await res.json() };
+    };
+    const { code } = (await call('/v1/cast/open', {}, { Authorization: `Bearer ${session}` })).body;
+    const { token } = (await call('/v1/cast/join', { code }, {})).body;
+    const cast = { 'X-Cast-Token': token };
+    const first = call('/v1/cast/files', { url: 'https://a.example/slow.pdf' }, cast);
+    while (!asked.length) await new Promise((r) => setTimeout(r, 0));
+    const second = await call('/v1/cast/files', { url: 'https://a.example/b.pdf' }, cast);
+    expect(second.status).toBe(429);
+    expect(second.body.reason).toBe('busy');
+    // The desk shares the room's one copy too.
+    expect((await call('/v1/cast/desk/files', { url: 'https://a.example/c.pdf' }, { Authorization: `Bearer ${session}` })).body.reason).toBe('busy');
+    expect(asked).toEqual(['https://a.example/slow.pdf']);
+    release();
+    expect((await first).status).toBe(200);
+    expect((await call('/v1/cast/files', { url: 'https://a.example/d.pdf' }, cast)).status).toBe(200);
+    expect([...core.cast.rates.values()].reduce((n, r) => n + r.files, 0)).toBe(2);   // the refused ones were not counted
+  });
+});
+
 describe('the shared rules Cast adds', () => {
   it('a Google Slides or Docs link is its PDF export; other links are unchanged', () => {
     expect(fileLinkFrom('https://docs.google.com/presentation/d/1AbCdEfGhIjKlMn/edit?usp=sharing')).toBe('https://docs.google.com/presentation/d/1AbCdEfGhIjKlMn/export/pdf');

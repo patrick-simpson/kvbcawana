@@ -55,6 +55,15 @@ const PART_PREFIX = 'cpart:';
 export const FILE_PENDING_MS = 60 * 60 * 1000;
 /** A link the Worker copies: give up after this long. */
 const IMPORT_TIMEOUT_MS = 25 * 1000;
+
+/**
+ * A second link copy while one is still running in this room (IP-20261111-17): each
+ * holds up to 20 MB in memory, so several at once could restart the Worker. One at a
+ * time per room; the second is told to wait.
+ */
+export function linkCopyBusy() {
+  return fail('Another link is still being copied to the screen. Wait a moment, then try again.', 429, { reason: 'busy' });
+}
 /** Redirects a copied link may take (a Drive or Docs link takes one or two), each to https only. */
 export const IMPORT_REDIRECTS_MAX = 3;
 
@@ -139,6 +148,8 @@ export class Classroom {
     this.onShareEnd = () => {};
     /** @type {{ id: string, offer: any, answer: any, at: number, by?: string } | null} */
     this.share = null;
+    /** A link copy is running in this room (memory only; one at a time). */
+    this.importing = false;
   }
 
   /** The screen share now up: its offer and answer (memory only); `by` = who started it. */
@@ -264,6 +275,18 @@ export class Classroom {
    * @param {string} link @param {unknown} name @param {{ maxBytes?: number }} [opts]
    */
   async importFile(link, name, opts = {}) {
+    // Checked and set in one synchronous step, before any wait; let go however it ends.
+    if (this.importing) return linkCopyBusy();
+    this.importing = true;
+    try {
+      return await this.copyLink(link, name, opts);
+    } finally {
+      this.importing = false;
+    }
+  }
+
+  /** importFile's work (only from importFile). @param {string} link @param {unknown} name @param {{ maxBytes?: number }} opts */
+  async copyLink(link, name, opts) {
     const max = Math.min(CLASSROOM_FILE_MAX_BYTES, opts.maxBytes ?? CLASSROOM_FILE_MAX_BYTES);
     let url = fileLinkFrom(link);
     if (!url) return fail('That is not an https link.', 400, { reason: 'link' });

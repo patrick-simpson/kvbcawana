@@ -202,6 +202,34 @@ describe('files (POST/PUT/GET /v1/classroom/files)', () => {
   });
 });
 
+describe('one link copy at a time (IP-20261111-17)', () => {
+  it('a second copy while one runs is told to wait (429 busy); the next one after is fine, a failed one too', async () => {
+    let release;
+    const gate = new Promise((r) => { release = r; });
+    const asked = [];
+    const fetchFn = async (url) => {
+      asked.push(String(url));
+      if (String(url).includes('slow')) await gate;
+      if (String(url).includes('down')) throw new Error('unreachable');
+      return new Response(pdfOf(500), { headers: { 'content-type': 'application/pdf' } });
+    };
+    const s = await setup({ fetchFn });
+    const first = s.call('POST', '/v1/classroom/files', { url: 'https://a.example/slow.pdf' });
+    while (!asked.length) await new Promise((r) => setTimeout(r, 0));
+    const second = await s.call('POST', '/v1/classroom/files', { url: 'https://a.example/b.pdf' });
+    expect(second.status).toBe(429);
+    expect(second.body.reason).toBe('busy');
+    expect(second.body.error).toMatch(/Wait a moment/);
+    expect(asked).toEqual(['https://a.example/slow.pdf']);   // the second never fetched
+    release();
+    expect((await first).status).toBe(200);
+    expect((await s.call('POST', '/v1/classroom/files', { url: 'https://a.example/c.pdf' })).status).toBe(200);
+    // A copy that fails lets go too.
+    expect((await s.call('POST', '/v1/classroom/files', { url: 'https://a.example/down.pdf' })).status).toBe(502);
+    expect((await s.call('POST', '/v1/classroom/files', { url: 'https://a.example/d.pdf' })).status).toBe(200);
+  });
+});
+
 describe('the stage (POST /v1/classroom/remote, GET /v1/classroom/stage)', () => {
   it('a press puts a copy of the button up, rings the doorbell, and Back takes it down', async () => {
     const s = await setup();

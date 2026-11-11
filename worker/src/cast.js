@@ -65,7 +65,7 @@
 // hour, and the per-caller rates (files, PowerPoints, presses) apply to it exactly as to
 // a presenter, with an allowance of its own.
 
-import { Classroom, newId } from './classroom.js';
+import { Classroom, linkCopyBusy, newId } from './classroom.js';
 import { netOf } from './netof.js';
 import { fail, json } from './http.js';
 import { CLASSROOM_CLIP_MAX_BYTES, CLASSROOM_FILE_MAX_BYTES, CLASSROOM_FILE_TYPES, fileLimits, isClipType } from '../../shared/classroomRemote.js';
@@ -235,6 +235,8 @@ export class Cast {
     const r = this.rateOf(who);
     if (r.files >= CAST_FILES_PER_HOUR) return fail('That is a lot of files this hour. Wait a while, or share your screen instead.', 429, { reason: 'too-many' });
     const isLink = typeof body?.url === 'string';
+    // One link copy at a time (the engine refuses a second too); said before anything is counted.
+    if (isLink && this.engine.importing) return linkCopyBusy();
     const bytes = isLink ? CLASSROOM_FILE_MAX_BYTES : Number(body?.bytes);
     // Anything the engine would refuse anyway (type, empty, too big) gets its own answer.
     const typeOk = CLASSROOM_FILE_TYPES.includes(body?.type) || isClipType(body?.type);
