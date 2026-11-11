@@ -35,6 +35,11 @@
 //   blob and played in a <video>; a public Facebook video in Facebook's plain iframe
 //   player (never its SDK on this page). One set of controls for YouTube and clips
 //   (`media`), each takes itself down when it ends; a Facebook video stays until Back.
+// - A countdown and the clock (owner 2026-11-11): the countdown is drawn every animation
+//   frame from this computer's clock corrected by the Worker's (`serverNow` on each read;
+//   the offset from the tightest round trip, logic.js createSkew) down to 0:00, where it
+//   holds, silent, until Back or the next thing. The clock is this computer's own local
+//   time, 12-hour, redrawn at each minute. Neither asks the Worker for anything.
 // - Black (owner 2026-11-11): the stage's `black` puts pure black over whatever is up
 //   and pauses a playing video; off shows the same thing again, the video still paused.
 // - ?configure=1 (KVBC Awana's display Settings window, coordinator 2026-11-08): a
@@ -45,6 +50,7 @@
 import * as R from '../shared/classroomRemote.js';
 import { CONNECT_WAIT_MS, answerShare } from '../shared/screenShare.js';
 import { addressWords, presenterUrl } from '../logic.js';
+import { clockWords, createSkew, minSec, timerLeft } from '../logic.js';
 import { drawQrCode } from '../qr.js';
 
 const SESSION_KEY = 'awanaSyncSession.v1';
@@ -78,7 +84,10 @@ const loadedAt = Date.now();
 let base = '';
 let code = null;
 let stage = R.sanitizeStage(null);
-let skew = 0;
+let skew = 0; // the Worker's clock minus this computer's (ms)
+const clockSync = createSkew();
+let timerFrame = 0; // the countdown's animation frame
+let clockTimer = 0; // the clock's wait for the next minute
 let watch = false;
 let showKey = '';
 let busy = Promise.resolve();
@@ -256,10 +265,13 @@ function signedOut() {
 
 async function read() {
   if (closed) return;
+  const sentAt = Date.now();
   const r = await request('/v1/cast/screen');
   if (r.status === 401) { refused(); return; }
   if (!r.ok || !r.body) return;
-  if (typeof r.body.serverNow === 'number') skew = r.body.serverNow - Date.now();
+  // The Worker's time: the offset from the tightest round trip of the last few reads.
+  clockSync.add(sentAt, Date.now(), r.body.serverNow);
+  skew = clockSync.offset();
   watch = r.body.watch === true;
   // The room was closed from elsewhere while this screen is up: open a new one.
   if (r.body.code === null && code) { code = null; drawCode(); openRoom(); return; }
@@ -341,6 +353,8 @@ async function change(show) {
   else if (b.kind === 'clip') playClip(b, show);
   else if (b.kind === 'facebook') playFacebook(b);
   else if (b.kind === 'text') drawText(b);
+  else if (b.kind === 'timer') drawTimer(b);
+  else if (b.kind === 'clock') drawClock();
   else if (b.kind === 'image') drawImage(prepared);
   else if (b.kind === 'pdf') await openPdf(prepared, show.page);
   else if (b.kind === 'screen') { status('Connecting to the presenter’s screen…', b.title !== 'Shared screen' ? b.title : '', true); trySignal(); }
@@ -356,6 +370,9 @@ function clear() {
   rtc = null;
   shareTries = 0;
   clearTimeout(signalTimer);
+  cancelAnimationFrame(timerFrame);
+  timerFrame = 0;
+  clearTimeout(clockTimer);
   for (const v of layer.querySelectorAll('video')) { v.srcObject = null; }
   layer.replaceChildren();
   if (blobUrl) { URL.revokeObjectURL(blobUrl); blobUrl = ''; }
@@ -412,6 +429,83 @@ function fitText() {
     if (box.scrollHeight <= box.clientHeight + 2 && el.scrollWidth <= el.clientWidth + 1) lo = mid; else hi = mid;
   }
   el.style.setProperty('--words-size', String(lo));
+}
+
+/* ── A countdown and the clock ── */
+
+/** The cream face both share: an optional title, the big figures, a small line, the logo at the foot. */
+function face(kind, title) {
+  const box = document.createElement('div');
+  box.className = `face face--${kind}`;
+  const mid = document.createElement('div');
+  mid.className = 'face-mid';
+  if (title) {
+    const t = document.createElement('p');
+    t.className = 'face-title';
+    t.textContent = title;
+    mid.append(t);
+  }
+  const figures = document.createElement('p');
+  figures.className = 'face-figures';
+  mid.append(figures);
+  const logo = document.createElement('img');
+  logo.className = 'face-logo';
+  logo.src = '../church/kvbc-logo.png';
+  logo.alt = '';
+  box.append(mid, logo);
+  layer.append(box);
+  return { mid, figures };
+}
+
+/** The figures, one fixed cell a character (the colon a narrow one), so nothing shifts as they change. */
+function setFigures(el, text, ampm) {
+  const cells = [...text].map((ch) => {
+    const s = document.createElement('span');
+    if (ch === ':') s.className = 'sep';
+    s.textContent = ch;
+    return s;
+  });
+  if (ampm) {
+    const s = document.createElement('span');
+    s.className = 'ampm';
+    s.textContent = ampm;
+    cells.push(s);
+  }
+  el.replaceChildren(...cells);
+  el.setAttribute('aria-label', ampm ? `${text} ${ampm}` : text);
+}
+
+/**
+ * A countdown to the Worker's `endsAt`: m:ss, counted each frame on this computer's clock
+ * plus the offset to the Worker's, redrawn only when the second changes. At 0:00 it
+ * holds (no sound, no flashing) and the frames stop.
+ */
+function drawTimer(b) {
+  const { figures } = face('timer', b.title);
+  let shown = '';
+  const tick = () => {
+    const left = timerLeft(b.endsAt, Date.now() + skew);
+    const text = minSec(left);
+    if (text !== shown) { shown = text; setFigures(figures, text); }
+    timerFrame = left > 0 ? requestAnimationFrame(tick) : 0;
+  };
+  tick();
+}
+
+/** The time of day: this computer's own local time, redrawn as each minute turns. */
+function drawClock() {
+  const { mid, figures } = face('clock', '');
+  const date = document.createElement('p');
+  date.className = 'face-date';
+  mid.append(date);
+  const tick = () => {
+    const now = new Date();
+    const w = clockWords(now);
+    setFigures(figures, w.time, w.ampm);
+    if (date.textContent !== w.date) date.textContent = w.date;
+    clockTimer = setTimeout(tick, 60000 - (now.getTime() % 60000) + 40);
+  };
+  tick();
 }
 
 /* ── A picture ── */

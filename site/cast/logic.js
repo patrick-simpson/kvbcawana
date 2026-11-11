@@ -110,6 +110,90 @@ export function resultPress(result, R) {
   return videoPress({ link: result && result.youtube, title: result && result.title }, R);
 }
 
+/* ── A countdown and the clock (owner 2026-11-11) ── */
+
+/**
+ * A countdown as an item press, or the problem in words. Minutes and seconds as typed;
+ * the shared rules hold the limits (15 s to 60 min, steps of 15 s). The Worker sets when
+ * it ends, by its own clock, when it takes the press.
+ * @param {{ minutes: unknown, seconds: unknown, title?: string }} form @param {any} R
+ */
+export function timerPress(form, R) {
+  const whole = (v) => (/^\d{1,4}$/.test(String(v ?? '').trim() || '0') ? Number(String(v ?? '').trim() || '0') : NaN);
+  const total = whole(form.minutes) * 60 + whole(form.seconds);
+  const range = `Pick a time from ${R.CAST_TIMER_MIN_S} seconds to ${R.CAST_TIMER_MAX_S / 60} minutes.`;
+  if (!Number.isFinite(total)) return { ok: false, error: 'Type the minutes as a number.' };
+  if (total < R.CAST_TIMER_MIN_S || total > R.CAST_TIMER_MAX_S) return { ok: false, error: range };
+  if (total % R.CAST_TIMER_STEP_S !== 0) return { ok: false, error: `Seconds go in steps of ${R.CAST_TIMER_STEP_S}.` };
+  return checked({ id: placeholderId(), kind: 'timer', seconds: total, title: R.oneLine(form.title, R.CLASSROOM_TITLE_MAX) }, R);
+}
+
+/** The clock (the time of day) as an item press. @param {any} R */
+export function clockPress(R) {
+  return checked({ id: placeholderId(), kind: 'clock' }, R);
+}
+
+/**
+ * Whole seconds left on a countdown, rounded UP (4:59.2 left reads 5:00; it reads 0:00
+ * only once the time is up), never below 0.
+ * @param {unknown} endsAt ms, the Worker's clock @param {number} now ms, the same clock
+ */
+export function timerLeft(endsAt, now) {
+  if (typeof endsAt !== 'number' || !Number.isFinite(endsAt)) return 0;
+  return Math.max(0, Math.ceil((endsAt - now) / 1000));
+}
+
+/** A countdown's figures: always m:ss, so the full hour reads 60:00 (never 1:00:00). @param {number} s whole seconds */
+export function minSec(s) {
+  const n = Math.max(0, Math.floor(Number(s) || 0));
+  return `${Math.floor(n / 60)}:${String(n % 60).padStart(2, '0')}`;
+}
+
+const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
+/**
+ * The time of day for the TV's clock, from the device's own local time: 12-hour, no
+ * seconds ("6:05" + "pm"), and the date ("Wednesday, November 11"). Written out here
+ * (not the browser's locale) so every computer draws the same words.
+ * @param {Date} d
+ */
+export function clockWords(d) {
+  const h = d.getHours();
+  return {
+    time: `${h % 12 || 12}:${String(d.getMinutes()).padStart(2, '0')}`,
+    ampm: h < 12 ? 'am' : 'pm',
+    date: `${WEEKDAYS[d.getDay()]}, ${MONTHS[d.getMonth()]} ${d.getDate()}`,
+  };
+}
+
+/**
+ * This device's clock against the Worker's: every timed answer that carries `serverNow`
+ * is a sample, and the offset (server minus device) comes from the sample with the
+ * TIGHTEST round trip among the last few (a short trip pins the server's time best).
+ * The same idea as createClockSync in shared/scoreboard.js, kept here so Cast's pages
+ * need no third shared file.
+ * @param {{ max?: number }} [opts]
+ */
+export function createSkew({ max = 8 } = {}) {
+  /** @type {{ offset: number, rtt: number }[]} */
+  let samples = [];
+  return {
+    /** @param {number} sentAt @param {number} gotAt device ms @param {unknown} serverNow the Worker's ms */
+    add(sentAt, gotAt, serverNow) {
+      if (typeof serverNow !== 'number' || !Number.isFinite(serverNow) || !Number.isFinite(sentAt) || !Number.isFinite(gotAt) || gotAt < sentAt) return;
+      // The Worker stamped its time somewhere inside the trip: take the middle.
+      samples.push({ offset: serverNow - (sentAt + gotAt) / 2, rtt: gotAt - sentAt });
+      samples = samples.slice(-max);
+    },
+    /** Server minus device, in ms; 0 before any sample. */
+    offset() {
+      if (!samples.length) return 0;
+      return Math.round(samples.reduce((a, b) => (b.rtt < a.rtt ? b : a)).offset);
+    },
+  };
+}
+
 /** Cast's own address (owner 2026-11-09): the presenter page at its root, the TV at /screen/. */
 export const CAST_HOME = 'https://cast.kvbchurch.org/';
 
@@ -194,13 +278,15 @@ export function errorWords(status, body) {
   return (body && typeof body.error === 'string' && body.error) || 'That did not work. Try again.';
 }
 
-const KIND_WORDS = { video: 'a YouTube video', clip: 'a video', facebook: 'a Facebook video', image: 'a picture', pdf: 'slides', text: 'text', screen: 'a shared screen' };
+const KIND_WORDS = { video: 'a YouTube video', clip: 'a video', facebook: 'a Facebook video', image: 'a picture', pdf: 'slides', text: 'text', screen: 'a shared screen', timer: 'a countdown', clock: 'the clock' };
 
 /**
  * The "On the TV now" line. `short` leaves off the "On the TV now: " lead-in, for a page
  * that already has "On the TV now" as the heading above it (the desk).
+ * A countdown's time left is counted here from `opts.at` (now, by the Worker's clock),
+ * so the line ticks between state reads with no request of its own.
  * @param {{ stage: any, now: any, screenOnline: boolean }} s
- * @param {{ short?: boolean }} [opts]
+ * @param {{ short?: boolean, at?: number }} [opts]
  * @returns {{ main: string, sub: string, online: boolean }}
  */
 export function tvWords({ stage, now, screenOnline }, opts = {}) {
@@ -219,6 +305,10 @@ export function tvWords({ stage, now, screenOnline }, opts = {}) {
   if (mine && mine.video) sub = `${clock(mine.video.t)} of ${clock(mine.video.d)}${mine.video.paused ? ', paused' : ''}${mine.video.muted ? ', muted' : `, volume ${mine.video.volume}%`}`;
   else if (mine && mine.pages) sub = `Page ${mine.page} of ${mine.pages}`;
   else if (shown.kind === 'pdf') sub = `Page ${stage.show.page}`;
+  else if (shown.kind === 'timer') {
+    const left = timerLeft(shown.endsAt, typeof opts.at === 'number' ? opts.at : Date.now());
+    sub = left > 0 ? `${minSec(left)} left` : 'Time is up. It holds at 0:00 until you take it down.';
+  }
   if (!screenOnline) sub = 'Waiting for the TV to pick it up.';
   const title = shown.kind === 'screen' || !shown.title ? '' : `: ${shown.title}`;
   const what = KIND_WORDS[shown.kind] || 'something';

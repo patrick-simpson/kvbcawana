@@ -106,7 +106,7 @@
   .bare { border-color: transparent; background: transparent; }
   .bare:hover { background: var(--subtle); }
   .bare:active { background: var(--subtle-press); }
-  input[type=text], input[type=url], input[type=search], textarea {
+  input[type=text], input[type=url], input[type=search], textarea, select {
     width: 100%; min-height: 32px; padding: 5px 10px; border: 1px solid var(--ctl-stroke); border-bottom-color: color-mix(in srgb, var(--text) 54%, transparent);
     border-radius: 4px; background: var(--ctl);
   }
@@ -171,6 +171,11 @@
   .choice[aria-current="page"]:hover { background: color-mix(in srgb, var(--nav-sel) 100%, var(--subtle)); }
   .choice[aria-current="page"] .f { opacity: .24; }
   .choice b { font-weight: 400; overflow: hidden; text-overflow: ellipsis; }
+  .picks { display: flex; flex-wrap: wrap; gap: 4px; }
+  .picks button { min-width: 64px; }
+  .dur { display: flex; align-items: center; gap: 8px; }
+  .dur input, .dur select { width: 72px; }
+  select:hover { background: var(--ctl-hover); }
   .navsep { height: 1px; margin: 4px 8px; background: var(--stroke-strong); }
   .pill { position: absolute; left: 0; top: 0; width: 3px; height: 16px; border-radius: 3px; background: var(--accent); transform: translateY(var(--y, 10px)); pointer-events: none; }
   .panefoot { margin-top: auto; display: grid; gap: 8px; padding: 12px 4px 0; border-top: 1px solid var(--stroke-strong); }
@@ -255,7 +260,8 @@
   .ph svg { width: 56px; height: 56px; display: none; fill: none; stroke: currentColor; stroke-width: 1.25; stroke-linecap: round; stroke-linejoin: round; }
   .ph .cap { font-size: 12px; line-height: 16px; color: #8F8F8F; }
   #tv-mini[data-kind="code"] .g-code, #tv-mini[data-kind="video"] .g-video, #tv-mini[data-kind="slides"] .g-slides, #tv-mini[data-kind="picture"] .g-picture,
-  #tv-mini[data-kind="text"] .g-text, #tv-mini[data-kind="share"] .g-share, #tv-mini[data-kind="off"] .g-off, #tv-mini[data-kind="black"] .g-black { display: block; }
+  #tv-mini[data-kind="text"] .g-text, #tv-mini[data-kind="share"] .g-share, #tv-mini[data-kind="off"] .g-off, #tv-mini[data-kind="black"] .g-black,
+  #tv-mini[data-kind="timer"] .g-timer, #tv-mini[data-kind="clock"] .g-timer { display: block; }
   #tv-mini[data-kind="black"] .ph { background: #000; }
   .screen[data-shot="true"] .ph { display: none; }
   .stand { width: 18%; height: 10px; background: #2B2B2B; clip-path: polygon(10% 0, 90% 0, 100% 100%, 0 100%); }
@@ -408,6 +414,8 @@
           <li><button class="choice" type="button" aria-expanded="false" aria-controls="p-pics" title="Pictures" data-title="Pictures" data-cap="Show pictures from this computer."><svg class="icon" viewBox="0 0 20 20" width="20" height="20" aria-hidden="true" focusable="false"><rect class="f" x="3" y="3.5" width="14" height="13" rx="2.5"/><rect x="3" y="3.5" width="14" height="13" rx="2.5"/><circle cx="7.5" cy="8" r="1.3"/><path d="M3.5 14l4-3.8 3 2.8 2.5-2.2 3.5 3.4"/></svg><b>Pictures</b></button></li>
           <li><button class="choice" type="button" aria-expanded="false" aria-controls="p-clip" title="Video file" data-title="Video file" data-cap="Play a video from this computer."><svg class="icon" viewBox="0 0 20 20" width="20" height="20" aria-hidden="true" focusable="false"><path class="f" d="M5.5 2.5h6l4 4v9a2 2 0 01-2 2h-8a2 2 0 01-2-2v-11a2 2 0 012-2z"/><path d="M5.5 2.5h6l4 4v9a2 2 0 01-2 2h-8a2 2 0 01-2-2v-11a2 2 0 012-2z"/><path d="M11.5 2.5v4h4"/><path d="M8.3 9.8v4l3.2-2z"/></svg><b>Video file</b></button></li>
           <li><button class="choice" type="button" aria-expanded="false" aria-controls="p-text" title="Text" data-title="Text" data-cap="A verse or an announcement, big on the TV."><svg class="icon" viewBox="0 0 20 20" width="20" height="20" aria-hidden="true" focusable="false"><rect class="f" x="2.5" y="3.5" width="15" height="13" rx="2.5"/><path d="M3.5 5.5h13M3.5 9.5h13M3.5 13.5h8"/></svg><b>Text</b></button></li>
+          <li><button class="choice" type="button" aria-expanded="false" aria-controls="p-timer" title="Countdown" data-title="Countdown" data-cap="Count down to the start, big on the TV."><svg class="icon" viewBox="0 0 20 20" width="20" height="20" aria-hidden="true" focusable="false"><circle class="f" cx="10" cy="11" r="6.25"/><circle cx="10" cy="11" r="6.25"/><path d="M10 7.8V11l2.1 1.4M8 2.6h4"/></svg><b>Countdown</b></button></li>
+          <li><button class="choice" type="button" aria-expanded="false" aria-controls="p-clock" title="Clock" data-title="Clock" data-cap="The time and the date, big on the TV."><svg class="icon" viewBox="0 0 20 20" width="20" height="20" aria-hidden="true" focusable="false"><circle class="f" cx="10" cy="10" r="7.25"/><circle cx="10" cy="10" r="7.25"/><path d="M10 5.8V10l3 1.9"/></svg><b>Clock</b></button></li>
           <li class="navsep" role="separator"></li>
           <li><button class="choice" type="button" aria-expanded="false" aria-controls="p-house" title="House slide" data-title="House slide" data-cap="What the TV shows when nothing is up."><svg class="icon" viewBox="0 0 20 20" width="20" height="20" aria-hidden="true" focusable="false"><rect class="f" x="2.5" y="3.5" width="15" height="13" rx="2.5"/><rect x="2.5" y="3.5" width="15" height="13" rx="2.5"/><circle cx="10" cy="8.4" r="2.4"/><path d="M6.5 13.4h7"/></svg><b>House slide</b></button></li>
         </ul>
@@ -537,6 +545,42 @@
             </form>
           </section>
 
+          <!-- A countdown and the clock (owner 2026-11-11). -->
+          <section class="panel" id="p-timer" hidden>
+            <form id="timer-form" class="group">
+              <div class="setting">
+                <svg class="svg-ic" viewBox="0 0 20 20" width="20" height="20" aria-hidden="true" focusable="false"><circle cx="10" cy="11" r="6.25"/><path d="M10 7.8V11l2.1 1.4M8 2.6h4"/></svg>
+                <div class="txt"><span class="t" id="timer-picks-label">How long</span><small>From 15 seconds to 60 minutes.</small></div>
+                <div class="ctl picks" id="timer-picks" role="group" aria-labelledby="timer-picks-label"><button class="quiet" type="button" data-min="1" aria-pressed="false">1 min</button><button class="quiet" type="button" data-min="2" aria-pressed="false">2 min</button><button class="quiet" type="button" data-min="5" aria-pressed="false">5 min</button><button class="quiet" type="button" data-min="10" aria-pressed="false">10 min</button><button class="quiet" type="button" data-min="15" aria-pressed="false">15 min</button></div>
+              </div>
+              <div class="setting">
+                <svg class="svg-ic" viewBox="0 0 20 20" width="20" height="20" aria-hidden="true" focusable="false"><path d="M4 6.5h12M4 10h12M4 13.5h7"/></svg>
+                <div class="txt"><span class="t">Or set it exactly</span><small>Seconds go in steps of 15.</small></div>
+                <div class="ctl dur">
+                  <input type="text" id="timer-min" inputmode="numeric" maxlength="2" value="5" autocomplete="off" aria-label="Minutes"><span>min</span>
+                  <select id="timer-sec" aria-label="Seconds"><option value="0">0</option><option value="15">15</option><option value="30">30</option><option value="45">45</option></select><span>sec</span>
+                </div>
+              </div>
+              <div class="setting stack">
+                <svg class="svg-ic" viewBox="0 0 20 20" width="20" height="20" aria-hidden="true" focusable="false"><path d="M4 5.5h12M10 5.5v10"/></svg>
+                <div class="txt"><label for="timer-title">Title <span class="opt">(optional)</span></label><small>A line above the time, such as Starting in.</small></div>
+                <div class="ctl"><input type="text" id="timer-title" maxlength="60" placeholder="Starting in"></div>
+              </div>
+              <div class="setting actions"><button class="primary" type="submit">Start on the TV</button></div>
+            </form>
+            <p class="help">At 0:00 it stays up, silent, until you take it down or show something else.</p>
+          </section>
+
+          <section class="panel" id="p-clock" hidden>
+            <div class="group">
+              <div class="setting">
+                <svg class="svg-ic" viewBox="0 0 20 20" width="20" height="20" aria-hidden="true" focusable="false"><circle cx="10" cy="10" r="7.25"/><path d="M10 5.8V10l3 1.9"/></svg>
+                <div class="txt"><span class="t">The time of day</span><small>This computer’s time, such as 6:05 pm, with the date under it.</small></div>
+                <div class="ctl"><button class="primary" type="button" id="clock-show">Show the clock</button></div>
+              </div>
+            </div>
+          </section>
+
           <!-- The house slide (owner 2026-11-11): what the TV shows with nothing up. Set here only. -->
           <section class="panel" id="p-house" hidden>
             <form id="house-form" class="group">
@@ -568,6 +612,7 @@
                 <svg class="g-picture" viewBox="0 0 48 48" aria-hidden="true" focusable="false"><rect x="6" y="8" width="36" height="32" rx="6"/><circle cx="17" cy="19" r="3.2"/><path d="M7 35l10-9.5 7.5 7 6-5.5 10.5 9"/></svg>
                 <svg class="g-text" viewBox="0 0 48 48" aria-hidden="true" focusable="false"><path d="M9 12h30M9 22h30M9 32h30M9 42h18"/></svg>
                 <svg class="g-share" viewBox="0 0 48 48" aria-hidden="true" focusable="false"><rect x="5" y="8" width="38" height="26" rx="4"/><path d="M24 29V16M18.5 21.5L24 16l5.5 5.5M16 41h16"/></svg>
+                <svg class="g-timer" viewBox="0 0 48 48" aria-hidden="true" focusable="false"><circle cx="24" cy="25" r="15"/><path d="M24 16v9l6 4"/></svg>
                 <svg class="g-black" viewBox="0 0 48 48" aria-hidden="true" focusable="false"><rect x="5" y="8" width="38" height="26" rx="4"/><path d="M16 41h16M24 34v7"/><path d="M15 21h18"/></svg>
                 <svg class="g-off" viewBox="0 0 48 48" aria-hidden="true" focusable="false"><rect x="5" y="8" width="38" height="26" rx="4"/><path d="M16 41h16M24 34v7M12 14l24 14"/></svg>
                 <span class="cap" id="tv-ph-label">Showing the house slide</span>

@@ -41,6 +41,11 @@
 // THE HOUSE SLIDE: with nothing up the Cast TV shows the church's logo and ONE optional
 // line set at the lobby computer's desk (CAST_HOUSE_LINE_MAX, sanitizeHouse). It is the
 // church's own, kept across rooms (worker/src/cast.js `cast:house`), never a guest's.
+// A COUNTDOWN AND A CLOCK: two more items a presenter or the desk may put up. Kind
+// `timer {seconds, title, endsAt}`: 15 s to 60 min in steps of 15 s; the WORKER sets
+// `endsAt` from its own clock when it takes the press, and every screen counts down to
+// it. Kind `clock {}`: the time of day, drawn by the TV from its own clock. Neither is a
+// Sparks button, and the classroom room refuses them (CAST_ONLY_KINDS).
 
 export const CLASSROOM_VIDEOS_MAX = 4;
 export const CLASSROOM_ITEMS_MAX = 8;
@@ -79,7 +84,13 @@ export const CLASSROOM_WATCH_MS = 30 * 1000;
 export const CLASSROOM_SEEK_S = 10;
 export const CLASSROOM_VOLUME_STEP_PCT = 10;
 export const CLASSROOM_TEXT_LOOKS = Object.freeze(['page', 'board']);
-export const CLASSROOM_ITEM_KINDS = Object.freeze(['image', 'pdf', 'text', 'clip', 'facebook']);
+export const CLASSROOM_ITEM_KINDS = Object.freeze(['image', 'pdf', 'text', 'clip', 'facebook', 'timer', 'clock']);
+/** Items only Cast shows: never in the Sparks list, refused by the classroom room. */
+export const CAST_ONLY_KINDS = Object.freeze(['timer', 'clock']);
+/** A countdown: this short at least, this long at most, in steps of this (the scoreboard timer's steps). */
+export const CAST_TIMER_MIN_S = 15;
+export const CAST_TIMER_MAX_S = 60 * 60;
+export const CAST_TIMER_STEP_S = 15;
 /** The kinds a video press works on: YouTube, an uploaded clip, a Facebook video. */
 export const CLASSROOM_PLAYABLE_KINDS = Object.freeze(['video', 'clip', 'facebook']);
 /** Everything a remote (or /settings) may ask. */
@@ -88,7 +99,7 @@ export const CLASSROOM_ACTIONS = Object.freeze(['show', 'back', 'video', 'page',
 export const CLASSROOM_SIGNAL_MAX = 24000;
 export const CLASSROOM_VIDEO_OPS = Object.freeze(['toggle', 'play', 'pause', 'seek', 'volume', 'mute', 'unmute']);
 /** What the screen can be showing (its report's `view`). */
-export const CLASSROOM_VIEWS = Object.freeze(['off', 'cubbies', 'black', 'sparks', 'lobby', 'board', 'video', 'image', 'pdf', 'text', 'screen', 'waiting', 'clip', 'facebook']);
+export const CLASSROOM_VIEWS = Object.freeze(['off', 'cubbies', 'black', 'sparks', 'lobby', 'board', 'video', 'image', 'pdf', 'text', 'screen', 'waiting', 'clip', 'facebook', 'timer', 'clock']);
 
 const BUTTON_ID_RE = /^b[a-z0-9]{6,20}$/;
 const FILE_ID_RE = /^f[a-z0-9]{12,24}$/;
@@ -243,12 +254,21 @@ export function sanitizeVideo(v) {
 }
 
 /**
- * One picture, PDF or text button, or null.
+ * One picture, PDF or text button (or, for Cast, a countdown or the clock), or null.
  * @param {unknown} v
- * @returns {{ id: string, kind: string, title: string, file?: string, type?: string, heading?: string, text?: string, look?: string } | null}
+ * @returns {{ id: string, kind: string, title: string, file?: string, type?: string, heading?: string, text?: string, look?: string, seconds?: number, endsAt?: number } | null}
  */
 export function sanitizeItem(v) {
   if (!isObj(v) || !isButtonId(v.id) || !CLASSROOM_ITEM_KINDS.includes(v.kind)) return null;
+  // A countdown: whole steps within the limits; the title line is optional ('' = none).
+  // `endsAt` (ms) is the Worker's: it is kept here only so the stored stage reads back whole.
+  if (v.kind === 'timer') {
+    const s = v.seconds;
+    if (!Number.isInteger(s) || s < CAST_TIMER_MIN_S || s > CAST_TIMER_MAX_S || s % CAST_TIMER_STEP_S !== 0) return null;
+    const endsAt = typeof v.endsAt === 'number' && Number.isFinite(v.endsAt) && v.endsAt > 0 ? Math.round(v.endsAt) : 0;
+    return { id: v.id, kind: 'timer', title: oneLine(v.title, CLASSROOM_TITLE_MAX), seconds: s, ...(endsAt ? { endsAt } : {}) };
+  }
+  if (v.kind === 'clock') return { id: v.id, kind: 'clock', title: '' };
   if (v.kind === 'text') {
     const text = cleanText(v.text);
     if (!text) return null;
@@ -275,8 +295,9 @@ export function sanitizeButtons(v) {
   const videos = (isObj(v) && Array.isArray(v.videos) ? v.videos : []).map(sanitizeVideo).filter(keep).slice(0, CLASSROOM_VIDEOS_MAX);
   let clips = 0;
   const items = (isObj(v) && Array.isArray(v.items) ? v.items : []).map(sanitizeItem)
-    // The Sparks list: no Facebook (the classroom TV has no Facebook player), at most CLIPS_MAX clips.
-    .filter((b) => b && b.kind !== 'facebook' && (b.kind !== 'clip' || (clips += 1) <= CLASSROOM_CLIPS_MAX))
+    // The Sparks list: no Facebook (the classroom TV has no Facebook player), no countdown or
+    // clock (Cast only), at most CLIPS_MAX clips.
+    .filter((b) => b && b.kind !== 'facebook' && !CAST_ONLY_KINDS.includes(b.kind) && (b.kind !== 'clip' || (clips += 1) <= CLASSROOM_CLIPS_MAX))
     .filter(keep).slice(0, CLASSROOM_ITEMS_MAX);
   return { videos: /** @type {NonNullable<ReturnType<typeof sanitizeVideo>>[]} */ (videos), items: /** @type {NonNullable<ReturnType<typeof sanitizeItem>>[]} */ (items) };
 }

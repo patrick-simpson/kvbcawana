@@ -15,6 +15,7 @@ import {
   joinWords, linkToCopy, placeholderId, shareWords, size, textPress, titleFromName, tvWords, videoPress, volumeWords,
   SLIDES_ACCEPT, convertWords, isPresentation, slideView, slidesChoice,
   codeFromHash, facebookPress, resultPress, CAST_HOME, presenterUrl, addressWords,
+  clockPress, clockWords, createSkew, minSec, timerLeft, timerPress,
 } from '../cast/logic.js';
 
 const SITE = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
@@ -390,6 +391,99 @@ test('the house slide: the church logo on cream, one optional line from the desk
   assert.ok(!/innerHTML/.test(desk));
   // The phone page has no such field: a guest cannot change the church's slide.
   assert.ok(!/house/i.test(page + appOwn));
+});
+
+// Owner 2026-11-11: "All of those sound fantastic. Let's build them" (a countdown and a clock).
+test('a countdown: minutes and seconds become a press the shared rules take, or one plain sentence', () => {
+  const five = timerPress({ minutes: '5', seconds: '0', title: '  Starting   in ' }, R);
+  assert.ok(five.ok);
+  assert.equal(five.press.action, 'item');
+  assert.deepEqual({ ...five.press.data.item, id: 'x' }, { id: 'x', kind: 'timer', title: 'Starting in', seconds: 300 });
+  assert.equal(timerPress({ minutes: '', seconds: '15' }, R).press.data.item.seconds, 15);
+  assert.equal(timerPress({ minutes: ' 60 ', seconds: 0 }, R).press.data.item.seconds, 3600);
+  assert.equal(timerPress({ minutes: 1, seconds: '30' }, R).press.data.item.title, '');
+  assert.match(timerPress({ minutes: '0', seconds: '0' }, R).error, /from 15 seconds to 60 minutes/);
+  assert.match(timerPress({ minutes: '60', seconds: '15' }, R).error, /from 15 seconds to 60 minutes/);
+  assert.match(timerPress({ minutes: '2', seconds: '20' }, R).error, /steps of 15/);
+  assert.match(timerPress({ minutes: 'five', seconds: '0' }, R).error, /as a number/);
+  assert.match(timerPress({ minutes: '-5', seconds: '0' }, R).error, /as a number/);
+  const c = clockPress(R);
+  assert.ok(c.ok);
+  assert.deepEqual({ ...c.press.data.item, id: 'x' }, { id: 'x', kind: 'clock', title: '' });
+});
+
+test('the time left rounds up and holds at 0; the clock is 12-hour with am and pm, no seconds', () => {
+  assert.equal(timerLeft(300000, 800), 300);
+  assert.equal(timerLeft(300000, 1000), 299);
+  assert.equal(timerLeft(300000, 299999), 1);
+  assert.equal(timerLeft(300000, 300000), 0);
+  assert.equal(timerLeft(300000, 999999), 0);
+  assert.equal(timerLeft(undefined, 5), 0);
+  assert.equal(minSec(timerLeft(300000, 800)), '5:00');
+  assert.equal(minSec(timerLeft(3600000, 0)), '60:00', 'always m:ss: the full hour is 60:00, never 1:00:00');
+  assert.equal(minSec(9), '0:09');
+  assert.equal(minSec(-3), '0:00');
+  assert.match(screen, /const text = minSec\(left\);/);
+  assert.deepEqual(clockWords(new Date(2026, 10, 11, 18, 5, 59)), { time: '6:05', ampm: 'pm', date: 'Wednesday, November 11' });
+  assert.deepEqual(clockWords(new Date(2026, 10, 11, 0, 0)), { time: '12:00', ampm: 'am', date: 'Wednesday, November 11' });
+  assert.deepEqual(clockWords(new Date(2026, 10, 15, 12, 30)), { time: '12:30', ampm: 'pm', date: 'Sunday, November 15' });
+  assert.equal(clockWords(new Date(2026, 0, 1, 9, 7)).time, '9:07');
+});
+
+test('the Worker\'s clock: the offset comes from the tightest round trip of the last few', () => {
+  const k = createSkew({ max: 3 });
+  assert.equal(k.offset(), 0);
+  k.add(1000, 1400, 6200); // 400 ms trip: offset 5000
+  assert.equal(k.offset(), 5000);
+  k.add(2000, 2020, 7060); // 20 ms trip: offset 5050, the tighter one wins
+  assert.equal(k.offset(), 5050);
+  k.add(3000, 3900, 9000); // a slow one changes nothing
+  assert.equal(k.offset(), 5050);
+  k.add(4000, 4000, 'x'); k.add(4000, 3000, 9000); k.add(NaN, 1, 2);
+  assert.equal(k.offset(), 5050, 'junk is no sample');
+  // Old samples age out by count, so a drifting clock is followed.
+  k.add(5000, 5100, 10050); k.add(6000, 6100, 11050);
+  assert.equal(k.offset(), 5000);
+});
+
+test('a countdown and the clock: on the TV, in the words, and as choices on both control pages', () => {
+  const timer = R.sanitizeStage({ show: { button: { id: 'babcdefgh', kind: 'timer', seconds: 300, title: 'Starting in', endsAt: 300000 }, at: 1, page: 1 } });
+  assert.deepEqual(tvWords({ stage: timer, now: null, screenOnline: true }, { at: 800 }), { main: 'On the TV now: a countdown: Starting in', sub: '5:00 left', online: true });
+  assert.equal(tvWords({ stage: timer, now: null, screenOnline: true }, { at: 240500 }).sub, '1:00 left');
+  assert.match(tvWords({ stage: timer, now: null, screenOnline: true }, { at: 300000 }).sub, /^Time is up\. It holds at 0:00/);
+  assert.equal(tvWords({ stage: timer, now: null, screenOnline: false }, { at: 800 }).sub, 'Waiting for the TV to pick it up.');
+  const bare = R.sanitizeStage({ show: { button: { id: 'babcdefgh', kind: 'timer', seconds: 60, endsAt: 60000 }, at: 1, page: 1 } });
+  assert.equal(tvWords({ stage: bare, now: null, screenOnline: true }, { short: true, at: 0 }).main, 'A countdown');
+  const clockUp = R.sanitizeStage({ show: { button: { id: 'babcdefgh', kind: 'clock' }, at: 1, page: 1 } });
+  assert.deepEqual(tvWords({ stage: clockUp, now: null, screenOnline: true }), { main: 'On the TV now: the clock', sub: '', online: true });
+  // The TV: the countdown per animation frame on its own clock plus the Worker's offset
+  // (serverNow on the read it already makes), holding at 0:00; the clock by the minute. No sound.
+  assert.match(screen, /clockSync\.add\(sentAt, Date\.now\(\), r\.body\.serverNow\);\n  skew = clockSync\.offset\(\);/);
+  assert.match(screen, /const left = timerLeft\(b\.endsAt, Date\.now\(\) \+ skew\);/);
+  assert.match(screen, /timerFrame = left > 0 \? requestAnimationFrame\(tick\) : 0;/);
+  assert.match(screen, /clockTimer = setTimeout\(tick, 60000 - \(now\.getTime\(\) % 60000\) \+ 40\);/);
+  assert.match(screen, /cancelAnimationFrame\(timerFrame\);/);
+  const faces = screen.slice(screen.indexOf('/* ── A countdown and the clock ── */'), screen.indexOf('/* ── A picture ── */'));
+  assert.ok(faces.length > 500 && !/request\(|fetch\(|Audio|playTones|innerHTML/.test(faces), 'no Worker call, no sound, text only');
+  assert.match(screenPage, /\.face-figures \{[^}]*var\(--heading\);[^}]*font-variant-numeric: tabular-nums;/);
+  assert.match(screenPage, /\.face-figures span \{ display: inline-block; width: \.62em; text-align: center; \}/);
+  // The control pages: two more choices, the same ids on both, wired once in the shared controls.
+  const deskPage = read('cast', 'desk', 'index.html');
+  for (const src of [page, deskPage]) {
+    for (const id of ['p-timer', 'timer-form', 'timer-picks', 'timer-min', 'timer-sec', 'timer-title', 'p-clock', 'clock-show']) assert.match(src, new RegExp(`id="${id}"`), id);
+    assert.deepEqual([...src.matchAll(/data-min="(\d+)"/g)].map((m) => m[1]), ['1', '2', '5', '10', '15']);
+    assert.deepEqual([...src.slice(src.indexOf('id="timer-sec"')).matchAll(/<option value="(\d+)">/g)].map((m) => m[1]), ['0', '15', '30', '45']);
+    assert.match(src, /id="timer-title" maxlength="60" placeholder="Starting in"/);
+  }
+  assert.match(controls, /\$\('timer-form'\)\.addEventListener\('submit', sendTimer\);/);
+  assert.match(controls, /\$\('clock-show'\)\.addEventListener\('click', sendClock\);/);
+  // "On the TV now" ticks locally from the state it already has: a redraw, never a request.
+  assert.match(controls, /if \(counting && !timerTick\) timerTick = setInterval\(render, 500\);/);
+  assert.match(controls, /if \(!counting && timerTick\) \{ clearInterval\(timerTick\); timerTick = 0; \}/);
+  assert.match(controls, /skew\.add\(sentAt, Date\.now\(\), r\.body\.serverNow\);/);
+  const render = controls.slice(controls.indexOf('  function render() {'), controls.indexOf('  /* ── Presses ── */'));
+  assert.ok(!/request\(|fetch\(|poll\(/.test(render), 'drawing asks the Worker nothing');
+  assert.match(read('cast', 'desk', 'desk.js'), /timer: 'A countdown is up', clock: 'The clock is up'/);
 });
 
 // Owner 2026-11-08: "Everything this does should have professional animations and

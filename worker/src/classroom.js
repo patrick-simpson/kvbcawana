@@ -22,6 +22,7 @@
 // (memory only) while a remote watched within CLASSROOM_WATCH_MS.
 
 import {
+  CAST_ONLY_KINDS,
   CLASSROOM_CMDS_MAX,
   CLASSROOM_CMD_TTL_MS,
   CLASSROOM_FILE_MAX_BYTES,
@@ -127,7 +128,7 @@ export class Classroom {
    * @param {{ storage: any, now: () => number, ring: (payload: Record<string, unknown>) => void, fetchFn?: typeof fetch,
    *   room?: { what: string, buttonsKey: string, stageKey: string, filePrefix: string, partPrefix: string, cast?: boolean } }} deps
    * `room`: the lobby's Cast screen (cast.js) runs a second copy under its own keys and doorbell;
-   * `room.cast` lets it take the presses only Cast has (Black).
+   * `room.cast` lets it take what only Cast has (Black, a countdown, the clock).
    */
   constructor({ storage, now, ring, fetchFn, room }) {
     this.room = room || { what: 'classroom', buttonsKey: BUTTONS_KEY, stageKey: STAGE_KEY, filePrefix: FILE_PREFIX, partPrefix: PART_PREFIX };
@@ -405,6 +406,11 @@ export class Classroom {
       // Cast (cast.js): an item put up directly; its file must be a finished file of this room.
       case 'item': {
         const item = /** @type {any} */ (p.data?.item);
+        // A countdown or the clock is Cast's alone (the classroom TV does not draw them).
+        if (CAST_ONLY_KINDS.includes(item.kind) && !this.room.cast) return fail('That is not something the Sparks remote can show.', 400, { reason: 'not-here' });
+        // A countdown ends by THIS clock (owner 2026-11-11): every screen counts down to the
+        // same moment, whatever its own clock says. Whatever the press said is replaced.
+        if (item.kind === 'timer') item.endsAt = t + item.seconds * 1000;
         if (item.file) {
           const meta = await this.storage.get(this.room.filePrefix + item.file);
           if (!meta?.done) return fail('That picture or PDF is still uploading, or was removed. Add it again.', 400, { reason: 'file-missing' });

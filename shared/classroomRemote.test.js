@@ -37,3 +37,38 @@ describe('the house slide (Cast): one optional line', () => {
     for (const bad of [null, undefined, 'Welcome', 7, [], { line: 7 }, { line: null }, {}]) expect(R.sanitizeHouse(bad)).toEqual({ line: '' });
   });
 });
+
+describe('a countdown and the clock (Cast): two more items', () => {
+  const timer = (over = {}) => ({ id: 'babcdefgh', kind: 'timer', seconds: 300, ...over });
+
+  it('a countdown is 15 s to 60 min in steps of 15 s, with an optional one-line title', () => {
+    expect([R.CAST_TIMER_MIN_S, R.CAST_TIMER_MAX_S, R.CAST_TIMER_STEP_S]).toEqual([15, 3600, 15]);
+    expect(R.sanitizeItem(timer())).toEqual({ id: 'babcdefgh', kind: 'timer', title: '', seconds: 300 });
+    expect(R.sanitizeItem(timer({ title: '  Starting\n in ', seconds: 15 }))).toEqual({ id: 'babcdefgh', kind: 'timer', title: 'Starting in', seconds: 15 });
+    expect(R.sanitizeItem(timer({ seconds: 3600 })).seconds).toBe(3600);
+    expect(R.sanitizeItem(timer({ title: 'x'.repeat(90) })).title).toHaveLength(60);
+    for (const seconds of [0, 14, 20, 3615, 300.5, '300', null, -15, Infinity]) expect(R.sanitizeItem(timer({ seconds }))).toBeNull();
+  });
+
+  it('endsAt (the Worker\'s) is kept when it is a real time, so a stored stage reads back whole', () => {
+    expect(R.sanitizeItem(timer({ endsAt: 1794000000000.4 })).endsAt).toBe(1794000000000);
+    for (const endsAt of [0, -5, 'soon', NaN, Infinity, null]) expect('endsAt' in R.sanitizeItem(timer({ endsAt }))).toBe(false);
+    const stage = R.sanitizeStage({ rev: 2, show: { button: timer({ endsAt: 1794000000000, title: 'Starting in' }), at: 9, page: 1 } });
+    expect(stage.show.button).toEqual({ id: 'babcdefgh', kind: 'timer', title: 'Starting in', seconds: 300, endsAt: 1794000000000 });
+  });
+
+  it('the clock carries nothing but its kind', () => {
+    expect(R.sanitizeItem({ id: 'babcdefgh', kind: 'clock', title: 'x', text: 'y', endsAt: 5 })).toEqual({ id: 'babcdefgh', kind: 'clock', title: '' });
+  });
+
+  it('both go up as item presses and are views the TV may report; neither is ever a Sparks button', () => {
+    expect(R.sanitizeClassroomPress('item', { item: timer() }).data.item.kind).toBe('timer');
+    expect(R.sanitizeClassroomPress('item', { item: { id: 'babcdefgh', kind: 'clock' } }).data.item.kind).toBe('clock');
+    expect(R.sanitizeClassroomNow({ view: 'timer' })).toEqual({ view: 'timer' });
+    expect(R.sanitizeClassroomNow({ view: 'clock' })).toEqual({ view: 'clock' });
+    expect(R.CAST_ONLY_KINDS).toEqual(['timer', 'clock']);
+    expect(R.CLASSROOM_PLAYABLE_KINDS).not.toContain('timer');
+    const list = R.sanitizeButtons({ videos: [], items: [timer(), { id: 'bclock0001', kind: 'clock' }, { id: 'btext00001', kind: 'text', text: 'Hi' }] });
+    expect(list.items.map((i) => i.kind)).toEqual(['text']);
+  });
+});

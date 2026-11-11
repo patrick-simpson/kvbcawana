@@ -27,6 +27,10 @@
 // - Black (owner 2026-11-11): one button, always there, beside Take it down. It sends
 //   `black {on}`: the TV goes pure black over whatever is up, and "Show again" brings the
 //   same thing back. The stage says which (`stage.black`), so every page agrees.
+// - A countdown and the clock (owner 2026-11-11): two more choices. The countdown's time
+//   left under "On the TV now" ticks HERE, from the `endsAt` the state already carries and
+//   this device's clock corrected by the Worker's (`serverNow`, logic.js createSkew): a
+//   local half-second redraw, never a request.
 // - Slides on the TV: the phone's preview (preview.js): this slide, the next, every slide.
 // - "On the TV now": the state every 2 s while the page is visible (which is also what
 //   makes the TV report), nothing while hidden, and it stops after 30 minutes with no
@@ -39,6 +43,7 @@ import {
   captureWords, errorWords, filePress, fileProblem, linkToCopy, shareWords, size, textPress, titleFromName, tvWords, videoPress,
   CONVERT_GIVE_UP_MS, CONVERT_POLL_MS, SLIDES_ACCEPT, convertWords, slidesChoice,
   clock, facebookPress, resultPress, volumeWords,
+  clockPress, createSkew, timerPress,
 } from './logic.js';
 import { createPreview } from './preview.js';
 
@@ -75,6 +80,8 @@ export function createControls(conn) {
   let converting = ''; // the id of the PowerPoint being made into slides
   let clipFile = null; // { file, title } the last video sent
   let preview = null;
+  const skew = createSkew(); // the Worker's clock against this device's
+  let timerTick = 0; // the countdown line's local redraw
   const pictures = []; // { file, url, title }
 
   /* ── Requests ── */
@@ -114,10 +121,12 @@ export function createControls(conn) {
       setText($('tv-sub'), `Paused while you were away. ${VERB} anywhere to see the TV again.`);
       return;
     }
+    const sentAt = Date.now();
     const r = await request('/v1/cast/state');
     if (!conn.live()) return;
     if (r.ok && r.body) {
       failures = 0;
+      skew.add(sentAt, Date.now(), r.body.serverNow);
       state = { stage: R.sanitizeStage(r.body.stage), now: R.sanitizeClassroomNow(r.body.now), screenOnline: r.body.screenOnline === true };
       if (conn.onState) conn.onState(r.body);
       // Someone else put something up over this page's share: stop sending the picture.
@@ -136,7 +145,11 @@ export function createControls(conn) {
     const offline = failures >= TUNING.failuresBeforeWarning;
     const w = offline
       ? { main: 'Not reaching the TV right now.', sub: navigator.onLine === false ? 'This device is offline.' : 'Trying again…', online: false }
-      : tvWords(state, { short: conn.nav === true });
+      : tvWords(state, { short: conn.nav === true, at: Date.now() + skew.offset() });
+    // A countdown up: its time left is redrawn here twice a second (no request), until it is down.
+    const counting = Boolean(state.stage.show && state.stage.show.button.kind === 'timer');
+    if (counting && !timerTick) timerTick = setInterval(render, 500);
+    if (!counting && timerTick) { clearInterval(timerTick); timerTick = 0; }
     const black = state.stage.black === true;
     // Slides: the preview says which slide (no second "Page 2 of 9" line above it).
     if (!offline && w.online && !black && state.stage.show && state.stage.show.button.kind === 'pdf') w.sub = '';
@@ -294,6 +307,35 @@ export function createControls(conn) {
     const out = textPress({ heading: $('text-heading').value, text: $('text-body').value, look: look ? look.value : 'page' }, R);
     if (!out.ok) { setText($('press-note'), out.error); return; }
     press(out.press.action, out.press.data, 'The text is going up');
+  }
+
+  /* ── A countdown and the clock ── */
+
+  /** A quick pick (1, 2, 5, 10, 15 min) fills the fields; the picks show which one they hold. */
+  function markPicks() {
+    const exact = $('timer-sec').value === '0' ? $('timer-min').value.trim() : '';
+    for (const b of $('timer-picks').querySelectorAll('[data-min]')) b.setAttribute('aria-pressed', String(b.dataset.min === exact));
+  }
+
+  function pickTimer(e) {
+    const b = e.target.closest('[data-min]');
+    if (!b) return;
+    $('timer-min').value = b.dataset.min;
+    $('timer-sec').value = '0';
+    markPicks();
+  }
+
+  function sendTimer(e) {
+    e.preventDefault();
+    const out = timerPress({ minutes: $('timer-min').value, seconds: $('timer-sec').value, title: $('timer-title').value }, R);
+    if (!out.ok) { setText($('press-note'), out.error); return; }
+    press(out.press.action, out.press.data, 'The countdown is going up');
+  }
+
+  function sendClock() {
+    const out = clockPress(R);
+    if (!out.ok) { setText($('press-note'), out.error); return; }
+    press(out.press.action, out.press.data, 'The clock is going up');
   }
 
   /* ── Files: sent in parts, then put up with one press ── */
@@ -586,12 +628,16 @@ export function createControls(conn) {
   async function letGo(takeDown) {
     if (shareId) { const id = shareId; endShareHere(); setShare('stopped'); if (!takeDown && state && state.stage.show && state.stage.show.button.id === id) await press('back', null, 'Your screen is off the TV'); }
     converting = '';
+    clearInterval(timerTick);
+    timerTick = 0;
     state = null;
   }
 
   /** Refused (a 401): stop sending and forget the state. */
   function forget() {
     endShareHere();
+    clearInterval(timerTick);
+    timerTick = 0;
     state = null;
   }
 
@@ -605,6 +651,12 @@ export function createControls(conn) {
     document.querySelector('.choices').addEventListener('click', onChoice);
     $('video-form').addEventListener('submit', sendVideo);
     $('text-form').addEventListener('submit', sendText);
+    $('timer-form').addEventListener('submit', sendTimer);
+    $('timer-picks').addEventListener('click', pickTimer);
+    $('timer-min').addEventListener('input', markPicks);
+    $('timer-sec').addEventListener('change', markPicks);
+    $('clock-show').addEventListener('click', sendClock);
+    markPicks();
     $('pic-input').addEventListener('change', addPictures);
     $('pdf-input').addEventListener('change', sendPdfFile);
     $('pdf-copy').addEventListener('click', copyPdfLink);

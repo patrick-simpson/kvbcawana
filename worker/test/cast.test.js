@@ -204,6 +204,81 @@ describe('Cast: the house slide line', () => {
   });
 });
 
+// Owner 2026-11-11: a countdown and a clock, two more things to put up.
+describe('Cast: a countdown and the clock', () => {
+  const timer = (seconds, title) => ({ action: 'item', data: { item: { id: 'bplaceholder', kind: 'timer', seconds, ...(title === undefined ? {} : { title }) } } });
+  const clock = { action: 'item', data: { item: { id: 'bplaceholder', kind: 'clock' } } };
+  async function joined() {
+    const s = await setup();
+    const { code } = (await s.call('POST', '/v1/cast/open', {})).body;
+    const token = (await s.call('POST', '/v1/cast/join', { code }, { auth: '' })).body.token;
+    const press = (body) => s.call('POST', '/v1/cast/press', body, { auth: '', cast: token });
+    const screen = async () => (await s.call('GET', '/v1/cast/screen')).body;
+    return { ...s, token, press, screen };
+  }
+  const T0 = Date.parse('2026-11-08T21:00:00Z');
+
+  it('a countdown ends by the Worker\'s clock, set when the press is taken, whatever the press said', async () => {
+    const s = await joined();
+    s.tick(7000);
+    const r = await s.press({ action: 'item', data: { item: { id: 'bplaceholder', kind: 'timer', seconds: 300, title: ' Starting  in ', endsAt: 5 } } });
+    expect(r.status).toBe(200);
+    const body = await s.screen();
+    expect(body.serverNow).toBe(T0 + 7000);
+    expect(body.stage.show.button).toMatchObject({ kind: 'timer', seconds: 300, title: 'Starting in', endsAt: T0 + 7000 + 300000 });
+    expect(body.stage.show.button.id).toBe(r.body.button);
+    // The phone and the desk read the same moment (and the Worker's time to count from).
+    const st = (await s.call('GET', '/v1/cast/state', undefined, { auth: '', cast: s.token })).body;
+    expect(st.stage.show.button.endsAt).toBe(T0 + 307000);
+    expect(st.serverNow).toBe(T0 + 7000);
+    expect((await s.call('GET', '/v1/cast/desk/state')).body.stage.show.button.endsAt).toBe(T0 + 307000);
+    // Stored with the stage; a new one replaces it and counts from its own press.
+    s.core.cast.engine.stageCache = null;
+    expect((await s.screen()).stage.show.button.endsAt).toBe(T0 + 307000);
+    s.tick(60000);
+    await s.call('POST', '/v1/cast/desk/press', timer(15));
+    const next = (await s.screen()).stage.show.button;
+    expect(next).toMatchObject({ kind: 'timer', seconds: 15, title: '', endsAt: T0 + 67000 + 15000 });
+    // Past its end it simply stays up (0:00) until Back.
+    s.tick(10 * 60 * 1000);
+    expect((await s.screen()).stage.show.button.endsAt).toBe(T0 + 82000);
+    await s.press({ action: 'back' });
+    expect((await s.screen()).stage.show).toBeNull();
+  });
+
+  it('only 15 s to 60 min in steps of 15 s; anything else is not a press', async () => {
+    const s = await joined();
+    for (const seconds of [0, 10, 20, 3615, 7200, '300']) expect((await s.press(timer(seconds))).status).toBe(400);
+    expect((await s.press(timer(3600))).status).toBe(200);
+    expect((await s.press(timer(15))).status).toBe(200);
+  });
+
+  it('the clock goes up as an item with nothing in it; the video and page presses do not apply to either', async () => {
+    const s = await joined();
+    expect((await s.press(clock)).status).toBe(200);
+    expect((await s.screen()).stage.show.button).toMatchObject({ kind: 'clock', title: '' });
+    expect((await s.press({ action: 'video', data: { op: 'pause' } })).status).toBe(409);
+    expect((await s.press({ action: 'page', data: { step: 1 } })).status).toBe(409);
+    // Black covers it and shows it again like anything else.
+    await s.press({ action: 'black', data: { on: true } });
+    const st = (await s.screen()).stage;
+    expect(st.black).toBe(true);
+    expect(st.show.button.kind).toBe('clock');
+  });
+
+  it('the classroom room refuses both, and its button list never holds one', async () => {
+    const s = await setup();
+    for (const body of [timer(300), clock]) {
+      const r = await s.call('POST', '/v1/classroom/remote', body);
+      expect(r.status).toBe(400);
+      expect(r.body.reason).toBe('not-here');
+    }
+    expect((await s.call('GET', '/v1/classroom/stage')).body.stage.show).toBeNull();
+    const put = await s.call('PUT', '/v1/classroom/buttons', { baseRev: 0, buttons: { videos: [], items: [{ id: 'btimer0001', kind: 'timer', seconds: 300 }, { id: 'bclock0001', kind: 'clock' }] } });
+    expect(put.body.buttons.items).toEqual([]);
+  });
+});
+
 describe('Cast: one link copy at a time (IP-20261111-17)', () => {
   it('a second copy while one runs is 429 busy, counted against nothing; the next one after is fine', async () => {
     let release;
