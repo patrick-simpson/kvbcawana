@@ -171,6 +171,7 @@
   .choice[aria-current="page"]:hover { background: color-mix(in srgb, var(--nav-sel) 100%, var(--subtle)); }
   .choice[aria-current="page"] .f { opacity: .24; }
   .choice b { font-weight: 400; overflow: hidden; text-overflow: ellipsis; }
+  .navsep { height: 1px; margin: 4px 8px; background: var(--stroke-strong); }
   .pill { position: absolute; left: 0; top: 0; width: 3px; height: 16px; border-radius: 3px; background: var(--accent); transform: translateY(var(--y, 10px)); pointer-events: none; }
   .panefoot { margin-top: auto; display: grid; gap: 8px; padding: 12px 4px 0; border-top: 1px solid var(--stroke-strong); }
   .presence { display: flex; align-items: center; gap: 10px; padding: 4px 8px; color: var(--text-2); }
@@ -407,6 +408,8 @@
           <li><button class="choice" type="button" aria-expanded="false" aria-controls="p-pics" title="Pictures" data-title="Pictures" data-cap="Show pictures from this computer."><svg class="icon" viewBox="0 0 20 20" width="20" height="20" aria-hidden="true" focusable="false"><rect class="f" x="3" y="3.5" width="14" height="13" rx="2.5"/><rect x="3" y="3.5" width="14" height="13" rx="2.5"/><circle cx="7.5" cy="8" r="1.3"/><path d="M3.5 14l4-3.8 3 2.8 2.5-2.2 3.5 3.4"/></svg><b>Pictures</b></button></li>
           <li><button class="choice" type="button" aria-expanded="false" aria-controls="p-clip" title="Video file" data-title="Video file" data-cap="Play a video from this computer."><svg class="icon" viewBox="0 0 20 20" width="20" height="20" aria-hidden="true" focusable="false"><path class="f" d="M5.5 2.5h6l4 4v9a2 2 0 01-2 2h-8a2 2 0 01-2-2v-11a2 2 0 012-2z"/><path d="M5.5 2.5h6l4 4v9a2 2 0 01-2 2h-8a2 2 0 01-2-2v-11a2 2 0 012-2z"/><path d="M11.5 2.5v4h4"/><path d="M8.3 9.8v4l3.2-2z"/></svg><b>Video file</b></button></li>
           <li><button class="choice" type="button" aria-expanded="false" aria-controls="p-text" title="Text" data-title="Text" data-cap="A verse or an announcement, big on the TV."><svg class="icon" viewBox="0 0 20 20" width="20" height="20" aria-hidden="true" focusable="false"><rect class="f" x="2.5" y="3.5" width="15" height="13" rx="2.5"/><path d="M3.5 5.5h13M3.5 9.5h13M3.5 13.5h8"/></svg><b>Text</b></button></li>
+          <li class="navsep" role="separator"></li>
+          <li><button class="choice" type="button" aria-expanded="false" aria-controls="p-house" title="House slide" data-title="House slide" data-cap="What the TV shows when nothing is up."><svg class="icon" viewBox="0 0 20 20" width="20" height="20" aria-hidden="true" focusable="false"><rect class="f" x="2.5" y="3.5" width="15" height="13" rx="2.5"/><rect x="2.5" y="3.5" width="15" height="13" rx="2.5"/><circle cx="10" cy="8.4" r="2.4"/><path d="M6.5 13.4h7"/></svg><b>House slide</b></button></li>
         </ul>
       </div>
     </nav>
@@ -533,6 +536,22 @@
               <div class="setting actions"><button class="primary" type="submit">Show on the TV</button></div>
             </form>
           </section>
+
+          <!-- The house slide (owner 2026-11-11): what the TV shows with nothing up. Set here only. -->
+          <section class="panel" id="p-house" hidden>
+            <form id="house-form" class="group">
+              <div class="setting stack">
+                <svg class="svg-ic" viewBox="0 0 20 20" width="20" height="20" aria-hidden="true" focusable="false"><path d="M4 5.5h12M10 5.5v10"/></svg>
+                <div class="txt"><label for="house-line">House slide line</label><small>One line under the church logo, such as Welcome. Leave it empty for the logo alone.</small></div>
+                <div class="ctl"><div class="row">
+                  <input type="text" id="house-line" maxlength="60" autocomplete="off" placeholder="Welcome">
+                  <button class="primary" type="submit">Save</button>
+                </div></div>
+              </div>
+            </form>
+            <p class="note" id="house-note" role="status"></p>
+            <p class="help">The TV shows the house slide whenever nothing is up. The line stays when Cast is turned off and on again.</p>
+          </section>
         </main>
       </div>
 
@@ -543,7 +562,7 @@
             <div class="bezel"><div class="screen" id="tv-mini" data-kind="code" data-shot="false">
               <img id="tv-shot" alt="A live picture of what the TV is showing" decoding="async" hidden>
               <div class="ph" id="tv-ph">
-                <svg class="g-code" viewBox="0 0 48 48" aria-hidden="true" focusable="false"><rect x="7" y="7" width="13" height="13" rx="2.5"/><rect x="28" y="7" width="13" height="13" rx="2.5"/><rect x="7" y="28" width="13" height="13" rx="2.5"/><path d="M28 28h5v5h-5zM36 36h5v5h-5zM36 28h5M28 36h2"/></svg>
+                <svg class="g-code" viewBox="0 0 48 48" aria-hidden="true" focusable="false"><rect x="5" y="8" width="38" height="32" rx="6"/><circle cx="24" cy="20" r="6"/><path d="M15 32h18"/></svg>
                 <svg class="g-video" viewBox="0 0 48 48" aria-hidden="true" focusable="false"><rect x="5" y="9" width="38" height="30" rx="7"/><path d="M20 18v12l10-6z"/></svg>
                 <svg class="g-slides" viewBox="0 0 48 48" aria-hidden="true" focusable="false"><rect x="6" y="8" width="36" height="25" rx="4"/><path d="M24 33v8M17 41h14M14 17h20M14 24h12"/></svg>
                 <svg class="g-picture" viewBox="0 0 48 48" aria-hidden="true" focusable="false"><rect x="6" y="8" width="36" height="32" rx="6"/><circle cx="17" cy="19" r="3.2"/><path d="M7 35l10-9.5 7.5 7 6-5.5 10.5 9"/></svg>
@@ -551,7 +570,7 @@
                 <svg class="g-share" viewBox="0 0 48 48" aria-hidden="true" focusable="false"><rect x="5" y="8" width="38" height="26" rx="4"/><path d="M24 29V16M18.5 21.5L24 16l5.5 5.5M16 41h16"/></svg>
                 <svg class="g-black" viewBox="0 0 48 48" aria-hidden="true" focusable="false"><rect x="5" y="8" width="38" height="26" rx="4"/><path d="M16 41h16M24 34v7"/><path d="M15 21h18"/></svg>
                 <svg class="g-off" viewBox="0 0 48 48" aria-hidden="true" focusable="false"><rect x="5" y="8" width="38" height="26" rx="4"/><path d="M16 41h16M24 34v7M12 14l24 14"/></svg>
-                <span class="cap" id="tv-ph-label">Showing its code</span>
+                <span class="cap" id="tv-ph-label">Showing the house slide</span>
               </div>
             </div></div>
             <div class="stand" aria-hidden="true"></div>

@@ -158,6 +158,52 @@ describe('Cast: Black', () => {
   });
 });
 
+// Owner 2026-11-11: the house slide (the church's logo and one optional line with nothing up).
+describe('Cast: the house slide line', () => {
+  it('is set at the desk with the computer\'s sign-in only, cleaned to one line of 60, and rings the TV', async () => {
+    const s = await setup();
+    const { code } = (await s.call('POST', '/v1/cast/open', {})).body;
+    const token = (await s.call('POST', '/v1/cast/join', { code }, { auth: '' })).body.token;
+    // Never a presenter's: no sign-in, or a token alone, is refused.
+    expect((await s.call('PUT', '/v1/cast/desk/house', { line: 'x' }, { auth: '' })).status).toBe(401);
+    expect((await s.call('PUT', '/v1/cast/desk/house', { line: 'x' }, { auth: '', cast: token })).status).toBe(401);
+    expect((await s.call('GET', '/v1/cast/desk/house', undefined, { auth: '', cast: token })).status).toBe(401);
+    // Nothing set yet: the logo alone, everywhere it is read.
+    expect((await s.call('GET', '/v1/cast/desk/house')).body).toEqual({ ok: true, house: { line: '', savedAt: null } });
+    expect((await s.call('GET', '/v1/cast/screen')).body.house).toEqual({ line: '' });
+    s.frames.length = 0;
+    const put = await s.call('PUT', '/v1/cast/desk/house', { line: '  Welcome\n to   Kennebec Valley  ' });
+    expect(put.status).toBe(200);
+    expect(put.body.house.line).toBe('Welcome to Kennebec Valley');
+    expect(put.body.house.savedAt).toBe('2026-11-08T21:00:00.000Z');
+    expect(s.frames.some((f) => f.e === 'changed' && f.d?.what === 'cast' && f.d?.house === true)).toBe(true);
+    // The TV reads it with its one read; the desk with its state; a presenter's state has none.
+    expect((await s.call('GET', '/v1/cast/screen')).body.house).toEqual({ line: 'Welcome to Kennebec Valley' });
+    expect((await s.call('GET', '/v1/cast/desk/state')).body.house).toEqual({ line: 'Welcome to Kennebec Valley' });
+    expect((await s.call('GET', '/v1/cast/state', undefined, { auth: '', cast: token })).body.house).toBeUndefined();
+    expect((await s.call('PUT', '/v1/cast/desk/house', { line: 'y'.repeat(90) })).body.house.line).toHaveLength(60);
+    // Not a line: refused, nothing changed.
+    expect((await s.call('PUT', '/v1/cast/desk/house', { line: 7 })).status).toBe(400);
+    expect((await s.call('PUT', '/v1/cast/desk/house', {})).status).toBe(400);
+    expect((await s.call('GET', '/v1/cast/desk/house')).body.house.line).toHaveLength(60);
+  });
+
+  it('is the church\'s own: a reset, a new code, Cast off and on, and a restart all keep it; empty means the logo alone', async () => {
+    const s = await setup();
+    await s.call('POST', '/v1/cast/open', {});
+    await s.call('PUT', '/v1/cast/desk/house', { line: 'Welcome' });
+    await s.call('POST', '/v1/cast/reset', {});
+    expect((await s.call('GET', '/v1/cast/screen')).body.house.line).toBe('Welcome');
+    await s.call('POST', '/v1/cast/close', {});
+    await s.call('POST', '/v1/cast/open', {});
+    expect((await s.call('GET', '/v1/cast/screen')).body.house.line).toBe('Welcome');
+    // Stored under its own key, in the cleaned shape.
+    expect(await s.core.storage.get('cast:house')).toEqual({ line: 'Welcome', savedAt: '2026-11-08T21:00:00.000Z' });
+    expect((await s.call('PUT', '/v1/cast/desk/house', { line: '   ' })).body.house.line).toBe('');
+    expect((await s.call('GET', '/v1/cast/screen')).body.house).toEqual({ line: '' });
+  });
+});
+
 describe('Cast: one link copy at a time (IP-20261111-17)', () => {
   it('a second copy while one runs is 429 busy, counted against nothing; the next one after is fine', async () => {
     let release;

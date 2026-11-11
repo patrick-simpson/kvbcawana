@@ -38,12 +38,17 @@
 // whatever is up (a playing video is paused by the TV) until `black {on: false}`
 // brings the same thing back. Back, a new thing going up, a new code and the tray's
 // reset all clear it. The classroom room refuses the press (worker/src/classroom.js).
+// THE HOUSE SLIDE: with nothing up the Cast TV shows the church's logo and ONE optional
+// line set at the lobby computer's desk (CAST_HOUSE_LINE_MAX, sanitizeHouse). It is the
+// church's own, kept across rooms (worker/src/cast.js `cast:house`), never a guest's.
 
 export const CLASSROOM_VIDEOS_MAX = 4;
 export const CLASSROOM_ITEMS_MAX = 8;
 export const CLASSROOM_TITLE_MAX = 60;
 export const CLASSROOM_HEADING_MAX = 60;
 export const CLASSROOM_TEXT_MAX = 400;
+/** Cast's house slide: its one optional line under the church logo is at most this long. */
+export const CAST_HOUSE_LINE_MAX = 60;
 /** An uploaded or copied file: at most this big, sent in parts of PART bytes (under the Worker's 128 KiB body cap). */
 export const CLASSROOM_FILE_MAX_BYTES = 20 * 1024 * 1024;
 export const CLASSROOM_FILE_PART_BYTES = 96 * 1024;
@@ -109,6 +114,15 @@ export function cleanText(v) {
   while (lines.length && !lines[lines.length - 1]) lines.pop();
   while (lines.length && !lines[0]) lines.shift();
   return lines.slice(0, 8).join('\n').slice(0, CLASSROOM_TEXT_MAX);
+}
+
+/**
+ * Cast's house slide (what the TV shows with nothing up): `{line}`, one line, '' = the
+ * logo alone. Cleaned the same way by the Worker, the desk and the TV.
+ * @param {unknown} v @returns {{ line: string }}
+ */
+export function sanitizeHouse(v) {
+  return { line: oneLine(isObj(v) ? v.line : '', CAST_HOUSE_LINE_MAX) };
 }
 
 export const isButtonId = (v) => typeof v === 'string' && BUTTON_ID_RE.test(v);

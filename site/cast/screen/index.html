@@ -9,8 +9,9 @@
 <link rel="stylesheet" href="../church/church.css">
 <style>
   /* The Cast screen (owner 2026-11-08; worker/src/routes.md 10.18): what KVBC Awana
-     shows on the lobby TV while Cast is on. Waiting = the code on the church's cream;
-     anything a presenter puts up = on black, edge to edge. Sizes in --u, 1% of the
+     shows on the lobby TV while Cast is on. Waiting = the house slide (the church's logo
+     on cream); asked for = the code, white on black; anything a presenter puts up = on
+     black, edge to edge. Sizes in --u, 1% of the
      largest 16:9 box in the window, so 720p, 1080p and 4K draw the same picture. */
   * { box-sizing: border-box; }
   html, body { margin: 0; height: 100%; overflow: hidden; }
@@ -32,10 +33,20 @@
   .card .foot b { font-weight: 700; color: var(--c-text); }
   /* The code and QR stay hidden until someone clicks the screen (owner 2026-11-08: "the pin
      should not show up by default until it's clicked on, same with the QR code"). */
-  .reveal { display: none; margin: calc(3.4 * var(--u)) 0 0; padding: calc(2 * var(--u)) calc(3 * var(--u)); border: 2px dashed var(--c-rule); border-radius: calc(1 * var(--u)); font: 500 calc(3 * var(--u))/1.2 var(--heading); color: var(--c-muted); width: max-content; }
   .card.code-hidden .code, .card.code-hidden .qr { display: none !important; }
-  .card.code-hidden .reveal { display: block; }
   .card.code-hidden { cursor: pointer; }
+
+  /* ── waiting: the house slide (owner 2026-11-11) ──
+     With nothing up and the code not asked for, the TV shows the church's logo on its cream,
+     ONE optional line set at the lobby computer's desk, and a quiet hint at the foot. It
+     lies over the code screen and steps away (opacity) when the code is asked for. */
+  .house { background: var(--cream); color: var(--charcoal); display: grid; grid-template-rows: 1fr auto; justify-items: center; padding: 6.2vh 7vw 5.4vh; cursor: pointer; transition: opacity var(--t-slow) var(--ease-in-out); }
+  .house.is-away { opacity: 0; pointer-events: none; }
+  .house-mid { align-self: center; display: grid; justify-items: center; text-align: center; }
+  .house-logo { display: block; width: calc(58 * var(--u)); height: auto; }
+  .house-line { margin: calc(4.6 * var(--u)) 0 0; max-width: calc(78 * var(--u)); font: 400 calc(4.4 * var(--u))/1.2 var(--heading); letter-spacing: .01em; text-wrap: balance; overflow-wrap: anywhere; }
+  .house-line::before { content: ''; display: block; width: calc(7 * var(--u)); height: max(2px, calc(.16 * var(--u))); margin: 0 auto calc(3.6 * var(--u)); background: var(--tan); }
+  .house-hint { margin: 0; font: 500 calc(1.25 * var(--u))/1 var(--heading); letter-spacing: .18em; text-transform: uppercase; color: #8C7760; }
   .card h1 { font: 500 calc(5 * var(--u))/1.05 var(--heading); letter-spacing: -.01em; margin: 0; }
   .card .go { font: 400 calc(2.5 * var(--u))/1.4 var(--body); color: var(--c-muted); margin: calc(1.6 * var(--u)) 0 0; }
   .card .go b { font-weight: 700; color: var(--c-text); }
@@ -80,7 +91,10 @@
     .card > .logo { animation: cast-rise var(--t-slow) var(--ease-out) both; }
     .card .middle h1 { animation: cast-rise var(--t-slow) var(--ease-out) 90ms both; }
     .card .middle .go { animation: cast-rise var(--t-slow) var(--ease-out) 170ms both; }
-    .card .middle .reveal { animation: cast-rise var(--t-slow) var(--ease-out) 250ms both; }
+    /* The house slide settles in: the logo, then the line, then the hint. */
+    .house:not(.is-away) .house-logo { animation: cast-rise var(--t-slow) var(--ease-out) both; }
+    .house:not(.is-away) .house-line { animation: cast-rise var(--t-slow) var(--ease-out) 140ms both; }
+    .house:not(.is-away) .house-hint { animation: cast-fade var(--t-slow) var(--ease-out) 420ms both; }
     .card > .foot { animation: cast-fade var(--t-slow) var(--ease-out) 380ms both; }
     /* Asked for: the digits rise one after another, the QR settles in beside them. */
     .card:not(.code-hidden) .code > span { animation: cast-rise var(--t-slow) var(--ease-out) both; }
@@ -109,11 +123,18 @@
         <h1 id="card-title">Present on this screen</h1>
         <p class="go" id="card-go">Go to <b id="card-addr">cast.kvbchurch.org</b> and enter</p>
         <p class="code is-empty" id="code" aria-label="Code"><span id="code-a">···</span><span id="code-b">···</span></p>
-        <p class="reveal" id="reveal">Click this screen to show the code</p>
       </div>
       <figure class="qr" id="qr" hidden><canvas id="qr-canvas" aria-label="QR code: open the Cast page with this code"></canvas><figcaption>Or scan</figcaption></figure>
     </div>
     <p class="foot" id="card-foot"><span>Casting a laptop? Join the <b>KVBC_Guest</b> Wi-Fi first. Phones can present on any connection.</span></p>
+  </section>
+  <!-- Waiting, the code not asked for: the house slide (the logo, one optional line) -->
+  <section class="layer house is-away" id="house">
+    <div class="house-mid">
+      <img class="house-logo" src="../church/kvbc-logo.png" alt="Kennebec Valley Baptist Church" width="1302" height="277">
+      <p class="house-line" id="house-line" hidden></p>
+    </div>
+    <p class="house-hint">Click for the Cast code</p>
   </section>
   <!-- Something a presenter put up -->
   <section class="layer" id="show" hidden></section>

@@ -7,6 +7,10 @@
 // phone joining, leaving or being let go never touches this window (routes.md 10.18).
 // No screen share: it is the TV's own computer.
 //
+// The house slide's line (owner 2026-11-11) is set HERE only: the "House slide" page's one
+// field, saved with PUT /v1/cast/desk/house. The line the Worker holds comes with every
+// state answer (`house`), so the field fills itself with no request of its own.
+//
 // Signed in ONLY through the app: KVBC Awana's bridge (static/display/cast-preload.cjs,
 // window.awanaCastHost.session()) hands over the computer's sign-in, kept in memory only
 // (this page is only ever the app's window). A 401 asks the app once more (a newer
@@ -81,6 +85,7 @@ function off(title, words) {
 function drawRoom(body) {
   drawTv(body);
   void refreshShot();
+  drawHouse(body);
   const code = typeof body.code === 'string' && /^\d{6}$/.test(body.code) ? body.code : '';
   setText($('desk-code'), code ? formatCode(code) : '— — —');
   $('desk-code').setAttribute('aria-label', code ? `Code ${code.split('').join(' ')}` : 'No code yet');
@@ -112,7 +117,7 @@ async function drawQr(code) {
 /* ── The TV card: the miniature, what is up, the video's progress ── */
 
 const KIND_GLYPH = { video: 'video', clip: 'video', facebook: 'video', pdf: 'slides', image: 'picture', text: 'text', screen: 'share' };
-const GLYPH_WORDS = { black: 'The TV is black', code: 'Showing its code', video: 'A video is playing', slides: 'Slides are up', picture: 'A picture is up', text: 'Text is up', share: 'A shared screen is up', off: 'The TV is not answering' };
+const GLYPH_WORDS = { black: 'The TV is black', code: 'Showing the house slide', video: 'A video is playing', slides: 'Slides are up', picture: 'A picture is up', text: 'Text is up', share: 'A shared screen is up', off: 'The TV is not answering' };
 
 function drawTv(body) {
   const stage = R.sanitizeStage(body.stage);
@@ -241,6 +246,33 @@ function say(words, ok) {
   if (ok) note.dataset.sev = 'ok'; else delete note.dataset.sev;
 }
 
+/* ── The house slide's line ── */
+
+let houseSeen = null; // the line the Worker last said (null = not heard yet)
+
+/** The Worker's line into the field, when it changed there and nobody is typing in it. */
+function drawHouse(body) {
+  const { line } = R.sanitizeHouse(body.house);
+  if (line === houseSeen) return;
+  houseSeen = line;
+  const el = $('house-line');
+  if (document.activeElement !== el) el.value = line;
+}
+
+async function saveHouse(e) {
+  e.preventDefault();
+  const note = $('house-note');
+  note.classList.remove('bad');
+  const { line } = R.sanitizeHouse({ line: $('house-line').value });
+  setText(note, 'Saving…');
+  const r = await ui.request('/v1/cast/house', { method: 'PUT', body: { line } });
+  if (r.status === 401) return;
+  if (!r.ok || !r.body) { setText(note, 'That was not saved. Try again.'); note.classList.add('bad'); return; }
+  houseSeen = R.sanitizeHouse(r.body.house).line;
+  $('house-line').value = houseSeen;
+  setText(note, houseSeen ? 'Saved. The TV shows it under the logo when nothing is up.' : 'Saved. The house slide is the logo alone.');
+}
+
 async function copyAddress() {
   const note = $('copy-note');
   try {
@@ -287,6 +319,7 @@ async function start() {
   $('btn-reveal').addEventListener('click', reveal);
   $('btn-kick').addEventListener('click', kick);
   $('btn-copy').addEventListener('click', copyAddress);
+  $('house-form').addEventListener('submit', saveHouse);
   document.querySelector('.choices').addEventListener('click', onNav);
   document.querySelector('.choices').addEventListener('keydown', onNavKey);
   watchNotes();

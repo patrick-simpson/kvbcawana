@@ -116,7 +116,9 @@ test('the volume between the − and + buttons', () => {
 });
 
 test('the "On the TV now" line', () => {
-  assert.deepEqual(tvWords({ stage: R.sanitizeStage(null), now: null, screenOnline: true }), { main: 'Nothing yet. The TV is showing its code.', sub: '', online: true });
+  // The house slide (owner 2026-11-11): with nothing up the TV shows the church logo, so the words say that now.
+  assert.deepEqual(tvWords({ stage: R.sanitizeStage(null), now: null, screenOnline: true }), { main: 'Nothing yet. The TV is showing the church logo.', sub: '', online: true });
+  assert.equal(tvWords({ stage: R.sanitizeStage(null), now: null, screenOnline: true }, { short: true }).main, 'Nothing yet: the house slide');
   assert.match(tvWords({ stage: R.sanitizeStage(null), now: null, screenOnline: false }).main, /not answering/);
   const stage = R.sanitizeStage({ rev: 3, show: { button: { id: 'babcdefgh', kind: 'video', youtube: 'dQw4w9WgXcQ', title: 'Welcome' }, at: 1, page: 1 } });
   const now = R.sanitizeClassroomNow({ view: 'video', button: 'babcdefgh', video: { t: 65, d: 200, paused: true, muted: false, volume: 70 } });
@@ -351,10 +353,43 @@ test('never a black screen: the picture shows only once it arrives, and a share 
 test('the code and QR stay hidden until a click, the tray or Display code asks', () => {
   assert.match(screenPage, /<section class="layer card code-hidden" id="card">/);
   assert.match(screenPage, /\.card\.code-hidden \.code, \.card\.code-hidden \.qr \{ display: none !important; \}/);
-  assert.match(screenPage, /Click this screen to show the code/);
+  // The house slide (owner 2026-11-11) replaced the "Click this screen to show the code" card:
+  // the hint is its foot line now; every way of asking for the code is as it was.
+  assert.match(screenPage, /<p class="house-hint">Click for the Cast code<\/p>/);
+  assert.ok(!/Click this screen to show the code/.test(screenPage));
   assert.match(screen, /document\.addEventListener\('pointerdown', \(\) => \{ if \(layer\.hidden\) reveal\(\); \}\);/);
   assert.match(screen, /const asked = Number\(r\.body\.revealAt\) \|\| 0;/);
   assert.match(screen, /REVEAL_MS = 5 \* 60 \* 1000/);
+});
+
+// Owner 2026-11-11: "All of those sound fantastic. Let's build them" (the house slide).
+test('the house slide: the church logo on cream, one optional line from the desk, shown while the code is hidden', () => {
+  // The TV: a cream layer with the church's own logo, the line (hidden while empty) and the hint.
+  assert.match(screenPage, /<section class="layer house is-away" id="house">/);
+  assert.match(screenPage, /\.house \{ background: var\(--cream\); color: var\(--charcoal\);/);
+  assert.match(screenPage, /<img class="house-logo" src="\.\.\/church\/kvbc-logo\.png" alt="Kennebec Valley Baptist Church"/);
+  assert.match(screenPage, /<p class="house-line" id="house-line" hidden><\/p>/);
+  // Up exactly while the code is hidden; never over a calm note or in configure mode.
+  assert.match(screen, /const on = !CONFIGURE && !calmNote && \$\('card'\)\.classList\.contains\('code-hidden'\);/);
+  const reveal = screen.slice(screen.indexOf('function reveal()'), screen.indexOf('/* ── The room ── */'));
+  assert.equal((reveal.match(/drawHouse\(\);/g) || []).length, 2, 'asking for the code puts the house slide away; hiding it brings it back');
+  // The line comes with the TV's one read (no request of its own), cleaned by the shared rule, as text.
+  assert.match(screen, /drawHouseLine\(r\.body\.house\);/);
+  assert.match(screen, /const \{ line \} = R\.sanitizeHouse\(house\);/);
+  assert.ok(!/\/v1\/cast\/desk\/house|\/house'/.test(screen), 'the TV never asks for the house slide by itself');
+  assert.ok(!/innerHTML/.test(screen + controls + appOwn));
+  // The desk: the one place it is set. A nav item, a field of 60, saved through the desk route.
+  const deskPage = read('cast', 'desk', 'index.html');
+  const desk = read('cast', 'desk', 'desk.js');
+  assert.match(deskPage, /aria-controls="p-house" title="House slide"/);
+  assert.match(deskPage, /<label for="house-line">House slide line<\/label>/);
+  assert.match(deskPage, /<input type="text" id="house-line" maxlength="60"/);
+  assert.equal(R.CAST_HOUSE_LINE_MAX, 60);
+  assert.match(desk, /ui\.request\('\/v1\/cast\/house', \{ method: 'PUT', body: \{ line \} \}\)/);
+  assert.match(desk, /if \(document\.activeElement !== el\) el\.value = line;/, 'never over what someone is typing');
+  assert.ok(!/innerHTML/.test(desk));
+  // The phone page has no such field: a guest cannot change the church's slide.
+  assert.ok(!/house/i.test(page + appOwn));
 });
 
 // Owner 2026-11-08: "Everything this does should have professional animations and

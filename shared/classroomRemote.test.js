@@ -27,3 +27,13 @@ describe('Black (Cast): the press and the stage', () => {
     expect(up.show.button.text).toBe('Welcome');
   });
 });
+
+describe('the house slide (Cast): one optional line', () => {
+  it('is one cleaned line of at most 60 characters; anything else is the logo alone', () => {
+    expect(R.CAST_HOUSE_LINE_MAX).toBe(60);
+    expect(R.sanitizeHouse({ line: '  Welcome\n to   church ' })).toEqual({ line: 'Welcome to church' });
+    expect(R.sanitizeHouse({ line: 'x'.repeat(200) }).line).toHaveLength(60);
+    expect(R.sanitizeHouse({ line: 'Hi', savedAt: 'x', html: '<b>' })).toEqual({ line: 'Hi' });
+    for (const bad of [null, undefined, 'Welcome', 7, [], { line: 7 }, { line: null }, {}]) expect(R.sanitizeHouse(bad)).toEqual({ line: '' });
+  });
+});

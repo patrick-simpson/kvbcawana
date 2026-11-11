@@ -210,7 +210,8 @@ export function tvWords({ stage, now, screenOnline }, opts = {}) {
   if (!shown) {
     if (black && screenOnline) return { main: 'The TV is black.', sub: 'Nothing is up underneath.', online: true };
     return screenOnline
-      ? { main: 'Nothing yet. The TV is showing its code.', sub: '', online: true }
+      // Nothing up: the TV is on its house slide (the church logo; owner 2026-11-11).
+      ? { main: opts.short ? 'Nothing yet: the house slide' : 'Nothing yet. The TV is showing the church logo.', sub: '', online: true }
       : { main: 'The TV is not answering right now.', sub: 'It may be turning on. Anything you send will show when it does.', online: false };
   }
   const mine = now && now.button === shown.id ? now : null;

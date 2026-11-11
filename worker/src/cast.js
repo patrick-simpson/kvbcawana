@@ -17,6 +17,11 @@
 //   cast:room                   {code, at, tokens: [{hash, at}]}
 // Opening (a new code) or closing the room clears the stage, every file and every
 // token: nothing a guest put up outlives their session.
+//   cast:house                  {line, savedAt}: the HOUSE SLIDE's one optional line
+//                               (owner 2026-11-11). With nothing up the TV shows the
+//                               church's logo and this line. It is the church's own, set
+//                               at the desk (GET/PUT /v1/cast/desk/house), so opening,
+//                               closing and resetting the room never clear it.
 //
 // PowerPoint (owner 2026-11-08: "Support pptx upload and show a preview on the phone
 // screen", the exact copy): the presenter's browser scrambles the .pptx (AES-256-GCM,
@@ -69,9 +74,11 @@
 import { Classroom, linkCopyBusy, newId } from './classroom.js';
 import { netOf } from './netof.js';
 import { fail, json } from './http.js';
-import { CLASSROOM_CLIP_MAX_BYTES, CLASSROOM_FILE_MAX_BYTES, CLASSROOM_FILE_TYPES, fileLimits, isClipType } from '../../shared/classroomRemote.js';
+import { CLASSROOM_CLIP_MAX_BYTES, CLASSROOM_FILE_MAX_BYTES, CLASSROOM_FILE_TYPES, fileLimits, isClipType, sanitizeHouse } from '../../shared/classroomRemote.js';
 
 const ROOM_KEY = 'cast:room';
+/** The house slide's line: church-wide, kept across rooms. */
+const HOUSE_KEY = 'cast:house';
 
 // What a guest may keep in the room (a guest needs no passphrase, so this bounds
 // what one code can cost the free plan's storage and writes). A talk needs a few
@@ -461,7 +468,32 @@ export class Cast {
     const body = await (await this.engine.remoteState()).json();
     const t = this.now();
     const presenter = room.tokens.some((x) => t - x.at <= TOKEN_TTL_MS && t - (this.seen.get(x.hash) ?? x.at) <= PRESENTER_IDLE_MS);
-    return json({ ...body, code: room.code, presenter });
+    return json({ ...body, code: room.code, presenter, house: sanitizeHouse(await this.houseDoc()) });
+  }
+
+  /** The house slide: its line, and when it was saved. @returns {Promise<{ line: string, savedAt: string | null }>} */
+  async houseDoc() {
+    const d = await this.storage.get(HOUSE_KEY);
+    return { ...sanitizeHouse(d), savedAt: typeof d?.savedAt === 'string' ? d.savedAt : null };
+  }
+
+  /** GET /v1/cast/desk/house (the desk): the house slide's line. */
+  async house() {
+    return json({ ok: true, house: await this.houseDoc() });
+  }
+
+  /**
+   * PUT /v1/cast/desk/house {line} (the desk's "House slide line"): one line, cleaned and
+   * cut to CAST_HOUSE_LINE_MAX; '' = the logo alone. One write, the last one wins; the TV
+   * is rung so it shows the new line at once.
+   * @param {any} body
+   */
+  async putHouse(body) {
+    if (typeof body?.line !== 'string') return fail('Send the line to show (empty for the logo alone).', 400, { reason: 'line' });
+    const house = { ...sanitizeHouse(body), savedAt: new Date(this.now()).toISOString() };
+    await this.storage.put(HOUSE_KEY, house);
+    this.ring({ what: 'cast', rev: (await this.engine.stage()).rev, house: true });
+    return json({ ok: true, house });
   }
 
   /** POST /v1/cast/desk/reveal (the desk's "Show the code on the TV"): the TV shows its code; nobody is let go. */
@@ -476,12 +508,12 @@ export class Cast {
     return json({ ok: true });
   }
 
-  /** GET /v1/cast/screen (the Cast screen): its code and the stage. */
+  /** GET /v1/cast/screen (the Cast screen): its code, the stage and the house slide's line (no second request). */
   async screen() {
     const room = await this.roomDoc();
     const res = await this.engine.readStage(true);
     const body = await res.json();
-    return json({ ...body, code: room.code, revealAt: room.revealAt });
+    return json({ ...body, code: room.code, revealAt: room.revealAt, house: sanitizeHouse(await this.houseDoc()) });
   }
 
   /* ── PowerPoint into slides ── */
@@ -684,6 +716,8 @@ export function mountCast(registry, core) {
   // routes (it is the same computer as the TV).
   registry.add('GET', '/v1/cast/desk/state', 'session', async () => c().deskState());
   registry.add('POST', '/v1/cast/desk/reveal', 'session', async () => c().deskReveal());
+  registry.add('GET', '/v1/cast/desk/house', 'session', async () => c().house());
+  registry.add('PUT', '/v1/cast/desk/house', 'session', async ({ body }) => c().putHouse(await body()));
   registry.add('GET', '/v1/cast/desk/youtube', 'session', async ({ url }) => c().youtube(url.searchParams.get('q')));
   registry.add('POST', '/v1/cast/desk/press', 'session', async ({ body }) => c().engine.press(DESK, await body()));
   registry.add('POST', '/v1/cast/desk/files', 'session', async ({ body }) => c().fileStart(DESK, await body()));

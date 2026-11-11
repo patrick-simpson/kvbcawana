@@ -1739,7 +1739,7 @@ each good for `TOKEN_TTL_MS` (8 h).
 | --- | --- | --- | --- |
 | `POST /v1/cast/open` | session (the Cast screen) | `{}` | `{ok, code}`: a fresh code; whatever was up, every file and token gone |
 | `POST /v1/cast/close` | session | `{}` | `{ok}`: no code, nothing kept (KVBC Awana turning Cast off) |
-| `GET /v1/cast/screen` | session | | as `GET /v1/classroom/stage` plus `code` |
+| `GET /v1/cast/screen` | session | | as `GET /v1/classroom/stage` (so `serverNow` too) plus `code`, `revealAt` and `house {line}` (the house slide's line, below: the TV needs no request of its own for it) |
 | `GET /v1/cast/screen/files/:id` | session | | the file (as 10.13) |
 | `POST /v1/cast/screen/now` | session | `{now}` | as `POST /v1/classroom/now` (views add `screen`, `waiting`) |
 | `GET /v1/cast/screen/signal` | session | | `{signal: {type: 'offer', id, sdp} \| null, id}`: the share's offer |
@@ -1781,12 +1781,25 @@ screen-share signal or ICE routes (it is the TV's own computer).
 
 | Route | Auth | Request | Answer |
 | --- | --- | --- | --- |
-| `GET /v1/cast/desk/state` | session | | as `GET /v1/cast/state` (reading it is watching) plus `code` (always, whether or not the TV shows it) and `presenter` (a phone is connected and not idle) |
+| `GET /v1/cast/desk/state` | session | | as `GET /v1/cast/state` (reading it is watching) plus `code` (always, whether or not the TV shows it), `presenter` (a phone is connected and not idle) and `house {line}` (the house slide's line, so the desk's field fills itself) |
+| `GET /v1/cast/desk/house` | session | | `{ok, house: {line, savedAt}}` (`''` and `null` when never set) |
+| `PUT /v1/cast/desk/house` | session | `{line}` (a string; cleaned to ONE line of at most `CAST_HOUSE_LINE_MAX` 60 with the shared `oneLine`; `''` = the logo alone) | `{ok, house: {line, savedAt}}`; rings `changed {what: 'cast', rev, house: true}` so the TV reads it at once; 400 `line` when it is not a string |
 | `POST /v1/cast/desk/reveal` | session | `{}` | `{ok}`: the TV shows its code for `REVEAL_MS` (`revealAt`); nobody is let go, nothing taken down |
 | `POST /v1/cast/desk/press` | session | as `POST /v1/cast/press` | as `POST /v1/cast/press` (Back takes down what is up) |
 | `GET /v1/cast/desk/youtube?q=` | session | | as `GET /v1/cast/youtube` |
 | `POST /v1/cast/desk/files`, `PUT /v1/cast/desk/files/:id/:n`, `POST /v1/cast/desk/files/:id/done`, `GET /v1/cast/desk/files/:id` | session | as the presenter's | as the presenter's (the same room, caps and rates; the caller `DESK`) |
 | `POST /v1/cast/desk/convert`, `PUT /v1/cast/desk/convert/:id/:n`, `POST /v1/cast/desk/convert/:id/start`, `GET /v1/cast/desk/convert/:id` | session | as the presenter's | as the presenter's |
+
+The house slide (owner 2026-11-11: "All of those sound fantastic. Let's build them"): with nothing
+up and the code not asked for, the TV shows the church's logo on cream and ONE optional line, with a
+small hint "Click for the Cast code" (every way of asking for the code is as before: a click or key
+on the TV, the tray, `leave {takeDown}`, `desk/reveal`; the code screen shows for `REVEAL_MS`, then
+the house slide is back). The line is the church's own, not a guest's: storage `cast:house {line,
+savedAt}` under its own key, set only through the desk routes above (the computer's sign-in), read
+by the TV inside `GET /v1/cast/screen`. `open`, `close`, `reset`, `kick` and `leave` never clear it.
+One write, the last one wins. A computer with one monitor has no desk window: the logo alone.
+Rules `shared/classroomRemote.js` (`CAST_HOUSE_LINE_MAX`, `sanitizeHouse`). Tests
+`worker/test/cast.test.js` ("Cast: the house slide line").
 
 Black (owner 2026-11-11: "All of those sound fantastic. Let's build them"): the press `black {on}`
 (presenter or desk; Cast only, the classroom room answers 400) sets `stage.black`, present on the

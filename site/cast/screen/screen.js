@@ -23,6 +23,10 @@
 //   presenter page reads the code from it and connects) and says a laptop must join the
 //   KVBC_Guest Wi-Fi to share its screen (owner 2026-11-08). The QR is drawn by
 //   qrcode-generator (cdnjs), white on the black code screen; no QR when it cannot load.
+// - The HOUSE SLIDE (owner 2026-11-11): with nothing up and the code not asked for, the
+//   TV shows the church's logo on cream, ONE optional line (set at the desk; it comes with
+//   GET /v1/cast/screen as `house {line}`, no request of its own) and a quiet hint "Click
+//   for the Cast code". Asking for the code shows the code screen; it goes back by itself.
 // - The code and its QR are HIDDEN until asked for (owner 2026-11-08: "the pin should
 //   not show up by default until it's clicked on, same with the QR code"): a click or a
 //   key on this screen, the tray's "Show Cast code" or a presenter's "Display code" (the
@@ -119,6 +123,8 @@ async function request(path, opts = {}) {
 /* ── The waiting card ── */
 
 function calm(title, words) {
+  calmNote = true;
+  drawHouse();
   $('card').classList.add('calm');
   $('card-title').textContent = title;
   $('card-go').textContent = words;
@@ -159,11 +165,30 @@ async function drawQr(d) {
   }
 }
 
+/* ── The house slide: what the TV shows while nothing is up and the code is hidden ── */
+
+let calmNote = false; // a calm note (signed out, configure mode) has the screen: no house slide
+
+/** The house slide is up exactly while the code is hidden (and no calm note took the screen). */
+function drawHouse() {
+  const on = !CONFIGURE && !calmNote && $('card').classList.contains('code-hidden');
+  $('house').classList.toggle('is-away', !on);
+}
+
+/** The one optional line under the logo (the desk's "House slide line"); '' = the logo alone. @param {unknown} house */
+function drawHouseLine(house) {
+  const { line } = R.sanitizeHouse(house);
+  const el = $('house-line');
+  if (el.textContent !== line) el.textContent = line;
+  el.hidden = !line;
+}
+
 /* ── Showing the code (hidden until asked for) ── */
 
 function reveal() {
   if (CONFIGURE) return;
   $('card').classList.remove('code-hidden');
+  drawHouse();
   clearTimeout(revealTimer);
   revealTimer = setTimeout(hideCode, REVEAL_MS);
 }
@@ -171,6 +196,7 @@ function reveal() {
 function hideCode() {
   clearTimeout(revealTimer);
   $('card').classList.add('code-hidden');
+  drawHouse();
 }
 
 /* ── The room ── */
@@ -238,6 +264,7 @@ async function read() {
   // The room was closed from elsewhere while this screen is up: open a new one.
   if (r.body.code === null && code) { code = null; drawCode(); openRoom(); return; }
   if (typeof r.body.code === 'string' && r.body.code !== code) { code = r.body.code; drawCode(); }
+  drawHouseLine(r.body.house);
   // "Show Cast code" (tray) or "Display code" (a presenter): show it, once per ask, if recent.
   const asked = Number(r.body.revealAt) || 0;
   if (asked > revealSeen) {
@@ -785,7 +812,7 @@ async function start() {
   if (!base && location.protocol === 'https:') base = `${location.origin}/api`;
   if (!session()) await sessionFromHost();
   if (!session()) { signedOut(); }
-  else { await openRoom(); openLive(); }
+  else { drawHouse(); await openRoom(); openLive(); }
 
   // A click or a key on the TV shows the code.
   document.addEventListener('pointerdown', () => { if (layer.hidden) reveal(); });
