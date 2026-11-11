@@ -71,10 +71,10 @@ test('the opening ceremony\'s films are committed web copies with their stills, 
 test('the lobby\'s 3D intro is committed, a web copy, and streamed with Range like the film', () => {
   const video = path.join(ROOT, 'lobby/public/intro/awana-intro.mp4');
   assert.ok(existsSync(video), 'lobby/public/intro/awana-intro.mp4 is committed');
-  // video/awana-intro writes it at 6 Mbps (~11 MB for 15 s); a lossless render
-  // committed by mistake would be hundreds.
+  // video/lobby-intro writes it (8 s at 1080p60, about 2 MB: flat colour is
+  // cheap); a lossless render committed by mistake would be hundreds.
   assert.ok(statSync(video).size <= 16 * 1000 * 1000);
-  // Its index is in front of its pictures (tools/faststart.py), so a TV can
+  // Its index is in front of its pictures (ffmpeg +faststart), so a TV can
   // start it from the first request through the Function.
   const head = readFileSync(video).subarray(0, 64 * 1024);
   const moov = head.indexOf('moov');

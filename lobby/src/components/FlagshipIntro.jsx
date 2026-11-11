@@ -2,14 +2,18 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { FLAGSHIP_DURATION_SEC, FLAGSHIP_INTRO, FLAGSHIP_INTRO_SRC } from '../lib/flagship.js';
 
 // ─────────────────────────────────────────────────────────────
-// The 3D intro (owner 2026-10-27: "occasionally replace the awana confetti
+// The flagship's intro film (owner 2026-10-27: "occasionally replace the awana confetti
 // slide with a smooth transition in and out of this video. It should look
 // seamless."). Played by FlagshipSlide on the passes ManualSlideshow picks
 // (src/lib/flagship.js flagshipIntroLap), over the bounce + glad showing.
 //
+// Since 2026-11-11 the film is "Six doors" (video/lobby-intro; owner: the 3D
+// one was "cheesy": too busy, the mascots, the 3D look): six flat club-colour
+// doors close over the slide, each with its club's mark, then lift away.
+//
 // The video's first and last frames ARE that slide at rest, the scene's tab
-// and house waves included (video/awana-intro: fitted to the lobby as
-// tools/measure-lobby.mjs measures it). So nothing on screen changes at
+// and house waves included (video/lobby-intro: built on plates captured off
+// the built lobby by capture.mjs). So nothing on screen changes at
 // either hand-over; only which layer is drawing it:
 //
 //   0       the showing starts as usual (its bounce, ~3.5 s, then still); the
@@ -18,9 +22,9 @@ import { FLAGSHIP_DURATION_SEC, FLAGSHIP_INTRO, FLAGSHIP_INTRO_SRC } from '../li
 //   lead    the video starts. On its first frame it fades in OVER the slide
 //           (identical), then the scene's tab and waves, which stand over
 //           every slide, fade out over it (`onHandOver({ away: true })`) so
-//           the video's own can fly off in 3D. Both inside the video's
+//           the video's doors can cover them. Both inside the video's
 //           opening still (0.6 s).
-//   homeAt  (video time) its world has flattened back into the slide: the
+//   homeAt  (video time) its doors have lifted off the slide: the
 //           scene's tab and waves fade back in over it, still identical.
 //   end     the video fades out over the slide, which holds `tail`, then
 //           the showing ends (`onFinished`) and the deck moves on.

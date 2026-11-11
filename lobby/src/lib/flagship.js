@@ -144,11 +144,12 @@ function defaultStore() {
   }
 }
 
-// ── The 3D intro (owner 2026-10-27) ─────────────────────────────────────
-// Now and then a showing of the flagship carries on into the 15 s 3D intro
-// video (video/awana-intro/: Blender, rendered from the brand kit). Its first
+// ── The intro film (owner 2026-10-27; "Six doors" since 2026-11-11) ─────
+// Now and then a showing of the flagship carries on into the 8 s intro film
+// (video/lobby-intro/: a flat 2D film in the brand kit, six club-colour doors;
+// it replaced the Blender 3D one, which the owner found cheesy). Its first
 // and last frames ARE this slide in its bounce style with the glad line, at
-// rest (measured off the lobby by video/awana-intro/tools/measure-lobby.mjs),
+// rest (plates captured off the built lobby by video/lobby-intro/capture.mjs),
 // so the showing plays that pick, settles, and the video takes over on an
 // identical frame; at its end it hands back the same way and the deck moves
 // on. FlagshipIntro.jsx plays it.
@@ -169,13 +170,13 @@ export const FLAGSHIP_INTRO_PICK = Object.freeze({ style: 'bounce', version: 'gl
  * Its timing, in seconds. `lead`: the video starts this long into the
  * showing, once the slide is at rest. `fade`: each hand-over (video in, the
  * scene's tab and waves out, and back). `homeAt`: the video's own time from
- * which it is the lobby again (its world has flattened back), when the tab
+ * which it is the lobby again (its doors have lifted away), when the tab
  * and waves take back over. `tail`: the slide holds this long after the
  * video ends. `waitMax`: a video not ready this long after `lead` is skipped
  * (the showing ends like any other, at FLAGSHIP_DURATION_SEC). `stall`: a
  * video stuck this long mid-play is let go.
  */
-export const FLAGSHIP_INTRO = Object.freeze({ lead: 4, fade: 0.15, homeAt: 14.2, tail: 1, waitMax: 6, stall: 6 });
+export const FLAGSHIP_INTRO = Object.freeze({ lead: 4, fade: 0.15, homeAt: 7.1, tail: 1, waitMax: 6, stall: 6 });
 
 /**
  * Is this pass (the deck's `lap`) one that plays the intro?

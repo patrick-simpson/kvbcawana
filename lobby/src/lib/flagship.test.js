@@ -139,12 +139,12 @@ describe('the 3D intro', () => {
     expect(FLAGSHIP_STYLES).toContain(FLAGSHIP_INTRO_PICK.style);
     expect(FLAGSHIP_VERSIONS).toContain(FLAGSHIP_INTRO_PICK.version);
     // Both hand-overs (video in, then the tab and waves out) fit inside the
-    // video's opening still (frames 1-18 at 30 fps, video/awana-intro).
-    expect(FLAGSHIP_INTRO.fade * 2).toBeLessThan(18 / 30);
-    // The tab and waves come back after its world has flattened (frame 418)
-    // and before it ends (15 s).
-    expect(FLAGSHIP_INTRO.homeAt).toBeGreaterThan(418 / 30);
-    expect(FLAGSHIP_INTRO.homeAt).toBeLessThan(15);
+    // video's opening still (0.6 s, video/lobby-intro film.html `T.still`).
+    expect(FLAGSHIP_INTRO.fade * 2).toBeLessThan(0.6);
+    // The tab and waves come back once it is the lobby's own picture again
+    // (7.1 s, its `T.home`) and before it ends (8 s).
+    expect(FLAGSHIP_INTRO.homeAt).toBeGreaterThanOrEqual(7.1);
+    expect(FLAGSHIP_INTRO.homeAt).toBeLessThan(8);
     expect(FLAGSHIP_INTRO_SRC).toBe('./intro/awana-intro.mp4');
   });
 });

@@ -1,0 +1,29 @@
+{
+ "note": "Ink boxes [left, top, right, bottom] in px at 1920x1080, by capture.mjs.",
+ "boxes": {
+  "church": [
+   270,
+   371,
+   1641,
+   424
+  ],
+  "awana": [
+   271,
+   444,
+   1648,
+   654
+  ],
+  "tagline": [
+   281,
+   672,
+   1647,
+   719
+  ],
+  "glad": [
+   420,
+   781,
+   1498,
+   858
+  ]
+ }
+}

@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<title>Lobby intro: six doors</title>
+<!--
+  The lobby's welcome intro, "Six doors" (owner 2026-11-11, replacing the 3D
+  Blender film: "It's cheesy"; picked: flat, calm, no mascots, direction C).
+
+  One 1920x1080 stage drawn from TIME ALONE: window.setTime(seconds) puts
+  every piece where it belongs at that moment (no CSS animation, no timers),
+  so render.mjs can photograph it frame by frame at exactly 60 fps.
+
+  It starts and ends on the lobby's own welcome slide at rest
+  (plates/rest.png, captured off the real page by capture.mjs) and only ever
+  moves pieces captured the same way, so the cut into and out of the video
+  on the lobby TV is invisible.
+
+  THE STORY (seconds)
+    0.00  the welcome slide, still (the lobby fades the video in over itself here)
+    0.60  six club-colour doors come down, left to right, and cover it;
+          each carries its club's official white mark, which settles as it lands
+    3.05  the marks nod once, left to right
+    4.40  the doors lift, from the middle outward
+    4.75  under them the logo comes back line by line, each rising from behind
+          its own baseline; then "We're so glad you're here!"
+    7.10  it is the welcome slide again, exactly (HOME); still to the end
+    8.00  end
+
+  Flat like the kit: solid colour, hard edges, no blur, glow, gradient or
+  3D. Timing on the kit's own curves (shared/brand/tokens.json motion).
+-->
+<style>
+  html, body { margin: 0; background: #000; }
+  #stage { position: relative; width: 1920px; height: 1080px; overflow: hidden; background: #B3D0E7; }
+  #stage > img.plate { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; }
+  .line { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; overflow: hidden; }
+  .line > img { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; will-change: transform; }
+  .door { position: absolute; top: 0; width: 320px; height: 1080px; will-change: transform; }
+  .door::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 16px; background: var(--deep); }
+  .door > img { position: absolute; left: 50%; top: 50%; height: auto; will-change: transform; }
+</style>
+<div id="stage">
+  <img class="plate" id="bg" src="plates/bg.png" alt="">
+  <div class="line" id="l-church"><img src="plates/church.png" alt=""></div>
+  <div class="line" id="l-awana"><img src="plates/awana.png" alt=""></div>
+  <div class="line" id="l-tagline"><img src="plates/tagline.png" alt=""></div>
+  <div class="line" id="l-glad"><img src="plates/glad.png" alt=""></div>
+  <div id="doors"></div>
+  <img class="plate" id="rest" src="plates/rest.png" alt="">
+</div>
+<script>
+  // ── the kit ───────────────────────────────────────────────────────────
+  const CLUBS = [
+    { id: 'puggles', primary: '#1DB6D9', deep: '#1A627C', w: 430, turn: true },
+    { id: 'cubbies', primary: '#4C72B8', deep: '#2F4F8A', w: 563, turn: true },
+    { id: 'sparks', primary: '#F04A4B', deep: '#B82B32', w: 518, turn: true },
+    { id: 'tnt', primary: '#58BD79', deep: '#2F8A4E', w: 215, turn: false },
+    { id: 'trek', primary: '#047E71', deep: '#02554C', w: 482, turn: true },
+    { id: 'journey', primary: '#8A649D', deep: '#56467F', w: 555, turn: true },
+  ];
+  // Each door is a banner: its club's mark runs UP it (turned a quarter turn, reading bottom to
+  // top, as the name tags print them; T&T's shield stays upright, as there). Sizes keep the
+  // marks' approved balance, by painted area (GrandWelcomeClassic.jsx MARK_WIDTH_U), x 36.5 px.
+
+  // ── time ──────────────────────────────────────────────────────────────
+  const T = {
+    still: 0.6,
+    down: 0.6, downGap: 0.09, downDur: 0.72,
+    markAfter: 0.42, markDur: 0.62,
+    nod: 3.05, nodGap: 0.075, nodDur: 0.7,
+    swap: 2.4,            // under the doors: the logo is taken off, to come back
+    up: 4.4, upGap: 0.14, upDur: 0.82,
+    church: 4.78, awana: 4.9, tagline: 5.28, glad: 5.62,
+    home: 7.1, end: 8.0,
+  };
+  window.FILM = { fps: 60, seconds: T.end, home: T.home, still: T.still };
+
+  // cubic-bezier(x1, y1, x2, y2) as a function of time 0..1
+  function bezier(x1, y1, x2, y2) {
+    const cx = 3 * x1; const bx = 3 * (x2 - x1) - cx; const ax = 1 - cx - bx;
+    const cy = 3 * y1; const by = 3 * (y2 - y1) - cy; const ay = 1 - cy - by;
+    const fx = (t) => ((ax * t + bx) * t + cx) * t;
+    const fy = (t) => ((ay * t + by) * t + cy) * t;
+    return (x) => {
+      if (x <= 0) return 0;
+      if (x >= 1) return 1;
+      let lo = 0; let hi = 1; let t = x;
+      for (let i = 0; i < 40; i += 1) {
+        const v = fx(t);
+        if (Math.abs(v - x) < 1e-7) break;
+        if (v < x) lo = t; else hi = t;
+        t = (lo + hi) / 2;
+      }
+      return fy(t);
+    };
+  }
+  const WIPE = bezier(0.76, 0, 0.24, 1);
+  const SETTLE = bezier(0.16, 1, 0.3, 1);
+  const p = (t, start, dur) => Math.max(0, Math.min(1, (t - start) / dur));
+
+  // ── the pieces ────────────────────────────────────────────────────────
+  const doorsEl = document.getElementById('doors');
+  const doors = CLUBS.map((c, i) => {
+    const d = document.createElement('div');
+    d.className = 'door';
+    d.style.left = `${i * 320}px`;
+    d.style.background = c.primary;
+    d.style.setProperty('--deep', c.deep);
+    const m = document.createElement('img');
+    m.src = `../../shared/brand/logos/${c.id}-white.svg`;
+    m.alt = '';
+    m.style.width = `${c.w}px`;
+    d.appendChild(m);
+    doorsEl.appendChild(d);
+    return { el: d, mark: m, turn: c.turn };
+  });
+  // The lift goes from the middle outward: doors 2 and 3, then 1 and 4, then 0 and 5.
+  const liftRank = [2, 1, 0, 0, 1, 2];
+
+  // Each line of the logo rises from behind its own baseline: a window the
+  // size of the line's ink (plates/boxes.json), the line sliding up inside it.
+  const BOX = { church: [270, 371, 1641, 424], awana: [271, 444, 1648, 654], tagline: [281, 672, 1647, 719], glad: [420, 781, 1498, 858] };
+  const lines = {};
+  for (const name of Object.keys(BOX)) {
+    const wrap = document.getElementById(`l-${name}`);
+    const [, top, , bottom] = BOX[name];
+    const pad = 14;   // room for the antialiased edge, and descenders inside the box
+    wrap.style.clipPath = `inset(${top - pad}px 0 ${1080 - bottom - pad}px 0)`;
+    lines[name] = { wrap, img: wrap.firstElementChild, travel: bottom - top + pad * 2 };
+  }
+  const LINE_DUR = { church: 0.7, awana: 0.85, tagline: 0.62, glad: 0.74 };
+  const rest = document.getElementById('rest');
+
+  window.setTime = (t) => {
+    // The exact slide, at both ends.
+    rest.style.opacity = t < T.still ? '1' : String(Math.max(0, Math.min(1, (t - (T.home - 0.1)) / 0.1)));
+
+    doors.forEach((d, i) => {
+      const down = WIPE(p(t, T.down + i * T.downGap, T.downDur));
+      const up = WIPE(p(t, T.up + liftRank[i] * T.upGap, T.upDur));
+      // -1096: fully above the screen, its 16 px edge strip included.
+      const y = -1096 * (1 - down) - 1096 * up;
+      d.el.style.transform = `translate3d(0, ${y.toFixed(2)}px, 0)`;
+      d.el.style.visibility = (down <= 0 || up >= 1) ? 'hidden' : 'visible';
+
+      const land = SETTLE(p(t, T.down + i * T.downGap + T.markAfter, T.markDur));
+      // The nod: up 12 px and back, once.
+      const n = p(t, T.nod + i * T.nodGap, T.nodDur);
+      const nod = n > 0 && n < 1 ? Math.sin(Math.PI * SETTLE(n < 0.5 ? n * 2 : 1) * (n < 0.5 ? 0.5 : 1)) * (n < 0.5 ? 1 : 1 - SETTLE((n - 0.5) * 2)) : 0;
+      const my = 46 * (1 - land) - 12 * nod;
+      const ms = 0.9 + 0.1 * land;
+      d.mark.style.opacity = String(Math.min(1, land * 1.6));
+      d.mark.style.transform = `translate(-50%, -50%) translate3d(0, ${my.toFixed(2)}px, 0)${d.turn ? ' rotate(-90deg)' : ''} scale(${ms.toFixed(4)})`;
+    });
+
+    for (const [name, l] of Object.entries(lines)) {
+      let y = 0; let o = 1;
+      if (t >= T.swap) {
+        const k = SETTLE(p(t, T[name], LINE_DUR[name]));
+        y = l.travel * (1 - k);
+        o = k > 0 ? 1 : 0;
+      }
+      l.img.style.transform = `translate3d(0, ${y.toFixed(2)}px, 0)`;
+      l.wrap.style.opacity = String(o);
+    }
+  };
+  window.setTime(0);
+  window.ready = Promise.all([...document.images].map((im) => im.decode().catch(() => {}))).then(() => true);
+</script>
+</html>
