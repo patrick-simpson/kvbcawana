@@ -491,6 +491,60 @@ exit 0
     turns.release(e);
   }
 
+  console.log('\njob puller: a job that waited long in its batch asks whether the lease is still ours');
+  {
+    // The Worker's lease is 90 s and only the job being printed renewed it: a later job of a
+    // slow batch could lapse, be leased by a SECOND station, and print twice.
+    const w = makeWorker();
+    const clock = { t: Date.now() };
+    const request = w.request;
+    const asked = [];
+    w.request = async (base, p, opts = {}) => {
+      if (p === '/v1/print/heartbeat' && opts.body && opts.body.jobId) {
+        asked.push(opts.body.jobId);
+        if (opts.body.jobId === w.lost) return { ok: true, status: 200, body: { ok: false, reason: 'other' } };
+        if (opts.body.jobId === w.offline) return { ok: false, status: 0, body: null };
+      }
+      const r = await request(base, p, opts);
+      // "The batch was slow": the clock jumps a minute once the lease answer is in.
+      if (w.slow && p.startsWith('/v1/print/next')) setImmediate(() => { clock.t += 60000; });
+      return r;
+    };
+    // heartbeatMs is long here so the only job-named heartbeats are the lease question.
+    const { puller, journal } = makePuller(w, { now: () => clock.t, heartbeatMs: 60000 });
+    const a = await makeJob(printRec(71, 'Lea', 'Lease', 'Sparks'));
+    const b = await makeJob(printRec(72, 'Les', 'Lease', 'Sparks'));
+    const c = await makeJob(printRec(73, 'Lou', 'Lease', 'Sparks'));
+    check('the wait that asks is half the 90 s lease', jp.LEASE_CHECK_MS === 45000);
+
+    w.queue.push(a);
+    let before = jobs();
+    await puller.tick();
+    check('a job started promptly is not asked about (no extra request)', asked.length === 0 && jobs() === before + 1, JSON.stringify(asked));
+
+    // The next two "waited" a minute: the clock jumps as soon as the lease answer is in.
+    w.queue.push(b, c);
+    w.lost = b.jobId;
+    w.slow = true;
+    before = jobs();
+    await new Promise((r) => setImmediate(r));
+    const acksBefore = w.acks.length;
+    const round = puller.tick();
+    await round;
+    check('both late jobs were asked about', asked.includes(b.jobId) && asked.includes(c.jobId), JSON.stringify(asked));
+    check('the one another station holds is NOT printed here', jobs() === before + 1, String(jobs() - before));
+    check('...nor journalled or acked: it is no longer this station\'s job', !journal.get(b.jobId) && !w.acks.slice(acksBefore).some((x) => x.jobId === b.jobId));
+    check('the one still ours printed and was acked', !!journal.get(c.jobId) && w.acks.slice(acksBefore).some((x) => x.jobId === c.jobId && x.result === 'printed'));
+
+    // No answer from the Worker at all: the label prints (never held for the network).
+    const d = await makeJob(printRec(74, 'Lux', 'Lease', 'Sparks'));
+    w.queue.push(d);
+    w.offline = d.jobId;
+    before = jobs();
+    await puller.tick();
+    check('with no answer to the question, the label still prints', jobs() === before + 1 && !!journal.get(d.jobId));
+  }
+
   console.log('\njob puller: draw ahead (the next label is drawn while one prints), the paper in lease order');
   {
     const printing = require(path.join(root, 'print-server', 'server', 'printing.js'));

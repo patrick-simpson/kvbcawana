@@ -1,4 +1,9 @@
-﻿## [11.1.0] - 2026-11-10
+﻿## [11.1.1] - 2026-11-10
+A safety fix for churches with two print stations.
+
+**No second label from a slow batch.** A print station takes up to ten labels from the sync service at once and prints them in order. The service gives each label to that station for 90 seconds, and the station only kept renewing the one it was printing. If the printer was slow (a retry, the backup printer), a label near the end of the batch could pass its 90 seconds, be handed to a SECOND station, and print on both. Now a label that has waited more than 45 seconds for its turn asks the service first "is this still mine?". If the answer is no (another station has it, or it is already done), this station leaves it alone. If the service cannot be reached at all, the label prints as before: a label is never held up waiting for the internet. With one print station nothing changes.
+
+## [11.1.0] - 2026-11-10
 The Cast control window becomes a proper Windows 11 screen.
 
 **A richer Cast control window** (owner 2026-11-10: "Rich Windows 11 native screen"). The back-of-house window that opens on the second monitor while Cast is on was plain. It is now laid out like a Windows 11 app: a navigation list on the left with the sliding accent marker, each source (YouTube, Facebook video, Slides, Pictures, Video file, Text) as settings-style cards, and on the right "On the TV now" and "Connect a presenter". It uses the computer's own Windows accent colour, follows dark mode and high contrast, and moves the way Windows does.

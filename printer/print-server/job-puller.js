@@ -82,6 +82,12 @@ const JOB_ID_RE = /^(?:[A-Za-z0-9_-]{22}|reprint:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f
 const IDLE_MS = 5 * 1000;
 /** Labels asked for in one lease (9.5.0, owner 2026-10-15: a big family prints at once; the Worker's LEASE_MAX). */
 const LEASE_BATCH = 10;
+// A leased job that waited this long before its print could start (behind the
+// rest of its batch) asks the Worker first whether the lease is still this
+// station's. The Worker's lease is 90 s and only a job being printed renewed
+// it, so a slow batch could let a later job's lease lapse, a SECOND station
+// lease it, and both print the label (11.1.1, 2026-11-10). Half the lease.
+const LEASE_CHECK_MS = 45 * 1000;
 const BUSY_MS = 1000;
 const SIGNED_OUT_MS = 60 * 1000;
 const ROUTE_MISSING_MS = 60 * 1000;
@@ -211,6 +217,7 @@ function createJobPuller(o) {
   const fetchFn = o.fetchFn || globalThis.fetch;
   const setIntervalFn = o.setIntervalFn || setInterval;
   const heartbeatMs = o.heartbeatMs || HEARTBEAT_MS;
+  const leaseCheckMs = Number.isFinite(o.leaseCheckMs) ? o.leaseCheckMs : LEASE_CHECK_MS;
   const journal = o.journal;
   const inFlight = new Set();
   let pausedUntil = 0;
@@ -314,7 +321,7 @@ function createJobPuller(o) {
     return 'already-spooled';
   }
 
-  async function handleOne(job, turn) {
+  async function handleOne(job, turn, leasedAt) {
     const id = job.jobId;
     const prior = journal.get(id);
     if (prior) return priorJob(id, prior);
@@ -366,6 +373,22 @@ function createJobPuller(o) {
     if (turnInRoute) rec.body.printTurn = turn;
     else if (turn) await o.turns.wait(turn);
 
+    // Still this station's? Asked only for a job that waited a long time in its
+    // batch (LEASE_CHECK_MS). The Worker's answer is the truth: ok renews the
+    // lease; anything else (another station has it, it is done, it was undone)
+    // means it is NOT printed here, and nothing is journalled or acked: it is no
+    // longer this station's job. No answer at all (the internet is down) prints:
+    // nobody else can lease it either, and a label is never held for the network.
+    if (leasedAt != null && now() - leasedAt >= leaseCheckMs) {
+      let still = null;
+      try { still = await call('/v1/print/heartbeat', { method: 'POST', body: { printer: { state: 'busy', detail: 'printing' }, jobId: id, ...extras() } }); } catch { still = null; }
+      if (still && still.body && still.body.ok === false) {
+        stats.dropped++;
+        log(`[jobs] ${id}: waited too long in its batch and the lease is no longer ours (${still.body.reason}); not printing it here`);
+        return 'lease-lost';
+      }
+    }
+
     journal.begin(id, { route: rec.route, night, key });   // on disk BEFORE the printer is touched
     const beat = setIntervalFn(() => {
       // Extends the lease (90 s) while the printer works; {ok: false} cannot stop a print already sent.
@@ -412,12 +435,12 @@ function createJobPuller(o) {
    * One job. Never throws. `turn` is its print-turn ticket (released by the caller).
    * @returns {Promise<string>} what became of it
    */
-  async function handle(job, turn) {
+  async function handle(job, turn, leasedAt) {
     const id = job && job.jobId;
     if (typeof id !== 'string' || !JOB_ID_RE.test(id)) return 'invalid';
     if (inFlight.has(id)) { stats.duplicates++; return 'duplicate-in-flight'; }
     inFlight.add(id);
-    try { return await handleOne(job, turn); } catch (e) {
+    try { return await handleOne(job, turn, leasedAt); } catch (e) {
       stats.lastError = e && e.message;
       log(`[jobs] ${id}: ${e && e.message}`);
       return 'error';
@@ -453,9 +476,10 @@ function createJobPuller(o) {
         try { Promise.resolve(o.onChurch(Number(ch.rev) || 0, Number(ch.switchesRev) || 0)).catch(() => {}); } catch (e) { log(`[jobs] church hook: ${e && e.message}`); }
       }
       const jobs = Array.isArray(r.body.jobs) ? r.body.jobs : [];
+      const leasedAt = now();   // this station's own clock: how long each job then waits (LEASE_CHECK_MS)
       let handled = 0;
       if (!o.turns) {
-        for (const job of jobs) { await handle(job); handled++; }
+        for (const job of jobs) { await handle(job, undefined, leasedAt); handled++; }
       } else {
         // Draw ahead: the next job's label is drawn while this one prints; the turn
         // (a ticket per job, taken in lease order) keeps the paper in that order.
@@ -463,7 +487,7 @@ function createJobPuller(o) {
         for (const job of jobs) {
           while (running.size >= DRAW_AHEAD) await Promise.race(running);
           const turn = o.turns.take();
-          const run = handle(job, turn).finally(() => { o.turns.release(turn); running.delete(run); });
+          const run = handle(job, turn, leasedAt).finally(() => { o.turns.release(turn); running.delete(run); });
           running.add(run);
           handled++;
         }
@@ -596,6 +620,6 @@ function startJobPuller({ puller, bundles, log, setTimeoutFn = setTimeout, clear
 module.exports = {
   JOB_PULL_ROUTES, jobPullAllowed, JOB_ID_RE,
   createJournal, createJobPuller, createBundleSync, startJobPuller,
-  IDLE_MS, BUSY_MS, HELLO_MS, HEARTBEAT_MS, FAIL_PAUSE_MS, MALFORMED, LEASE_BATCH, DRAW_AHEAD,
+  IDLE_MS, BUSY_MS, HELLO_MS, HEARTBEAT_MS, FAIL_PAUSE_MS, MALFORMED, LEASE_BATCH, LEASE_CHECK_MS, DRAW_AHEAD,
   BUNDLE_MS, QUIET_IDLE_MS, QUIET_HELLO_MS, QUIET_BUNDLE_MS,
 };
