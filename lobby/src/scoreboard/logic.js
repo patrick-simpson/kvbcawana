@@ -66,7 +66,8 @@ export function liveWords(state) {
   return {
     ok: '● Live on the projector',
     poll: 'Connected · updating',
-    off: 'Offline: taps will not reach the projector',
+    // Taps made offline are kept and sent again (see waitingWords below).
+    off: 'Offline: taps are kept and sent when the signal is back',
     wait: 'Connecting…',
   }[state] || 'Connecting…';
 }

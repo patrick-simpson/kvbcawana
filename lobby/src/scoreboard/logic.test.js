@@ -53,7 +53,9 @@ describe('the scoreboard phone page', () => {
 
   it('says plainly whether taps reach the projector', () => {
     expect(liveWords('ok')).toMatch(/Live/);
-    expect(liveWords('off')).toMatch(/Offline/);
+    // Taps are queued and resent since 4375caf2, so the words must not say they are lost.
+    expect(liveWords('off')).toBe('Offline: taps are kept and sent when the signal is back');
+    expect(liveWords('off')).not.toMatch(/will not reach/);
   });
 
   it('taps that do not get through wait and are sent again; a refusal is final (owner 2026-11-06)', () => {
