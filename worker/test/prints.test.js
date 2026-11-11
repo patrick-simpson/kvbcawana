@@ -144,8 +144,8 @@ describe('the GitHub dispatch only starts its own workflows', () => {
     }
     expect(asked).toEqual([]);
     for (const wf of DISPATCH_WORKFLOWS) expect((await prints.dispatch(wf, {})).ok).toBe(true);
-    expect(DISPATCH_WORKFLOWS).toEqual(['letterhead-print.yml', 'handbook-print.yml', CONVERT_WORKFLOW]);
-    expect(asked).toHaveLength(3);
+    expect(DISPATCH_WORKFLOWS).toEqual(['letterhead-print.yml', 'handbook-print.yml', CONVERT_WORKFLOW, 'checkin-health.yml']);   // the last since 2026-11-10 (healthcall.js)
+    expect(asked).toHaveLength(4);
   });
 });
 

@@ -20,6 +20,16 @@ name: Check-in ready tonight?
 # season's skips itself (it reads which schedule started it, so a late start
 # from GitHub's queue cannot make it skip or double).
 
+#
+# STARTED ON TIME BY THE SYNC SERVICE (2026-11-10): GitHub's scheduler started
+# these runs three to four hours late (8:27 to 9:47 pm on 2026-11-04), after
+# club, so the warning was no warning. The sync Worker now starts this job
+# itself at 5:12 and 5:47 pm on a club night (worker/src/healthcall.js, the
+# print tool's dispatch token; input `station` true at 5:47). The schedule
+# below stays as the backup: a scheduled run that starts more than 45 minutes
+# late only checks that the service can be reached, then stops (a late list of
+# problems is a false alarm: after 9 pm the service is no longer watching).
+
 on:
   schedule:
     - cron: '12 21 * * 3'   # 5:12 pm EDT
@@ -72,6 +82,16 @@ jobs:
           if ! body="$(curl -sS --fail --retry 3 --retry-delay 20 --retry-all-errors --max-time 30 "$url")"; then
             err "Could not reach the sync service at $url. Check-in (awana.kvbchurch.org/checkin) may not work tonight. Open awana.kvbchurch.org/settings → Tonight, and check Cloudflare."
             exit 1
+          fi
+          if [ "$EVENT" = "schedule" ]; then
+            # How late did GitHub start this run? (Eastern minutes after midnight.)
+            nowmin=$(( 10#$(TZ=America/New_York date +%H) * 60 + 10#$(TZ=America/New_York date +%M) ))
+            if [ "$late" = "true" ]; then want=$(( 17 * 60 + 47 )); else want=$(( 17 * 60 + 12 )); fi
+            behind=$(( nowmin - want ))
+            if [ "$behind" -lt 0 ] || [ "$behind" -gt 45 ]; then
+              say "GitHub started this scheduled check late (it was due at $(( want / 60 )):$(printf '%02d' $(( want % 60 ))) Eastern). The sync service answers; it starts this check on time itself now, so nothing more is checked here."
+              exit 0
+            fi
           fi
           if ! echo "$body" | jq -e '.v == 1' > /dev/null 2>&1; then
             err "The sync service answered, but not with a check-in health report (is the Worker deployed with GET /v1/health/checkin?)."

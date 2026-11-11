@@ -44,7 +44,7 @@ export const HANDBOOK_WORKFLOW = 'handbook-print.yml';
  * the handbook sheets and Cast's PowerPoint converter (cast.js CONVERT_WORKFLOW).
  * Anything else (a release, a delete job) is refused before GitHub is asked.
  */
-export const DISPATCH_WORKFLOWS = Object.freeze([PDF_WORKFLOW, HANDBOOK_WORKFLOW, 'cast-convert.yml']);
+export const DISPATCH_WORKFLOWS = Object.freeze([PDF_WORKFLOW, HANDBOOK_WORKFLOW, 'cast-convert.yml', 'checkin-health.yml']);
 
 const UP_KEY = 'prints:up';
 const partKey = (/** @type {string} */ id, /** @type {number} */ n) => `prints:part:${id}:${n}`;
