@@ -829,4 +829,24 @@ describe('display: Cast on and off (real createDisplay with a stand-in Electron)
       expect(casts).toEqual([]);
     } finally { display.stop(); clock.mock.restore(); }
   });
+
+  it('the tray status line names Cast, never the removed Presentation screen', () => {
+    const clock = mock.method(Date, 'now', () => at('2026-11-12T17:00:00')); // Thursday: no club
+    const { display } = setup({ settings: { screen: 'cast' }, castReturn: 'lobby' });
+    try {
+      display.start();
+      expect(display.statusLine()).toBe('Cast: on screen now');
+    } finally { display.stop(); clock.mock.restore(); }
+  });
+
+  it('a Cast screen put away by hand says so in the status line', () => {
+    const clock = mock.method(Date, 'now', () => at('2026-11-12T17:00:00'));
+    const { display } = setup({ settings: { screen: 'cast' }, castReturn: 'lobby' });
+    try {
+      display.start();
+      const items = Object.values(display.menuGroups()).flat().filter((x) => x && typeof x === 'object');
+      items.find((x) => x.label === 'Hide until the next club night').click();
+      expect(display.statusLine()).toBe('Cast: put away until it is switched on again');
+    } finally { display.stop(); clock.mock.restore(); }
+  });
 });

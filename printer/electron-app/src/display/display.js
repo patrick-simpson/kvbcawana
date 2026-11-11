@@ -1013,7 +1013,10 @@ function createDisplay(opts) {
     const t = now();
     const win = displayWindow(t, sources, hours());
     const { reason } = decideVisibility(win, state.overrides, t.getTime());
-    if (reason === 'off' && urls().screen.always) return blackDismissed ? 'Presentation: put away until it is chosen again' : 'Presentation: on screen now';
+    if (reason === 'off' && urls().screen.always) {
+      const name = urls().screen.short; // the screen's own short name ("Cast")
+      return blackDismissed ? `${name}: put away until it is switched on again` : `${name}: on screen now`;
+    }
     if (reason === 'schedule') return `On screen for club night, until ${clock(hours().closeMin)}`;
     if (reason === 'manual') return `Shown by hand, until ${fmtTime(state.overrides.manualUntil)}`;
     if (reason === 'hidden') return 'Hidden until the next club night';
