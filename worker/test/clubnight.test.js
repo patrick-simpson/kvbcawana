@@ -164,11 +164,12 @@ const deskCheckin = (at, clubberId = '662') => ({
 
 // Real time passes while the simulation settles: these take a few seconds each.
 describe('a club night on the one 5 s read clock', { timeout: 60000 }, () => {
-  it('6 pm: report every 30 s, the roster 30 s fresh for three phones, no two reads within 5 s, a check-in never waits', async () => {
+  it('6:10 pm: report every 30 s, the roster 30 s fresh for three phones, no two reads within 5 s, a check-in never waits', async () => {
+    // Moved from 6:00 to 6:10 pm on 2026-11-11: 5:45 to 6:10 is now the doors' rush (next test).
     const { t, log } = await night({
-      start: AT('18:00'), minutes: 8,
+      start: AT('18:10'), minutes: 8,
       // a check-in while the clock is booked (a read started, the next not yet allowed)
-      script: [deskCheckin(AT('18:04:02'))],
+      script: [deskCheckin(AT('18:14:02'))],
     });
     const all = t.slots.map((s) => s.at);
     expect(Math.min(...gaps(all))).toBeGreaterThanOrEqual(READ_INTERVAL_MS);
@@ -189,11 +190,39 @@ describe('a club night on the one 5 s read clock', { timeout: 60000 }, () => {
     expect(log.checkins[0].body).toMatchObject({ ok: true, already: false });
     expect(t.tt.checkins).toHaveLength(1);
     // the schedule (reads a minute by kind, minutes 2 to 8 once signed in)
-    const rate = perMinute(t.slots, AT('18:02'), AT('18:08'));
-    console.warn('[schedule 6:00 pm]', JSON.stringify(rate));
+    const rate = perMinute(t.slots, AT('18:12'), AT('18:18'));
+    console.warn('[schedule 6:10 pm]', JSON.stringify(rate));
     expect(rate['/clubber/checkin_report']).toBe(2);
     expect(rate['/clubber/checkout']).toBeLessThanOrEqual(1);   // the Checkout page all club night (hand check-outs), YM_CHECKOUT off
     expect(Object.values(rate).reduce((a, b) => a + b, 0)).toBeLessThanOrEqual(6);   // report 2 + roster page 2 + Checkout page 1 + a stations' feed read now and then: 5 to 6 of the 12 slots a minute
+  });
+
+  it('6:00 pm, the doors\' rush: the report takes the spare slots, and the phones, the desk and the Checkout page lose nothing', async () => {
+    // Owner 2026-11-11: check-ins on TwoTimTwo's own page print sooner from 5:45 to 6:10 pm.
+    const { t, log } = await night({
+      start: AT('18:00'), minutes: 8,
+      script: [deskCheckin(AT('18:04:02'))],
+    });
+    // never past TwoTimTwo's limit, whatever is asking
+    expect(Math.min(...gaps(t.slots.map((s) => s.at)))).toBeGreaterThanOrEqual(READ_INTERVAL_MS);
+    // three phones polling the roster: none refused, none kept waiting, their page still read ahead
+    const signedIn = t.reads.find((x) => x.path === '/clubber/checkin_report').at;
+    expect(log.roster.filter((r) => r.at >= signedIn && (r.status !== 200 || r.waited > 20000))).toEqual([]);
+    const rosterPages = t.reads.filter((r) => r.path === '/clubber/checkin').map((r) => r.at);
+    expect(Math.min(...gaps(rosterPages.slice(1)))).toBeGreaterThanOrEqual(CHECKIN_PAGE_TTL_MS);
+    // the desk check-in: answered at once, no read
+    expect(log.checkins).toHaveLength(1);
+    expect(log.checkins[0]).toMatchObject({ status: 200, ms: 0, readsDuring: 0 });
+    expect(log.checkins[0].body).toMatchObject({ ok: true, already: false });
+    const rate = perMinute(t.slots, AT('18:02'), AT('18:08'));
+    console.warn('[schedule 6:00 pm, the rush]', JSON.stringify(rate));
+    // the others keep the pace they have without the rush...
+    expect(rate['/clubber/checkin']).toBeGreaterThanOrEqual(1.5);          // the roster page, about every 30 s
+    expect(rate['/clubber/checkout']).toBeGreaterThanOrEqual(0.8);         // the Checkout page, about once a minute
+    expect(rate['/clubber/checkout']).toBeLessThanOrEqual(1);
+    // ...and the report has what is left: far more than its 2 a minute, never more than the clock allows
+    expect(rate['/clubber/checkin_report']).toBeGreaterThanOrEqual(6);
+    expect(Object.values(rate).reduce((x, y) => x + y, 0)).toBeLessThanOrEqual(12);
   });
 
   it('7:30 pm: the youth check-out joins (Checkout page once a minute, one post per 15 s), the report still every 30-45 s', async () => {

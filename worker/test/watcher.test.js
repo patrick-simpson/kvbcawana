@@ -10,6 +10,7 @@ import {
   WATCH_INTERVAL_MS,
   WATCH_FAST_MS,
   WATCH_RUSH_MS,
+  rushAt,
   Watcher,
   watchIntervalAt,
   compareReport,
@@ -153,7 +154,8 @@ describe('the watcher', () => {
     expect(READ_INTERVAL_MS).toBe(5000);
     expect(WATCH_INTERVAL_MS).toBe(30000);
     expect(SEAL_PER_TICK).toBe(1);
-    const s = setup({ kids: [kid(1)] });
+    // At 6:30 pm since 2026-11-11 (the default 6:00 pm is now inside the doors' rush, 5:45 to 6:10).
+    const s = setup({ start: WED_6PM + 30 * 60 * 1000, kids: [kid(1)] });
     await s.w.tick();
     expect(reportReads(s)).toBe(1);
     // the free slot between two reports: the night's check-in page
@@ -171,9 +173,8 @@ describe('the watcher', () => {
     expect(reportReads(s)).toBe(2);
   });
 
-  it('5:00 to 6:00 pm (the arrival rush): the report at least every 10 s, and in every spare 5 s slot nothing else wants', async () => {
+  it('reads the report every 10 s from 5:00 to 6:00 pm (the arrival rush), the slot between still free', async () => {
     expect(WATCH_FAST_MS).toBe(10000);
-    expect(WATCH_RUSH_MS).toBe(READ_INTERVAL_MS);
     expect(watchIntervalAt(Date.parse('2026-10-14T20:59:59Z'))).toBe(WATCH_INTERVAL_MS);   // 4:59:59 pm EDT
     expect(watchIntervalAt(Date.parse('2026-10-14T21:00:00Z'))).toBe(WATCH_FAST_MS);       // 5:00 pm
     expect(watchIntervalAt(Date.parse('2026-10-14T21:59:59Z'))).toBe(WATCH_FAST_MS);       // 5:59:59 pm
@@ -182,30 +183,55 @@ describe('the watcher', () => {
     const s = setup({ start: Date.parse('2026-10-14T21:15:00Z'), kids: [kid(1)] });
     await s.w.tick();
     expect(reportReads(s)).toBe(1);
-    expect(s.alarm.at - s.now()).toBe(READ_INTERVAL_MS);   // the free slot
+    expect(s.alarm.at - s.now()).toBe(READ_INTERVAL_MS);   // the free slot: the night's check-in page
     s.tick(READ_INTERVAL_MS);
     await s.w.tick();
-    // Another read was due, so IT got the slot, not the report: the night's check-in page.
     expect(reportReads(s)).toBe(1);
-    expect(s.tt.calls.filter((c) => c.path === '/clubber/checkin')).toHaveLength(1);
-    // Owner 2026-11-10 (check-ins on TwoTimTwo's own page at the desk laptop): with nothing
-    // else due, the report takes each spare slot too. A quiet minute, the alarm run when due:
-    const at = [];
-    const until = s.now() + 60000;
-    while (s.now() < until) {
-      s.tick(Math.max(1, Math.min(s.alarm.at - s.now(), until - s.now())));
-      const before = reportReads(s);
-      await s.w.tick();
-      if (reportReads(s) > before) at.push(s.now());
-    }
-    const gaps = at.slice(1).map((t, i) => t - at[i]);
-    expect(Math.min(...gaps)).toBeGreaterThanOrEqual(READ_INTERVAL_MS);   // never past TwoTimTwo's limit
-    expect(Math.max(...gaps)).toBeLessThanOrEqual(WATCH_FAST_MS);        // the 10 s pace is still the floor
-    expect(at.length).toBeGreaterThanOrEqual(10);                         // about every 5 s (was six a minute)
+    expect(s.alarm.at - s.now()).toBe(WATCH_FAST_MS - READ_INTERVAL_MS);
+    s.tick(WATCH_FAST_MS - READ_INTERVAL_MS);
+    await s.w.tick();
+    expect(reportReads(s)).toBe(2);
+    // a minute of the rush: six reports, never two reads closer than the 5 s clock
+    for (let i = 0; i < 12; i++) { s.tick(READ_INTERVAL_MS); await s.w.tick(); }
+    expect(reportReads(s)).toBe(8);
   });
 
-  it('6:00 pm on: the spare slots are left alone again (the report every 30 s)', async () => {
-    const s = setup({ start: Date.parse('2026-10-14T22:00:00Z'), kids: [kid(1)] });
+  it('5:45 to 6:10 pm (the doors): the report also takes every spare 5 s slot nothing else wants', async () => {
+    // Owner 2026-11-10/11: check-ins on TwoTimTwo's own page at the desk laptop print sooner; "realistically the
+    // faster updates only need to happen from 5:45 to 6:10".
+    expect(WATCH_RUSH_MS).toBe(READ_INTERVAL_MS);
+    expect(rushAt(Date.parse('2026-10-14T21:44:59Z'))).toBe(false);   // 5:44:59 pm EDT
+    expect(rushAt(Date.parse('2026-10-14T21:45:00Z'))).toBe(true);    // 5:45 pm
+    expect(rushAt(Date.parse('2026-10-14T22:09:59Z'))).toBe(true);    // 6:09:59 pm
+    expect(rushAt(Date.parse('2026-10-14T22:10:00Z'))).toBe(false);   // 6:10 pm
+    expect(rushAt(Date.parse('2026-12-02T23:00:00Z'))).toBe(true);    // 6:00 pm EST, winter
+    for (const start of ['2026-10-14T21:50:00Z', '2026-10-14T22:02:00Z']) {   // 5:50 pm (the 10 s hour) and 6:02 pm (the 30 s pace)
+      const s = setup({ start: Date.parse(start), kids: [kid(1)] });
+      await s.w.tick();
+      expect(reportReads(s)).toBe(1);
+      s.tick(READ_INTERVAL_MS);
+      await s.w.tick();
+      // Another read was due, so IT got the slot, not the report: the night's check-in page.
+      expect(reportReads(s)).toBe(1);
+      expect(s.tt.calls.filter((c) => c.path === '/clubber/checkin')).toHaveLength(1);
+      // A quiet minute, the alarm run when it is due: about a report every 5 s.
+      const at = [];
+      const until = s.now() + 60000;
+      while (s.now() < until) {
+        s.tick(Math.max(1, Math.min(s.alarm.at - s.now(), until - s.now())));
+        const before = reportReads(s);
+        await s.w.tick();
+        if (reportReads(s) > before) at.push(s.now());
+      }
+      const between = at.slice(1).map((t, i) => t - at[i]);
+      expect(Math.min(...between)).toBeGreaterThanOrEqual(READ_INTERVAL_MS);   // never past TwoTimTwo's limit
+      expect(Math.max(...between)).toBeLessThanOrEqual(WATCH_FAST_MS);
+      expect(at.length).toBeGreaterThanOrEqual(10);
+    }
+  });
+
+  it('6:10 pm on: the spare slots are left alone again (the report every 30 s)', async () => {
+    const s = setup({ start: Date.parse('2026-10-14T22:10:00Z'), kids: [kid(1)] });
     await s.w.tick();
     const until = s.now() + 60000;
     while (s.now() < until) { s.tick(Math.max(1, Math.min(s.alarm.at - s.now(), until - s.now()))); await s.w.tick(); }

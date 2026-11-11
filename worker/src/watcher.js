@@ -71,6 +71,19 @@ export const WATCH_FAST_UNTIL_MIN = 18 * 60;
  * (14 tests said so), so it is opportunistic, never a reservation.
  */
 export const WATCH_RUSH_MS = READ_INTERVAL_MS;
+/**
+ * When the spare slots are taken (owner 2026-11-11: "realistically the faster
+ * updates only need to happen from 5:45 to 6:10"): the doors. Its own window,
+ * apart from the 10 s hour above. Local minutes, start inclusive, end exclusive.
+ */
+export const WATCH_RUSH_FROM_MIN = 17 * 60 + 45;
+export const WATCH_RUSH_UNTIL_MIN = 18 * 60 + 10;
+
+/** Is it the doors' rush now? @param {number} now */
+export function rushAt(now) {
+  const m = zonedParts(new Date(now), TIME_ZONE).minutes;
+  return m >= WATCH_RUSH_FROM_MIN && m < WATCH_RUSH_UNTIL_MIN;
+}
 
 /** How often the report is read at this moment. @param {number} now */
 export function watchIntervalAt(now) {
@@ -526,7 +539,7 @@ export class Watcher {
       const other = this.otherWakeInMs(s);
       if (other !== null) next = Math.min(next, Math.max(other, this.budget.peek(false), 1000));
       // The arrival rush: wake for the spare slot too (rushReadWanted).
-      if (watchIntervalAt(this.now()) === WATCH_FAST_MS) {
+      if (rushAt(this.now())) {
         const spare = this.lastWatcherRead(s) + WATCH_RUSH_MS - this.now();
         next = Math.min(next, Math.max(spare, this.budget.peek(false), 1000));
       }
@@ -576,13 +589,13 @@ export class Watcher {
 
   /** When the watcher last read the report (ms; 0 never). @param {{ lastReadAt?: string|null }} status */
   /**
-   * The arrival rush's extra report: only in the 10 s hour, only when a
+   * The arrival rush's extra report: only at the doors (rushAt), only when a
    * non-reserved read may start now, and never sooner than one slot after the
    * last report. @param {any} status
    */
   rushReadWanted(status) {
     const now = this.now();
-    return watchIntervalAt(now) === WATCH_FAST_MS
+    return rushAt(now)
       && this.budget.peek(false) === 0
       && now - this.lastWatcherRead(status) >= WATCH_RUSH_MS;
   }
