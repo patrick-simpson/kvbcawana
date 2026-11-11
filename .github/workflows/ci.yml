@@ -11,14 +11,6 @@ on:
   push:
     branches: [main]
   pull_request:
-  # The catch-up for a Worker deploy that was HELD on a club evening (the
-  # deploy job's "Did the Worker change?"): Thursday 03:20 UTC is Wednesday
-  # 10:20 pm Eastern in winter and 11:20 pm in summer, after the club evening
-  # ends either way. GitHub may start it hours late; that only makes it later
-  # in the night. With nothing held it deploys no Worker (its sources are
-  # compared with the commit the running Worker names).
-  schedule:
-    - cron: '20 3 * * 4'
   workflow_dispatch:
     inputs:
       deploy_worker:
@@ -523,16 +515,9 @@ jobs:
         # First choice of all (2026-11-10): the commit the RUNNING Worker says
         # it was deployed from (GET /v1/health/build, the BUILD_COMMIT var the
         # deploy step below sets). That is the truth whatever happened to the
-        # runs in between, and it is what lets a deploy be held:
-        #
-        # HELD ON A CLUB EVENING (owner 2026-11-10): Wednesday 3:30 to 10 pm
-        # Eastern (shared/clubNight.js CLUB_EVENING, the one rule) a changed
-        # Worker is NOT deployed: a restart then blinks every TV and makes the
-        # next check-ins wait for a cold TwoTimTwo sign-in. The site still
-        # publishes. The next run after the evening (any push, or the
-        # Thursday-morning schedule above) sees the running Worker is behind
-        # and deploys it. To deploy anyway: run this workflow by hand with
-        # "Redeploy the sync Worker" ticked.
+        # runs in between. (A changed Worker was HELD on the club evening from
+        # 2026-11-10 to 2026-11-11; the owner took the hold out: "Builds during
+        # the night are okay." It deploys whenever its sources changed.)
         id: worker
         if: steps.ready.outputs.ready == 'true'
         env:
@@ -567,13 +552,6 @@ jobs:
             echo "changed=true" >> "$GITHUB_OUTPUT"
           elif git diff --quiet "$BASE" HEAD -- worker lobby/src/lib shared/text.js shared/sync-protocol.js shared/cloud-crypto.js shared/tonight.js shared/pickup.js shared/clubs.js shared/churchSettings.js shared/clubNight.js shared/schedule.json shared/journeyRemote.js shared/classroomRemote.js shared/scoreboard.js .github/workflows/ci.yml; then
             echo "Nothing the Worker is built from changed since $BASE; its deploy is skipped."
-            echo "changed=false" >> "$GITHUB_OUTPUT"
-          elif [ -n "$DEPLOYED" ] && [ "$BASE" = "$DEPLOYED" ] && node --input-type=module -e "import { clubEveningNow } from './shared/clubNight.js'; process.exit(clubEveningNow() ? 0 : 1)"; then
-            # Held only when the running Worker names its commit: that is what
-            # lets a later run find the change again. Without it, deploy.
-            msg="The sync Worker changed, but it is the club evening (Wednesday 3:30 to 10 pm Eastern), so its deploy is HELD: a restart now would blink every screen and slow check-in. The site was still published. The next run after 10 pm deploys it (one starts by itself tonight). To deploy now anyway, run CI by hand with 'Redeploy the sync Worker' ticked."
-            echo "::warning::$msg"
-            echo "$msg" >> "$GITHUB_STEP_SUMMARY"
             echo "changed=false" >> "$GITHUB_OUTPUT"
           else
             echo "The Worker's sources changed since $BASE; deploying it."
