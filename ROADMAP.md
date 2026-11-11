@@ -1212,8 +1212,8 @@ Nothing; the three items below are done (kept as the record).
 ### The owner's decision (2026-10-19)
 - Redesign awana.kvbchurch.org/links (`site/links/index.html`, the unlisted volunteer page) to follow the rest of the styling: the 2026-27 catalog kit (`shared/brand/`: Paytone One shouts, Londrina Solid labels, Figtree reads, flat colour with hard offsets, club colours, the church's logo). "We won't do it today": not started. Its content is reorganized first (grouped by who uses it: tonight at the desk, the screens and their remotes, settings and setup, the public pages), with the game time projector remote added to it.
 
-### Still to do
-- The redesign itself, when the owner asks. Keep `site/test/links.test.mjs` (every link listed once, no script, noindex) passing.
+### Status
+- Done 2026-11-10 (owner: "build all of them"): Awana blue masthead with the church's two-line white logo and the kit's wave, cream paper, "Tonight at the desk" first with Check in as the one hot plate, then Remotes, Screens, Settings and setup, Public pages as sheets of rows (alphabetical within each, two columns from 860 px), hard offsets, light and dark, no script. Keep `site/test/links.test.mjs` (every link listed once, no script, noindex) passing.
 
 ## Handbook sheets
 

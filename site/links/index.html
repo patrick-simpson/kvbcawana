@@ -11,148 +11,151 @@
 <meta name="apple-mobile-web-app-title" content="Awana links">
 <link rel="stylesheet" href="/lobby/shared/brand/fonts.css">
 <style>
+/* The volunteers' links page in the 2026-27 catalog kit (owner 2026-10-19, built
+   2026-11-10): ONE colour family (Awana blue on cream paper), hot orange for the
+   one thing pressed most (Check in), Paytone shouts, Londrina labels, Figtree
+   reads, flat colour with hard offsets (never a blur or a gradient), the church's
+   own logo. No script. The wave is the kit's own path (wave-cubbies.svg), inline. */
 :root {
-  --bg: #ffffff;
-  --ink: #1b1f3b;
-  --muted: #4a5070;
-  --card: #f4f8fc;
-  --edge: #1A627C;
-  --accent: #2F4F8A;
-  --focus: #1A627C;
-  --display: 'Paytone One', 'Arial Rounded MT Bold', system-ui, sans-serif;
-  --body: 'Figtree', 'Segoe UI', system-ui, sans-serif;
+  --paper: #FBF6EC;
+  --sheet: #ffffff;
+  --ink: #231F20;
+  --soft: #5A5552;
+  --line: #E6DFD2;
+  --blue: #4C72B8;
+  --blue-deep: #34569A;
+  --blue-text: #34569A;
+  --hot: #CF4518;
+  --hot-deep: #9E3512;
+  --sun: #FCB614;
+  --offset: var(--ink);
+  --focus: #231F20;
+  --shout: 'Paytone One', 'Arial Rounded MT Bold', system-ui, sans-serif;
+  --label: 'Londrina Solid', 'Arial Narrow', system-ui, sans-serif;
+  --read: 'Figtree', 'Segoe UI', system-ui, sans-serif;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #1b1f3b;
-    --ink: #f4f7ff;
-    --muted: #c9d3ea;
-    --card: #262d52;
-    --edge: #7fd3ec;
-    --accent: #9fc8f0;
-    --focus: #9fd8ff;
+    --paper: #1C1A1B; --sheet: #2A2728; --ink: #F6F1E7; --soft: #C9C2B6; --line: #403B3C;
+    --blue-text: #A9C3F0; --offset: #000000; --focus: #FCB614;
   }
 }
 :root[data-theme="dark"] {
-  --bg: #1b1f3b;
-  --ink: #f4f7ff;
-  --muted: #c9d3ea;
-  --card: #262d52;
-  --edge: #7fd3ec;
-  --accent: #9fc8f0;
-  --focus: #9fd8ff;
+  --paper: #1C1A1B; --sheet: #2A2728; --ink: #F6F1E7; --soft: #C9C2B6; --line: #403B3C;
+  --blue-text: #A9C3F0; --offset: #000000; --focus: #FCB614;
 }
 * { box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; }
-body {
-  margin: 0;
-  background: var(--bg);
-  color: var(--ink);
-  font-family: var(--body);
-  font-size: 17px;
-  line-height: 1.45;
+body { margin: 0; background: var(--paper); color: var(--ink); font: 400 17px/1.45 var(--read); }
+
+/* The masthead: the blue field, the church's logo, the kit's wave along its foot. */
+.mast { position: relative; background: var(--blue); color: #fff; padding: 22px 16px 78px; overflow: hidden; }
+.mast-in { max-width: 920px; margin: 0 auto; display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 18px 28px; }
+.mast img { display: block; width: 260px; max-width: 100%; height: auto; }
+.mast h1 { margin: 0; font: 400 46px/1 var(--shout); text-transform: uppercase; letter-spacing: .01em; text-shadow: 3px 3px 0 var(--blue-deep); }
+.mast p { margin: 6px 0 0; font: 400 19px/1.2 var(--label); letter-spacing: .06em; text-transform: uppercase; }
+.wave { position: absolute; left: 0; bottom: -1px; width: 100%; height: 58px; color: var(--paper); display: block; }
+
+main { max-width: 920px; margin: 0 auto; padding: 6px 16px 44px; }
+h2 { margin: 30px 0 10px; font: 400 21px/1 var(--label); letter-spacing: .08em; text-transform: uppercase; color: var(--blue-text); display: flex; align-items: center; gap: 10px; }
+h2::after { content: ''; flex: 1; height: 3px; background: var(--line); border-radius: 2px; }
+ul { list-style: none; margin: 0; padding: 0; }
+a { color: inherit; text-decoration: none; }
+a:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
+
+/* Tonight at the desk: the two plates everything else waits behind. */
+.desk { display: grid; gap: 16px; grid-template-columns: 1fr; margin-top: 4px; }
+.plate { display: block; min-height: 96px; padding: 18px 20px 16px; border-radius: 16px; background: var(--sheet); box-shadow: 5px 5px 0 var(--offset); }
+.plate .title { display: block; font: 400 30px/1.05 var(--shout); text-transform: uppercase; }
+.plate .desc { display: block; margin-top: 6px; font-size: 16px; color: var(--soft); }
+.plate.hot { background: var(--hot); color: #fff; box-shadow: 5px 5px 0 var(--hot-deep); }
+.plate.hot .title { font-size: 38px; }
+.plate.hot .desc { color: #fff; }
+.plate:active { translate: 3px 3px; box-shadow: 2px 2px 0 var(--offset); }
+.plate.hot:active { box-shadow: 2px 2px 0 var(--hot-deep); }
+
+/* Every other section: one sheet, its links as rows. */
+.cols { display: grid; gap: 0 28px; grid-template-columns: 1fr; }
+.sheet { background: var(--sheet); border-radius: 14px; box-shadow: 4px 4px 0 var(--offset); overflow: hidden; }
+.sheet li + li { border-top: 2px solid var(--line); }
+.row { position: relative; display: block; min-height: 60px; padding: 12px 44px 12px 16px; }
+.row .title { display: block; font-weight: 700; font-size: 18px; line-height: 1.25; }
+.row .desc { display: block; font-size: 15px; color: var(--soft); }
+.row::after { content: ''; position: absolute; right: 18px; top: 50%; width: 10px; height: 10px; margin-top: -6px; border-right: 3px solid var(--blue-text); border-top: 3px solid var(--blue-text); rotate: 45deg; }
+.row:hover { background: color-mix(in srgb, var(--blue) 9%, var(--sheet)); }
+.row:hover .title { text-decoration: underline; text-underline-offset: 3px; }
+.row:active { background: color-mix(in srgb, var(--blue) 18%, var(--sheet)); }
+
+footer { margin-top: 34px; display: flex; align-items: center; gap: 10px; color: var(--soft); font-size: 15px; }
+footer::before { content: ''; flex: none; width: 12px; height: 12px; border-radius: 50%; background: var(--sun); box-shadow: 2px 2px 0 var(--offset); }
+
+@media (min-width: 620px) {
+  .desk { grid-template-columns: 3fr 2fr; }
+  .mast h1 { font-size: 60px; }
 }
-main {
-  max-width: 640px;
-  margin: 0 auto;
-  padding: 24px 16px 40px;
-}
-h1 {
-  font-family: var(--display);
-  font-weight: 400;
-  font-size: 32px;
-  line-height: 1.15;
-  margin: 8px 0 6px;
-}
-.lead { margin: 0 0 20px; color: var(--muted); }
-h2 {
-  font-family: var(--display);
-  font-weight: 400;
-  font-size: 19px;
-  color: var(--accent);
-  margin: 26px 0 8px;
-}
-ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
-a.card {
-  display: block;
-  min-height: 48px;
-  padding: 12px 16px;
-  background: var(--card);
-  color: var(--ink);
-  border-left: 6px solid var(--edge);
-  border-radius: 10px;
-  text-decoration: none;
-}
-a.card:hover { text-decoration: underline; }
-a.card:focus-visible {
-  outline: 3px solid var(--focus);
-  outline-offset: 2px;
-}
-.title {
-  display: block;
-  font-weight: 700;
-  font-size: 18px;
-}
-.desc {
-  display: block;
-  color: var(--muted);
-  font-size: 15px;
-}
-footer {
-  margin-top: 30px;
-  color: var(--muted);
-  font-size: 14px;
-}
-@media (min-width: 720px) {
-  main { padding-top: 40px; }
-  h1 { font-size: 40px; }
-  a.card { padding: 14px 18px; }
+@media (min-width: 860px) {
+  .mast { padding-top: 30px; }
+  .cols { grid-template-columns: 1fr 1fr; align-items: start; }
 }
 </style>
 </head>
 <body>
+<header class="mast">
+  <div class="mast-in">
+    <img src="/lobby/shared/brand/logos/kvbc-awana-two-line-white.svg" alt="Kennebec Valley Baptist Church Awana Clubs" width="260" height="55">
+    <div>
+      <h1>Awana links</h1>
+      <p>For volunteers. Bookmark this page.</p>
+    </div>
+  </div>
+  <!-- The kit's wave (shared/brand/shapes/wave-cubbies.svg, its path as it is), the band where it rises. -->
+  <svg class="wave" viewBox="0 58 576 132" preserveAspectRatio="none" aria-hidden="true"><path fill="currentColor" d="M-43.69,318.51C-32.24,290.76 -31.36,260.78 -19.43,233.16C-7.51,205.54 20.90,178.73 57.81,178.33C69.98,178.20 81.87,180.96 93.85,182.68C111.48,185.22 129.63,185.49 147.37,183.49C164.31,181.58 181.40,177.36 194.29,168.45C207.97,158.99 215.50,145.32 223.47,132.41C238.40,108.24 257.92,83.99 288.51,72.24C316.28,61.56 348.90,62.86 379.38,66.76C409.86,70.66 440.30,76.92 471.12,75.40C527.07,72.64 572.47,41.71 591.47,0.00L591.47,325.95L-43.69,325.95L-43.69,318.51"/></svg>
+</header>
 <main>
-  <h1>Awana links</h1>
-  <p class="lead">For volunteers. Bookmark this page.</p>
-
-  <h2>Check in</h2>
-  <ul>
-    <li><a class="card" href="/checkin"><span class="title">Check in</span><span class="desc">Phones and the desk: check children in</span></a></li>
-    <li><a class="card" href="/checkin/ym"><span class="title">Check in (Trek and Journey)</span><span class="desc">The youth leaders' page</span></a></li>
+  <h2>Tonight at the desk</h2>
+  <ul class="desk">
+    <li><a class="plate hot" href="/checkin"><span class="title">Check in</span><span class="desc">Phones and the desk: check children in</span></a></li>
+    <li><a class="plate" href="/checkin/ym"><span class="title">Trek and Journey</span><span class="desc">The youth leaders' check-in page</span></a></li>
   </ul>
 
-  <h2>Remotes</h2>
-  <ul>
-    <li><a class="card" href="https://cast.kvbchurch.org/"><span class="title">Cast</span><span class="desc">Present on the lobby TV: your screen, YouTube, slides, pictures or text (type the code on the TV)</span></a></li>
-    <li><a class="card" href="/lobby/scoreboard.html"><span class="title">Game time scoreboard</span><span class="desc">From a phone: scores for T&amp;T, Sparks and Cubbies on the game time projector, plus a stopwatch and timer</span></a></li>
-    <li><a class="card" href="/journey/remote/"><span class="title">Journey remote</span><span class="desc">Run the lesson from your phone</span></a></li>
-    <li><a class="card" href="/lobby/projector-remote.html"><span class="title">Opening ceremony remote</span><span class="desc">From a phone: Next and Back for the game time projector's opening slides, plus flag and verse backups</span></a></li>
-    <li><a class="card" href="/classroom/remote/"><span class="title">Sparks remote</span><span class="desc">Put videos, pictures, PDFs and text on the classroom TV</span></a></li>
-  </ul>
+  <div class="cols">
+    <section>
+      <h2>Remotes</h2>
+      <ul class="sheet">
+        <li><a class="row" href="https://cast.kvbchurch.org/"><span class="title">Cast</span><span class="desc">Present on the lobby TV: your screen, YouTube, slides, pictures or text (type the code on the TV)</span></a></li>
+        <li><a class="row" href="/lobby/scoreboard.html"><span class="title">Game time scoreboard</span><span class="desc">From a phone: scores for T&amp;T, Sparks and Cubbies on the game time projector, plus a stopwatch and timer</span></a></li>
+        <li><a class="row" href="/journey/remote/"><span class="title">Journey remote</span><span class="desc">Run the lesson from your phone</span></a></li>
+        <li><a class="row" href="/lobby/projector-remote.html"><span class="title">Opening ceremony remote</span><span class="desc">From a phone: Next and Back for the game time projector's opening slides, plus flag and verse backups</span></a></li>
+        <li><a class="row" href="/classroom/remote/"><span class="title">Sparks remote</span><span class="desc">Put videos, pictures, PDFs and text on the classroom TV</span></a></li>
+      </ul>
 
-  <h2>Screens</h2>
-  <ul>
-    <li><a class="card" href="/classroom/"><span class="title">Downstairs classroom</span><span class="desc">The Cubbies and Sparks screen downstairs</span></a></li>
-    <li><a class="card" href="/journey/"><span class="title">Journey</span><span class="desc">The youth room's lesson screen</span></a></li>
-    <li><a class="card" href="/lobby/"><span class="title">Lobby TV</span><span class="desc">The welcome screen and check-in moments</span></a></li>
-    <li><a class="card" href="/lobby/countdown"><span class="title">Projector</span><span class="desc">Countdown and game time</span></a></li>
-  </ul>
+      <h2>Screens</h2>
+      <ul class="sheet">
+        <li><a class="row" href="/classroom/"><span class="title">Downstairs classroom</span><span class="desc">The Cubbies and Sparks screen downstairs</span></a></li>
+        <li><a class="row" href="/journey/"><span class="title">Journey</span><span class="desc">The youth room's lesson screen</span></a></li>
+        <li><a class="row" href="/lobby/"><span class="title">Lobby TV</span><span class="desc">The welcome screen and check-in moments</span></a></li>
+        <li><a class="row" href="/lobby/countdown"><span class="title">Projector</span><span class="desc">Countdown and game time</span></a></li>
+      </ul>
+    </section>
 
-  <h2>Settings and setup</h2>
-  <ul>
-    <li><a class="card" href="/help"><span class="title">Help and install guide</span><span class="desc">Setup steps and answers</span></a></li>
-    <li><a class="card" href="/download/kvbc-awana"><span class="title">KVBC Awana for Windows</span><span class="desc">The app for the check-in laptop and the screens</span></a></li>
-    <li><a class="card" href="/tools/print/"><span class="title">Print tool</span><span class="desc">Letters on Awana letterhead, PDFs and handbook sheets, printed downstairs</span></a></li>
-    <li><a class="card" href="/settings"><span class="title">Settings</span><span class="desc">Screens, printing, tonight and history</span></a></li>
-  </ul>
+    <section>
+      <h2>Settings and setup</h2>
+      <ul class="sheet">
+        <li><a class="row" href="/help"><span class="title">Help and install guide</span><span class="desc">Setup steps and answers</span></a></li>
+        <li><a class="row" href="/download/kvbc-awana"><span class="title">KVBC Awana for Windows</span><span class="desc">The app for the check-in laptop and the screens</span></a></li>
+        <li><a class="row" href="/tools/print/"><span class="title">Print tool</span><span class="desc">Letters on Awana letterhead, PDFs and handbook sheets, printed downstairs</span></a></li>
+        <li><a class="row" href="/settings"><span class="title">Settings</span><span class="desc">Screens, printing, tonight and history</span></a></li>
+      </ul>
 
-  <h2>More</h2>
-  <ul>
-    <li><a class="card" href="/"><span class="title">Home page</span><span class="desc">The page everyone can see</span></a></li>
-    <li><a class="card" href="/logo/"><span class="title">Logo</span><span class="desc">The KVBC Awana logo: versions, colors and files</span></a></li>
-    <li><a class="card" href="/release-notes/printer.md"><span class="title">Release notes</span><span class="desc">What changed in each version</span></a></li>
-    <li><a class="card" href="/capabilities.html"><span class="title">What it can do</span><span class="desc">The full list of features</span></a></li>
-  </ul>
+      <h2>Public pages</h2>
+      <ul class="sheet">
+        <li><a class="row" href="/"><span class="title">Home page</span><span class="desc">The page everyone can see</span></a></li>
+        <li><a class="row" href="/logo/"><span class="title">Logo</span><span class="desc">The KVBC Awana logo: versions, colors and files</span></a></li>
+        <li><a class="row" href="/release-notes/printer.md"><span class="title">Release notes</span><span class="desc">What changed in each version</span></a></li>
+        <li><a class="row" href="/capabilities.html"><span class="title">What it can do</span><span class="desc">The full list of features</span></a></li>
+      </ul>
+    </section>
+  </div>
 
   <footer>Everything here needs the church passphrase to show names.</footer>
 </main>
