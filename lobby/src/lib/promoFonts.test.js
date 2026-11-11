@@ -64,7 +64,7 @@ const isPromo = (sel) => /(^|[\s>+~])\.promo[-_a-zA-Z]*/.test(sel);
 describe('promo font isolation (app.css + styles/promos/)', () => {
   it('parses the stylesheet into a plausible number of rules', () => {
     expect(ALL.length).toBeGreaterThan(300);
-    expect(ALL.some((r) => r.selector === '.promo-headline')).toBe(true);
+    expect(ALL.some((r) => r.selector === '.promo-slide')).toBe(true);
   });
 
   it('no promo rule sets its type in a brand-kit voice', () => {
@@ -86,12 +86,16 @@ describe('promo font isolation (app.css + styles/promos/)', () => {
     expect(root?.body).toMatch(/font-synthesis-weight:\s*auto/);
   });
 
-  it('the poster tokens still name the faces the posters were drawn in', () => {
-    const root = ALL.find((r) => r.selector === ':root' && /--promo-font-display/.test(r.body));
-    expect(root?.body).toMatch(/--promo-font-display:\s*'Baloo 2 Variable'/);
-    expect(root?.body).toMatch(/--promo-font-condensed:\s*'Oswald Variable'/);
+  it('the one poster token left names Nunito, and the removed fall-poster faces are gone', () => {
+    const root = ALL.find((r) => r.selector === ':root' && /--promo-font-body/.test(r.body));
     expect(root?.body).toMatch(/--promo-font-body:\s*'Nunito Variable'/);
-    expect(root?.body).toMatch(/--font-poster:\s*'Lilita One'/);
+    // Owner 2026-11-11: the fall posters' display, condensed and poster faces were removed.
+    const bare = css.replace(/\/\*[\s\S]*?\*\//g, '');
+    expect(bare).not.toMatch(/--promo-font-(display|condensed)|--font-poster|Oswald|Lilita/);
+    const pkg = JSON.parse(readFileSync(resolve(__dirname, '../../package.json'), 'utf8'));
+    expect(Object.keys({ ...pkg.dependencies, ...pkg.devDependencies }).filter((n) => /oswald|lilita/.test(n))).toEqual([]);
+    const main = readFileSync(resolve(__dirname, '../main.jsx'), 'utf8');
+    expect(main.split('\n').filter((l) => /^import /.test(l) && /oswald|lilita/i.test(l))).toEqual([]);
   });
 
   it('the lobby speaks the three brand voices', () => {

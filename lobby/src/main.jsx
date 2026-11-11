@@ -11,15 +11,12 @@ import ReactDOM from 'react-dom/client';
 import '@fontsource-variable/figtree';
 // Baloo 2 stays for good: it backs the shout stack for Devanagari, the one
 // script a name may use that Paytone One lacks and a chunky face still draws,
-// and the browser only fetches that subset when such a name appears. It is
-// also the fall promo posters' display face (--promo-font-display).
+// and the browser only fetches that subset when such a name appears.
 import '@fontsource-variable/baloo-2';
-// Pinned for the fall promo posters ONLY (--promo-font-*, --font-poster),
-// which stay exactly as printed until they retire on 2026-11-05. Drop these
-// three imports then, not before.
+// The posters' body face (--promo-font-body, the .promo-slide root rule).
+// The fall posters' other two faces, Oswald and Lilita One, went with them
+// (2026-11-11).
 import '@fontsource-variable/nunito';
-import '@fontsource-variable/oswald';
-import '@fontsource/lilita-one';
 import App from './App.jsx';
 import { RootErrorBoundary } from './components/RootErrorBoundary.jsx';
 import { forgetPresentationKey } from './lib/forgetPresentationKey.js';

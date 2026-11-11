@@ -125,18 +125,11 @@
   /* The catalog has no hand-script voice of its own, so the old script
      accents now speak in the label voice. */
   --font-hand: var(--font-condensed);
-  /* The fall promo posters stay EXACTLY as printed, so they keep the
-     faces they were drawn in through their own tokens: no rule outside
-     .promo-* may use these, and no .promo-* rule may use the brand
+  /* The poster body face. Only the shared .promo-slide rule uses it (the
+     three posters that are left draw in their own stylesheets). No rule
+     outside .promo-* may use it, and no .promo-* rule may use the brand
      tokens above (src/lib/promoFonts.test.js pins both). */
-  --promo-font-display: 'Baloo 2 Variable', 'Baloo 2', 'Segoe UI', system-ui, sans-serif;
-  --promo-font-condensed: 'Oswald Variable', 'Oswald', 'Arial Narrow', 'Segoe UI', system-ui, sans-serif;
   --promo-font-body: 'Nunito Variable', 'Nunito', 'Segoe UI', system-ui, sans-serif;
-  /* The poster voice: the single-weight chunky face the fall event
-     promo slides set their hero words and dates in, so a poster reads
-     as a poster and not as another catalog page. Bundled via
-     @fontsource/lilita-one in src/main.jsx. */
-  --font-poster: 'Lilita One', 'Baloo 2 Variable', 'Baloo 2', 'Segoe UI', system-ui, sans-serif;
 
   /* TV title-safe inset for all fixed chrome — older panels overscan. */
   --safe-inset: max(24px, 2.5vmin);
@@ -2612,22 +2605,15 @@ input:focus-visible {
   .corner-stack { gap: 0.8rem; }
 }
 
-/* ── Season promo slides (fall 2026) ───────────────────────
-   Four 15 second showreel pieces, one per fall poster, sharing one slot
-   in the background rotation (PromoSlide.jsx; which one shows is decided
-   in src/lib/promos.js). Each piece's own art lives in
-   src/styles/promos/<poster>.css, @imported at the top of this file;
-   only the rules every poster shares stay here. Unlike a typed slide
-   these are FULL-BLEED (the poster is the whole screen), so each keeps
-   its own safe area away from the corners instead of reusing
-   .manual-slide-copy's inset.
-
-   Sizes are clamp(min, min(vw, vh), max) so 1920x1080, 1366x768 and a
-   1024x600 stick all read the same, and the floors are deliberately
-   high: a line that will not fit should lose words, not points.
-
-   Layering inside a slide, lowest first: texture (0), vignette (1),
-   each poster's own art (2-3), the wordmark and the countdown chip (4). */
+/* ── Season promo slides ───────────────────────
+   Showreel pieces that share one slot in the background rotation
+   (PromoSlide.jsx; which one shows is decided in src/lib/promos.js).
+   Each piece's own art lives in src/styles/promos/<poster>.css,
+   @imported at the top of this file. Only the root rule every poster
+   shares stays here (the fall posters' headline, chip, wordmark and
+   detail rules went with them, 2026-11-11). Unlike a typed slide these
+   are FULL-BLEED (the poster is the whole screen), so each keeps its
+   own safe area away from the corners. */
 .promo-slide {
   position: absolute;
   inset: 0;
@@ -2640,144 +2626,6 @@ input:focus-visible {
   /* A promo is art, not text to select or a target to click. */
   user-select: none;
 }
-
-/* Depth, two cheap static layers. The grain keeps a big flat field of
-   navy or purple from banding on a TV panel; the vignette pulls the
-   corners down so the hero sits in a pool of light. Neither animates. */
-.promo-texture,
-.promo-vignette {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-}
-.promo-texture {
-  z-index: 0;
-  opacity: 0.05;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)'/%3E%3C/svg%3E");
-}
-.promo-vignette {
-  z-index: 1;
-  background: radial-gradient(ellipse at 50% 44%, rgba(0, 0, 0, 0) 52%, rgba(0, 0, 0, 0.38) 100%);
-}
-
-/* The church's logo, centred at the top of every promo (owner 2026-10-13):
-   two-line, never under 260px wide (its thin church line's floor). The
-   posters were laid out round a small wordmark, so on a screen under
-   1600x900 a legible logo would crowd each headline: there it stays off and
-   the poster carries on without it (the corner chip still dates it). Its own
-   slot does the centring so framer-motion owns the element outright. */
-.promo-wordmark-slot {
-  position: absolute;
-  z-index: 4;
-  top: 3.2%;
-  left: 0;
-  right: 0;
-  display: flex;
-  justify-content: center;
-  pointer-events: none;
-}
-.promo-wordmark {
-  width: clamp(260px, min(13.5vw, 24vh), 600px);
-  height: auto;
-  aspect-ratio: 1910 / 403;
-}
-@media (max-width: 1599.98px), (max-height: 899.98px) {
-  .promo-wordmark-slot { display: none; }
-}
-
-/* The live counter: "3 club nights left" / "Tonight!". Top-LEFT on
-   purpose: the corner widget stack (clock, weather, tally) owns the
-   top right, and the bottom left is kept clear (the settings gear stood there
-   as a faded 44px target until 2026-10-13). The slot holds the position so the pill itself is
-   free to pulse on the mid-hold beat. */
-.promo-chip-slot {
-  position: absolute;
-  z-index: 4;
-  top: 3.4%;
-  left: 3.4%;
-}
-.promo-chip {
-  padding: 0.42em 1.1em 0.48em;
-  border-radius: 999px;
-  font-family: var(--promo-font-condensed);
-  font-weight: 600;
-  font-size: clamp(1rem, min(1.9vw, 3.4vh), 2rem);
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  white-space: nowrap;
-  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.3);
-}
-
-/* The one headline per poster. */
-.promo-headline {
-  margin: 0;
-  font-family: var(--promo-font-display);
-  font-weight: 800;
-  font-size: clamp(2.2rem, min(4.6vw, 8vh), 5rem);
-  line-height: 1.02;
-  letter-spacing: 0.01em;
-  text-transform: uppercase;
-}
-
-/* Hero words and dates: the poster face, one weight, set big. */
-.promo-date {
-  font-family: var(--font-poster);
-  font-weight: 400;
-  font-size: clamp(2rem, min(5.2vw, 9vh), 6rem);
-  line-height: 1.04;
-  /* No extra tracking: the poster face already sets its own, and a
-     comma picked up a visible gap in front of it at these sizes. */
-  letter-spacing: 0;
-  text-transform: uppercase;
-}
-
-/* A two-tone outline: eight offsets of --po-c around the glyph, then
-   one solid drop of --po-s behind it. text-shadow rather than
-   -webkit-text-stroke because the stroke inks INWARD and thins a
-   display face at these sizes. Both properties inherit, so the class
-   goes on the element that owns the type and the inner beat span picks
-   it up. */
-.promo-outline {
-  text-shadow:
-    calc(var(--po-w) * -1) 0 0 var(--po-c),
-    var(--po-w) 0 0 var(--po-c),
-    0 calc(var(--po-w) * -1) 0 var(--po-c),
-    0 var(--po-w) 0 var(--po-c),
-    calc(var(--po-w) * -1) calc(var(--po-w) * -1) 0 var(--po-c),
-    var(--po-w) calc(var(--po-w) * -1) 0 var(--po-c),
-    calc(var(--po-w) * -1) var(--po-w) 0 var(--po-c),
-    var(--po-w) var(--po-w) 0 var(--po-c),
-    0 var(--po-drop, 0.07em) 0 var(--po-s, transparent);
-}
-
-/* The beat span: an inline-block so its one-shot bounce has something
-   to scale. */
-.promo-beat { display: inline-block; }
-
-/* The rotating detail line. One slot, one string at a time, at a size
-   that can actually be read from the check-in line. Everything the
-   printed poster says in small type takes its turn here. The slot owns
-   the font-size so its min-height can hold the row while
-   AnimatePresence swaps the string out. */
-.promo-detail-slot {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  min-height: 1.5em;
-  font-size: clamp(1.3rem, min(2.6vw, 4.6vh), 2.6rem);
-}
-.promo-detail {
-  display: inline-block;
-  font-family: var(--promo-font-condensed);
-  font-weight: 600;
-  font-size: 1em;
-  line-height: 1.2;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  text-align: center;
-}
-
 
 /* ── Wave 1: presentation variants + operator surfaces ─────────────── */
 
