@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { SyncCore } from '../src/sync.js';
-import { CAST_BYTES_MAX, CAST_CONVERTS_PER_HOUR, CAST_FILES_MAX, CAST_FILES_PER_HOUR, JOIN_FAILS_MAX, JOIN_NET_FAILS_MAX, TOKEN_TTL_MS } from '../src/cast.js';
+import { CAST_BYTES_MAX, CAST_UPLOAD_QUIET_MS, CAST_CONVERTS_PER_HOUR, CAST_FILES_MAX, CAST_FILES_PER_HOUR, JOIN_FAILS_MAX, JOIN_NET_FAILS_MAX, TOKEN_TTL_MS } from '../src/cast.js';
 import { memoryStore, signInV2 } from './helpers.js';
 import { CLASSROOM_CLIP_PART_BYTES, CLASSROOM_FILE_PART_BYTES, fileLinkFrom, sanitizeButtons, sanitizeClassroomPress, sanitizeSignal } from '../../shared/classroomRemote.js';
 
@@ -532,6 +532,43 @@ describe('Cast: what a guest may keep in the room', () => {
     const full = await start(1000, 'image/png');
     expect(full.status).toBe(413);
     expect(full.body.reason).toBe('room-full');
+  });
+
+  it('a dropped upload stops holding the room; one still sending parts keeps it (IP-20261111-06)', async () => {
+    const s = await presenter();
+    const t = await s.join();
+    const start = (bytes, type = 'video/mp4') => s.call('POST', '/v1/cast/files', { type, bytes }, { auth: '', cast: t });
+    const clip = await start(200 * 1024 * 1024);
+    expect(clip.status).toBe(200);
+    s.tick(CAST_UPLOAD_QUIET_MS + 60 * 1000);
+    // The clip is slow but still going: a part arrives now.
+    const part = new Uint8Array(clip.body.partBytes);
+    expect((await s.call('PUT', `/v1/cast/files/${clip.body.id}/0`, part, { auth: '', cast: t, type: 'application/octet-stream' })).status).toBe(200);
+    expect((await start(20 * 1024 * 1024, 'application/pdf')).status).toBe(200);
+    expect((await start(CAST_BYTES_MAX - 220 * 1024 * 1024, 'application/pdf')).status).toBe(200);
+    // Nothing is quiet long enough yet: full, and nothing was taken.
+    expect((await start(1000, 'image/png')).body.reason).toBe('room-full');
+    expect((await files(s)).map((m) => m.id)).toContain(clip.body.id);
+    // The phone lost the Wi-Fi: no part for a while. The retry gets in.
+    s.tick(CAST_UPLOAD_QUIET_MS + 60 * 1000);
+    expect((await start(1000, 'image/png')).status).toBe(200);
+    expect((await files(s)).map((m) => m.id)).not.toContain(clip.body.id);
+    expect(await s.core.storage.get(`castpart:${clip.body.id}:0`)).toBeUndefined();
+  });
+
+  it('a dropped upload on the TV is never taken', async () => {
+    const s = await presenter();
+    const t = await s.join();
+    for (let n = 0; n < CAST_FILES_MAX; n += 1) {
+      expect((await s.call('POST', '/v1/cast/files', { type: 'image/png', bytes: 10 }, { auth: '', cast: t })).status).toBe(200);
+    }
+    const metas = await files(s);
+    // Pretend the oldest is on the TV (a stage that names it).
+    const stage = await s.core.cast.engine.stage();
+    await s.core.cast.engine.saveStage({ ...stage, show: { button: { id: 'bonthetv01', kind: 'image', file: metas[0].id, type: 'image/png' }, at: 0, page: 1 } });
+    s.tick(CAST_UPLOAD_QUIET_MS + 1000);
+    expect((await s.call('POST', '/v1/cast/files', { type: 'image/png', bytes: 10 }, { auth: '', cast: t })).status).toBe(200);
+    expect((await files(s)).map((m) => m.id)).toContain(metas[0].id);
   });
 
   it('a token may start only so many uploads an hour', async () => {

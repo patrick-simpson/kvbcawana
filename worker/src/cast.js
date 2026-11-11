@@ -79,6 +79,10 @@ const ROOM_KEY = 'cast:room';
 // upload that would pass either makes room by deleting the room's OLDEST finished
 // files that are not on the TV; one that still cannot fit is refused 413 `room-full`.
 export const CAST_FILES_MAX = 12;
+// An unfinished upload with no part for this long was dropped (a phone off the Wi-Fi):
+// it no longer holds its room (IP-20261111-06). A part arrives every few seconds
+// while an upload runs, so an upload still going is never taken.
+export const CAST_UPLOAD_QUIET_MS = 3 * 60 * 1000;
 export const CAST_BYTES_MAX = CLASSROOM_CLIP_MAX_BYTES + 2 * CLASSROOM_FILE_MAX_BYTES;
 // Rates (memory only; a restart forgets them, the room caps above stay): a presenter
 // token may start CAST_FILES_PER_HOUR uploads or link copies and CAST_CONVERTS_PER_HOUR
@@ -201,18 +205,22 @@ export class Cast {
   }
 
   /**
-   * Room for `bytes` more in the room: the oldest finished files not on the TV go
+   * Room for `bytes` more in the room: dropped uploads (no part for
+   * CAST_UPLOAD_QUIET_MS) go first, then the oldest finished files not on the TV,
    * until it fits. False when it cannot (what is up, or still uploading, fills it).
    * @param {number} bytes
    */
   async makeRoom(bytes) {
     const metas = [...(await this.storage.list({ prefix: 'castmeta:' })).values()].filter((m) => m?.id);
     const shown = (await this.engine.stage()).show?.button?.file || null;
+    const t = this.now();
     let count = metas.length;
     let used = metas.reduce((n, m) => n + (Number(m.bytes) || 0), 0);
     const fits = () => count + 1 <= CAST_FILES_MAX && used + bytes <= CAST_BYTES_MAX;
     if (fits()) return true;
-    const old = metas.filter((m) => m.done && m.id !== shown).sort((a, b) => (a.at || 0) - (b.at || 0));
+    const dropped = (/** @type {any} */ m) => !m.done && t - (Number(m.lastAt) || Number(m.at) || 0) >= CAST_UPLOAD_QUIET_MS;
+    const old = metas.filter((m) => (m.done || dropped(m)) && m.id !== shown)
+      .sort((a, b) => (Number(dropped(b)) - Number(dropped(a))) || ((a.at || 0) - (b.at || 0)));
     for (const m of old) {
       if (fits()) break;
       await this.engine.deleteFile(m);

@@ -236,7 +236,8 @@ export class Classroom {
     for (let j = 0; j * CLASSROOM_FILE_PART_BYTES < buf.length; j += 1) {
       await this.storage.put(`${this.room.partPrefix}${id}:${i * per + j}`, buf.slice(j * CLASSROOM_FILE_PART_BYTES, (j + 1) * CLASSROOM_FILE_PART_BYTES));
     }
-    if (i === meta.next) await this.storage.put(this.room.filePrefix + id, { ...meta, next: i + 1 });
+    // `lastAt`: when a part last arrived, so Cast can tell a dropped upload from a slow one.
+    if (i === meta.next) await this.storage.put(this.room.filePrefix + id, { ...meta, next: i + 1, lastAt: this.now() });
     return json({ ok: true, next: Math.max(meta.next, i + 1) });
   }
 
