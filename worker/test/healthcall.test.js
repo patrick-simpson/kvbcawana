@@ -31,14 +31,15 @@ describe('the health check is started on time', () => {
     expect(DISPATCH_WORKFLOWS).toContain(HEALTH_WORKFLOW);
   });
 
-  it('5:12 and 5:47 pm on a club night: each once, the second asking for a print station', async () => {
+  it('5:12, 5:47 and 6:15 pm on a club night: each once, the later ones asking for a print station', async () => {
     const h = make();
     await h.run(at('21:00'));
     expect(h.asked.map((a) => [a.at, a.workflow, a.inputs])).toEqual([
       [at('17:12'), 'checkin-health.yml', { station: 'false' }],
       [at('17:47'), 'checkin-health.yml', { station: 'true' }],
+      [at('18:15'), 'checkin-health.yml', { station: 'true' }],   // during check-in
     ]);
-    expect(CALLS.map((c) => c.id)).toEqual(['early', 'late']);
+    expect(CALLS.map((c) => c.id)).toEqual(['early', 'late', 'doors']);
   });
 
   it('is marked in storage before GitHub is asked, so a restarted Worker never starts it twice', async () => {
@@ -83,8 +84,8 @@ describe('the health check is started on time', () => {
     const h = make();
     await h.run(at('21:00'));
     h.clock.t += 7 * 24 * 3600 * 1000 - 5 * 3600 * 1000;   // the next Wednesday, 4 pm
-    await h.run(h.clock.t + 2 * 3600 * 1000);
-    expect(h.asked).toHaveLength(4);
+    await h.run(h.clock.t + 3 * 3600 * 1000);
+    expect(h.asked).toHaveLength(6);
   });
 
   it('a throwing dependency never breaks the alarm', async () => {

@@ -25,7 +25,8 @@ name: Check-in ready tonight?
 # these runs three to four hours late (8:27 to 9:47 pm on 2026-11-04), after
 # club, so the warning was no warning. The sync Worker now starts this job
 # itself at 5:12 and 5:47 pm on a club night (worker/src/healthcall.js, the
-# print tool's dispatch token; input `station` true at 5:47). The schedule
+# print tool's dispatch token; input `station` true at 5:47), and once more
+# during check-in at 6:15 pm. The schedule
 # below stays as the backup: a scheduled run that starts more than 45 minutes
 # late only checks that the service can be reached, then stops (a late list of
 # problems is a false alarm: after 9 pm the service is no longer watching).

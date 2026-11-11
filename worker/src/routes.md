@@ -1455,8 +1455,8 @@ Started on time by the Worker (2026-11-10, `healthcall.js`, test
 `test/healthcall.test.js`): GitHub's scheduler started the workflow three to
 four hours late, so from its alarm the Worker starts `checkin-health.yml`
 itself (the print tool's dispatch, `PRINT_DISPATCH_TOKEN`; `DISPATCH_WORKFLOWS`
-lists it) at 5:12 pm (`station: false`) and 5:47 pm (`station: true`) Eastern
-on a club day, each once a night (storage `health:called`, marked before
+lists it) at 5:12 pm (`station: false`), 5:47 pm and, during check-in,
+6:15 pm (`station: true`) Eastern on a club day, each once a night (storage `health:called`, marked before
 GitHub is asked; a refusal tried again up to 3 times within 15 minutes). No
 token: nothing; the workflow's own schedule is the backup and skips a run that
 starts over 45 minutes late.

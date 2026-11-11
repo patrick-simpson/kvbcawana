@@ -5,7 +5,8 @@
 // three to four hours late, after club, on 2026-10-28 and 2026-11-04).
 //
 // So the Worker starts that job itself. Its alarm already ticks at least every
-// 30 s from 4:30 pm on a club night (watcher.js); at each time in CALLS it
+// 30 s from 4:30 pm on a club night (watcher.js); at each time in CALLS (5:12,
+// 5:47 and, during check-in, 6:15 pm) it
 // asks GitHub to run checkin-health.yml now (the print tool's dispatch,
 // prints.js, the PRINT_DISPATCH_TOKEN secret). The job then asks
 // GET /v1/health/checkin as before and FAILS when something is wrong; GitHub
@@ -32,6 +33,9 @@ export const HEALTH_WORKFLOW = 'checkin-health.yml';
 export const CALLS = Object.freeze([
   Object.freeze({ id: 'early', at: 17 * 60 + 12, station: false }),
   Object.freeze({ id: 'late', at: 17 * 60 + 47, station: true }),
+  // During check-in (2026-11-10): nothing looked after 5:47, so a station that died
+  // or a sign-in refused at 6:05 told nobody. One more look while the doors are open.
+  Object.freeze({ id: 'doors', at: 18 * 60 + 15, station: true }),
 ]);
 /** A call is made only within this many minutes after its time. */
 export const LATE_MIN = 15;
