@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { FILM_FIRST_NIGHT, FILM_ON, alternatingStyle, clubWeek, welcomeStyle } from './grandWelcomeWeek.js';
+import { FILM_FIRST_NIGHT, FILM_ON, LEAD_IN_ON, alternatingStyle, clubWeek, leadInStyle, welcomeStyle } from './grandWelcomeWeek.js';
 
 // Owner 2026-11-01: the 3D film alternates with the old style each week.
 // Owner 2026-11-08: the film is off; the 2D welcome every week.
@@ -42,5 +42,15 @@ describe('while FILM_ON, the grand welcome alternates each club week', () => {
     expect(alternatingStyle(at('2027-03-17T18:00:00'))).toBe(clubWeek(at('2027-03-17T18:00:00')) % 2 === 0 ? 'film' : 'classic');
     expect(clubWeek(at('2027-03-17T18:00:00')) - clubWeek(at('2027-03-10T18:00:00'))).toBe(1);
     expect(clubWeek(at('2026-11-11T18:00:00')) - clubWeek(at('2026-11-04T18:00:00'))).toBe(1);
+  });
+});
+
+describe("the other screens' lead-in (owner 2026-11-11: back every week)", () => {
+  it('plays every week, whatever the gym shows', () => {
+    expect(LEAD_IN_ON).toBe(true);
+    for (const d of [new Date(2026, 10, 4, 18), new Date(2026, 10, 11, 18), new Date(2026, 10, 18, 18), new Date(2027, 0, 6, 18)]) {
+      expect(leadInStyle(d)).toBe('film');
+      expect(welcomeStyle(d)).toBe('classic');
+    }
   });
 });

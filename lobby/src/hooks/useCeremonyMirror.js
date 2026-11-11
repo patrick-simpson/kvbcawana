@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { MIRROR_EARLY_GRACE_MS, MIRROR_OVERRUN_MS, mirrorEarly, mirrorSwitching, mirrorWanted, mirrorWord } from '../lib/ceremonyMirror.js';
-import { welcomeStyle } from '../../../shared/grandWelcomeWeek.js';
+import { leadInStyle } from '../../../shared/grandWelcomeWeek.js';
 
 const TICK_MS = 5000;
 /** While the frame is loaded the clock is read finely, so the early turn-over lands on its second. */
@@ -66,9 +66,10 @@ export function useCeremonyMirror({ schedule, showcase, configure, settingsPage,
   // The switching card: the five seconds before the early turn-over (owner 2026-10-22).
   const switching = mounted && !up && (tuning().switching === true || (wanted && mirrorSwitching({ schedule, now })));
   const query = typeof tuning().query === 'string' ? tuning().query : '';
-  // Week by week (shared/grandWelcomeWeek.js, the projector's own rule): the
-  // see-through lead-in film on a film week, the switching card on a classic
-  // one. The seam's `style` picks one for a test.
-  const style = tuning().style === 'film' || tuning().style === 'classic' ? tuning().style : welcomeStyle(now);
+  // The see-through lead-in film, every week (shared/grandWelcomeWeek.js
+  // leadInStyle, owner 2026-11-11; its own switch, apart from the gym's
+  // film weeks); 'classic' = the switching card. The seam's `style` picks one
+  // for a test.
+  const style = tuning().style === 'film' || tuning().style === 'classic' ? tuning().style : leadInStyle(now);
   return { mounted, up, switching, leadIn: style === 'film', frameRef, query };
 }

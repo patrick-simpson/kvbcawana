@@ -57,3 +57,23 @@ export function alternatingStyle(now) {
 export function welcomeStyle(now) {
   return FILM_ON ? alternatingStyle(now) : 'classic';
 }
+
+/**
+ * Whether the other screens (lobby TV, Journey, the classroom) play the
+ * see-through "Opening ceremony" lead-in film before they copy the gym
+ * (owner 2026-11-11, after seeing it again: "I actually like this one. Can we
+ * put that one back in each week"). Its own switch: the lead-in no longer
+ * follows the gym's film weeks.
+ */
+export const LEAD_IN_ON = true;
+
+/**
+ * What the other screens show in the five seconds before they turn over:
+ * 'film' = the lead-in film (every week while LEAD_IN_ON), 'classic' = the
+ * "Switching to opening ceremony" card.
+ * @param {Date} now
+ * @returns {'film' | 'classic'}
+ */
+export function leadInStyle(now) {
+  return LEAD_IN_ON ? 'film' : welcomeStyle(now);
+}
