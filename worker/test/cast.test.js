@@ -44,6 +44,120 @@ describe('the tray\'s Show Cast code on an idle room (IP-20261111-07)', () => {
   });
 });
 
+// Owner 2026-11-11: "All of those sound fantastic. Let's build them" (the Black button).
+describe('Cast: Black', () => {
+  const text = (words) => ({ action: 'item', data: { item: { id: 'bplaceholder', kind: 'text', text: words } } });
+  const black = (on) => ({ action: 'black', data: { on } });
+  async function joined() {
+    const s = await setup();
+    const { code } = (await s.call('POST', '/v1/cast/open', {})).body;
+    const token = (await s.call('POST', '/v1/cast/join', { code }, { auth: '' })).body.token;
+    const press = (body) => s.call('POST', '/v1/cast/press', body, { auth: '', cast: token });
+    const stage = async () => (await s.call('GET', '/v1/cast/screen')).body.stage;
+    return { ...s, code, token, press, stage };
+  }
+
+  it('black goes over what is up and rings the TV; Show again brings back exactly the same thing', async () => {
+    const s = await joined();
+    await s.press(text('Welcome'));
+    const before = (await s.stage()).show;
+    s.frames.length = 0;
+    const on = await s.press(black(true));
+    expect(on.status).toBe(200);
+    expect(s.frames.some((f) => f.e === 'changed' && f.d?.what === 'cast')).toBe(true);
+    let st = await s.stage();
+    expect(st.black).toBe(true);
+    expect(st.show).toEqual(before);
+    // The presenter's own state says so too (what the pages draw from).
+    expect((await s.call('GET', '/v1/cast/state', undefined, { auth: '', cast: s.token })).body.stage.black).toBe(true);
+    expect((await s.call('GET', '/v1/cast/desk/state')).body.stage.black).toBe(true);
+    // The same press again changes nothing (no new rev, no ring).
+    s.frames.length = 0;
+    const again = await s.press(black(true));
+    expect(again.body).toMatchObject({ ok: true, already: true, rev: on.body.rev });
+    expect(s.frames.length).toBe(0);
+    const off = await s.press(black(false));
+    expect(off.status).toBe(200);
+    st = await s.stage();
+    expect(st.black).toBeUndefined();
+    expect(st.show).toEqual(before);
+  });
+
+  it('black works with nothing up, and from the desk; a press that does not say on or off is refused', async () => {
+    const s = await joined();
+    expect((await s.call('POST', '/v1/cast/desk/press', black(true))).status).toBe(200);
+    const st = await s.stage();
+    expect(st.black).toBe(true);
+    expect(st.show).toBeNull();
+    expect((await s.press({ action: 'black' })).status).toBe(400);
+    expect((await s.press({ action: 'black', data: { on: 1 } })).status).toBe(400);
+  });
+
+  it('Back, a new thing going up, the tray reset and a new code all clear it', async () => {
+    const s = await joined();
+    await s.press(text('One'));
+    await s.press(black(true));
+    await s.press({ action: 'back' });
+    expect((await s.stage()).black).toBeUndefined();
+    await s.press(black(true));
+    await s.press(text('Two'));
+    let st = await s.stage();
+    expect(st.black).toBeUndefined();
+    expect(st.show.button.text).toBe('Two');
+    await s.press(black(true));
+    await s.press({ action: 'screen', data: {} });
+    expect((await s.stage()).black).toBeUndefined();
+    await s.press(black(true));
+    await s.call('POST', '/v1/cast/reset', {});
+    st = await s.stage();
+    expect(st.black).toBeUndefined();
+    expect(st.show).toBeNull();
+    // Black with nothing up, then a new code (the TV page loading again).
+    await s.call('POST', '/v1/cast/desk/press', black(true));
+    expect((await s.stage()).black).toBe(true);
+    await s.call('POST', '/v1/cast/open', {});
+    expect((await s.stage()).black).toBeUndefined();
+  });
+
+  it('black is kept in storage with the stage (a restarted Worker still has it)', async () => {
+    const s = await joined();
+    await s.press(text('Kept'));
+    await s.press(black(true));
+    s.core.cast.engine.stageCache = null;
+    const st = await s.stage();
+    expect(st.black).toBe(true);
+    expect(st.show.button.text).toBe('Kept');
+  });
+
+  it('a video under the black still takes its presses; slides keep their page', async () => {
+    const s = await joined();
+    await s.press({ action: 'item', data: { item: { id: 'bplaceholder', kind: 'video', youtube: 'dQw4w9WgXcQ' } } });
+    await s.press(black(true));
+    expect((await s.press({ action: 'video', data: { op: 'play' } })).status).toBe(200);
+    const st = await s.stage();
+    expect(st.black).toBe(true);
+    expect(st.cmds.at(-1)).toMatchObject({ action: 'video', data: { op: 'play' } });
+  });
+
+  it('the desk asking for the code takes an idle black off (the code would be hidden); black over something stays', async () => {
+    const s = await joined();
+    await s.call('POST', '/v1/cast/desk/press', black(true));
+    await s.call('POST', '/v1/cast/desk/reveal', {});
+    expect((await s.stage()).black).toBeUndefined();
+    await s.press(text('Up'));
+    await s.press(black(true));
+    await s.call('POST', '/v1/cast/desk/reveal', {});
+    expect((await s.stage()).black).toBe(true);
+  });
+
+  it('the classroom room refuses it: its stage never goes black', async () => {
+    const s = await setup();
+    const r = await s.call('POST', '/v1/classroom/remote', black(true));
+    expect(r.status).toBe(400);
+    expect((await s.call('GET', '/v1/classroom/stage')).body.stage.black).toBeUndefined();
+  });
+});
+
 describe('Cast: one link copy at a time (IP-20261111-17)', () => {
   it('a second copy while one runs is 429 busy, counted against nothing; the next one after is fine', async () => {
     let release;

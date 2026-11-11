@@ -112,18 +112,20 @@ async function drawQr(code) {
 /* ── The TV card: the miniature, what is up, the video's progress ── */
 
 const KIND_GLYPH = { video: 'video', clip: 'video', facebook: 'video', pdf: 'slides', image: 'picture', text: 'text', screen: 'share' };
-const GLYPH_WORDS = { code: 'Showing its code', video: 'A video is playing', slides: 'Slides are up', picture: 'A picture is up', text: 'Text is up', share: 'A shared screen is up', off: 'The TV is not answering' };
+const GLYPH_WORDS = { black: 'The TV is black', code: 'Showing its code', video: 'A video is playing', slides: 'Slides are up', picture: 'A picture is up', text: 'Text is up', share: 'A shared screen is up', off: 'The TV is not answering' };
 
 function drawTv(body) {
   const stage = R.sanitizeStage(body.stage);
   const now = R.sanitizeClassroomNow(body.now);
   const shown = stage.show ? stage.show.button : null;
   const online = body.screenOnline === true;
-  const glyph = !online ? 'off' : (shown ? (KIND_GLYPH[shown.kind] || 'code') : 'code');
+  // Black (the Black button): the miniature is black too, whatever is under it.
+  const black = stage.black === true;
+  const glyph = !online ? 'off' : black ? 'black' : (shown ? (KIND_GLYPH[shown.kind] || 'code') : 'code');
   $('tv').dataset.kind = glyph;
   $('tv-mini').dataset.kind = glyph;
   setText($('tv-ph-label'), GLYPH_WORDS[glyph]);
-  $('tv-live').hidden = !(online && shown);
+  $('tv-live').hidden = !(online && shown) || black;
   // Something up (or not): the short-window layout orders the right column by it.
   document.querySelector('.right').dataset.up = String(Boolean(online && shown));
   // The video's progress (display only; the buttons below move it).

@@ -1751,7 +1751,7 @@ each good for `TOKEN_TTL_MS` (8 h).
 | `POST /v1/cast/leave` | public + token | `{takeDown?: true}` | `{ok}`: this presenter's token is dropped (the room is free); `takeDown` puts the TV back to its code first (the page's "Display code") |
 | `GET /v1/cast/youtube?q=` | public + token | | `{ok, results: [{youtube, title, channel, seconds}]}` (at most 8; YouTube Data API with secret `YOUTUBE_API_KEY`, safe search strict, embeddable only; kept 10 min; `YOUTUBE_PER_HOUR` 60); 503 `not-configured`, 502 `youtube`, 429 `too-many` |
 | `GET /v1/cast/state` | public + token | | as `GET /v1/classroom/remote/state` (reading it is watching) |
-| `POST /v1/cast/press` | public + token | as `POST /v1/classroom/remote`; `item {item}` puts a video, text, picture or PDF up directly (its file a finished file of this room, else 400 `file-missing`), `screen {title?}` puts a shared screen up | as 10.13 plus `button` (the new stage button's id) for `item`/`screen` |
+| `POST /v1/cast/press` | public + token | as `POST /v1/classroom/remote`; `item {item}` puts a video, text, picture or PDF up directly (its file a finished file of this room, else 400 `file-missing`), `screen {title?}` puts a shared screen up, `black {on: true\|false}` makes the TV black over whatever is up or shows it again (Black, below) | as 10.13 plus `button` (the new stage button's id) for `item`/`screen`; `black` that changes nothing answers `{ok, already: true, rev}` |
 | `POST /v1/cast/files`, `PUT /v1/cast/files/:id/:n`, `POST /v1/cast/files/:id/done` | public + token | as 10.13 (a `{url}` copy too: a Google Slides/Docs link is copied as its PDF export) | as 10.13. The room holds at most `CAST_FILES_MAX` 12 files and `CAST_BYTES_MAX` 240 MB (one clip + two 20 MB files, unfinished uploads counted); a new one past either first deletes the room's dropped uploads (unfinished, no part for `CAST_UPLOAD_QUIET_MS` 3 min) and then its oldest finished files, never one on the TV, else 413 `room-full`. 429 `too-many`: past `CAST_FILES_PER_HOUR` 30 starts per token an hour, or the room's `CAST_UPLOAD_BYTES_PER_HOUR` 300 MB (whoever sends; a new token does not reset it). A `{url}` copy while another is still running in the room: 429 `busy`. Rates are memory only |
 | `POST /v1/cast/signal` | public + token | `{signal: {type: 'offer', id, sdp}}` (id = the screen button's) | `{ok}`; 409 `ended` |
 | `GET /v1/cast/signal?id=` | public + token | | `{signal: {type: 'answer', id, sdp} \| null, id}` |
@@ -1787,6 +1787,17 @@ screen-share signal or ICE routes (it is the TV's own computer).
 | `GET /v1/cast/desk/youtube?q=` | session | | as `GET /v1/cast/youtube` |
 | `POST /v1/cast/desk/files`, `PUT /v1/cast/desk/files/:id/:n`, `POST /v1/cast/desk/files/:id/done`, `GET /v1/cast/desk/files/:id` | session | as the presenter's | as the presenter's (the same room, caps and rates; the caller `DESK`) |
 | `POST /v1/cast/desk/convert`, `PUT /v1/cast/desk/convert/:id/:n`, `POST /v1/cast/desk/convert/:id/start`, `GET /v1/cast/desk/convert/:id` | session | as the presenter's | as the presenter's |
+
+Black (owner 2026-11-11: "All of those sound fantastic. Let's build them"): the press `black {on}`
+(presenter or desk; Cast only, the classroom room answers 400) sets `stage.black`, present on the
+stage only while true, so every reader of the stage (`GET /v1/cast/screen`, `/v1/cast/state`,
+`/v1/cast/desk/state`) sees it and the doorbell rings as for any press. The TV covers whatever is up
+with pure black (no words) and pauses a playing video; `black {on: false}` shows exactly the same
+thing again (`show` and its page are untouched; a screen share stays connected; the video stays
+paused until a `video` press). It works with nothing up too. Cleared by `back`, by `show`, `item`
+or `screen` (a new thing going up), by `leave {takeDown}`, `reset`, `open` and `close`; a
+`desk/reveal` clears it only when nothing is up (the code would be hidden). Kept in storage with the
+stage (`cast:stage`). Tests `worker/test/cast.test.js` ("Cast: Black").
 
 PowerPoint (owner 2026-11-08, "Support pptx upload and show a preview on the phone screen", the
 exact copy): the presenter's browser scrambles the file, the job (`scripts/cast/convert.mjs`) reads

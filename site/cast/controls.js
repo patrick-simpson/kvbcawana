@@ -24,6 +24,9 @@
 //   key), sent in parts, then "start" hands the key on to the GitHub job that turns it
 //   into a PDF with LibreOffice (about a minute); the status is asked every
 //   CONVERT_POLL_MS and the PDF goes up when it is ready.
+// - Black (owner 2026-11-11): one button, always there, beside Take it down. It sends
+//   `black {on}`: the TV goes pure black over whatever is up, and "Show again" brings the
+//   same thing back. The stage says which (`stage.black`), so every page agrees.
 // - Slides on the TV: the phone's preview (preview.js): this slide, the next, every slide.
 // - "On the TV now": the state every 2 s while the page is visible (which is also what
 //   makes the TV report), nothing while hidden, and it stops after 30 minutes with no
@@ -134,11 +137,15 @@ export function createControls(conn) {
     const w = offline
       ? { main: 'Not reaching the TV right now.', sub: navigator.onLine === false ? 'This device is offline.' : 'Trying again…', online: false }
       : tvWords(state, { short: conn.nav === true });
+    const black = state.stage.black === true;
     // Slides: the preview says which slide (no second "Page 2 of 9" line above it).
-    if (!offline && w.online && state.stage.show && state.stage.show.button.kind === 'pdf') w.sub = '';
+    if (!offline && w.online && !black && state.stage.show && state.stage.show.button.kind === 'pdf') w.sub = '';
     setText($('tv-main'), w.main);
     setText($('tv-sub'), w.sub);
     $('tv').dataset.online = String(w.online);
+    $('tv').dataset.black = String(black);
+    setText($('btn-black'), black ? 'Show again' : 'Black');
+    $('btn-black').setAttribute('aria-pressed', String(black));
     const shown = state.stage.show ? state.stage.show.button : null;
     const kind = shown ? shown.kind : '';
     $('ctl-video').hidden = !R.CLASSROOM_PLAYABLE_KINDS.includes(kind);
@@ -607,6 +614,11 @@ export function createControls(conn) {
       const shown = state && state.stage.show ? state.stage.show.button : null;
       if (shown && shown.id === shareId) stopShare();
       else press('back', null, 'Taken down');
+    });
+    // Black: the TV goes black over what is up; the same button shows it again.
+    $('btn-black').addEventListener('click', () => {
+      const on = !(state && state.stage.black);
+      press('black', { on }, on ? 'The TV is black' : 'Showing again');
     });
     $('ctl-video').addEventListener('click', (e) => {
       const b = e.target.closest('[data-op]');

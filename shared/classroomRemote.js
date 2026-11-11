@@ -32,6 +32,12 @@
 // both sparks and this" (kind `clip`: a video FILE uploaded like a picture, up to
 // CLASSROOM_CLIP_MAX_BYTES, sent in CLASSROOM_CLIP_PART_BYTES requests). Both take the
 // same video presses as a YouTube video.
+//
+// Owner 2026-11-11 ("All of those sound fantastic. Let's build them"), Cast only:
+// BLACK. The press `black {on}` sets `stage.black`: the Cast TV goes pure black over
+// whatever is up (a playing video is paused by the TV) until `black {on: false}`
+// brings the same thing back. Back, a new thing going up, a new code and the tray's
+// reset all clear it. The classroom room refuses the press (worker/src/classroom.js).
 
 export const CLASSROOM_VIDEOS_MAX = 4;
 export const CLASSROOM_ITEMS_MAX = 8;
@@ -72,7 +78,7 @@ export const CLASSROOM_ITEM_KINDS = Object.freeze(['image', 'pdf', 'text', 'clip
 /** The kinds a video press works on: YouTube, an uploaded clip, a Facebook video. */
 export const CLASSROOM_PLAYABLE_KINDS = Object.freeze(['video', 'clip', 'facebook']);
 /** Everything a remote (or /settings) may ask. */
-export const CLASSROOM_ACTIONS = Object.freeze(['show', 'back', 'video', 'page', 'preview', 'preview-end', 'sparky', 'item', 'screen']);
+export const CLASSROOM_ACTIONS = Object.freeze(['show', 'back', 'video', 'page', 'preview', 'preview-end', 'sparky', 'item', 'screen', 'black']);
 /** A screen share's offer or answer (SDP text) is at most this long. */
 export const CLASSROOM_SIGNAL_MAX = 24000;
 export const CLASSROOM_VIDEO_OPS = Object.freeze(['toggle', 'play', 'pause', 'seek', 'volume', 'mute', 'unmute']);
@@ -280,7 +286,8 @@ export function sanitizeShown(v) {
 /**
  * One press, or null. data: show {button}, video {op, by?|step?}, page {step}|{to},
  * preview {look, hold?}, item {item} (a video or an item put up directly, Cast),
- * screen {title?} (a screen share starting); the others none. Never free text
+ * screen {title?} (a screen share starting), black {on} (Cast: the TV black, or
+ * showing again); the others none. Never free text
  * but an item's own (cleaned by sanitizeShown).
  * @param {unknown} action @param {unknown} data
  * @returns {{ action: string, data?: Record<string, any> } | null}
@@ -306,6 +313,8 @@ export function sanitizeClassroomPress(action, data) {
       return item && item.kind !== 'screen' ? { action, data: { item } } : null;
     }
     case 'screen': return { action, data: { title: oneLine(d.title, CLASSROOM_TITLE_MAX) || 'Shared screen' } };
+    // Cast's Black button: on or off, said outright (a repeat of the same press changes nothing).
+    case 'black': return typeof d.on === 'boolean' ? { action, data: { on: d.on } } : null;
     default: return { action };
   }
 }
@@ -330,7 +339,8 @@ export function sanitizeStage(v) {
   const show = shown && typeof s.show.at === 'number' ? { button: shown, at: s.show.at, page: Number.isInteger(s.show.page) && s.show.page >= 1 ? Math.min(s.show.page, 9999) : 1 } : null;
   const preview = isObj(s.preview) && CLASSROOM_LOOKS.includes(s.preview.look) && typeof s.preview.until === 'number' ? { look: s.preview.look, until: s.preview.until, ...(s.preview.held === true ? { held: true } : {}) } : null;
   const cmds = (Array.isArray(s.cmds) ? s.cmds : []).map(sanitizeCmd).filter(Boolean).slice(-CLASSROOM_CMDS_MAX);
-  return { rev: Number.isInteger(s.rev) && s.rev >= 0 ? s.rev : 0, show, preview, cmds };
+  // `black` (Cast) is only there while it is on, so a stage without it reads as before.
+  return { rev: Number.isInteger(s.rev) && s.rev >= 0 ? s.rev : 0, show, preview, cmds, ...(s.black === true ? { black: true } : {}) };
 }
 
 /**

@@ -31,6 +31,8 @@
 //   blob and played in a <video>; a public Facebook video in Facebook's plain iframe
 //   player (never its SDK on this page). One set of controls for YouTube and clips
 //   (`media`), each takes itself down when it ends; a Facebook video stays until Back.
+// - Black (owner 2026-11-11): the stage's `black` puts pure black over whatever is up
+//   and pauses a playing video; off shows the same thing again, the video still paused.
 // - ?configure=1 (KVBC Awana's display Settings window, coordinator 2026-11-08): a
 //   short note only. No room is opened, no socket, nothing closed on pagehide.
 //
@@ -90,6 +92,7 @@ let openRetryMs = 0;
 let closed = false;
 let revealTimer = 0;
 let revealSeen = 0; // the Worker's last revealAt this screen has acted on
+let black = false; // the presenter's Black button: the TV is black over what is up
 
 const session = () => {
   let s = '';
@@ -245,8 +248,29 @@ async function read() {
   apply(R.sanitizeStage(r.body.stage));
 }
 
+/* ── Black: pure black over whatever is up ── */
+
+/**
+ * The presenter's Black button (owner 2026-11-11). What is up stays under the black: a
+ * playing video is paused (and stays paused after Show again, until Play), slides keep
+ * their page, a shared screen stays connected. Facebook's plain player cannot be paused
+ * from here, so its frame is parked (no sound under the black) and starts over when shown.
+ * @param {boolean} on
+ */
+function setBlack(on) {
+  if (on === black) return;
+  black = on;
+  $('black').hidden = !on;
+  if (on && media) { try { media.pause(); } catch { /* the player is not ready */ } }
+  for (const f of layer.querySelectorAll('.fb-video')) {
+    if (on && f.src) { f.dataset.src = f.src; f.removeAttribute('src'); }
+    if (!on && f.dataset.src) { f.src = f.dataset.src; delete f.dataset.src; }
+  }
+}
+
 function apply(next) {
   stage = next;
+  setBlack(next.black === true);
   const key = next.show ? `${next.show.button.id}@${next.show.at}` : '';
   if (key !== showKey) {
     showKey = key;
@@ -465,7 +489,8 @@ async function playVideo(b) {
           volume: () => player.getVolume(), setVolume: (v) => player.setVolume(v),
           t: () => player.getCurrentTime(), d: () => player.getDuration(), destroy: () => player.destroy(),
         };
-        try { e.target.unMute(); e.target.playVideo(); } catch { /* blocked */ }
+        // Under the black a video waits, paused, until it is shown again and Play is pressed.
+        try { e.target.unMute(); if (black) e.target.pauseVideo(); else e.target.playVideo(); } catch { /* blocked */ }
         report();
       },
       // Ended: black at once (never YouTube's end screen), then the TV takes it down itself
@@ -496,7 +521,7 @@ async function playClip(b, show) {
   const v = document.createElement('video');
   v.src = blobUrl;
   v.playsInline = true;
-  v.autoplay = true;
+  v.autoplay = !black;
   v.addEventListener('ended', ended);
   for (const ev of ['play', 'pause', 'volumechange']) v.addEventListener(ev, () => report());
   layer.append(v);
@@ -510,7 +535,7 @@ async function playClip(b, show) {
   };
   // Sound on when the browser allows it (KVBC Awana does); else the picture, muted.
   v.muted = false;
-  v.play().catch(() => { v.muted = true; v.play().catch(() => {}); });
+  if (!black) v.play().catch(() => { v.muted = true; v.play().catch(() => {}); });
   report(true);
 }
 
@@ -553,7 +578,7 @@ function playFacebook(b) {
   frame.height = String(Math.round(h));
   frame.style.width = `${Math.round(w)}px`;
   frame.style.height = `${Math.round(h)}px`;
-  frame.src = src;
+  if (black) frame.dataset.src = src; else frame.src = src;
   box.append(frame);
   layer.append(box);
   report(true);

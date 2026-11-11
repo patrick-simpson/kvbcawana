@@ -130,6 +130,32 @@ test('the "On the TV now" line', () => {
   assert.equal(tvWords({ stage, now, screenOnline: true }, { short: true }).main, 'A YouTube video: Welcome');
 });
 
+// Owner 2026-11-11: "All of those sound fantastic. Let's build them" (Black).
+test('Black: one button on the phone and the desk, pure black on the TV, and the words say so', () => {
+  const none = R.sanitizeStage({ black: true });
+  assert.deepEqual(tvWords({ stage: none, now: null, screenOnline: true }), { main: 'The TV is black.', sub: 'Nothing is up underneath.', online: true });
+  assert.match(tvWords({ stage: none, now: null, screenOnline: false }).main, /not answering/);
+  const up = R.sanitizeStage({ black: true, show: { button: { id: 'babcdefgh', kind: 'pdf', file: 'fabcdefghijklmnop', type: 'application/pdf', title: 'Sunday' }, at: 1, page: 3 } });
+  assert.deepEqual(tvWords({ stage: up, now: null, screenOnline: true }), { main: 'The TV is black.', sub: 'Underneath: slides, Sunday.', online: true });
+  assert.deepEqual(tvWords({ stage: up, now: null, screenOnline: true }, { short: true }), { main: 'The TV is black.', sub: 'Underneath: slides, Sunday.', online: true });
+  assert.equal(tvWords({ stage: up, now: null, screenOnline: false }).sub, 'Waiting for the TV to pick it up.');
+  // The button: on both pages, beside Take it down; its words and pressed state follow the stage.
+  const deskPage = read('cast', 'desk', 'index.html');
+  assert.match(page, /id="btn-down" hidden>Take it down<\/button>\s*<button class="quiet" type="button" id="btn-black" aria-pressed="false">Black<\/button>/);
+  assert.match(deskPage, /id="btn-black" aria-pressed="false">Black<\/button>\s*<button class="quiet mi" type="button" id="btn-down" hidden>/);
+  assert.match(controls, /setText\(\$\('btn-black'\), black \? 'Show again' : 'Black'\);/);
+  assert.match(controls, /press\('black', \{ on \}, on \? 'The TV is black' : 'Showing again'\);/);
+  assert.ok(R.sanitizeClassroomPress('black', { on: true }), 'the press the button sends is one the shared rules take');
+  // The TV: a layer of pure black over everything, no words; a playing video is paused.
+  assert.match(screenPage, /#black \{ background: #000; z-index: 5; \}/);
+  assert.match(screenPage, /<div class="layer" id="black" hidden><\/div>/);
+  assert.match(screen, /setBlack\(next\.black === true\);/);
+  assert.match(screen, /if \(on && media\) \{ try \{ media\.pause\(\); \}/);
+  // The desk's miniature placeholder and LIVE tag follow it.
+  assert.match(read('cast', 'desk', 'desk.js'), /black \? 'black' :/);
+  assert.match(deskPage, /#tv-mini\[data-kind="black"\] \.g-black/);
+});
+
 test('the presenter\'s token lives in sessionStorage only, and every call carries it', () => {
   assert.equal(TOKEN_KEY, 'awanaCastToken.v1');
   assert.match(app, /sessionStorage\.getItem\(TOKEN_KEY\)/);

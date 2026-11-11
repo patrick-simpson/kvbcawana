@@ -205,7 +205,10 @@ const KIND_WORDS = { video: 'a YouTube video', clip: 'a video', facebook: 'a Fac
  */
 export function tvWords({ stage, now, screenOnline }, opts = {}) {
   const shown = stage && stage.show ? stage.show.button : null;
+  // The Black button (owner 2026-11-11): the TV is black over whatever is up.
+  const black = Boolean(stage && stage.black);
   if (!shown) {
+    if (black && screenOnline) return { main: 'The TV is black.', sub: 'Nothing is up underneath.', online: true };
     return screenOnline
       ? { main: 'Nothing yet. The TV is showing its code.', sub: '', online: true }
       : { main: 'The TV is not answering right now.', sub: 'It may be turning on. Anything you send will show when it does.', online: false };
@@ -218,6 +221,7 @@ export function tvWords({ stage, now, screenOnline }, opts = {}) {
   if (!screenOnline) sub = 'Waiting for the TV to pick it up.';
   const title = shown.kind === 'screen' || !shown.title ? '' : `: ${shown.title}`;
   const what = KIND_WORDS[shown.kind] || 'something';
+  if (black) return { main: 'The TV is black.', sub: screenOnline ? `Underneath: ${what}${shown.kind === 'screen' || !shown.title ? '' : `, ${shown.title}`}.` : sub, online: screenOnline };
   const main = opts.short ? `${what.charAt(0).toUpperCase()}${what.slice(1)}${title}` : `On the TV now: ${what}${title}`;
   return { main, sub, online: screenOnline };
 }

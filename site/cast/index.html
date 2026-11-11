@@ -134,6 +134,10 @@
   .result span { display: block; margin-top: 2px; font-size: 14px; color: var(--muted); }
   .result:active { background: var(--sand); }
   #ctl-down .quiet { flex: 1 1 40%; }
+  /* Black is on: the button is filled, so it is plain at a glance that the TV is dark. */
+  .quiet[aria-pressed="true"] { background: var(--charcoal); color: var(--cream); }
+  .quiet[aria-pressed="true"]:active { background: var(--charcoal); }
+  .tv[data-black="true"] .dot { background: var(--charcoal); }
   #code-help { margin-top: 8px; font-size: 14px; }
 
   /* ── Motion (church.css's language; nothing moves with "reduce motion" on) ── */
@@ -231,9 +235,10 @@
       <p id="share-state" hidden></p>
       <div class="controls" id="ctl-down">
         <button class="quiet" type="button" id="btn-down" hidden>Take it down</button>
+        <button class="quiet" type="button" id="btn-black" aria-pressed="false">Black</button>
         <button class="quiet" type="button" id="btn-code">Display code</button>
       </div>
-      <p class="help" id="code-help">Display code puts the code back on the TV and lets the next person connect.</p>
+      <p class="help" id="code-help">Black makes the TV dark until you tap Show again. Display code puts the code back on the TV and lets the next person connect.</p>
       <p class="note" id="press-note" role="status"></p>
     </section>
 

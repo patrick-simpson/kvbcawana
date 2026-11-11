@@ -6,7 +6,7 @@
 //
 // Storage (the free plan's SQLite-backed object; small writes):
 //   classroom:buttons   {rev, savedAt, buttons}        one put per edit
-//   classroom:stage     {rev, show, preview, cmds}     one put per press
+//   classroom:stage     {rev, show, preview, cmds}     one put per press (Cast's adds `black`)
 //   cmeta:<id>          {id, type, bytes, parts, name, done, at}
 //   cpart:<id>:<n>      one part of the file, CLASSROOM_FILE_PART_BYTES (under the 128 KiB body cap)
 // A file not named by the button list is deleted when the list is saved
@@ -125,8 +125,9 @@ export function sniffType(b) {
 export class Classroom {
   /**
    * @param {{ storage: any, now: () => number, ring: (payload: Record<string, unknown>) => void, fetchFn?: typeof fetch,
-   *   room?: { what: string, buttonsKey: string, stageKey: string, filePrefix: string, partPrefix: string } }} deps
-   * `room`: the lobby's Cast screen (cast.js) runs a second copy under its own keys and doorbell.
+   *   room?: { what: string, buttonsKey: string, stageKey: string, filePrefix: string, partPrefix: string, cast?: boolean } }} deps
+   * `room`: the lobby's Cast screen (cast.js) runs a second copy under its own keys and doorbell;
+   * `room.cast` lets it take the presses only Cast has (Black).
    */
   constructor({ storage, now, ring, fetchFn, room }) {
     this.room = room || { what: 'classroom', buttonsKey: BUTTONS_KEY, stageKey: STAGE_KEY, filePrefix: FILE_PREFIX, partPrefix: PART_PREFIX };
@@ -397,7 +398,7 @@ export class Classroom {
         const item = buttons.items.find((v) => v.id === p.data?.button);
         if (!video && !item) return fail('That button is gone. The list has been reloaded.', 404, { reason: 'no-button' });
         // One thing up at a time: a button takes a held look (the Sparks screen) down.
-        next = { ...stage, show: { button: video ? { ...video, kind: 'video' } : item, at: t, page: 1 }, preview: stage.preview?.held ? null : stage.preview, cmds };
+        next = { ...stage, show: { button: video ? { ...video, kind: 'video' } : item, at: t, page: 1 }, preview: stage.preview?.held ? null : stage.preview, cmds, black: false };
         this.rtc = null;
         break;
       }
@@ -408,7 +409,7 @@ export class Classroom {
           const meta = await this.storage.get(this.room.filePrefix + item.file);
           if (!meta?.done) return fail('That picture or PDF is still uploading, or was removed. Add it again.', 400, { reason: 'file-missing' });
         }
-        next = { ...stage, show: { button: { ...item, id: newId('b', 10) }, at: t, page: 1 }, preview: stage.preview?.held ? null : stage.preview, cmds };
+        next = { ...stage, show: { button: { ...item, id: newId('b', 10) }, at: t, page: 1 }, preview: stage.preview?.held ? null : stage.preview, cmds, black: false };
         this.rtc = null;
         break;
       }
@@ -416,11 +417,21 @@ export class Classroom {
       case 'screen': {
         const id = newId('b', 10);
         this.rtc = { id, offer: null, answer: null, at: t, by: who };
-        next = { ...stage, show: { button: { id, kind: 'screen', title: p.data?.title || 'Shared screen' }, at: t, page: 1 }, preview: stage.preview?.held ? null : stage.preview, cmds };
+        next = { ...stage, show: { button: { id, kind: 'screen', title: p.data?.title || 'Shared screen' }, at: t, page: 1 }, preview: stage.preview?.held ? null : stage.preview, cmds, black: false };
         break;
       }
       // Back to the schedule: whatever the remote put up goes, a held look too.
-      case 'back': next = { ...stage, show: null, preview: stage.preview?.held ? null : stage.preview, cmds }; this.rtc = null; break;
+      case 'back': next = { ...stage, show: null, preview: stage.preview?.held ? null : stage.preview, cmds, black: false }; this.rtc = null; break;
+      // Cast's Black button (owner 2026-11-11): the TV goes black over whatever is up, or
+      // shows it again. What is up, its page and a screen share all stay as they are; a new
+      // thing going up or Back (above) clears it. Not in the classroom room.
+      case 'black': {
+        if (!this.room.cast) return fail('That is not something the Sparks remote can ask.', 400);
+        const on = p.data?.on === true;
+        if (Boolean(stage.black) === on) return json({ ok: true, already: true, rev: stage.rev, screenOnline: this.screenOnline() });
+        next = { ...stage, black: on, cmds };
+        break;
+      }
       case 'video':
         if (!CLASSROOM_PLAYABLE_KINDS.includes(stage.show?.button?.kind)) return fail('No video is on the screen.', 409, { reason: 'no-video' });
         next = { ...stage, cmds: cmd('video', p.data) };

@@ -71,6 +71,7 @@
     --m-info: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round'%3E%3Ccircle cx='10' cy='10' r='7.25'/%3E%3Cpath d='M10 9v4.6'/%3E%3Ccircle cx='10' cy='6.6' r='.5' fill='black'/%3E%3C/svg%3E");
     --m-ok: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='10' cy='10' r='7.25'/%3E%3Cpath d='M6.8 10.2l2.2 2.2 4.2-4.6'/%3E%3C/svg%3E");
     --m-err: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round'%3E%3Ccircle cx='10' cy='10' r='7.25'/%3E%3Cpath d='M7.7 7.7l4.6 4.6M12.3 7.7l-4.6 4.6'/%3E%3C/svg%3E");
+    --m-black: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Crect x='2.75' y='3.75' width='14.5' height='10' rx='1.8' fill='black'/%3E%3Cpath d='M7 16.75h6' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E");
     --m-chev: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5.5 7.8l4.5 4.5 4.5-4.5'/%3E%3C/svg%3E");
   }
 
@@ -142,6 +143,11 @@
   #btn-mute { --mi: var(--m-vol); }
   #btn-mute[data-op="unmute"] { --mi: var(--m-mute); }
   #btn-down { --mi: var(--m-x); }
+  #btn-black { --mi: var(--m-black); }
+  /* A toggle that is on (Black): the accent fill, as a Windows ToggleButton. */
+  button[aria-pressed="true"] { background: var(--accent); border-color: color-mix(in srgb, var(--accent) 80%, white 10%); border-bottom-color: color-mix(in srgb, var(--accent) 60%, black); color: var(--on-accent); }
+  button[aria-pressed="true"]:hover { background: color-mix(in srgb, var(--accent) 90%, var(--base)); }
+  button[aria-pressed="true"]:active { background: color-mix(in srgb, var(--accent) 80%, var(--base)); color: var(--on-accent); }
   #btn-copy { --mi: var(--m-copy); }
 
   /* Cards: stroke-defined, no drop shadow. */
@@ -248,7 +254,8 @@
   .ph svg { width: 56px; height: 56px; display: none; fill: none; stroke: currentColor; stroke-width: 1.25; stroke-linecap: round; stroke-linejoin: round; }
   .ph .cap { font-size: 12px; line-height: 16px; color: #8F8F8F; }
   #tv-mini[data-kind="code"] .g-code, #tv-mini[data-kind="video"] .g-video, #tv-mini[data-kind="slides"] .g-slides, #tv-mini[data-kind="picture"] .g-picture,
-  #tv-mini[data-kind="text"] .g-text, #tv-mini[data-kind="share"] .g-share, #tv-mini[data-kind="off"] .g-off { display: block; }
+  #tv-mini[data-kind="text"] .g-text, #tv-mini[data-kind="share"] .g-share, #tv-mini[data-kind="off"] .g-off, #tv-mini[data-kind="black"] .g-black { display: block; }
+  #tv-mini[data-kind="black"] .ph { background: #000; }
   .screen[data-shot="true"] .ph { display: none; }
   .stand { width: 18%; height: 10px; background: #2B2B2B; clip-path: polygon(10% 0, 90% 0, 100% 100%, 0 100%); }
   .stand::after { content: ''; display: block; }
@@ -269,7 +276,8 @@
   .vol { display: inline-flex; align-items: center; gap: 4px; }
   .vol .quiet { min-width: 32px; padding: 4px 0; font-size: 16px; line-height: 20px; }
   .vol-level { min-width: 124px; text-align: center; font-variant-numeric: tabular-nums; }
-  #btn-down { margin-top: 12px; width: 100%; }
+  .tvactions { display: flex; gap: 8px; margin-top: 12px; }
+  .tvactions button { flex: 1 1 0; min-width: 0; }
   #press-note { margin-top: 12px; }
 
   /* The slides on the TV (preview.js): this one, the next, every slide. */
@@ -360,7 +368,7 @@
   @media (forced-colors: active) {
     body, html { background: Canvas; }
     .card, .group, .layer, button, .file-pick, input, textarea, .note, .bezel { border: 1px solid CanvasText; }
-    .primary { background: Highlight; color: HighlightText; border-color: Highlight; forced-color-adjust: none; }
+    .primary, button[aria-pressed="true"] { background: Highlight; color: HighlightText; border-color: Highlight; forced-color-adjust: none; }
     .choice[aria-current="page"] { outline: 2px solid Highlight; }
     .pill { background: Highlight; forced-color-adjust: none; }
     .dot, .pdot, .live { background: CanvasText; forced-color-adjust: none; }
@@ -541,6 +549,7 @@
                 <svg class="g-picture" viewBox="0 0 48 48" aria-hidden="true" focusable="false"><rect x="6" y="8" width="36" height="32" rx="6"/><circle cx="17" cy="19" r="3.2"/><path d="M7 35l10-9.5 7.5 7 6-5.5 10.5 9"/></svg>
                 <svg class="g-text" viewBox="0 0 48 48" aria-hidden="true" focusable="false"><path d="M9 12h30M9 22h30M9 32h30M9 42h18"/></svg>
                 <svg class="g-share" viewBox="0 0 48 48" aria-hidden="true" focusable="false"><rect x="5" y="8" width="38" height="26" rx="4"/><path d="M24 29V16M18.5 21.5L24 16l5.5 5.5M16 41h16"/></svg>
+                <svg class="g-black" viewBox="0 0 48 48" aria-hidden="true" focusable="false"><rect x="5" y="8" width="38" height="26" rx="4"/><path d="M16 41h16M24 34v7"/><path d="M15 21h18"/></svg>
                 <svg class="g-off" viewBox="0 0 48 48" aria-hidden="true" focusable="false"><rect x="5" y="8" width="38" height="26" rx="4"/><path d="M16 41h16M24 34v7M12 14l24 14"/></svg>
                 <span class="cap" id="tv-ph-label">Showing its code</span>
               </div>
@@ -586,7 +595,10 @@
             </div>
             <div class="strip" data-slide-strip aria-label="Every slide"></div>
           </div>
-          <button class="quiet mi" type="button" id="btn-down" hidden>Take it down</button>
+          <div class="tvactions">
+            <button class="quiet mi" type="button" id="btn-black" aria-pressed="false">Black</button>
+            <button class="quiet mi" type="button" id="btn-down" hidden>Take it down</button>
+          </div>
           <p class="note" id="press-note" role="status"></p>
         </section>
 

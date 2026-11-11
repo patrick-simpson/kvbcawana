@@ -11,7 +11,8 @@
 //
 // The engine is the Sparks remote's (classroom.js, rules shared/classroomRemote.js),
 // a second copy under its own keys and doorbell ('cast'):
-//   cast:stage                  what the Cast screen shows
+//   cast:stage                  what the Cast screen shows (and `black`: the TV is
+//                               black over it, owner 2026-11-11, the Black button)
 //   castmeta:<id> / castpart:   the room's uploaded files
 //   cast:room                   {code, at, tokens: [{hash, at}]}
 // Opening (a new code) or closing the room clears the stage, every file and every
@@ -177,7 +178,7 @@ export class Cast {
     this.converts = { n: 0, since: 0 };
     this.engine = new Classroom({
       storage, now, ring, fetchFn,
-      room: { what: 'cast', buttonsKey: 'cast:buttons', stageKey: 'cast:stage', filePrefix: 'castmeta:', partPrefix: 'castpart:' },
+      room: { what: 'cast', buttonsKey: 'cast:buttons', stageKey: 'cast:stage', filePrefix: 'castmeta:', partPrefix: 'castpart:', cast: true },
     });
     /** Per presenter token this hour (hash -> counts), memory only. @type {Map<string, { since: number, files: number, converts: number }>} */
     this.rates = new Map();
@@ -289,7 +290,7 @@ export class Cast {
     this.converts = { n: 0, since: 0 };
     this.roomBytes = { n: 0, since: 0 };
     const stage = await this.engine.stage();
-    if (stage.show || stage.preview) await this.engine.saveStage({ ...stage, show: null, preview: null, cmds: [] });
+    if (stage.show || stage.preview || stage.black) await this.engine.saveStage({ ...stage, show: null, preview: null, cmds: [], black: false });
   }
 
   /** POST /v1/cast/open (the Cast screen): a fresh code; whatever was up and every token goes. */
@@ -467,7 +468,11 @@ export class Cast {
   async deskReveal() {
     const room = await this.roomDoc();
     await this.storage.put(ROOM_KEY, { ...room, revealAt: this.now() });
-    this.ring({ what: 'cast', rev: (await this.engine.stage()).rev });
+    // A TV that is black with nothing up would hide the code that was just asked for: the
+    // black goes (saveStage rings). Black over something stays, as that thing does.
+    const stage = await this.engine.stage();
+    if (stage.black && !stage.show) { await this.engine.saveStage({ ...stage, black: false }); return json({ ok: true }); }
+    this.ring({ what: 'cast', rev: stage.rev });
     return json({ ok: true });
   }
 
