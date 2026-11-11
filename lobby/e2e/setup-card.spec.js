@@ -143,7 +143,9 @@ test.describe('the lobby\'s first-run card, 1280x720', () => {
     // and the debug panel's simulator must show it on a fresh screen too.
     await page.route(/open-meteo|twotimtwo|sockjs/, (route) => route.abort());
     // The strip is off by default (7.15.0): this screen has turned it on.
-    await page.addInitScript(() => localStorage.setItem('awanaConfig.v1', JSON.stringify({ showTonightTicker: true })));
+    await page.addInitScript(() => localStorage.setItem('awanaConfig.v1', JSON.stringify({ showTonightTicker: true, seasonPromos: false })));
+    // No season promos: a poster holds the foot's card away (the one-day Veterans
+    // Day poster failed this test on 2026-11-11).
     await page.goto('/index.html?lowPower=1');
     await expect(page.locator('.setup-card')).toBeVisible();
     await page.keyboard.press('Control+Shift+D');

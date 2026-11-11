@@ -137,7 +137,7 @@ for (const [width, height] of [[640, 480], [1280, 720], [1920, 1080]]) {
     // host's toggle on every screen; embedded, the column ends short of it.
     test('a name that fills the column ends short of the host\'s buttons', async ({ page }) => {
       const send = await liveChannel(page);
-      const frame = await embed(page, { config: { standardDisplayMs: 60_000, firstArrivalMoment: false, showClock: false } });
+      const frame = await embed(page, { config: { standardDisplayMs: 60_000, firstArrivalMoment: false, showClock: false, seasonPromos: false } });
       await send('checkin', { id: 'e2e-long', firstName: 'Maximiliana Wolfeschlegel', club: 'Sparks', at: new Date().toISOString() });
       const name = frame.locator('.checkin__name');
       await expect(name).toHaveAttribute('aria-label', 'MAXIMILIANA WOLFESCHLEGEL');

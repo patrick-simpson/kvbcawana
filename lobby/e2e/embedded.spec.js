@@ -181,7 +181,7 @@ test.describe('embedded on a portrait phone (390x844)', () => {
   // there and ran under the host's gear.
   test('the first-run card ends short of the host\'s column', async ({ page }) => {
     // The first-run card is for a screen that has not signed in yet.
-    const frame = await embed(page, { setupCard: true, signedIn: false });
+    const frame = await embed(page, { setupCard: true, signedIn: false, config: { seasonPromos: false } });
     await expect(frame.locator('.setup-card')).toBeVisible();
     expectClear(await boxes(frame, '.setup-card'), { width: 390, height: 844 });
   });
