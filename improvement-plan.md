@@ -110,6 +110,7 @@ history keeps them).
 - Suggested fix: Remove the BARF shot and its cut, set the intro to 8 seconds and re-pick its moment, then the owner runs `npm run reel` (it needs his music file).
 - Status: Open. The recipe is fixed (2082381). The film itself is still the old one until the owner runs `npm run reel` with his music file.
 
+## Closed findings
 
 ### IP-20261111-23: The lost-label count is not shown on the settings page
 - Severity: Low
@@ -117,7 +118,7 @@ history keeps them).
 - What: The Worker now reports `labelsLost` on the tonight overview and the print status, but no page reads it yet.
 - Why it matters: A label given up on is still only visible to someone who reads the raw answer.
 - Suggested fix: Add a Needs a look alert on /settings Tonight when `labelsLost` is above 0, with a test.
-- Status: Open
+- Status: Fixed in c6a829e
 
 ### IP-20261111-24: Cast: a dropped big upload still uses up the hour's allowance
 - Severity: Low
@@ -125,7 +126,7 @@ history keeps them).
 - What: A 200 MB video whose upload dropped has already been counted, so a retry within the hour is refused as too many.
 - Why it matters: The presenter cannot retry a big video for up to an hour, though the room has space again.
 - Suggested fix: Count the bytes when the upload finishes, or give them back when a dropped upload is cleared.
-- Status: Open
+- Status: Fixed in 1a57b22
 
 ### IP-20261111-25: Relay hours for the month can be undercounted
 - Severity: Low
@@ -133,9 +134,7 @@ history keeps them).
 - What: Two different shares starting at the same moment both read the same month total and each writes its own.
 - Why it matters: The monthly cap of 120 relay hours could be passed by a little. Cloudflare's free allowance is far larger, so no cost.
 - Suggested fix: Add the cost to an in-memory total in one step, and write that through.
-- Status: Open
-
-## Closed findings
+- Status: Fixed in 4a7ae16
 
 ### IP-20261111-01: Cast stays on until someone turns it off by hand
 - Severity: High
@@ -328,3 +327,4 @@ history keeps them).
 - 2026-11-11: set up. Starting point 58721b9 (2026-11-03), so the first review covers the week before. No review run yet.
 - 2026-11-11: first review, by Fable with four Fable helpers (the owner asked for Fable this once). 58721b9..331b5cc, 171 commits (about 165 without the bots). 22 findings: 1 High, 8 Medium, 13 Low. Fixed 3 (13, 14, 15: stale words in docs and comments). Nothing weakened a privacy rule; no paid-plan risk found.
 - 2026-11-11, later: the owner said to build them all. 18 findings fixed the same day (see Closed); IP-08 half done (the film needs the owner's rebuild). Three small follow-ups found while fixing: IP-23, IP-24, IP-25. The club-evening deploy hold was removed at the owner's word (0036b72).
+- 2026-11-11, evening: the three follow-ups fixed (IP-23, IP-24, IP-25). Only IP-08 is open: the film needs the owner's rebuild with his music file.
