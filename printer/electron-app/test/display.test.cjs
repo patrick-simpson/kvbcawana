@@ -693,3 +693,86 @@ describe('display/ink-clear (SMART Ink cleared on the clock, owner 2026-10-19)',
     w.stop();
   });
 });
+
+describe('display: Cast on and off (real createDisplay with a stand-in Electron)', () => {
+  const fs = require('node:fs');
+  const os = require('node:os');
+  const path = require('node:path');
+  const Module = require('node:module');
+  const { mock } = require('node:test');
+
+  // A stand-in for the parts of Electron the display touches: every call is a harmless
+  // no-op, every property is another stand-in. A few answers must be real shapes.
+  function fake() {
+    const f = new Proxy(function () {}, {
+      get: (_t, k) => (k === 'then' ? undefined : k === Symbol.toPrimitive ? () => 0 : f),
+      apply: () => f,
+      construct: () => f,
+    });
+    return f;
+  }
+  function electronStandIn() {
+    const bounds = { x: 0, y: 0, width: 1920, height: 1080 };
+    const display = { id: 1, bounds, workArea: bounds, scaleFactor: 1 };
+    const screen = { getAllDisplays: () => [display], getPrimaryDisplay: () => display, on() {}, removeListener() {} };
+    class BrowserWindow {
+      constructor() { this.webContents = fake(); this.destroyed = false; }
+      on() {} once() {} isDestroyed() { return this.destroyed; } destroy() { this.destroyed = true; }
+      isVisible() { return false; } isFullScreen() { return false; } getBounds() { return bounds; }
+      setBounds() {} setFullScreen() {} setAlwaysOnTop() {} setTitle() {} show() {} showInactive() {} focus() {}
+      moveTop() {} loadURL() { return Promise.resolve(); } loadFile() { return Promise.resolve(); } close() {}
+    }
+    const powerSaveBlocker = { start: () => 1, stop() {}, isStarted: () => true };
+    return { BrowserWindow, WebContentsView: fake(), ipcMain: { handle() {}, on() {}, removeHandler() {}, removeListener() {}, removeAllListeners() {} },
+      net: { fetch: () => Promise.reject(new Error('offline in tests')) }, powerMonitor: { on() {}, removeListener() {} },
+      powerSaveBlocker, screen, session: fake(), shell: fake() };
+  }
+  function loadDisplayModule() {
+    const real = Module._load;
+    Module._load = function (request, ...rest) { return request === 'electron' ? electronStandIn() : real.call(this, request, ...rest); };
+    const file = require.resolve('../src/display/display.js');
+    delete require.cache[file];
+    try { return require(file); } finally { Module._load = real; }
+  }
+
+  // Sunday and Wednesday of one week (EST in November 2026 is UTC-5).
+  const SCHEDULE = { meeting: { day: 3, start: '18:00' }, timezone: 'America/New_York', specialDates: {} };
+  const FEED = { generatedAt: '2026-11-01T12:00:00Z', events: [{ date: '2026-11-11', kind: 'club', isCancelled: false }, { date: '2026-11-18', kind: 'club', isCancelled: false }] };
+  const at = (iso) => Date.parse(`${iso}-05:00`);
+
+  function setup(state) {
+    const userData = fs.mkdtempSync(path.join(os.tmpdir(), 'awana-display-'));
+    const dir = path.join(userData, 'display');
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, 'state.json'), JSON.stringify({ hoursFrom4pm: true, ...state }));
+    fs.writeFileSync(path.join(dir, 'sources.json'), JSON.stringify({ schedule: SCHEDULE, feed: FEED, fetchedAt: Date.now() }));
+    const casts = [];
+    const { createDisplay } = loadDisplayModule();
+    const display = createDisplay({
+      userData, staticDir: userData, iconPath: '', isPackaged: false, version: () => '0.0.0', quietStart: true,
+      getAutostart: () => false, setAutostart() {}, onChange() {}, onCast: (on) => casts.push(on),
+    });
+    const saved = () => JSON.parse(fs.readFileSync(path.join(dir, 'state.json'), 'utf8'));
+    const logText = () => { try { return fs.readFileSync(path.join(dir, 'display.log'), 'utf8'); } catch { return ''; } };
+    return { display, casts, saved, logText };
+  }
+
+  it('Cast on then off leaves the classroom computer\'s changed hours and shutdown exactly as they were', () => {
+    const clock = mock.method(Date, 'now', () => at('2026-11-08T12:00:00')); // a Sunday: no club
+    const { display, casts, saved } = setup({
+      settings: { screen: 'classroom', hours: { start: '15:30', end: '21:00' }, shutdown: { enabled: false, at: '21:30' } },
+    });
+    try {
+      display.start();
+      display.castOn();
+      expect(saved().settings.screen).toBe('cast');
+      expect(saved().settings.hours).toEqual({ start: '15:30', end: '21:00' });
+      expect(saved().settings.shutdown).toEqual({ enabled: false, at: '21:30' });
+      display.castOff();
+      expect(saved().settings.screen).toBe('classroom');
+      expect(saved().settings.hours).toEqual({ start: '15:30', end: '21:00' });
+      expect(saved().settings.shutdown).toEqual({ enabled: false, at: '21:30' });
+      expect(casts).toEqual([true, false]);
+    } finally { display.stop(); clock.mock.restore(); }
+  });
+});

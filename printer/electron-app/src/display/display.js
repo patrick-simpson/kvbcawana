@@ -27,7 +27,7 @@ const path = require('path');
 const { clubNightToday, displayWindow, nextClubNight } = require('./clubNight');
 const { NO_OVERRIDES, decideVisibility, hide, showNow, tidy } = require('./visibility');
 const { findDisplay, rememberDisplay } = require('./displays');
-const { CHOOSABLE, castHostAllowed, isScreenPage, screenUrls } = require('./screens');
+const { CHOOSABLE, castHostAllowed, isScreenPage, screenFor, screenUrls } = require('./screens');
 const { createCastDesk } = require('./cast-desk');
 const { createCastPreview } = require('./cast-preview');
 const { hoursMinutes, moveToFourPm, normalizeSettings, parseTime, settingsForScreen } = require('./settings');
@@ -682,9 +682,16 @@ function createDisplay(opts) {
 
   /* ── The screen it shows ────────────────────────────────────────── */
 
+  // Set by castOff only: the next setScreen puts the screen id back and leaves hours and
+  // shutdown alone (the classroom is not newly chosen, so its defaults must not apply again).
+  let keepSettingsOnce = false;
+
   /** Switches the screen. One that is up is replaced at once, on the same monitor. */
   function setScreen(id) {
-    const next = settingsForScreen(state.settings, id);
+    const next = keepSettingsOnce
+      ? normalizeSettings({ ...state.settings, screen: screenFor(id).id })
+      : settingsForScreen(state.settings, id);
+    keepSettingsOnce = false;
     if (next.screen === state.settings.screen) return;
     const wasUp = Boolean(lobby);
     state.settings = next;
@@ -737,6 +744,7 @@ function createDisplay(opts) {
     if (state.settings.screen !== 'cast') return;
     const back = typeof state.castReturn === 'string' && state.castReturn !== 'cast' ? state.castReturn : 'lobby';
     log('cast off, back to', back);
+    keepSettingsOnce = true;
     setScreen(back);
     if (opts.onCast) { try { opts.onCast(false); } catch { /* best effort */ } }
   }
