@@ -66,7 +66,7 @@ describe('a countdown and the clock (Cast): two more items', () => {
     expect(R.sanitizeClassroomPress('item', { item: { id: 'babcdefgh', kind: 'clock' } }).data.item.kind).toBe('clock');
     expect(R.sanitizeClassroomNow({ view: 'timer' })).toEqual({ view: 'timer' });
     expect(R.sanitizeClassroomNow({ view: 'clock' })).toEqual({ view: 'clock' });
-    expect(R.CAST_ONLY_KINDS).toEqual(['timer', 'clock']);
+    expect(R.CAST_ONLY_KINDS).toEqual(['timer', 'clock', 'scripture']);
     expect(R.CLASSROOM_PLAYABLE_KINDS).not.toContain('timer');
     const list = R.sanitizeButtons({ videos: [], items: [timer(), { id: 'bclock0001', kind: 'clock' }, { id: 'btext00001', kind: 'text', text: 'Hi' }] });
     expect(list.items.map((i) => i.kind)).toEqual(['text']);
@@ -106,5 +106,31 @@ describe('the line-up (Cast): entries as an item press takes them, capped', () =
     expect(lu).toEqual({ rev: 4, savedAt: '2026-11-11T20:00:00Z', entries: [R.sanitizeLineupEntry(text('bentryone1')), R.sanitizeLineupEntry(text('bentrytwo2'))], on: 'bentrytwo2', button: 'bstagebtn01' });
     expect(R.sanitizeLineup({ entries: [text('bentryone1')], on: 'bgone00001', button: 'bstagebtn01' })).toMatchObject({ on: null, button: null, rev: 0, savedAt: null });
     expect(R.sanitizeLineup(null)).toEqual({ rev: 0, savedAt: null, entries: [], on: null, button: null });
+  });
+});
+
+describe('Scripture by reference (Cast): a reference and its pages, King James only', () => {
+  const sc = (over = {}) => ({ id: 'bscripture1', kind: 'scripture', ref: 'John 3:16', pages: ['16 For God so loved the world.'], ...over });
+
+  it('the label is made from the reference and always ends (KJV), whatever was sent', () => {
+    expect(R.sanitizeItem(sc({ label: 'John 3:16 (NIV)', title: 'x' }))).toEqual({ id: 'bscripture1', kind: 'scripture', title: 'John 3:16 (KJV)', ref: 'John 3:16', label: 'John 3:16 (KJV)', pages: ['16 For God so loved the world.'] });
+    expect(R.sanitizeItem(sc({ ref: '  Psalm\n23 ', pages: [' 1 The LORD is my shepherd; ', '2 He maketh me'] }))).toMatchObject({ ref: 'Psalm 23', label: 'Psalm 23 (KJV)', pages: ['1 The LORD is my shepherd;', '2 He maketh me'] });
+  });
+
+  it('caps: a reference, 1 to 40 pages, each one line of 600 at most, 8,000 characters in all', () => {
+    expect([R.CAST_SCRIPTURE_REF_MAX, R.CAST_SCRIPTURE_PAGE_MAX, R.CAST_SCRIPTURE_TEXT_MAX, R.CAST_SCRIPTURE_PAGES_MAX]).toEqual([40, 600, 8000, 40]);
+    expect(R.sanitizeItem(sc({ pages: ['x'.repeat(700)] })).pages[0]).toHaveLength(600);
+    expect(R.sanitizeItem(sc({ pages: Array(40).fill('a') })).pages).toHaveLength(40);
+    for (const bad of [{ ref: '' }, { ref: 7 }, { pages: [] }, { pages: 'text' }, { pages: ['ok', ''] }, { pages: [7] }, { pages: Array(41).fill('a') }, { pages: Array(14).fill('x'.repeat(600)) }]) {
+      expect(R.sanitizeItem(sc(bad))).toBeNull();
+    }
+  });
+
+  it('an item press and a line-up entry, never a Sparks button; a view the TV may report', () => {
+    expect(R.sanitizeClassroomPress('item', { item: sc() }).data.item.kind).toBe('scripture');
+    expect(R.sanitizeLineupEntry({ id: 'bscripture1', item: sc() }).item.label).toBe('John 3:16 (KJV)');
+    expect(R.sanitizeButtons({ videos: [], items: [sc()] }).items).toEqual([]);
+    expect(R.sanitizeClassroomNow({ view: 'scripture', page: 2, pages: 3 })).toEqual({ view: 'scripture', page: 2, pages: 3 });
+    expect(R.CLASSROOM_PLAYABLE_KINDS).not.toContain('scripture');
   });
 });

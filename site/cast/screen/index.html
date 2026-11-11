@@ -92,6 +92,17 @@
   .face-date { margin: calc(2.2 * var(--u)) 0 0; font: 400 calc(3 * var(--u))/1.2 var(--heading); color: var(--muted); }
   /* (Over "#show img", which stretches a presenter's picture to the whole screen.) */
   #show .face-logo { position: static; display: block; width: calc(18 * var(--u)); height: auto; margin: 0; }
+  /* Scripture (King James): the cream page, the reference in Jost caps above, the words in
+     Almarai as big as fit, verse numbers small and tan, the church's logo and the page at the foot. */
+  .verse { position: absolute; inset: 0; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; background: var(--cream); color: var(--charcoal); padding: 8.4vh 9vw 5.6vh; overflow: hidden; }
+  .verse-ref { margin: 0; font: 500 calc(2.4 * var(--u))/1.2 var(--heading); letter-spacing: .16em; text-transform: uppercase; color: #8C7760; }
+  .verse-ref::after { content: ''; display: block; width: calc(6 * var(--u)); height: max(2px, calc(.16 * var(--u))); margin-top: calc(2.4 * var(--u)); background: var(--tan); }
+  .verse-words { display: grid; align-content: safe center; min-height: 0; overflow: hidden; margin: calc(2.4 * var(--u)) 0; max-width: calc(84 * var(--u)); font: 400 calc(var(--verse-size, 5) * var(--u))/1.42 var(--body); }
+  .verse-words > span { text-wrap: pretty; }
+  .verse-words .vn { font: 500 .5em/1 var(--heading); color: #8C7760; vertical-align: .72em; margin-right: .22em; letter-spacing: .02em; }
+  .verse-foot { display: flex; align-items: center; justify-content: space-between; }
+  #show .verse-logo { position: static; display: block; width: calc(14 * var(--u)); height: auto; margin: 0; }
+  .verse-page { margin: 0; font: 500 calc(1.7 * var(--u))/1 var(--heading); letter-spacing: .08em; color: var(--muted); font-variant-numeric: tabular-nums; }
   .status { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; text-align: center; padding: 10vw; font: 400 calc(2.4 * var(--u))/1.4 var(--heading); color: #CFC4B5; }
   /* Black (owner 2026-11-11, the presenter's Black button): pure black over whatever is up,
      no words. What is under it stays as it is and comes back with Show again. */

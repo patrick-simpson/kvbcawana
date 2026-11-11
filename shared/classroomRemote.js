@@ -52,6 +52,10 @@
 // `item` press takes it (never a shared screen; a countdown's `endsAt` is set only when it
 // goes up). At most CAST_LINEUP_MAX entries and CAST_LINEUP_CHARS_MAX characters of items.
 // Cleaned by cleanLineupEntries (an edit: all or nothing) and sanitizeLineup (a read).
+// SCRIPTURE BY REFERENCE: kind `scripture {ref, label, pages}`, Cast only. The page looks
+// the reference up in the King James text it serves itself (site/cast/bible/) and sends
+// the verses already cut into pages; the label is always the reference plus " (KJV)".
+// Stepped like slides with the `page` press. Caps: CAST_SCRIPTURE_*.
 
 export const CLASSROOM_VIDEOS_MAX = 4;
 export const CLASSROOM_ITEMS_MAX = 8;
@@ -90,9 +94,15 @@ export const CLASSROOM_WATCH_MS = 30 * 1000;
 export const CLASSROOM_SEEK_S = 10;
 export const CLASSROOM_VOLUME_STEP_PCT = 10;
 export const CLASSROOM_TEXT_LOOKS = Object.freeze(['page', 'board']);
-export const CLASSROOM_ITEM_KINDS = Object.freeze(['image', 'pdf', 'text', 'clip', 'facebook', 'timer', 'clock']);
+export const CLASSROOM_ITEM_KINDS = Object.freeze(['image', 'pdf', 'text', 'clip', 'facebook', 'timer', 'clock', 'scripture']);
 /** Items only Cast shows: never in the Sparks list, refused by the classroom room. */
-export const CAST_ONLY_KINDS = Object.freeze(['timer', 'clock']);
+export const CAST_ONLY_KINDS = Object.freeze(['timer', 'clock', 'scripture']);
+/** Scripture (King James only): the reference, each page, all pages, and how many pages at most. */
+export const CAST_SCRIPTURE_REF_MAX = 40;
+export const CAST_SCRIPTURE_PAGE_MAX = 600;
+export const CAST_SCRIPTURE_TEXT_MAX = 8000;
+export const CAST_SCRIPTURE_PAGES_MAX = 40;
+export const CAST_SCRIPTURE_VERSION = 'KJV';
 /** A countdown: this short at least, this long at most, in steps of this (the scoreboard timer's steps). */
 export const CAST_TIMER_MIN_S = 15;
 export const CAST_TIMER_MAX_S = 60 * 60;
@@ -108,7 +118,7 @@ export const CLASSROOM_ACTIONS = Object.freeze(['show', 'back', 'video', 'page',
 export const CLASSROOM_SIGNAL_MAX = 24000;
 export const CLASSROOM_VIDEO_OPS = Object.freeze(['toggle', 'play', 'pause', 'seek', 'volume', 'mute', 'unmute']);
 /** What the screen can be showing (its report's `view`). */
-export const CLASSROOM_VIEWS = Object.freeze(['off', 'cubbies', 'black', 'sparks', 'lobby', 'board', 'video', 'image', 'pdf', 'text', 'screen', 'waiting', 'clip', 'facebook', 'timer', 'clock']);
+export const CLASSROOM_VIEWS = Object.freeze(['off', 'cubbies', 'black', 'sparks', 'lobby', 'board', 'video', 'image', 'pdf', 'text', 'screen', 'waiting', 'clip', 'facebook', 'timer', 'clock', 'scripture']);
 
 const BUTTON_ID_RE = /^b[a-z0-9]{6,20}$/;
 const FILE_ID_RE = /^f[a-z0-9]{12,24}$/;
@@ -265,7 +275,7 @@ export function sanitizeVideo(v) {
 /**
  * One picture, PDF or text button (or, for Cast, a countdown or the clock), or null.
  * @param {unknown} v
- * @returns {{ id: string, kind: string, title: string, file?: string, type?: string, heading?: string, text?: string, look?: string, seconds?: number, endsAt?: number } | null}
+ * @returns {{ id: string, kind: string, title: string, file?: string, type?: string, heading?: string, text?: string, look?: string, seconds?: number, endsAt?: number, ref?: string, label?: string, pages?: string[] } | null}
  */
 export function sanitizeItem(v) {
   if (!isObj(v) || !isButtonId(v.id) || !CLASSROOM_ITEM_KINDS.includes(v.kind)) return null;
@@ -278,6 +288,16 @@ export function sanitizeItem(v) {
     return { id: v.id, kind: 'timer', title: oneLine(v.title, CLASSROOM_TITLE_MAX), seconds: s, ...(endsAt ? { endsAt } : {}) };
   }
   if (v.kind === 'clock') return { id: v.id, kind: 'clock', title: '' };
+  // Scripture: a reference, the verses in pages. The label is made here (never taken as
+  // sent), so it always names the King James Version.
+  if (v.kind === 'scripture') {
+    const ref = oneLine(v.ref, CAST_SCRIPTURE_REF_MAX);
+    if (!ref || !Array.isArray(v.pages) || v.pages.length < 1 || v.pages.length > CAST_SCRIPTURE_PAGES_MAX) return null;
+    const pages = v.pages.map((p) => oneLine(p, CAST_SCRIPTURE_PAGE_MAX));
+    if (pages.some((p) => !p) || pages.reduce((n, p) => n + p.length, 0) > CAST_SCRIPTURE_TEXT_MAX) return null;
+    const label = `${ref} (${CAST_SCRIPTURE_VERSION})`;
+    return { id: v.id, kind: 'scripture', title: label, ref, label, pages };
+  }
   if (v.kind === 'text') {
     const text = cleanText(v.text);
     if (!text) return null;

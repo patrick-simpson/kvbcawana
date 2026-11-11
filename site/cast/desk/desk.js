@@ -116,8 +116,8 @@ async function drawQr(code) {
 
 /* ── The TV card: the miniature, what is up, the video's progress ── */
 
-const KIND_GLYPH = { video: 'video', clip: 'video', facebook: 'video', pdf: 'slides', image: 'picture', text: 'text', screen: 'share', timer: 'timer', clock: 'clock' };
-const GLYPH_WORDS = { timer: 'A countdown is up', clock: 'The clock is up', black: 'The TV is black', code: 'Showing the house slide', video: 'A video is playing', slides: 'Slides are up', picture: 'A picture is up', text: 'Text is up', share: 'A shared screen is up', off: 'The TV is not answering' };
+const KIND_GLYPH = { video: 'video', clip: 'video', facebook: 'video', pdf: 'slides', image: 'picture', text: 'text', screen: 'share', timer: 'timer', clock: 'clock', scripture: 'scripture' };
+const GLYPH_WORDS = { timer: 'A countdown is up', clock: 'The clock is up', scripture: 'Scripture is up', black: 'The TV is black', code: 'Showing the house slide', video: 'A video is playing', slides: 'Slides are up', picture: 'A picture is up', text: 'Text is up', share: 'A shared screen is up', off: 'The TV is not answering' };
 
 function drawTv(body) {
   const stage = R.sanitizeStage(body.stage);

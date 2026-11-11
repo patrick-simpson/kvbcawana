@@ -40,6 +40,9 @@
 //   the offset from the tightest round trip, logic.js createSkew) down to 0:00, where it
 //   holds, silent, until Back or the next thing. The clock is this computer's own local
 //   time, 12-hour, redrawn at each minute. Neither asks the Worker for anything.
+// - Scripture by reference: the King James text a presenter looked up, already in pages
+//   (`scripture {ref, label, pages}`): one page at a time on the cream page, the reference
+//   above, verse numbers small, the words as big as fit; the page press steps it.
 // - Black (owner 2026-11-11): the stage's `black` puts pure black over whatever is up
 //   and pauses a playing video; off shows the same thing again, the video still paused.
 // - ?configure=1 (KVBC Awana's display Settings window, coordinator 2026-11-08): a
@@ -50,7 +53,7 @@
 import * as R from '../shared/classroomRemote.js';
 import { CONNECT_WAIT_MS, answerShare } from '../shared/screenShare.js';
 import { addressWords, presenterUrl } from '../logic.js';
-import { clockWords, createSkew, minSec, timerLeft } from '../logic.js';
+import { clockWords, createSkew, minSec, timerLeft, verseRuns } from '../logic.js';
 import { drawQrCode } from '../qr.js';
 
 const SESSION_KEY = 'awanaSyncSession.v1';
@@ -316,6 +319,8 @@ function apply(next) {
     busy = busy.then(() => change(next.show)).catch(() => {});
   } else if (next.show && next.show.button.kind === 'pdf' && next.show.page !== shownPage) {
     busy = busy.then(() => drawPdfPage(next.show.page)).catch(() => {});
+  } else if (next.show && next.show.button.kind === 'scripture' && next.show.page !== shownPage) {
+    drawScripturePage(next.show.button, next.show.page);
   } else if (next.show && next.show.button.kind === 'screen' && !rtc) {
     trySignal();
   }
@@ -355,6 +360,7 @@ async function change(show) {
   else if (b.kind === 'text') drawText(b);
   else if (b.kind === 'timer') drawTimer(b);
   else if (b.kind === 'clock') drawClock();
+  else if (b.kind === 'scripture') drawScripture(b, show.page);
   else if (b.kind === 'image') drawImage(prepared);
   else if (b.kind === 'pdf') await openPdf(prepared, show.page);
   else if (b.kind === 'screen') { status('Connecting to the presenter’s screen…', b.title !== 'Shared screen' ? b.title : '', true); trySignal(); }
@@ -429,6 +435,64 @@ function fitText() {
     if (box.scrollHeight <= box.clientHeight + 2 && el.scrollWidth <= el.clientWidth + 1) lo = mid; else hi = mid;
   }
   el.style.setProperty('--words-size', String(lo));
+}
+
+/* ── Scripture: one page at a time, the reference above ── */
+
+function drawScripture(b, page) {
+  const box = document.createElement('div');
+  box.className = 'verse';
+  const ref = document.createElement('p');
+  ref.className = 'verse-ref';
+  ref.textContent = b.label;
+  const words = document.createElement('p');
+  words.className = 'verse-words';
+  const foot = document.createElement('div');
+  foot.className = 'verse-foot';
+  const logo = document.createElement('img');
+  logo.className = 'verse-logo';
+  logo.src = '../church/kvbc-logo.png';
+  logo.alt = '';
+  const count = document.createElement('p');
+  count.className = 'verse-page';
+  foot.append(logo, count);
+  box.append(ref, words, foot);
+  layer.append(box);
+  drawScripturePage(b, page);
+}
+
+/** The page asked for, numbers small, the words fitted; a step eases the words in. */
+function drawScripturePage(b, page) {
+  const box = layer.querySelector('.verse');
+  if (!box) return;
+  const n = Math.min(Math.max(1, page || 1), b.pages.length);
+  shownPage = n;
+  const words = box.querySelector('.verse-words');
+  // One inline run inside the words' box: the box is the room (its track), the run what fills it.
+  const run = document.createElement('span');
+  run.append(...verseRuns(b.pages[n - 1]).map((r) => {
+    if (r.n) { const s = document.createElement('sup'); s.className = 'vn'; s.textContent = r.n; return s; }
+    return document.createTextNode(`${r.t} `);
+  }));
+  words.replaceChildren(run);
+  box.querySelector('.verse-page').textContent = b.pages.length > 1 ? `${n} of ${b.pages.length}` : '';
+  words.classList.remove('m-fade');
+  void words.offsetWidth;
+  words.classList.add('m-fade');
+  fitVerse(words);
+  report();
+}
+
+/** The words as big as their own box holds (it is the page's middle track, overflow hidden). */
+function fitVerse(el) {
+  let lo = 2.4;
+  let hi = 6.6; // a single short verse reads big, never shouts
+  for (let i = 0; i < 14; i += 1) {
+    const mid = (lo + hi) / 2;
+    el.style.setProperty('--verse-size', String(mid));
+    if (el.scrollHeight <= el.clientHeight + 1 && el.scrollWidth <= el.clientWidth + 1) lo = mid; else hi = mid;
+  }
+  el.style.setProperty('--verse-size', String(lo));
 }
 
 /* ── A countdown and the clock ── */
@@ -817,6 +881,7 @@ function nowReport() {
   const out = { view: b ? b.kind : 'waiting' };
   if (b) { out.button = b.id; out.title = b.title; }
   if (b && b.kind === 'pdf' && pdf) { out.page = shownPage || 1; out.pages = pdf.pages; }
+  if (b && b.kind === 'scripture') { out.page = Math.min(shownPage || 1, b.pages.length); out.pages = b.pages.length; }
   if (b && R.CLASSROOM_PLAYABLE_KINDS.includes(b.kind) && media) {
     try { out.video = { t: media.t(), d: media.d(), paused: media.paused(), muted: media.muted(), volume: media.volume() }; } catch { /* not yet */ }
   }

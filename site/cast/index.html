@@ -177,6 +177,19 @@
   .lu-ic { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
   #lineup-empty { margin-top: 0; }
 
+  /* ── Scripture: the passage as it will read, and the page on the TV ── */
+  .sc-preview { margin-top: 18px; padding: 18px 18px 16px; background: #fff; border: 1px solid var(--rule); border-left: 3px solid var(--tan); border-radius: 0 6px 6px 0; }
+  .sc-label { margin: 0 0 10px; font: 500 12px/1 var(--heading); letter-spacing: .16em; text-transform: uppercase; color: #8C7760; }
+  .sc-text { margin: 0; max-height: 240px; overflow: auto; font: 400 17px/1.6 var(--body); color: var(--charcoal); }
+  .vn { font: 500 .62em/1 var(--heading); color: #8C7760; vertical-align: .55em; margin-right: .2em; }
+  .sc-count { margin: 12px 0 0; font-size: 14px; color: var(--muted); }
+  .pages { margin-top: 16px; }
+  .pages-text { margin: 0; padding: 14px 16px; background: #fff; border: 1px solid var(--rule); border-radius: 6px; font: 400 16px/1.55 var(--body); max-height: 168px; overflow: auto; }
+  .pages-label { margin: 12px 0 8px; font: 500 15px/1.3 var(--heading); font-variant-numeric: tabular-nums; }
+  .pages-row { display: grid; grid-template-columns: 1fr 1.6fr; gap: 8px; }
+  .pages-row .primary { margin: 0; min-height: 60px; font-size: 20px; }
+  .pages-row .quiet { min-height: 60px; }
+
   /* A search result with "Add to line-up" beside it. */
   .results > li { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px; border-bottom: 1px solid var(--rule); }
   .results > li .result { border-bottom: 0; }
@@ -275,6 +288,15 @@
         </div>
         <div class="strip" data-slide-strip aria-label="Every slide"></div>
       </div>
+      <!-- Scripture on the TV: the page that is up, and Back / Next. -->
+      <div class="pages" id="ctl-pages" hidden>
+        <p class="pages-text" id="pages-text"></p>
+        <p class="pages-label" id="pages-label" aria-live="polite"></p>
+        <div class="pages-row">
+          <button class="quiet" type="button" id="pages-back" data-page="-1">Back</button>
+          <button class="primary" type="button" id="pages-next" data-page="1">Next page</button>
+        </div>
+      </div>
       <p id="share-state" hidden></p>
       <div class="controls" id="ctl-down">
         <button class="quiet" type="button" id="btn-down" hidden>Take it down</button>
@@ -358,6 +380,26 @@
               <label><input type="radio" name="look" value="board"> White on dark</label>
             </div>
             <div class="sends"><button class="primary" type="submit">Show on the TV</button><button class="quiet" type="button" data-lineup="text">Add to line-up</button></div>
+          </form>
+        </div>
+      </li>
+      <li>
+        <button class="choice" type="button" aria-expanded="false" aria-controls="p-sc"><b>Scripture</b><span>Type a reference. The King James text, big on the TV.</span></button>
+        <div class="panel" id="p-sc" hidden>
+          <form id="sc-form" autocomplete="off">
+            <label for="sc-ref">Reference</label>
+            <div class="row">
+              <input type="text" id="sc-ref" maxlength="60" placeholder="John 3:16" enterkeyhint="go" autocapitalize="words">
+              <button class="quiet" type="button" id="sc-find">Look up</button>
+            </div>
+            <p class="note" id="sc-note" role="status"></p>
+            <div class="sc-preview" id="sc-preview" hidden>
+              <p class="sc-label" id="sc-label"></p>
+              <p class="sc-text" id="sc-text"></p>
+              <p class="sc-count" id="sc-count"></p>
+            </div>
+            <div class="sends"><button class="primary" type="submit">Show on the TV</button><button class="quiet" type="button" data-lineup="scripture">Add to line-up</button></div>
+            <p class="help">A verse (John 3:16), a run of verses (Romans 8:28-39) or a whole short chapter (Psalm 23), up to 40 verses. King James Version.</p>
           </form>
         </div>
       </li>

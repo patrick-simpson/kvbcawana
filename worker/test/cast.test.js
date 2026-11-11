@@ -406,6 +406,52 @@ describe('Cast: the line-up', () => {
   });
 });
 
+// Scripture by reference: the page sends the verses already in pages; KJV only.
+describe('Cast: Scripture', () => {
+  const sc = (pages, extra = {}) => ({ action: 'item', data: { item: { id: 'bplaceholder', kind: 'scripture', ref: 'Romans 8:28-39', pages, ...extra } } });
+  async function joined() {
+    const s = await setup();
+    const { code } = (await s.call('POST', '/v1/cast/open', {})).body;
+    const token = (await s.call('POST', '/v1/cast/join', { code }, { auth: '' })).body.token;
+    const press = (body) => s.call('POST', '/v1/cast/press', body, { auth: '', cast: token });
+    const stage = async () => (await s.call('GET', '/v1/cast/screen')).body.stage;
+    return { ...s, token, press, stage };
+  }
+
+  it('goes up labelled (KJV) and steps through its own pages with the page press', async () => {
+    const s = await joined();
+    expect((await s.press(sc(['28 And we know', '31 What shall we', '35 Who shall separate'], { label: 'Romans 8 (NIV)' }))).status).toBe(200);
+    let st = await s.stage();
+    expect(st.show.button).toMatchObject({ kind: 'scripture', label: 'Romans 8:28-39 (KJV)', title: 'Romans 8:28-39 (KJV)' });
+    expect(st.show.page).toBe(1);
+    await s.press({ action: 'page', data: { step: 1 } });
+    await s.press({ action: 'page', data: { step: 1 } });
+    st = await s.stage();
+    expect(st.show.page).toBe(3);
+    // Never past the last page (no report needed: the pages are its own).
+    const past = await s.press({ action: 'page', data: { step: 1 } });
+    expect(past.body.already).toBe(true);
+    await s.press({ action: 'page', data: { to: 1 } });
+    expect((await s.stage()).show.page).toBe(1);
+    expect((await s.press({ action: 'page', data: { to: 9 } })).body).toMatchObject({ ok: true });
+    expect((await s.stage()).show.page).toBe(3);
+    expect((await s.press({ action: 'video', data: { op: 'pause' } })).status).toBe(409);
+  });
+
+  it('refused when it is not one (no pages, too much), in the line-up like anything else, and never in the classroom', async () => {
+    const s = await joined();
+    expect((await s.press(sc([]))).status).toBe(400);
+    expect((await s.press(sc(Array(41).fill('a')))).status).toBe(400);
+    const lu = await s.call('PUT', '/v1/cast/desk/lineup', { baseRev: 0, entries: [{ id: 'bentryone1', item: { id: 'bentryone1', kind: 'scripture', ref: 'John 3:16', pages: ['16 For God so loved the world'] } }] });
+    expect(lu.body.lineup.entries[0].item.label).toBe('John 3:16 (KJV)');
+    await s.call('POST', '/v1/cast/desk/lineup/show', { next: true });
+    expect((await s.stage()).show.button.kind).toBe('scripture');
+    const room = await s.call('POST', '/v1/classroom/remote', sc(['a']));
+    expect(room.status).toBe(400);
+    expect(room.body.reason).toBe('not-here');
+  });
+});
+
 describe('Cast: one link copy at a time (IP-20261111-17)', () => {
   it('a second copy while one runs is 429 busy, counted against nothing; the next one after is fine', async () => {
     let release;

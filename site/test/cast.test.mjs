@@ -17,7 +17,9 @@ import {
   codeFromHash, facebookPress, resultPress, CAST_HOME, presenterUrl, addressWords,
   clockPress, clockWords, createSkew, minSec, timerLeft, timerPress,
   entryWords, lineupAdd, lineupEntryFrom, lineupMove, lineupRemove, lineupView,
+  scripturePagesWords, scripturePress, verseRuns,
 } from '../cast/logic.js';
+import { pagesFor, parseReference } from '../cast/bible/reference.js';
 
 const SITE = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const read = (...p) => readFileSync(path.join(SITE, ...p), 'utf8');
@@ -544,7 +546,7 @@ test('the line-up on both control pages: Add to line-up beside every send but a 
   const deskPage = read('cast', 'desk', 'index.html');
   for (const src of [page, deskPage]) {
     for (const id of ['lineup-list', 'lineup-empty', 'lineup-count', 'lineup-note', 'lineup-next', 'lineup-next-box', 'lineup-next-words', 'lineup-next-sub', 'pic-input-lineup', 'clip-input-lineup', 'pdf-input-lineup', 'pdf-copy-lineup']) assert.match(src, new RegExp(`id="${id}"`), id);
-    assert.deepEqual([...src.matchAll(/data-lineup="([a-z]+)"/g)].map((m) => m[1]).sort(), ['clock', 'fb', 'text', 'timer', 'video']);
+    assert.deepEqual([...src.matchAll(/data-lineup="([a-z]+)"/g)].map((m) => m[1]).sort(), ['clock', 'fb', 'scripture', 'text', 'timer', 'video']);
     for (const id of ['pic-input-lineup', 'clip-input-lineup', 'pdf-input-lineup']) assert.match(src, new RegExp(`id="${id}" data-dest="lineup"`));
   }
   // A shared screen only exists live: no line-up there.
@@ -559,6 +561,56 @@ test('the line-up on both control pages: Add to line-up beside every send but a 
   assert.match(controls, /if \(dest === 'lineup'\) \{\n\s+setText\(\$\('pdf-note'\), ''\);\n\s+addToLineup\(/);
   assert.ok(!/setInterval|setTimeout\(poll/.test(controls.slice(controls.indexOf('/* ── The line-up ── */'), controls.indexOf('  /** The choices list'))), 'no timer of its own');
   assert.match(deskPage, /aria-controls="p-lineup"/);
+});
+
+// Scripture by reference: the King James text the Cast site serves itself.
+test('Scripture: a reference becomes one press of pages the shared rules take, labelled (KJV)', () => {
+  const kjv = (...p) => JSON.parse(read('cast', 'bible', 'kjv', ...p));
+  const index = kjv('index.json');
+  const john = kjv('43-john.json');
+  const one = scripturePress(parseReference('John 3:16', index), john, pagesFor, R);
+  assert.ok(one.ok);
+  assert.deepEqual({ ...one.press.data.item, id: 'x' }, {
+    id: 'x', kind: 'scripture', title: 'John 3:16 (KJV)', ref: 'John 3:16', label: 'John 3:16 (KJV)',
+    pages: ['16 For God so loved the world, that he gave his only begotten Son, that whosoever believeth in him should not perish, but have everlasting life.'],
+  });
+  const rom = scripturePress(parseReference('Romans 8:28-39', index), kjv('45-romans.json'), pagesFor, R);
+  assert.ok(rom.ok && rom.press.data.item.pages.length > 1);
+  for (const p of rom.press.data.item.pages) assert.ok(p.length <= 380);
+  assert.match(rom.press.data.item.pages[0], /^28 And we know/);
+  const ps = scripturePress(parseReference('Psalm 23', index), kjv('19-psalms.json'), pagesFor, R);
+  assert.equal(ps.press.data.item.label, 'Psalm 23 (KJV)');
+  // The longest 40 verses the parser allows still fit the shared caps.
+  assert.ok(scripturePress(parseReference('2 Kings 23:1-37', index), kjv('12-2-kings.json'), pagesFor, R).ok);
+  assert.ok(!scripturePress({ ok: true, label: 'John 99:1', chapter: 99, from: 1, to: 1 }, john, pagesFor, R).ok);
+  assert.deepEqual(verseRuns('16 For God so loved. 17 For God sent'), [{ n: '16' }, { t: 'For God so loved.' }, { n: '17' }, { t: 'For God sent' }]);
+  assert.deepEqual(verseRuns('the rest of a long verse'), [{ t: 'the rest of a long verse' }]);
+  assert.match(scripturePagesWords(1), /one page/);
+  assert.match(scripturePagesWords(3), /^3 pages/);
+  const up = R.sanitizeStage({ show: { button: rom.press.data.item, at: 1, page: 2 } });
+  assert.deepEqual(tvWords({ stage: up, now: null, screenOnline: true }), { main: 'On the TV now: Scripture: Romans 8:28-39 (KJV)', sub: `Page 2 of ${rom.press.data.item.pages.length}`, online: true });
+});
+
+test('Scripture on both control pages and the TV: look up, preview, show or add, and step its pages', () => {
+  const deskPage = read('cast', 'desk', 'index.html');
+  for (const src of [page, deskPage]) {
+    for (const id of ['p-sc', 'sc-form', 'sc-ref', 'sc-find', 'sc-note', 'sc-preview', 'sc-label', 'sc-text', 'sc-count', 'ctl-pages', 'pages-text', 'pages-label', 'pages-back', 'pages-next']) assert.match(src, new RegExp(`id="${id}"`), id);
+  }
+  // Only that one book is fetched, from this site; the index once; nothing from another host.
+  assert.match(controls, /const BIBLE = new URL\('\.\/bible\/kjv\/', import\.meta\.url\);/);
+  assert.match(controls, /if \(!bibleIndex\) bibleIndex = await bibleFile\('index\.json'\);/);
+  assert.match(controls, /book = await bibleFile\(parsed\.book\.file\)/);
+  assert.match(controls, /\$\('sc-form'\)\.addEventListener\('submit', sendScripture\);/);
+  assert.match(controls, /press\('page', \{ step \}/);
+  // The TV: the reference in the church's look, Almarai words fitted, a page at a time.
+  assert.match(screen, /else if \(b\.kind === 'scripture'\) drawScripture\(b, show\.page\);/);
+  assert.match(screen, /next\.show\.button\.kind === 'scripture' && next\.show\.page !== shownPage/);
+  assert.match(screenPage, /\.verse-ref \{[^}]*var\(--heading\)/);
+  assert.match(screenPage, /\.verse-words \{[^}]*var\(--body\)/);
+  const verse = screen.slice(screen.indexOf('/* ── Scripture: one page at a time'), screen.indexOf('/* ── A countdown and the clock ── */'));
+  assert.ok(verse.length > 400 && !/request\(|fetch\(|innerHTML/.test(verse), 'no Worker call, text only');
+  // The build carries the parser and the text into the Cast site.
+  assert.match(build, /cpSync\(path\.join\(src, 'bible', 'kjv'\), path\.join\(out, 'bible', 'kjv'\), \{ recursive: true \}\);/);
 });
 
 // Owner 2026-11-08: "Everything this does should have professional animations and

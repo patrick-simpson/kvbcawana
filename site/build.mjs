@@ -207,6 +207,11 @@ rmSync(CAST_OUT, { recursive: true, force: true });
   for (const f of ['index.html', 'desk.js']) cpSync(path.join(src, 'desk', f), path.join(out, 'desk', f));
   cpSync(path.join(src, 'church'), path.join(out, 'church'), { recursive: true });
   for (const f of ['classroomRemote.js', 'screenShare.js']) cpSync(path.join(ROOT, 'shared', f), path.join(out, 'shared', f));
+  // Scripture by reference: the reference parser and the King James text (one file a book,
+  // fetched by the page from its own origin; static files, no Function, no request cost).
+  mkdirSync(path.join(out, 'bible'), { recursive: true });
+  cpSync(path.join(src, 'bible', 'reference.js'), path.join(out, 'bible', 'reference.js'));
+  cpSync(path.join(src, 'bible', 'kjv'), path.join(out, 'bible', 'kjv'), { recursive: true });
 }
 
 // The showcase twins (owner, 2026-10-16: the home page plays a club night on the REAL
@@ -449,7 +454,7 @@ writeFileSync(path.join(CAST_OUT, '_headers'), [
 // An old link typed onto the new host (cast.kvbchurch.org/cast/...) lands on the page it meant.
 writeFileSync(path.join(CAST_OUT, '_redirects'), ['/cast / 301', '/cast/* /:splat 301', ''].join('\n'));
 writeFileSync(path.join(CAST_OUT, '_routes.json'), `${JSON.stringify({ version: 1, include: ['/api', '/api/*'], exclude: [] }, null, 2)}\n`);
-for (const must of ['index.html', 'app.js', 'controls.js', 'logic.js', 'preview.js', 'qr.js', 'shared/classroomRemote.js', 'shared/screenShare.js', 'screen/index.html', 'screen/screen.js', 'desk/index.html', 'desk/desk.js', 'church/church.css', 'church/kvbc-logo.png', 'church/kvbc-logo-white.png', 'church/fonts/Jost-Variable.ttf', '_headers', '_routes.json', '_redirects', 'robots.txt']) {
+for (const must of ['index.html', 'app.js', 'controls.js', 'logic.js', 'preview.js', 'qr.js', 'shared/classroomRemote.js', 'shared/screenShare.js', 'screen/index.html', 'screen/screen.js', 'desk/index.html', 'desk/desk.js', 'church/church.css', 'church/kvbc-logo.png', 'church/kvbc-logo-white.png', 'church/fonts/Jost-Variable.ttf', 'bible/reference.js', 'bible/kjv/index.json', 'bible/kjv/43-john.json', '_headers', '_routes.json', '_redirects', 'robots.txt']) {
   if (!existsSync(path.join(CAST_OUT, must))) throw new Error(`the Cast site build is missing ${must}`);
 }
 

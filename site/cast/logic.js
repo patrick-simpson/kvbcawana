@@ -194,6 +194,45 @@ export function createSkew({ max = 8 } = {}) {
   };
 }
 
+/* ── Scripture by reference (King James only; bible/reference.js reads the reference) ── */
+
+/** The most characters on one page of Scripture on the TV (bible/reference.js pagesFor). */
+export const SCRIPTURE_PAGE_CHARS = 380;
+
+/**
+ * A looked-up reference as an item press: the verses (from the book's own file) cut
+ * into pages; the shared rules add " (KJV)" to the label. `pagesFor` is handed in so
+ * this file keeps no imports.
+ * @param {{ ok: boolean, label: string, chapter: number, from: number, to: number }} parsed
+ * @param {{ chapters: string[][] }} book @param {(v: string[], from: number, o?: any) => string[]} pagesFor @param {any} R
+ */
+export function scripturePress(parsed, book, pagesFor, R) {
+  const chapter = book && Array.isArray(book.chapters) ? book.chapters[parsed.chapter - 1] : null;
+  const verses = chapter ? chapter.slice(parsed.from - 1, parsed.to) : [];
+  if (!verses.length || verses.length !== parsed.to - parsed.from + 1) return { ok: false, error: 'That passage did not load. Try again.' };
+  return checked({ id: placeholderId(), kind: 'scripture', ref: parsed.label, pages: pagesFor(verses, parsed.from, { max: SCRIPTURE_PAGE_CHARS }) }, R);
+}
+
+/**
+ * A page of Scripture as runs to draw: each verse number on its own (the King James text
+ * has no figures of its own, so every number on a page is a verse number) and the words.
+ * @param {unknown} text @returns {{ n?: string, t?: string }[]}
+ */
+export function verseRuns(text) {
+  const out = [];
+  for (const part of String(text || '').split(/(?:^|\s)(\d{1,3})\s/)) {
+    if (!part) continue;
+    if (/^\d{1,3}$/.test(part)) out.push({ n: part });
+    else out.push({ t: part.trim() });
+  }
+  return out;
+}
+
+/** How many TV pages, in words. @param {number} n */
+export function scripturePagesWords(n) {
+  return n === 1 ? 'Fits on one page on the TV.' : `${n} pages on the TV. Step through them with Back and Next.`;
+}
+
 /* ── The line-up (owner 2026-11-11: "Load several things before the event (a video, the
    slides, a picture) and tap through them in order") ── */
 
@@ -359,7 +398,7 @@ export function errorWords(status, body) {
   return (body && typeof body.error === 'string' && body.error) || 'That did not work. Try again.';
 }
 
-const KIND_WORDS = { video: 'a YouTube video', clip: 'a video', facebook: 'a Facebook video', image: 'a picture', pdf: 'slides', text: 'text', screen: 'a shared screen', timer: 'a countdown', clock: 'the clock' };
+const KIND_WORDS = { video: 'a YouTube video', clip: 'a video', facebook: 'a Facebook video', image: 'a picture', pdf: 'slides', text: 'text', screen: 'a shared screen', timer: 'a countdown', clock: 'the clock', scripture: 'Scripture' };
 
 /**
  * The "On the TV now" line. `short` leaves off the "On the TV now: " lead-in, for a page
@@ -386,6 +425,7 @@ export function tvWords({ stage, now, screenOnline }, opts = {}) {
   if (mine && mine.video) sub = `${clock(mine.video.t)} of ${clock(mine.video.d)}${mine.video.paused ? ', paused' : ''}${mine.video.muted ? ', muted' : `, volume ${mine.video.volume}%`}`;
   else if (mine && mine.pages) sub = `Page ${mine.page} of ${mine.pages}`;
   else if (shown.kind === 'pdf') sub = `Page ${stage.show.page}`;
+  else if (shown.kind === 'scripture' && shown.pages.length > 1) sub = `Page ${Math.min(stage.show.page, shown.pages.length)} of ${shown.pages.length}`;
   else if (shown.kind === 'timer') {
     const left = timerLeft(shown.endsAt, typeof opts.at === 'number' ? opts.at : Date.now());
     sub = left > 0 ? `${minSec(left)} left` : 'Time is up. It holds at 0:00 until you take it down.';

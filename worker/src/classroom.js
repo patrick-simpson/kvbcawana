@@ -128,7 +128,7 @@ export class Classroom {
    * @param {{ storage: any, now: () => number, ring: (payload: Record<string, unknown>) => void, fetchFn?: typeof fetch,
    *   room?: { what: string, buttonsKey: string, stageKey: string, filePrefix: string, partPrefix: string, cast?: boolean } }} deps
    * `room`: the lobby's Cast screen (cast.js) runs a second copy under its own keys and doorbell;
-   * `room.cast` lets it take what only Cast has (Black, a countdown, the clock).
+   * `room.cast` lets it take what only Cast has (Black, a countdown, the clock, Scripture).
    */
   constructor({ storage, now, ring, fetchFn, room }) {
     this.room = room || { what: 'classroom', buttonsKey: BUTTONS_KEY, stageKey: STAGE_KEY, filePrefix: FILE_PREFIX, partPrefix: PART_PREFIX };
@@ -443,8 +443,12 @@ export class Classroom {
         next = { ...stage, cmds: cmd('video', p.data) };
         break;
       case 'page': {
-        if (stage.show?.button?.kind !== 'pdf') return fail('No PDF is on the screen.', 409, { reason: 'no-pdf' });
-        const pages = this.report?.button === stage.show.button.id && this.report.pages ? this.report.pages : 9999;
+        const paged = stage.show?.button?.kind;
+        if (paged !== 'pdf' && paged !== 'scripture') return fail('No PDF is on the screen.', 409, { reason: 'no-pdf' });
+        // Scripture (Cast) carries its own pages; a PDF's count is the TV's report, when there is one.
+        const pages = paged === 'scripture'
+          ? stage.show.button.pages.length
+          : (this.report?.button === stage.show.button.id && this.report.pages ? this.report.pages : 9999);
         const want = Number.isInteger(p.data?.to) ? p.data.to : stage.show.page + (p.data?.step || 0);
         const page = Math.min(Math.max(1, want), pages);
         if (page === stage.show.page) return json({ ok: true, already: true, rev: stage.rev });

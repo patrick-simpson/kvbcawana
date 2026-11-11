@@ -39,6 +39,11 @@
 //   the phone and the desk see each other's edits with no request of their own. "Next in
 //   line-up" puts the next entry up as an ordinary item press (POST /v1/cast/lineup/show).
 //   A file chosen for the line-up is uploaded and added, never put on the TV.
+// - Scripture by reference: a reference ("John 3:16", "Psalm 23", "Romans 8:28-39") is
+//   read by bible/reference.js against the King James index, then ONLY that book's file is
+//   fetched from this site (bible/kjv/, never another host), the verses previewed and sent
+//   as one `scripture` item already cut into pages (the TV steps them with the page press,
+//   like slides). The index and books are kept in memory once read.
 // - Slides on the TV: the phone's preview (preview.js): this slide, the next, every slide.
 // - "On the TV now": the state every 2 s while the page is visible (which is also what
 //   makes the TV report), nothing while hidden, and it stops after 30 minutes with no
@@ -53,7 +58,9 @@ import {
   clock, facebookPress, resultPress, volumeWords,
   clockPress, createSkew, timerPress,
   lineupAdd, lineupEntryFrom, lineupMove, lineupRemove, lineupView,
+  scripturePagesWords, scripturePress, verseRuns,
 } from './logic.js';
+import { pagesFor, parseReference } from './bible/reference.js';
 import { createPreview } from './preview.js';
 
 export const $ = (id) => /** @type {any} */ (document.getElementById(id));
@@ -162,7 +169,7 @@ export function createControls(conn) {
     if (!counting && timerTick) { clearInterval(timerTick); timerTick = 0; }
     const black = state.stage.black === true;
     // Slides: the preview says which slide (no second "Page 2 of 9" line above it).
-    if (!offline && w.online && !black && state.stage.show && state.stage.show.button.kind === 'pdf') w.sub = '';
+    if (!offline && w.online && !black && state.stage.show && (state.stage.show.button.kind === 'pdf' || state.stage.show.button.kind === 'scripture')) w.sub = '';
     setText($('tv-main'), w.main);
     setText($('tv-sub'), w.sub);
     $('tv').dataset.online = String(w.online);
@@ -172,6 +179,17 @@ export function createControls(conn) {
     const shown = state.stage.show ? state.stage.show.button : null;
     const kind = shown ? shown.kind : '';
     $('ctl-video').hidden = !R.CLASSROOM_PLAYABLE_KINDS.includes(kind);
+    // Scripture on the TV: the page that is up, and Back / Next through its pages.
+    $('ctl-pages').hidden = kind !== 'scripture';
+    if (kind === 'scripture') {
+      const count = shown.pages.length;
+      const at = Math.min(state.stage.show.page, count);
+      const key = `${shown.id}@${at}`;
+      if ($('ctl-pages').dataset.key !== key) { $('ctl-pages').dataset.key = key; drawVerses($('pages-text'), shown.pages[at - 1]); }
+      setText($('pages-label'), `${shown.label} · page ${at} of ${count}`);
+      $('pages-back').disabled = at <= 1;
+      $('pages-next').disabled = at >= count;
+    }
     if (preview) {
       if (kind === 'pdf') preview.show(shown.file, state.stage.show.page, state.now && state.now.button === shown.id ? state.now.pages || 0 : 0);
       else preview.hide();
@@ -371,14 +389,15 @@ export function createControls(conn) {
     },
     timer: () => timerPress({ minutes: $('timer-min').value, seconds: $('timer-sec').value, title: $('timer-title').value }, R),
     clock: () => clockPress(R),
+    scripture: () => lookUpScripture(),
   };
   const CLEARS = { video: ['video-link', 'video-title'], fb: ['fb-link', 'fb-title'] };
 
   /** "Add to line-up" beside a form's own send (data-lineup names the form). */
-  function addForm(e) {
+  async function addForm(e) {
     const b = e.target.closest('[data-lineup]');
     if (!b || !FORMS[b.dataset.lineup]) return;
-    const out = FORMS[b.dataset.lineup]();
+    const out = await FORMS[b.dataset.lineup]();
     if (!out.ok) { setText($('lineup-note'), out.error); $('lineup-note').classList.add('bad'); setText($('press-note'), out.error); return; }
     addToLineup(out).then((ok) => { if (ok) for (const id of CLEARS[b.dataset.lineup] || []) $(id).value = ''; });
   }
@@ -490,6 +509,66 @@ export function createControls(conn) {
     const out = FORMS.text();
     if (!out.ok) { setText($('press-note'), out.error); return; }
     press(out.press.action, out.press.data, 'The text is going up');
+  }
+
+  /* ── Scripture by reference (King James only) ── */
+
+  const BIBLE = new URL('./bible/kjv/', import.meta.url);
+  let bibleIndex = null;
+  const books = new Map();
+  let looked = null; // { text, out } the last reference looked up
+
+  async function bibleFile(name) {
+    const res = await fetch(new URL(name, BIBLE), { cache: 'force-cache' });
+    if (!res.ok) throw new Error(String(res.status));
+    return res.json();
+  }
+
+  /** A page of verses into an element: each verse number small, the words after it. */
+  function drawVerses(el, text) {
+    el.replaceChildren(...verseRuns(text).map((r) => {
+      if (r.n) { const n = document.createElement('sup'); n.className = 'vn'; n.textContent = r.n; return n; }
+      return document.createTextNode(`${r.t} `);
+    }));
+  }
+
+  /**
+   * The typed reference looked up: read against the index, that one book fetched (once),
+   * the verses previewed. The press to send, or the problem in words.
+   */
+  async function lookUpScripture() {
+    touch();
+    const text = $('sc-ref').value.trim();
+    if (looked && looked.text === text) return looked.out;
+    const note = $('sc-note');
+    const fail = (error) => { setText(note, error); note.classList.add('bad'); $('sc-preview').hidden = true; looked = null; return { ok: false, error }; };
+    note.classList.remove('bad');
+    setText(note, 'Looking it up…');
+    try { if (!bibleIndex) bibleIndex = await bibleFile('index.json'); } catch { bibleIndex = null; return fail('The Bible text did not load. Check the internet, then try again.'); }
+    const parsed = parseReference(text, bibleIndex);
+    if (!parsed.ok) return fail(parsed.hint);
+    let book = books.get(parsed.book.file);
+    if (!book) {
+      try { book = await bibleFile(parsed.book.file); } catch { return fail(`${parsed.book.name} did not load. Check the internet, then try again.`); }
+      books.set(parsed.book.file, book);
+    }
+    const out = scripturePress(parsed, book, pagesFor, R);
+    if (!out.ok) return fail(out.error);
+    const item = out.press.data.item;
+    setText(note, '');
+    setText($('sc-label'), item.label);
+    drawVerses($('sc-text'), item.pages.join(' '));
+    setText($('sc-count'), scripturePagesWords(item.pages.length));
+    $('sc-preview').hidden = false;
+    looked = { text, out };
+    return out;
+  }
+
+  async function sendScripture(e) {
+    e.preventDefault();
+    const out = await lookUpScripture();
+    if (!out.ok) return;
+    press(out.press.action, out.press.data, `${out.press.data.item.label} is going up`);
   }
 
   /* ── A countdown and the clock ── */
@@ -858,6 +937,15 @@ export function createControls(conn) {
     $('pdf-input-lineup').setAttribute('accept', SLIDES_ACCEPT);
     $('pdf-copy-lineup').addEventListener('click', copyPdfLink);
     $('timer-form').addEventListener('submit', sendTimer);
+    $('sc-form').addEventListener('submit', sendScripture);
+    $('sc-find').addEventListener('click', () => { lookUpScripture(); });
+    $('sc-ref').addEventListener('input', () => { if (looked && looked.text !== $('sc-ref').value.trim()) { looked = null; $('sc-preview').hidden = true; } });
+    $('ctl-pages').addEventListener('click', (e) => {
+      const b = e.target.closest('[data-page]');
+      if (!b || b.disabled) return;
+      const step = Number(b.dataset.page);
+      press('page', { step }, step > 0 ? 'Next page' : 'Previous page');
+    });
     $('timer-picks').addEventListener('click', pickTimer);
     $('timer-min').addEventListener('input', markPicks);
     $('timer-sec').addEventListener('change', markPicks);

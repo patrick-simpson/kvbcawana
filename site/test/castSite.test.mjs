@@ -57,13 +57,17 @@ test('the build writes dist-cast with the Cast pages at its root', () => {
 });
 
 test('a built Cast site: the pages at / and /screen/, nothing of the main site', { skip: !built && 'site/dist-cast is not built' }, () => {
-  for (const f of ['index.html', 'app.js', 'controls.js', 'logic.js', 'preview.js', 'qr.js', 'desk/index.html', 'desk/desk.js', 'shared/classroomRemote.js', 'shared/screenShare.js', 'screen/index.html', 'screen/screen.js', 'church/church.css', 'church/kvbc-logo.png', 'church/fonts/Jost-Variable.ttf', 'robots.txt']) {
+  for (const f of ['index.html', 'app.js', 'controls.js', 'logic.js', 'preview.js', 'qr.js', 'desk/index.html', 'desk/desk.js', 'shared/classroomRemote.js', 'shared/screenShare.js', 'screen/index.html', 'screen/screen.js', 'church/church.css', 'church/kvbc-logo.png', 'church/fonts/Jost-Variable.ttf', 'bible/reference.js', 'bible/kjv/index.json', 'bible/kjv/43-john.json', 'robots.txt']) {
     assert.ok(existsSync(path.join(DIST, f)), f);
   }
   for (const f of ['lobby', 'cast', 'journey', 'checkin', 'classroom']) assert.ok(!existsSync(path.join(DIST, f)), `${f} is the main site's`);
   assert.equal(readFileSync(path.join(DIST, 'screen', 'screen.js'), 'utf8'), read('cast', 'screen', 'screen.js'));
   assert.equal(readFileSync(path.join(DIST, 'shared', 'screenShare.js'), 'utf8'), readFileSync(path.join(ROOT, 'shared', 'screenShare.js'), 'utf8'));
   assert.equal(readFileSync(path.join(DIST, 'robots.txt'), 'utf8'), 'User-agent: *\nDisallow: /\n');
+  // Scripture by reference: the parser and all 66 books of the King James text, as they are.
+  assert.equal(readFileSync(path.join(DIST, 'bible', 'reference.js'), 'utf8'), read('cast', 'bible', 'reference.js'));
+  assert.equal(readdirSync(path.join(DIST, 'bible', 'kjv')).filter((f) => /^\d\d-.+\.json$/.test(f)).length, 66);
+  assert.ok(!existsSync(path.join(DIST, 'bible', 'verify.mjs')), 'the checking script stays in the repo');
 });
 
 test('a built Cast site: only /api invokes a Function', { skip: !built && 'site/dist-cast is not built' }, () => {
