@@ -90,6 +90,18 @@ export class Adopter {
     this.loading = null;
     /** Children given up on tonight after ADOPT_TRIES (memory only; logged). */
     this.lost = 0;
+    /** The night `lost` counts (a new night starts again at 0). */
+    this.lostNight = '';
+  }
+
+  /**
+   * How many children checked in on TwoTimTwo's page got NO label tonight (a number
+   * only, never a name or id): GET /v1/tonight/overview and /v1/print/status show it
+   * as `labelsLost` (IP-20261111-09). Memory only: a Worker restart forgets it.
+   * @param {string} night
+   */
+  lostTonight(night) {
+    return this.lostNight === night ? this.lost : 0;
   }
 
   /** CLOUD_PRINT=on makes jobs for TwoTimTwo-page check-ins. */
@@ -228,6 +240,7 @@ export class Adopter {
       await this.saveBacklog();
       this.log(`[cloud] a print job could not be made (${why}); the claim was released, try ${tries} of ${ADOPT_TRIES}`);
     } else {
+      if (this.lostNight !== e.night) { this.lostNight = e.night; this.lost = 0; }
       this.lost += 1;
       console.error(`[cloud] a print job could not be made (${why}) after ${tries} tries: one child checked in on TwoTimTwo's page has NO label. Reprint it from /checkin.`);
     }

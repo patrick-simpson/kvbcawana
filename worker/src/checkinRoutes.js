@@ -95,6 +95,7 @@ export function mountCheckin(registry, core) {
       ...(await core.printq.status()),
       claims: await core.ledger.counts(night),
       pendingToSeal: core.adopt.pending(),
+      labelsLost: core.adopt.lostTonight(night),
       cloudPrint: core.adopt.on,
       stations: (await core.stations.list()).map((s) => ({ stationId: s.stationId, name: s.name, lastSeenAt: s.lastSeenAt, printer: s.printer })),
     });

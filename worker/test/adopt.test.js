@@ -75,6 +75,27 @@ describe('a check-in made on TwoTimTwo\'s own page', () => {
     expect((await t.call('GET', '/v1/print/status')).body.claims).toMatchObject({ queued: 0 });
   });
 
+  it('a child given up on is shown as a number on Tonight and the print status, and a new night starts at 0 (IP-20261111-09)', async () => {
+    const { t } = await night();
+    expect((await t.call('GET', '/v1/tonight/overview')).body.print.labelsLost).toBe(0);
+    t.core.printq.enqueue = async () => ({ ok: false, reason: 'full' });
+    t.night.kids.push(kid(2, 'Cubbies', 'Ada Uniquename'));
+    await readReport(t);
+    for (let i = 0; i < 10; i++) await step(t, SPILL_MS);
+    const o = (await t.call('GET', '/v1/tonight/overview')).body;
+    expect(o.print.labelsLost).toBe(1);
+    const st = (await t.call('GET', '/v1/print/status')).body;
+    expect(st.labelsLost).toBe(1);
+    // A number only: no name, no id.
+    expect(JSON.stringify(o)).not.toContain('Uniquename');
+    expect(JSON.stringify(st)).not.toContain('Uniquename');
+    // The next club night (a week on): 0 again.
+    t.clock.tick(7 * 24 * 60 * 60 * 1000);
+    expect((await t.call('GET', '/v1/tonight/overview')).body.print.labelsLost).toBe(0);
+    expect((await t.call('GET', '/v1/print/status')).body.labelsLost).toBe(0);
+    expect(t.core.adopt.lostTonight(NIGHT)).toBe(1);
+  });
+
   it('the children already there when the watcher starts (the baseline) are never printed', async () => {
     const { t, sts } = await night({ kids: [kid(1), kid(2), kid(3)] });
     await step(t, SPILL_MS);

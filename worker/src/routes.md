@@ -650,7 +650,7 @@ these (`job-puller.js`; the end-to-end test records every path it uses).
 | `POST /v1/print/done` | station | `{jobId, result?: 'printed' \| 'already-spooled'}` | `{ok, already}`. Idempotent: a job already done, or gone (undone, purged) answers ok. `printed` marks the claim `printed` if the job's gen is still the claim's. `already-spooled` (the station journalled the jobId and did not print again) completes the job and raises `checkThePrinter` |
 | `POST /v1/print/failed` | station | `{jobId, error?: <short code a-z0-9->}` (any other text is stored as `failed`) | `{ok, state}`: the job is free for another lease at once; after five failures it is `dead` and shows on the status. A job no station can ever run (`no-payload`, `bundle-id-mismatch`, `route-not-allowed`, `stale-night`: `MALFORMED_CODES`, the puller's `MALFORMED`) is `dead` at once, and the station does not pause for it |
 | `POST /v1/print/heartbeat` | station | `{jobId?, printer?: {state, detail?}}` every 30 s, and every 20 s while a job prints | with `jobId`: `{ok: true, leaseUntil}` **extends the lease to now + 90 s**, or `{ok: false, reason}` where `unknown` (dropped: stop), `done`, `stale`, `other` (another station holds it). The printer state (`ok busy offline error paper unknown`; anything else is `unknown`) and `lastSeenAt` are noted for the status. The print role reports a label that may not have come out as `error` with `detail` |
-| `GET /v1/print/status` | session | | `{queued, leased, done, dead, waitingToSeal, checkThePrinter: [jobId], dropped: {stale, expired}, claims: {checking, queued, printed, undone}, pendingToSeal, cloudPrint, stations: [{stationId, name, lastSeenAt, printer}]}`. Counts and random ids only |
+| `GET /v1/print/status` | session | | `{queued, leased, done, dead, waitingToSeal, checkThePrinter: [jobId], dropped: {stale, expired}, claims: {checking, queued, printed, undone}, pendingToSeal, labelsLost, cloudPrint, stations: [{stationId, name, lastSeenAt, printer}]}`. Counts and random ids only. `labelsLost`: tonight's children checked in on TwoTimTwo's page whose print job was given up on after 3 tries (adopt.js): they have NO label; a number only, memory only (a restart forgets it), 0 on a new night |
 | `POST /v1/print/reprint` | session | `{jobId: 'reprint:<uuid>', bundle}` sealed to every station, `kind` `print-job`, `night` tonight | a reprint job: bypasses the claims entirely. `{ok, jobId, existing}` |
 
 **The wake-up call** (BUILT, owner 2026-10-15). A station also opens the live channel
@@ -1241,7 +1241,7 @@ Undo presses at once run once (the second is 409 `already-undone`,
 { at, night, clubNight, window: {open, opensInMin, closesInMin},
   count:    {source, checkedIn, checkedOut, byClub, reportAgeMs, enabled} | null,   // publisher.status()
   read:     {mode, configured, signedIn, lastReadAt, lastOkAt, lastError, loginBlockedForSec, watchIntervalSec},
-  print:    {queued, leased, dead, checkThePrinter, claims, pendingToSeal,
+  print:    {queued, leased, dead, checkThePrinter, claims, pendingToSeal, labelsLost,
              stations: [{stationId, name, lastSeenAt, printer, version, churchRev}]},
   ym:       {enabled, due, checkedOut, failed, gaveUp, pending, lastError} | null, // null before section 9 is merged
   switches: [...as GET /v1/switches],
@@ -1253,7 +1253,8 @@ Undo presses at once run once (the second is 409 `already-undone`,
 ```
 
 Built: `print.checkThePrinter` is a COUNT (the job ids stay on `GET
-/v1/print/status`); `window.closesInMin` is null while closed; each part is
+/v1/print/status`); `print.labelsLost` is the count of tonight's children with
+no label (as `GET /v1/print/status`, a number only); `window.closesInMin` is null while closed; each part is
 computed on its own and is `null` if it throws, the rest still answer.
 
 No TwoTimTwo read, no seal: storage reads and in-memory state only. The page

@@ -63,7 +63,7 @@ export async function overview(core) {
       const q = await core.printq.status();
       return {
         queued: q.queued, leased: q.leased, dead: q.dead, checkThePrinter: q.checkThePrinter.length,
-        claims: await core.ledger.counts(when.night), pendingToSeal: core.adopt.pending(),
+        claims: await core.ledger.counts(when.night), pendingToSeal: core.adopt.pending(), labelsLost: core.adopt.lostTonight(when.night),
         stations: (await core.stations.list()).map((/** @type {any} */ s) => ({
           stationId: s.stationId, name: s.name, lastSeenAt: s.lastSeenAt, printer: s.printer, version: s.version ?? null, churchRev: s.churchRev ?? null,
         })),
