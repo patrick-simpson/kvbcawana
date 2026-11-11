@@ -775,4 +775,58 @@ describe('display: Cast on and off (real createDisplay with a stand-in Electron)
       expect(casts).toEqual([true, false]);
     } finally { display.stop(); clock.mock.restore(); }
   });
+
+  it('Cast left on from earlier in the week is off when the club night window opens, and the lobby comes back', () => {
+    let nowMs = at('2026-11-11T15:30:00'); // Wednesday, before the 4:00 pm opening
+    const clock = mock.method(Date, 'now', () => nowMs);
+    const { display, casts, saved, logText } = setup({ settings: { screen: 'cast' }, castReturn: 'lobby' });
+    try {
+      display.start();
+      expect(saved().settings.screen).toBe('cast'); // not in the window yet: nothing changes
+      nowMs = at('2026-11-11T16:01:00');
+      display.requestShow();
+      expect(saved().settings.screen).toBe('lobby');
+      expect(display.info().settings.screen).toBe('lobby');
+      expect(casts).toEqual([false]);
+      expect(logText().includes('cast off: club night')).toBe(true);
+      display.requestShow(); // asked again later in the window: once only
+      expect(casts).toEqual([false]);
+    } finally { display.stop(); clock.mock.restore(); }
+  });
+
+  it('Cast turned on by hand during the club night stays on for that night', () => {
+    const clock = mock.method(Date, 'now', () => at('2026-11-11T16:30:00'));
+    const { display, casts, saved } = setup({ settings: { screen: 'lobby' } });
+    try {
+      display.start();
+      display.castOn();
+      display.requestShow();
+      expect(saved().settings.screen).toBe('cast');
+      expect(casts).toEqual([true]);
+    } finally { display.stop(); clock.mock.restore(); }
+  });
+
+  it('Cast turned on again by hand after the window ended it stays on', () => {
+    const clock = mock.method(Date, 'now', () => at('2026-11-11T16:05:00'));
+    const { display, casts, saved } = setup({ settings: { screen: 'cast' }, castReturn: 'lobby' });
+    try {
+      display.start();
+      expect(saved().settings.screen).toBe('lobby');
+      display.castOn();
+      display.requestShow();
+      expect(saved().settings.screen).toBe('cast');
+      expect(casts).toEqual([false, true]);
+    } finally { display.stop(); clock.mock.restore(); }
+  });
+
+  it('on a day with no club, Cast stays on', () => {
+    const clock = mock.method(Date, 'now', () => at('2026-11-12T17:00:00')); // Thursday
+    const { display, casts, saved } = setup({ settings: { screen: 'cast' }, castReturn: 'lobby' });
+    try {
+      display.start();
+      display.requestShow();
+      expect(saved().settings.screen).toBe('cast');
+      expect(casts).toEqual([]);
+    } finally { display.stop(); clock.mock.restore(); }
+  });
 });

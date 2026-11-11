@@ -464,6 +464,9 @@ function createDisplay(opts) {
 
   const currentWindow = () => displayWindow(now(), sources, hours());
   let lastReason = null;
+  // The club night (its dateKey) whose opening already ended a Cast left on from earlier.
+  // Memory only. A Cast switched on by hand during the window is not ended again.
+  let castEndedFor = null;
 
   /**
    * The schedule itself has the screen up right now (inside the window and
@@ -497,6 +500,15 @@ function createDisplay(opts) {
     if (!running) return;
     const t = now();
     const win = displayWindow(t, sources, hours());
+    // Cast left on from earlier in the week must not take over club night (IP-20261111-01):
+    // when the club night's window opens and Cast is the chosen screen, turn it off as the
+    // tray would. castOff re-runs evaluate with the earlier screen chosen, so stop here.
+    if (win.inWindow && state.settings.screen === 'cast' && castEndedFor !== win.dateKey && !SMOKE) {
+      castEndedFor = win.dateKey;
+      log('cast off: club night');
+      castOff();
+      return;
+    }
     const tidied = tidy(state.overrides, win, t.getTime());
     if (tidied !== state.overrides) { state.overrides = tidied; saveState(); }
     let { visible, reason } = SMOKE ? { visible: true, reason: 'manual' } : decideVisibility(win, state.overrides, t.getTime());
@@ -733,6 +745,9 @@ function createDisplay(opts) {
   function castOn() {
     if (state.settings.screen === 'cast') return;
     state.castReturn = state.settings.screen;
+    // Cast switched on by hand inside a club night's window stays on for that night.
+    const w = currentWindow();
+    if (w.inWindow) castEndedFor = w.dateKey;
     saveState();
     log('cast on (was', state.castReturn, ')');
     showScreen('cast');
