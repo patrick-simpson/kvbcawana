@@ -835,7 +835,12 @@ export class TwoTimTwoClient {
    * slot from the clock (queueing up to its waitMs); every redirect hop takes one
    * too (FOLLOW_WAIT_MS), a write's included.
    * `raw`: the answer's bytes and content type too, untouched (readRaw).
-   * @param {string} path @param {{method?: string, form?: URLSearchParams, slot?: { waitMs: number, kind: string, priority?: boolean | { urgent: boolean } }, urgent?: boolean, raw?: boolean}} [opts]
+   * `stopAtLogin` (a write's, 2026-11-10): a redirect to the sign-in page is
+   * NOT followed: it already says "signed out", and following it cost each
+   * write a 5 s read slot just to learn that. After a restart a burst of desk
+   * check-ins queued for those slots and the later ones were refused
+   * (`read-busy`) instead of signing in once and going through.
+   * @param {string} path @param {{method?: string, form?: URLSearchParams, slot?: { waitMs: number, kind: string, priority?: boolean | { urgent: boolean } }, urgent?: boolean, raw?: boolean, stopAtLogin?: boolean}} [opts]
    * @returns {Promise<{status: number, path: string, html: string, bytes?: Uint8Array, contentType?: string}>}
    */
   async request(path, opts = {}) {
@@ -858,6 +863,10 @@ export class TwoTimTwoClient {
       this.keepCookies(res);
       if (res.status >= 300 && res.status < 400 && res.headers.get('location')) {
         url = new URL(String(res.headers.get('location')), url);
+        if (opts.stopAtLogin && url.host === this.host && /^\/site\/login\b/i.test(url.pathname)) {
+          try { await res.body?.cancel(); } catch { /* nothing to let go */ }
+          return { status: res.status, path: url.pathname, html: '' };
+        }
         // A redirect after a form post is a plain GET (what a browser does).
         method = 'GET';
         body = undefined;
@@ -1038,7 +1047,7 @@ export class TwoTimTwoClient {
       for (const id of c.events) form.append('events[]', id);
       let res;
       try {
-        res = await this.request('/clubber/checkinclubber', { method: 'POST', form, urgent });
+        res = await this.request('/clubber/checkinclubber', { method: 'POST', form, urgent, stopAtLogin: true });
       } catch (err) {
         return { ok: /** @type {const} */ (false), error: errorCode(err) };
       }
@@ -1078,7 +1087,7 @@ export class TwoTimTwoClient {
     form.set('clubber_id', c.clubberId);
     let res;
     try {
-      res = await this.request(path, { method: 'POST', form, urgent });
+      res = await this.request(path, { method: 'POST', form, urgent, stopAtLogin: true });
     } catch (err) {
       return { ok: false, error: errorCode(err) };
     }

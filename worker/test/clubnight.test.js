@@ -8,6 +8,7 @@ import { READ_INTERVAL_MS } from '../src/readbudget.js';
 import { WATCH_INTERVAL_MS } from '../src/watcher.js';
 import { YM_CHECKOUT_GAP_MS } from '../src/ymcheckout.js';
 import { CHECKIN_PAGE_TTL_MS } from '../src/desk.js';
+import { CHECKIN_PAGE } from './fixtures.js';
 import { memoryStore } from './helpers.js';
 import { NIGHT, kid, rig, row } from './rig.js';
 
@@ -300,5 +301,29 @@ describe('a desk action never waits for a read', () => {
     expect(t.tt.checkins).toHaveLength(1);                 // the second post, after the sign-in
     expect(t.core.watcher.clientFor().relogins).toBe(1);
     expect(Math.min(...gaps(t.slots.map((s) => s.at))) ).toBeGreaterThanOrEqual(READ_INTERVAL_MS);
+  });
+
+  it('a lapsed session and a burst of check-ins: one shared sign-in, every child checked in, none refused as busy', async () => {
+    // 2026-11-10: each post used to FOLLOW TwoTimTwo's redirect to the sign-in page, a 5 s
+    // read slot apiece just to learn "signed out"; a burst queued for those slots and the
+    // later posts were refused `read-busy` (a red tile, no retry).
+    const ids = Array.from({ length: 12 }, (_, i) => String(900 + i));
+    const first = '<div class="clubber checkin-box boy" recid="662"';
+    const burstPage = CHECKIN_PAGE.replace(first, ids.map((id) => `<div class="clubber checkin-box boy" recid="${id}" club_id="2"><div class="name">Kit Tester${id}</div><div class="club"><img class="club-icon-16" alt="Sparks "></div></div>`).join('') + first);
+    const t = await rig({ kids: KIDS, checkinPage: () => burstPage });
+    const roster = await t.call('GET', '/v1/desk/roster');
+    expect(roster.body.kids.length).toBeGreaterThanOrEqual(12);
+    t.clock.tick(60 * 1000);
+    t.tt.expire();
+    const before = t.slots.length;
+    const answers = await Promise.all(ids.map((clubberId) => t.call('POST', '/v1/desk/checkin', { night: NIGHT, clubberId, items: {}, historyRow: row(), job: null })));
+    for (const a of answers) expect(a.body).toMatchObject({ ok: true });
+    expect(t.tt.checkins).toHaveLength(ids.length);
+    // The read clock was asked for the ONE sign-in only (its page, its post and the page it
+    // lands on), not once per child: before the fix there were twelve more, one per post.
+    const used = t.slots.slice(before);
+    expect(used.every((x) => x.path.startsWith('/site/'))).toBe(true);
+    expect(used.length).toBeLessThanOrEqual(3);
+    expect(t.core.watcher.clientFor().relogins).toBeGreaterThanOrEqual(1);
   });
 });

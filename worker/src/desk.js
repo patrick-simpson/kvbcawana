@@ -814,7 +814,13 @@ export class Desk {
       this.noteDeskChecked(clubberId, true);
       return { ok: true, club: child.club, name: child.name, calendarId: page.calendarId };
     }
-    if (AMBIGUOUS.has(res.error)) {
+    // `read-busy` from a WRITE (2026-11-10) is thrown after the post was sent, while
+    // its redirect waited for a read slot: TwoTimTwo may have it, so it is "unsure"
+    // (the page says to look at TwoTimTwo first; the watcher adopts the child if it
+    // was taken), never a flat "refused". A post that only met the sign-in page no
+    // longer gets here: it is not followed (twotimtwo.js stopAtLogin), signs in once
+    // and is made again.
+    if (AMBIGUOUS.has(res.error) || res.error === 'read-busy') {
       this.log('[desk] a check-in post timed out; the claim was released');
       return { ok: false, response: refuse(504, { reason: 'unsure', retry: true }) };
     }
@@ -955,7 +961,7 @@ export class Desk {
       ? await client.undoCheckIn({ clubberId, calendarId: r.page.calendarId }, { desk: true, ...(testDay ? { testDay: true } : {}) })
       : await client.checkOut({ clubberId, calendarId: r.page.calendarId }, { desk: true });
     if (res.ok) return { ok: true };
-    if (AMBIGUOUS.has(res.error)) return { ok: false, response: refuse(504, { reason: 'unsure', retry: true }) };
+    if (AMBIGUOUS.has(res.error) || res.error === 'read-busy') return { ok: false, response: refuse(504, { reason: 'unsure', retry: true }) };
     return { ok: false, response: refuse(409, { reason: res.error }) };
   }
 }
