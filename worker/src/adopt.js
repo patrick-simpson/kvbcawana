@@ -60,6 +60,9 @@ export function printRecord(e, gen) {
 export const BACKLOG_MAX = 200;
 export const PRINT_JOB_KIND = 'print-job';
 
+/** How many times one child's print job is tried before it is given up (giveBack). */
+export const ADOPT_TRIES = 3;
+
 export class Adopter {
   /**
    * @param {{ ledger: import('./ledger.js').Ledger, printq: import('./printq.js').PrintQueue,
@@ -85,6 +88,8 @@ export class Adopter {
     this.entries = null;
     /** @type {Promise<void>|null} */
     this.loading = null;
+    /** Children given up on tonight after ADOPT_TRIES (memory only; logged). */
+    this.lost = 0;
   }
 
   /** CLOUD_PRINT=on makes jobs for TwoTimTwo-page check-ins. */
@@ -99,7 +104,7 @@ export class Adopter {
         const secret = this.secret();
         const stored = secret ? await openState(secret, this.backlogDoc.data.sealed) : null;
         if (this.entries === null) this.entries = Array.isArray(stored) ? stored : [];
-      })();
+      })().catch((err) => { this.loading = null; throw err; });   // a failed load is tried again (doc.js)
     }
     return this.loading;
   }
@@ -196,19 +201,37 @@ export class Adopter {
     const targets = this.stations.sealTargets();
     if (targets.length) {
       const bundle = await sealForStations(targets, { id: jobId, night: e.night, kind: PRINT_JOB_KIND, record });
-      if (!bundle) {
-        // Fail closed: nothing is queued that a station could not read.
-        await this.ledger.undo(e.night, e.tag);
-        this.log('[cloud] could not seal a print job to the stations; the claim was released');
-        return 'seal-failed';
-      }
-      await this.printq.enqueue({ jobId, night: e.night, tag: e.tag, gen: c.gen, bundle });
-      return 'queued';
+      // Fail closed: nothing is queued that a station could not read.
+      if (!bundle) return this.giveBack(e, 'seal-failed');
+      const q = await this.printq.enqueue({ jobId, night: e.night, tag: e.tag, gen: c.gen, bundle });
+      return q.ok ? 'queued' : this.giveBack(e, `queue-${q.reason}`);
     }
     const secret = this.secret();
-    if (!secret) return 'no-secret';
-    await this.printq.enqueue({ jobId, night: e.night, tag: e.tag, gen: c.gen, raw: await sealState(secret, { record }) });
-    return 'waiting';
+    if (!secret) return this.giveBack(e, 'no-secret');
+    const q = await this.printq.enqueue({ jobId, night: e.night, tag: e.tag, gen: c.gen, raw: await sealState(secret, { record }) });
+    return q.ok ? 'waiting' : this.giveBack(e, `queue-${q.reason}`);
+  }
+
+  /**
+   * A child whose job could not be made (2026-11-10): the claim is released and
+   * the child goes to the BACK of the backlog to be tried again on a later tick,
+   * at most ADOPT_TRIES times. Before, the claim stayed (or was undone) with no
+   * job and the child, already off the backlog and never in a later diff, got no
+   * label and nobody was told. Counted in `lost` once the tries run out.
+   * @param {any} e @param {string} why a fixed code, never a name
+   */
+  async giveBack(e, why) {
+    await this.ledger.undo(e.night, e.tag);
+    const tries = (Number(e.tries) || 0) + 1;
+    if (tries < ADOPT_TRIES && this.entries) {
+      this.entries.push({ ...e, tries });
+      await this.saveBacklog();
+      this.log(`[cloud] a print job could not be made (${why}); the claim was released, try ${tries} of ${ADOPT_TRIES}`);
+    } else {
+      this.lost += 1;
+      console.error(`[cloud] a print job could not be made (${why}) after ${tries} tries: one child checked in on TwoTimTwo's page has NO label. Reprint it from /checkin.`);
+    }
+    return why;
   }
 
   /** A job made before any station existed: open its record and seal it now. @param {import('./printq.js').Job} job */

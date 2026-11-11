@@ -44,6 +44,37 @@ describe('a check-in made on TwoTimTwo\'s own page', () => {
     expect((await t.call('GET', '/v1/print/status')).body.claims).toMatchObject({ printed: 1, queued: 0 });
   });
 
+  it('a job that cannot be queued is not lost: the claim is released and the child is tried again', async () => {
+    // 2026-11-10: the queue's answer was ignored, so a child whose job was refused kept a
+    // claim with no job (already off the backlog, never in a later diff): no label, silently.
+    const { t, sts } = await night();
+    const enqueue = t.core.printq.enqueue.bind(t.core.printq);
+    let refuse = 1;
+    t.core.printq.enqueue = async (j) => (refuse-- > 0 ? { ok: false, reason: 'full' } : enqueue(j));
+    t.night.kids.push(kid(2, 'Cubbies', 'Ada Uniquename'));
+    await readReport(t);
+    await step(t, SPILL_MS);                   // the first try: refused
+    expect(t.core.adopt.pending()).toBe(1);    // back on the backlog, not dropped
+    expect(t.core.printq.readyCount(() => ({ state: 'queued' }))).toBe(0);   // nothing queued yet
+    for (let i = 0; i < 4 && t.core.adopt.pending(); i++) await step(t, SPILL_MS);
+    const jobs = await leased(sts[0]);
+    expect(jobs).toHaveLength(1);
+    expect((await openAsStation(sts[0].ring, jobs[0].bundle)).body).toMatchObject({ name: 'Ada Uniquename', clubberId: '2' });
+    expect(t.core.adopt.lost).toBe(0);
+  });
+
+  it('...and after three refusals it stops trying, counted and logged, never a loop', async () => {
+    const { t, sts } = await night();
+    t.core.printq.enqueue = async () => ({ ok: false, reason: 'full' });
+    t.night.kids.push(kid(2, 'Cubbies', 'Ada Uniquename'));
+    await readReport(t);
+    for (let i = 0; i < 10; i++) await step(t, SPILL_MS);
+    expect(t.core.adopt.pending()).toBe(0);
+    expect(t.core.adopt.lost).toBe(1);
+    expect(await leased(sts[0])).toEqual([]);
+    expect((await t.call('GET', '/v1/print/status')).body.claims).toMatchObject({ queued: 0 });
+  });
+
   it('the children already there when the watcher starts (the baseline) are never printed', async () => {
     const { t, sts } = await night({ kids: [kid(1), kid(2), kid(3)] });
     await step(t, SPILL_MS);
