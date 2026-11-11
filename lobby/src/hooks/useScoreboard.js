@@ -70,8 +70,9 @@ export function useScoreboard({ enabled }) {
     const first = window.setTimeout(read, 0);
     const off = onSyncDoorbell((what, payload) => {
       if (what !== 'scoreboard' || !payload) return;
-      // Before any timed read, the ring's own stamp is the best guess at the server's clock.
-      if (!sync.known() && Number.isFinite(payload.now)) sync.add(wallNow(), wallNow(), payload.now);
+      // The ring's own stamp is a guess at the server's clock. The sync uses it
+      // only until a real timed read arrives; it never outranks one.
+      if (Number.isFinite(payload.now)) sync.addGuess(wallNow(), payload.now);
       if (payload.board) take(payload.board);
       else read();
     });

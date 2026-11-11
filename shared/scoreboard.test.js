@@ -118,6 +118,30 @@ describe('the stopwatch and timer', () => {
   });
 });
 
+describe('a doorbell guess at the clock', () => {
+  it('is used while there is no timed sample, and does not count as one', () => {
+    const sync = createClockSync();
+    sync.addGuess(1000, 5000);
+    expect(sync.offset()).toBe(4000);
+    expect(sync.known()).toBe(false);
+  });
+  it('never outranks a real sample, even one with a long round trip', () => {
+    const sync = createClockSync();
+    sync.addGuess(1000, 5000);
+    sync.add(2000, 2600, 6350);   // rtt 600: offset 4050
+    expect(sync.offset()).toBe(4050);
+    sync.addGuess(3000, 7000);    // a later ring changes nothing
+    expect(sync.offset()).toBe(4050);
+    expect(sync.known()).toBe(true);
+  });
+  it('ignores a bad guess', () => {
+    const sync = createClockSync();
+    sync.addGuess(1000, NaN);
+    sync.addGuess(NaN, 5000);
+    expect(sync.offset()).toBe(0);
+  });
+});
+
 describe('which night a board is from', () => {
   // 2026-11-12 03:30 UTC is still the evening of 11-11 in Eastern time.
   const lateEastern = Date.parse('2026-11-12T03:30:00Z');

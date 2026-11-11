@@ -307,7 +307,20 @@ export function offsetSample(sentAt, gotAt, serverNow) {
 export function createClockSync({ keepMs = 10 * 60 * 1000, max = 12 } = {}) {
   /** @type {{offset: number, rtt: number, at: number}[]} */
   let samples = [];
+  // A doorbell ring's own stamp: a rough guess (no round trip is known), used
+  // only while there is no real timed sample, and never kept as one.
+  /** @type {number | null} */
+  let guess = null;
   return {
+    /**
+     * A guess at the offset from something that was not timed (a doorbell
+     * ring that said the server's time). It never outranks a real sample.
+     * @param {number} localNow @param {number} serverNow
+     */
+    addGuess(localNow, serverNow) {
+      if (!Number.isFinite(localNow) || !isTime(serverNow)) return;
+      guess = serverNow - localNow;
+    },
     /** @param {number} sentAt @param {number} gotAt @param {number} serverNow */
     add(sentAt, gotAt, serverNow) {
       const s = offsetSample(sentAt, gotAt, serverNow);
@@ -315,12 +328,12 @@ export function createClockSync({ keepMs = 10 * 60 * 1000, max = 12 } = {}) {
       samples.push({ ...s, at: gotAt });
       samples = samples.filter((x) => gotAt - x.at <= keepMs).slice(-max);
     },
-    /** The best offset (server minus device), 0 before any sample. */
+    /** The best offset (server minus device): a real sample, else a ring's guess, else 0. */
     offset() {
-      if (!samples.length) return 0;
+      if (!samples.length) return guess ?? 0;
       return samples.reduce((a, b) => (b.rtt < a.rtt ? b : a)).offset;
     },
-    /** True once one answer has been timed. */
+    /** True once one answer has been timed (a guess does not count). */
     known() { return samples.length > 0; },
   };
 }
