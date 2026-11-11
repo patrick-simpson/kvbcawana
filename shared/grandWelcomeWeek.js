@@ -10,6 +10,9 @@
 // Weeks run Wednesday to Tuesday (a club week); the film's first night,
 // FILM_FIRST_NIGHT, starts a film week, and they alternate from there both
 // ways. Local calendar days, so a clock change never shifts a week.
+// Since 2026-11-11 the other screens' half has its own switch (LEAD_IN_ON,
+// leadInStyle, at the foot of this file): the lead-in film every week,
+// whatever the gym shows; the card only if that switch is turned off.
 // Pure, no imports: the lobby and the projector import it in place.
 //
 // Owner 2026-11-08: "always show the 2d, don't show the 3d anymore". FILM_ON is
