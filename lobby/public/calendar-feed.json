@@ -1,15 +1,8 @@
 {
   "version": 1,
-  "generatedAt": "2026-11-05T16:27:42.156Z",
+  "generatedAt": "2026-11-12T16:47:41.409Z",
   "sourceUrl": "https://kvbchurch.twotimtwo.com/calendar/index",
   "events": [
-    {
-      "date": "2026-11-11",
-      "kind": "club",
-      "title": "Awana meeting",
-      "isCancelled": false,
-      "isSpecial": false
-    },
     {
       "date": "2026-11-18",
       "kind": "club",
