@@ -21,7 +21,8 @@ const ROSTER = {
     ['6', 'Fay', 'Hill', 'T&T ', '', 'hill@example.com', ''],
   ],
 };
-const MS = { MS_TENANT_ID: 'tenant', MS_CLIENT_ID: 'client', MS_CLIENT_SECRET: 'secret' };
+const OWNER = 'owner-code-1234';
+const MS = { MS_TENANT_ID: 'tenant', MS_CLIENT_ID: 'client', MS_CLIENT_SECRET: 'secret', MAIL_OWNER_CODE: OWNER };
 
 async function setup(env = MS) {
   const storage = memoryStore();
@@ -59,11 +60,11 @@ async function setup(env = MS) {
   let rosterAnswer = { ok: true, roster: ROSTER };
   core.clubMail.client = () => ({ rosterCsv: async () => { rosterReads += 1; return rosterAnswer; } });
   const session = (await signInV2(core)).body.session;
-  const call = async (method, path, body, auth = { session }, ip = '10.0.0.1') => {
+  const call = async (method, path, body, auth = { session, owner: OWNER }, ip = '10.0.0.1') => {
     const raw = typeof body === 'string' || body instanceof Uint8Array;
     const res = await core.handle(new Request(`https://sync.test${path}`, {
       method,
-      headers: { ...(raw ? {} : { 'Content-Type': 'application/json' }), ...(auth.session ? { Authorization: `Bearer ${auth.session}` } : {}), ...(auth.token ? { 'X-Mail-Token': auth.token } : {}) },
+      headers: { ...(raw ? {} : { 'Content-Type': 'application/json' }), ...(auth.session ? { Authorization: `Bearer ${auth.session}` } : {}), ...(auth.token ? { 'X-Mail-Token': auth.token } : {}), ...(auth.owner ? { 'X-Mail-Owner': auth.owner } : {}) },
       body: body === undefined ? undefined : (raw ? body : JSON.stringify(body)),
     }), ip);
     return { status: res.status, body: await res.json() };
@@ -79,7 +80,7 @@ async function setup(env = MS) {
     return { id: added.body.director.id, code, auth: { token: login.body.token } };
   };
   return {
-    core, storage, call, calls, answers, director,
+    core, storage, call, calls, answers, director, session,
     tick: (ms) => { t += ms; }, rosterReads: () => rosterReads, setRoster: (a) => { rosterAnswer = a; },
     graph: () => calls.filter((c) => c.kind === 'graph'),
   };
@@ -125,9 +126,24 @@ describe('club email: the pure rules', () => {
 
 describe('club email: directors and signing in', () => {
   it('says not set up without the Microsoft secrets', async () => {
-    const s = await setup({});
+    const s = await setup({ MAIL_OWNER_CODE: OWNER });
     expect((await s.call('GET', '/v1/mail/directors')).body.ready).toBe(false);
     expect((await s.call('POST', '/v1/mail/directors', { name: 'A', replyTo: 'a@example.com', clubs: ['trek'] })).status).toBe(503);
+  });
+
+  it('only the owner manages directors: the church passphrase alone opens nothing', async () => {
+    const s = await setup();
+    const justSession = { session: s.session };
+    expect((await s.call('GET', '/v1/mail/directors', undefined, justSession)).body.reason).toBe('not-owner');
+    expect((await s.call('POST', '/v1/mail/directors', { name: 'A', replyTo: 'a@example.com', clubs: ['trek'] }, justSession)).status).toBe(403);
+    expect((await s.call('GET', '/v1/mail/directors', undefined, { owner: OWNER })).status).toBe(401);
+    expect((await s.call('GET', '/v1/mail/me', undefined, justSession)).status).toBe(401);
+    expect((await s.call('POST', '/v1/mail/drafts', { club: 'trek', subject: 'x', blocks: WORDS, files: [] }, justSession)).status).toBe(401);
+    expect(s.graph()).toEqual([]);
+    for (let i = 0; i < CODE_FAILS_IP; i += 1) expect((await s.call('GET', '/v1/mail/directors', undefined, { session: s.session, owner: 'wrong-code-00000' })).status).toBe(403);
+    expect((await s.call('GET', '/v1/mail/directors')).status).toBe(429);
+    const unset = await setup({ MS_TENANT_ID: 't', MS_CLIENT_ID: 'c', MS_CLIENT_SECRET: 's', MAIL_OWNER_CODE: 'short' });
+    expect((await unset.call('GET', '/v1/mail/directors')).body.reason).toBe('owner-not-set');
   });
 
   it('mails the code to the director and never answers it to the page', async () => {

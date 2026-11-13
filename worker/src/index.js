@@ -207,7 +207,7 @@ export default {
           'Access-Control-Allow-Origin': origin,
           'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
           // X-Device / X-Device-Name: who made a change (routes.md 10.1), sent on every call.
-          'Access-Control-Allow-Headers': 'Authorization, Content-Type, X-Station, X-Device, X-Device-Name, X-Cast-Token, X-Mail-Token',
+          'Access-Control-Allow-Headers': 'Authorization, Content-Type, X-Station, X-Device, X-Device-Name, X-Cast-Token, X-Mail-Token, X-Mail-Owner',
           'Access-Control-Max-Age': '86400',
           Vary: 'Origin',
         } : {},

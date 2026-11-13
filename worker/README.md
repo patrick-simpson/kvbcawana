@@ -196,6 +196,38 @@ from then on. ci.yml pushes secrets only on a run that deploys the Worker (its
 files changed, or "Redeploy the sync Worker" ticked), so run that before the next
 print or PowerPoint job: until the Worker has it, that job is refused 401.
 
+## Club email (`src/clubmail.js`, `src/routes.md` 10.19)
+
+awana.kvbchurch.org/tools/email/ lets each director email the parents of their own club
+from the Awana mailbox. It needs four GitHub secrets (Settings, Secrets and variables,
+Actions); the next green run on `main` hands them to the Worker. Without the first three
+the page says sending is not set up.
+
+A Microsoft 365 admin of the church does this once:
+
+1. Microsoft Entra admin center, App registrations, New registration. Name "KVBC Awana
+   club email", single tenant, no redirect address.
+2. API permissions, Add, Microsoft Graph, **Application** permissions: `Mail.Send` and
+   `Mail.ReadWrite`. Then "Grant admin consent".
+3. Limit the app to the ONE mailbox. Until this is done the app can read and send as
+   every mailbox in the church. In Exchange Online PowerShell (the mailbox must be in a
+   mail-enabled security group, here `AwanaMailApp`):
+   `New-ApplicationAccessPolicy -AppId <client id> -PolicyScopeGroupId AwanaMailApp -AccessRight RestrictAccess -Description "Awana club email: awana@ only"`,
+   then check with `Test-ApplicationAccessPolicy -Identity <another mailbox> -AppId <client id>`
+   (it must say Denied).
+4. Certificates and secrets, New client secret. Note the day it ends: sending stops that
+   day until a new secret is saved here.
+
+| GitHub secret | What it is |
+|---|---|
+| `MS_TENANT_ID` | the app's Directory (tenant) ID |
+| `MS_CLIENT_ID` | the app's Application (client) ID |
+| `MS_CLIENT_SECRET` | the client secret's Value |
+| `MAIL_OWNER_CODE` | the owner's own code, 12 characters or more, made up by the owner. With the church passphrase it opens the Directors card; nobody else needs it |
+
+The mailbox is awana@kvbchurch.org (`MAIL_FROM` in `wrangler.toml` `[vars]` changes it).
+"Microsoft refused" on the page means the secret ended or the permission was taken away.
+
 ## Developing
 
 ```sh

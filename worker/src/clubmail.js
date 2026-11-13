@@ -4,11 +4,14 @@
 // src/routes.md 10.19). The page is awana.kvbchurch.org/tools/email/.
 //
 // WHO. Each director has their own login (owner's choice): a code tied to their
-// clubs and their own reply address. The office adds a director with the church
-// session; the Worker MAILS the code to the director's address and never shows it
-// on a page, and tells the awana@ mailbox a login was made. A code signs in for a
-// token (X-Mail-Token, stored as a hash). The church session itself may also send
-// (the office), to any club, with replies to awana@.
+// clubs and their own reply address. ONLY THE OWNER adds, changes or removes a
+// director (owner 2026-11-13: "Lock adding directors to me only"): the church
+// session AND the owner's own code (Worker secret MAIL_OWNER_CODE, header
+// X-Mail-Owner); the church passphrase alone opens nothing here. The Worker MAILS
+// a director's code to the director's address and never shows it on a page, and
+// tells the awana@ mailbox a login was made. A code signs in for a token
+// (X-Mail-Token, stored as a hash). The owner may also send, to any club, with
+// replies to awana@.
 //
 // TO WHOM. The parents' addresses come from TwoTimTwo's roster export at the
 // moment of sending (the one read clock), every active child of that club, Email
@@ -66,6 +69,8 @@ export const CODE_FAILS_IP = 8;
 export const CODE_FAILS_ALL = 60;
 export const CODE_WINDOW_MS = 10 * 60 * 1000;
 export const MAIL_LOG_MAX = 50;
+/** The owner's code is at least this long, or the owner's part stays shut. */
+export const OWNER_CODE_MIN = 12;
 
 const DIRECTORS_KEY = 'mail:directors';
 const TOKENS_KEY = 'mail:tokens';
@@ -339,6 +344,27 @@ export class ClubMail {
     return json({ ok: true });
   }
 
+  // ── the owner ──────────────────────────────────────────────────────────────
+
+  /**
+   * The owner's code on this request (beside the church session, which the route
+   * checks). Wrong codes share the directors' guess limit.
+   * @param {Request} request @param {string} ip
+   * @returns {'ok'|'unset'|'bad'|'locked'}
+   */
+  ownerCheck(request, ip) {
+    const want = String(this.env()?.MAIL_OWNER_CODE || '');
+    if (want.length < OWNER_CODE_MIN) return 'unset';
+    const got = (request.headers.get('X-Mail-Owner') || '').trim();
+    if (!got) return 'bad';
+    const t = this.now();
+    this.codeFails = this.codeFails.filter((f) => t - f.at < CODE_WINDOW_MS);
+    if (this.codeFails.length >= CODE_FAILS_ALL || this.codeFails.filter((f) => f.ip === ip).length >= CODE_FAILS_IP) return 'locked';
+    if (safeEqual(got, want)) return 'ok';
+    this.codeFails.push({ ip, at: t });
+    return 'bad';
+  }
+
   // ── signing in ──────────────────────────────────────────────────────────────
 
   /** POST /v1/mail/login {code} @param {any} body @param {string} ip */
@@ -367,11 +393,11 @@ export class ClubMail {
   }
 
   /**
-   * Who is asking: a director by token, or the office by the church session.
-   * @param {Request} request @param {() => Promise<boolean>} sessionOk
+   * Who is asking: a director by token, or the owner (church session + owner's code).
+   * @param {Request} request @param {() => Promise<boolean>} sessionOk @param {string} ip
    * @returns {Promise<{ id: string, name: string, replyTo: string, clubs: string[], office: boolean } | null>}
    */
-  async who(request, sessionOk) {
+  async who(request, sessionOk, ip) {
     const token = (request.headers.get('X-Mail-Token') || '').trim();
     if (token) {
       const row = (await this.tokens())[await sha256Hex(token)];
@@ -379,7 +405,7 @@ export class ClubMail {
       const d = (await this.directors()).list.find((x) => x.id === row.d);
       return d ? { id: d.id, name: d.name, replyTo: d.replyTo, clubs: d.clubs, office: false } : null;
     }
-    if (await sessionOk()) return { id: 'office', name: 'The Awana office', replyTo: this.from(), clubs: CLUB_IDS.slice(), office: true };
+    if (request.headers.get('X-Mail-Owner') && (await sessionOk()) && this.ownerCheck(request, ip) === 'ok') return { id: 'office', name: 'The Awana office', replyTo: this.from(), clubs: CLUB_IDS.slice(), office: true };
     return null;
   }
 
@@ -697,8 +723,8 @@ export class ClubMail {
 }
 
 /**
- * The routes (src/routes.md 10.19). The office's need the church session; a
- * sender's take a director's token (X-Mail-Token) or the church session.
+ * The routes (src/routes.md 10.19). The owner's need the church session and the
+ * owner's code; a sender's take a director's token (X-Mail-Token) or the owner's pair.
  * @param {import('./registry.js').Registry} registry
  * @param {any} core
  */
@@ -707,17 +733,25 @@ export function mountClubMail(registry, core) {
   /** @typedef {import('./registry.js').RouteContext} Ctx */
   const ready = (/** @type {(ctx: Ctx) => Promise<Response>} */ fn) => async (/** @type {Ctx} */ ctx) => (m().configured() ? fn(ctx) : json({ ok: false, reason: 'not-configured' }, 503));
   const sender = (/** @type {(ctx: Ctx, who: any) => Promise<Response>} */ fn) => async (/** @type {Ctx} */ ctx) => {
-    const who = await m().who(ctx.request, () => core.authorized(ctx.request));
+    const who = await m().who(ctx.request, () => core.authorized(ctx.request), ctx.ip);
     if (!who) return fail('Not signed in.', 401, { reason: 'signed-out' });
     return fn(ctx, who);
   };
+  // The owner's routes: the church session (the route's own auth) and the owner's code.
+  const owner = (/** @type {(ctx: Ctx) => Promise<Response>} */ fn) => async (/** @type {Ctx} */ ctx) => {
+    const c = m().ownerCheck(ctx.request, ctx.ip);
+    if (c === 'unset') return json({ ok: false, reason: 'owner-not-set' }, 503);
+    if (c === 'locked') return fail('Too many wrong codes. Wait ten minutes and try again.', 429, { reason: 'locked' });
+    if (c !== 'ok') return fail('That is not the owner\'s code.', 403, { reason: 'not-owner' });
+    return fn(ctx);
+  };
   const draftId = (/** @type {(ctx: Ctx, who: any) => Promise<Response>} */ fn) => sender(async (ctx, who) => (ID_RE.test(ctx.params.id || '') ? fn(ctx, who) : fail('There is no email by that name.', 404, { reason: 'no-draft' })));
 
-  registry.add('GET', '/v1/mail/directors', 'session', async () => m().list());
-  registry.add('POST', '/v1/mail/directors', 'session', ready(async ({ body }) => m().add(await body())));
-  registry.add('PUT', '/v1/mail/directors/:id', 'session', async ({ params, body }) => m().change(params.id, await body()));
-  registry.add('POST', '/v1/mail/directors/:id/code', 'session', ready(async ({ params }) => m().recode(params.id)));
-  registry.add('DELETE', '/v1/mail/directors/:id', 'session', async ({ params }) => m().remove(params.id));
+  registry.add('GET', '/v1/mail/directors', 'session', owner(async () => m().list()));
+  registry.add('POST', '/v1/mail/directors', 'session', owner(ready(async ({ body }) => m().add(await body()))));
+  registry.add('PUT', '/v1/mail/directors/:id', 'session', owner(async ({ params, body }) => m().change(params.id, await body())));
+  registry.add('POST', '/v1/mail/directors/:id/code', 'session', owner(ready(async ({ params }) => m().recode(params.id))));
+  registry.add('DELETE', '/v1/mail/directors/:id', 'session', owner(async ({ params }) => m().remove(params.id)));
 
   registry.add('POST', '/v1/mail/login', 'public', async ({ body, ip }) => m().login(await body(), ip));
   registry.add('POST', '/v1/mail/logout', 'public', async ({ request }) => m().logout(request));
@@ -726,6 +760,6 @@ export function mountClubMail(registry, core) {
   registry.add('GET', '/v1/mail/recipients', 'public', sender(async ({ url }, who) => m().recipients(who, clubIdByAlias(url.searchParams.get('club') || ''))));
   registry.add('POST', '/v1/mail/drafts', 'public', sender(async ({ body }, who) => m().start(who, await body())));
   registry.add('PUT', '/v1/mail/drafts/:id/files/:f/:n', 'public', draftId(async ({ params, request }, who) => m().part(who, params.id, params.f, params.n, request)));
-  registry.add('POST', '/v1/mail/drafts/:id/send', 'public', draftId(ready(async (ctx) => m().begin(await m().who(ctx.request, () => core.authorized(ctx.request)), ctx.params.id, await ctx.body()))));
-  registry.add('POST', '/v1/mail/drafts/:id/step', 'public', draftId(ready(async (ctx) => m().step(await m().who(ctx.request, () => core.authorized(ctx.request)), ctx.params.id))));
+  registry.add('POST', '/v1/mail/drafts/:id/send', 'public', draftId(ready(async (ctx) => m().begin(await m().who(ctx.request, () => core.authorized(ctx.request), ctx.ip), ctx.params.id, await ctx.body()))));
+  registry.add('POST', '/v1/mail/drafts/:id/step', 'public', draftId(ready(async (ctx) => m().step(await m().who(ctx.request, () => core.authorized(ctx.request), ctx.ip), ctx.params.id))));
 }

@@ -1897,3 +1897,64 @@ Screen shares in the classroom too (signed in): `POST /v1/classroom/remote {acti
 /v1/classroom/signal?type=offer|answer&id=`, and `GET /v1/classroom/ice?id=` (the relay, as above). Signals live in memory only (`SIGNAL_TTL_MS` 2 min for
 reading), the picture itself goes laptop to TV over the church network (WebRTC, no TURN server);
 a press of another button, Back, or a new code ends the share.
+
+### 10.19 Club email (BUILT, owner 2026-11-13)
+
+awana.kvbchurch.org/tools/email/: each director writes to the parents of their own club,
+from the Awana mailbox (owner: "a page that lets directors send emails from the awana@
+outlook account that goes to all parents who have a kid in that club"). Code
+`src/clubmail.js`; tests `test/clubmail.test.js`, `site/test/email.test.mjs`.
+
+**Who.** A director signs in with their own code (`XXXX-XXXX-XXXX`, stored as a SHA-256
+hash) for a token (`X-Mail-Token`, 30 days, stored as a hash) tied to their clubs and
+their reply address. ONLY THE OWNER adds, changes or removes a director (owner
+2026-11-13: "Lock adding directors to me only"): the church session AND the header
+`X-Mail-Owner` equal to the Worker secret `MAIL_OWNER_CODE` (12+ characters; unset = 503
+`owner-not-set`). The church passphrase alone opens nothing here. A new code is MAILED
+to the director (not kept in Sent Items) and never answered to a page; the mailbox gets a
+notice with no code. The owner's pair may also send, to any club, replies to the mailbox.
+Wrong codes (a director's or the owner's): 8 per network and 60 in all per 10 minutes,
+then 429 `locked`.
+
+**To whom.** The addresses are read from TwoTimTwo's roster export (`/clubber/csv`, the
+one read clock) when a count or a send asks: active children of the club, Email and Alt
+Email, each address once, at most 450. They stay in memory at most 5 minutes and are
+NEVER stored, logged or answered: a page gets counts. Parents are BCC; To and Reply-To
+are the director.
+
+**How.** Microsoft Graph, client credentials: secrets `MS_TENANT_ID`, `MS_CLIENT_ID`,
+`MS_CLIENT_SECRET` (application permissions `Mail.Send` and `Mail.ReadWrite`, limited to
+the one mailbox; setup in `worker/README.md`), mailbox `MAIL_FROM` (default
+awana@kvbchurch.org). Without them the sending routes answer 503 `not-configured`. The
+Worker builds the HTML from the page's blocks (`p`, `h`, `ul`, `img`); a page never sends
+HTML. Files: at most 10 and 18 MB together (pictures, PDF, Office, text, calendar); a file
+under about 3 MB is uploaded as base64 text and attached in one request, a bigger one as
+raw bytes through an upload session, about 2.9 MB a step; pieces are 96 KiB
+(`mail:part:<id>:<file>:<n>`), deleted once sent or after 3 hours. One draft per sender.
+
+**Sending** is driven by the page, one small piece of work per `POST .../step`:
+`draft` (the message is made in the mailbox, with the recipients), `files`, `send`,
+`sent`. The send step is marked `unknown` BEFORE Microsoft is asked: a definite refusal
+puts it back to `send` (it may be tried again), no answer leaves it `unknown` and it is
+never sent again. A test (`{test: true}`) goes to the sender alone, subject `[Test] ...`,
+reads no roster, and leaves the draft ready. At most 6 real sends a director a day.
+`mail:log` keeps the last 50 sends: when, who, club, subject, how many; no address.
+
+| Route | Auth | Body | Answer |
+|---|---|---|---|
+| `GET /v1/mail/directors` | session + owner | | `{ready, from, clubs, directors: [{id, name, replyTo, clubs, at}]}`; 403 `not-owner`, 503 `owner-not-set` |
+| `POST /v1/mail/directors` | session + owner | `{name, replyTo, clubs}` | `{director}` (the code is mailed); 400 `bad-director`, 409 `exists`/`full`, 502 `graph`/`graph-auth` |
+| `PUT /v1/mail/directors/:id` | session + owner | `{name?, clubs?}` | `{director}` |
+| `POST /v1/mail/directors/:id/code` | session + owner | `{}` | `{ok}`: a new code is mailed, the old code and every sign-in stop |
+| `DELETE /v1/mail/directors/:id` | session + owner | | `{ok}` |
+| `POST /v1/mail/login` | public | `{code}` | `{token, name}`; 401 `bad-code`, 429 `locked` |
+| `POST /v1/mail/logout` | public | | `{ok}` |
+| `GET /v1/mail/me` | sender | | `{ready, name, replyTo, office, from, clubs, limits}`; 401 `signed-out` |
+| `GET /v1/mail/recipients?club=` | sender | | `{club, name, addresses, kids, kidsWithoutEmail}` (counts only); 403 `not-your-club`, 502 `roster`, 503 `read-busy` |
+| `GET /v1/mail/log` | sender | | `{sends}` (the owner: all; a director: their own) |
+| `POST /v1/mail/drafts` | sender | `{club, subject, blocks, files: [{name, type, size, inline}]}` | `{id, part, files: [{enc: b64|raw, parts}]}`; 400 `subject`/`empty`/`files`/`file-type`/`file-size`/`too-big` |
+| `PUT /v1/mail/drafts/:id/files/:f/:n` | sender | one piece (text or bytes) | `{next}`; 409 `order`, 400 `size` |
+| `POST /v1/mail/drafts/:id/send` | sender | `{test?}` | the progress; 409 `sent`/`running`, 400 `parts`, 429 `daily-limit` |
+| `POST /v1/mail/drafts/:id/step` | sender | `{}` | `{stage, test, done, percent, recipients}`; 409 `no-recipients`, 502 `graph`/`graph-auth`/`roster`, 503 `read-busy` |
+
+"sender" = a director's `X-Mail-Token`, or the owner's session + `X-Mail-Owner`.

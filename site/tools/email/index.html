@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Club email · KVBC Awana</title>
+<link rel="stylesheet" href="/lobby/shared/brand/tokens.css">
+<link rel="stylesheet" href="/lobby/shared/brand/fonts.css">
+<style>
+  /* Club email (owner 2026-11-13): a director emails the parents of their own club from the Awana
+     mailbox. Unlisted; each director signs in with their own code. Rules: worker/src/routes.md 10.19. */
+  @font-face { font-family: 'Figtree'; font-weight: 300 900; src: url('/lobby/shared/brand/fonts/figtree-latin-wght-normal.woff2') format('woff2'); }
+  :root { --ink: var(--brand-ink, #231F20); --paper: #f6f4ef; --line: #d9d4ca; --hot: #CF4518; --muted: #4a4a4a; }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { margin: 0; background: var(--paper); color: var(--ink); font: 400 16px/1.5 var(--brand-font-body); }
+  header.bar { display: flex; align-items: center; gap: 16px; padding: 14px 24px; background: var(--brand-blue); color: #fff; }
+  header.bar img { width: 260px; height: auto; display: block; }
+  header.bar h1 { margin: 0; font: 400 26px/1 var(--brand-font-display); }
+  header.bar .who { margin-left: auto; display: flex; gap: 12px; align-items: center; font-size: 14px; }
+  .stripe { display: flex; height: 6px; } .stripe span { flex: 1; }
+  button { font: 400 17px/1 var(--brand-font-label); letter-spacing: .05em; text-transform: uppercase; border: 0; border-radius: 10px; padding: 12px 18px; min-height: 44px; cursor: pointer; color: var(--ink); background: #fff; box-shadow: 3px 3px 0 var(--ink); }
+  button:active { translate: 2px 2px; box-shadow: 1px 1px 0 var(--ink); }
+  button.hot { background: var(--hot); color: #fff; }
+  button.armed { background: var(--ink); color: #fff; }
+  button.quiet { box-shadow: none; border: 2px solid var(--ink); padding: 6px 10px; min-height: 36px; font-size: 13px; }
+  button:disabled { opacity: .5; cursor: default; }
+  button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible, a:focus-visible { outline: 3px solid var(--brand-blue); outline-offset: 2px; }
+  header.bar button { padding: 8px 12px; min-height: 36px; font-size: 14px; }
+  .signin { display: grid; gap: 10px; width: calc(100% - 32px); max-width: 26rem; margin: 40px auto 16px; padding: 24px 20px; background: #fff; border-radius: 16px; box-shadow: 4px 4px 0 var(--ink); }
+  .signin h2 { margin: 0; font: 400 28px/1.1 var(--brand-font-display); }
+  .signin p { margin: 0; }
+  .signin label, .field > label, .field > span.label { font: 400 17px/1.1 var(--brand-font-label); letter-spacing: .06em; text-transform: uppercase; color: var(--brand-blue); margin-top: 6px; }
+  .signin input, .field input[type=text], .field input[type=email], .field select { width: 100%; min-height: 48px; font: inherit; font-size: 17px; padding: 10px 12px; border: 2px solid var(--ink); border-radius: 10px; background: #fff; color: var(--ink); }
+  .signin button { width: 100%; min-height: 48px; }
+  .signin .note { min-height: 1.5em; font-size: 15px; font-weight: 600; color: var(--brand-sparks-deep); }
+  .fine { font-size: 14px; color: var(--muted); }
+  .swap { text-align: center; margin: 0 0 32px; font-size: 14px; }
+  .swap button { all: unset; cursor: pointer; text-decoration: underline; color: var(--brand-blue); padding: 8px; }
+  main { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 24px; padding: 24px; max-width: 1400px; margin: 0 auto; align-items: start; }
+  .card { background: #fff; border-radius: 16px; box-shadow: 4px 4px 0 var(--ink); padding: 22px 24px 24px; }
+  .card + .card { margin-top: 24px; }
+  .card h2 { margin: 0 0 4px; font: 400 24px/1.1 var(--brand-font-display); text-transform: uppercase; color: var(--brand-blue); }
+  .card p.lede { margin: 0 0 14px; color: var(--muted); }
+  .field { display: grid; gap: 6px; margin-top: 14px; }
+  #to-line { min-height: 1.5em; margin: 8px 0 0; font-weight: 600; }
+  #to-line.bad { color: var(--brand-sparks-deep); }
+  textarea { width: 100%; min-height: 300px; height: 44vh; resize: vertical; font: 400 16px/1.5 var(--brand-font-body); padding: 14px; border: 2px solid var(--ink); border-radius: 12px; background: #fff; color: var(--ink); }
+  .tools { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 12px; }
+  .tools .total { margin-left: auto; font-weight: 600; font-size: 14px; }
+  .tools .total.bad { color: var(--brand-sparks-deep); }
+  ul.files { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 8px; }
+  ul.files li { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 10px; background: var(--brand-cream); font-weight: 600; font-size: 15px; }
+  ul.files li span.name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  ul.files li span.kind { font-weight: 400; color: var(--muted); white-space: nowrap; }
+  details.help { margin-top: 12px; font-size: 14px; border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; }
+  details.help summary { cursor: pointer; font-weight: 700; }
+  details.help ul { margin: 8px 0 0; padding-left: 20px; }
+  details.help code { background: var(--brand-cream); padding: 0 4px; border-radius: 4px; }
+  .send { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 18px; }
+  progress { width: 100%; height: 10px; margin-top: 14px; accent-color: var(--brand-blue); }
+  .status { min-height: 1.5em; margin: 12px 0 0; font-weight: 600; }
+  .status.bad { color: var(--brand-sparks-deep); }
+  .status.good { color: var(--brand-tnt-deep); }
+  .setup { grid-column: 1 / -1; margin: 0; padding: 14px 18px; border-radius: 12px; background: var(--brand-cream); font-weight: 600; }
+  .col.out { position: sticky; top: 16px; }
+  .envelope { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+  .envelope dl { margin: 0; padding: 12px 16px; background: var(--paper); display: grid; grid-template-columns: auto 1fr; gap: 2px 12px; font-size: 14px; }
+  .envelope dt { color: var(--muted); } .envelope dd { margin: 0; font-weight: 600; overflow-wrap: anywhere; }
+  #preview { padding: 18px 16px; font: 400 16px/1.5 -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif; overflow-wrap: anywhere; min-height: 120px; }
+  #preview h2 { font: 700 18px/1.3 -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif; text-transform: none; color: inherit; margin: 22px 0 8px; } #preview h2:first-child { margin-top: 0; }
+  #preview p { margin: 0 0 14px; } #preview ul { margin: 0 0 14px; padding-left: 22px; }
+  #preview img { max-width: 100%; height: auto; }
+  #preview a { color: #0B5CAD; }
+  #preview .foot { margin: 26px 0 0; padding-top: 12px; border-top: 1px solid var(--line); font-size: 13px; color: #6B655E; }
+  #preview .empty { color: var(--muted); }
+  ul.log, ul.people { list-style: none; margin: 10px 0 0; padding: 0; }
+  ul.log li, ul.people li { padding: 10px 0; border-top: 1px solid var(--line); }
+  ul.log li b { display: block; overflow-wrap: anywhere; } ul.log li span { font-size: 14px; color: var(--muted); }
+  ul.people li { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; }
+  ul.people li .id { flex: 1; min-width: 12rem; } ul.people li .id b { display: block; } ul.people li .id span { font-size: 14px; color: var(--muted); overflow-wrap: anywhere; }
+  fieldset.clubs { border: 0; margin: 14px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px 16px; }
+  fieldset.clubs legend { padding: 0; margin-bottom: 6px; font: 400 17px/1.1 var(--brand-font-label); letter-spacing: .06em; text-transform: uppercase; color: var(--brand-blue); }
+  fieldset.clubs label { display: flex; align-items: center; gap: 6px; min-height: 36px; }
+  fieldset.clubs input { width: 20px; height: 20px; }
+  @media (max-width: 900px) {
+    main { grid-template-columns: minmax(0, 1fr); padding: 16px; } .col.out { position: static; }
+    header.bar { padding: 12px 16px; flex-wrap: wrap; } header.bar h1 { font-size: 20px; } header.bar img { width: 200px; }
+    textarea { height: 38vh; } .card { padding: 18px 16px 20px; }
+  }
+</style>
+</head>
+<body>
+<header class="bar">
+  <img src="/lobby/shared/brand/logos/kvbc-awana-two-line-white.svg" alt="Kennebec Valley Baptist Church Awana Clubs">
+  <h1>Club email</h1>
+  <div class="who" id="who" hidden><span id="who-name"></span><button type="button" id="signout">Sign out</button></div>
+</header>
+<div class="stripe"><span style="background:var(--brand-puggles)"></span><span style="background:var(--brand-cubbies)"></span><span style="background:var(--brand-sparks)"></span><span style="background:var(--brand-tnt)"></span><span style="background:var(--brand-trek)"></span><span style="background:var(--brand-journey)"></span></div>
+
+<form class="signin" id="signin" hidden>
+  <h2>Sign in</h2>
+  <p>Type the code that was emailed to you to write to your club's parents.</p>
+  <label for="code">Your director code</label>
+  <input id="code" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="XXXX-XXXX-XXXX" aria-describedby="signin-note">
+  <p class="note" id="signin-note" role="status" aria-live="polite"></p>
+  <button class="hot" id="signin-btn" type="submit">Sign in</button>
+  <p class="fine">The code is yours alone. No code? Ask the Awana director for one.</p>
+</form>
+
+<form class="signin" id="owner-signin" hidden>
+  <h2>Owner sign-in</h2>
+  <p>The church passphrase and the owner's code, to manage directors.</p>
+  <label for="passphrase">Church passphrase</label>
+  <input id="passphrase" type="password" autocomplete="current-password">
+  <label for="owner-code">Owner's code</label>
+  <input id="owner-code" type="password" autocomplete="off" aria-describedby="owner-note">
+  <p class="note" id="owner-note" role="status" aria-live="polite"></p>
+  <button class="hot" id="owner-btn" type="submit">Sign in</button>
+  <p class="fine">Neither is saved on this device. The owner's code is asked again when the page is reopened.</p>
+</form>
+<p class="swap" id="swap" hidden><button type="button" id="swap-btn">Owner sign-in</button></p>
+
+<main id="app" hidden>
+  <p class="setup" id="setup" hidden></p>
+  <div class="col">
+    <section class="card" aria-labelledby="write-h">
+      <h2 id="write-h">Write to your parents</h2>
+      <p class="lede">It comes from the Awana account. Parents never see each other's addresses, and their replies come to you.</p>
+      <div class="field" id="club-field">
+        <label for="club">Club</label>
+        <select id="club"></select>
+      </div>
+      <p id="to-line" role="status" aria-live="polite"></p>
+      <div class="field">
+        <label for="subject">Subject</label>
+        <input id="subject" type="text" maxlength="150" autocomplete="off">
+      </div>
+      <div class="field">
+        <label for="text">Message</label>
+        <textarea id="text" spellcheck="true"></textarea>
+      </div>
+      <div class="tools">
+        <button type="button" id="add-picture">Add a picture</button>
+        <button type="button" id="add-file">Attach a file</button>
+        <span class="total" id="total" role="status"></span>
+      </div>
+      <input type="file" id="pick-picture" accept="image/jpeg,image/png,image/gif" multiple hidden>
+      <input type="file" id="pick-file" multiple hidden>
+      <ul class="files" id="files"></ul>
+      <details class="help">
+        <summary>How the message is laid out</summary>
+        <ul>
+          <li>Leave a blank line between paragraphs.</li>
+          <li>Lines that start with <code>- </code> make a list.</li>
+          <li>A line that starts with <code># </code> is a heading.</li>
+          <li>A picture shows where its <code>[picture: name]</code> line is. Move that line to move the picture.</li>
+          <li>Web addresses become links. Other files are attached at the end.</li>
+        </ul>
+      </details>
+      <div class="send">
+        <button type="button" id="test">Send a test to me</button>
+        <button type="button" class="hot" id="send">Send to parents</button>
+      </div>
+      <progress id="progress" max="100" value="0" hidden></progress>
+      <p class="status" id="status" role="status" aria-live="polite"></p>
+    </section>
+  </div>
+
+  <div class="col out">
+    <section class="card" aria-labelledby="prev-h">
+      <h2 id="prev-h">What parents will get</h2>
+      <div class="envelope">
+        <dl>
+          <dt>From</dt><dd id="env-from"></dd>
+          <dt>Replies to</dt><dd id="env-reply"></dd>
+          <dt>Subject</dt><dd id="env-subject"></dd>
+        </dl>
+        <div id="preview"></div>
+      </div>
+    </section>
+
+    <section class="card" id="log-card" aria-labelledby="log-h" hidden>
+      <h2 id="log-h">Sent lately</h2>
+      <ul class="log" id="log"></ul>
+    </section>
+
+    <section class="card" id="directors-card" aria-labelledby="dir-h" hidden>
+      <h2 id="dir-h">Directors</h2>
+      <p class="lede">Each director gets their own code by email. Only you can add or remove one.</p>
+      <ul class="people" id="directors"></ul>
+      <form id="add-director">
+        <div class="field"><label for="d-name">Name</label><input id="d-name" type="text" maxlength="60" autocomplete="off"></div>
+        <div class="field"><label for="d-email">Their email (parents' replies go here)</label><input id="d-email" type="email" autocomplete="off"></div>
+        <fieldset class="clubs" id="d-clubs"><legend>Clubs</legend></fieldset>
+        <div class="send"><button type="submit" class="hot" id="d-add">Add and email their code</button></div>
+        <p class="status" id="d-status" role="status" aria-live="polite"></p>
+      </form>
+    </section>
+  </div>
+</main>
+<script type="module" src="./app.js"></script>
+</body>
+</html>

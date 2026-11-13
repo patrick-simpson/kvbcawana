@@ -17,6 +17,7 @@ const ALLOWED = [
   '/lobby/scoreboard.html', // the game time scoreboard (phone: four teams' scores and the stopwatch on the projector)
   'https://cast.kvbchurch.org/', // owner 2026-11-08: Cast, present on the lobby TV with the code it shows; its own site since 2026-11-09
   '/settings', '/logo/',
+  '/tools/email/', // owner 2026-11-13: club email, each director writes to their own club's parents
   '/tools/print/', // owner 2026-10-28: the letterhead maker; renamed the Print tool 2026-11-05
   '/download/kvbc-awana', '/help', '/capabilities.html', '/release-notes/printer.md',
   '/',
