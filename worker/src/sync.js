@@ -62,6 +62,7 @@ import { Presentation, mountPresentation } from './presentation.js';
 import { Tally, mountTally } from './tally.js';
 import { Scoreboard, mountScoreboard } from './scoreboard.js';
 import { Prints, mountPrints } from './prints.js';
+import { ClubMail, mountClubMail } from './clubmail.js';
 import { parseSession, sessionBody } from './session.js';
 import { BadRequest, fail, json } from './http.js';
 import { Registry } from './registry.js';
@@ -342,6 +343,13 @@ export class SyncCore {
       configured: () => this.prints.configured(), dispatch: (wf, inputs, opts) => this.prints.dispatch(wf, inputs, opts),
     });
     mountPrints(this.registry, this);   // /v1/prints/* (routes.md 10.16)
+    // Club email (clubmail.js, routes.md 10.19): a director emails their club's parents
+    // from the Awana mailbox (Microsoft Graph; MS_TENANT_ID, MS_CLIENT_ID, MS_CLIENT_SECRET).
+    this.clubMail = new ClubMail({
+      storage: this.storage, now: this.now, env: () => this.rawEnv || {}, fetchFn: this.fetchFn,
+      client: () => this.watcher.clientFor(), log: (line) => console.warn(line),
+    });
+    mountClubMail(this.registry, this);   // /v1/mail/* (routes.md 10.19)
     // The change log (changes.js, routes.md 10.5): every write path below logs who
     // (device.js), when, which keys, before and after; a module that owns an
     // undoable kind adds its undoer to `undoers`.
