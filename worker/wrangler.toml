@@ -48,6 +48,11 @@ YM_CHECKOUT = "on"
 # value here. SWITCHES_STORED = "off" is the deploy kill: stored values are ignored
 # (these defaults only) and the settings page cannot flip anything.
 SWITCHES_STORED = "on"
+# Club email (src/clubmail.js): a club with a mailbox of its own sends from it
+# instead of awana@ ("club=address, club=address"). The Microsoft app must be
+# allowed each one: the mailbox is a member of the AwanaMailApp group (README).
+# Owner 2026-11-13: Puggles sends from puggles@, which forwards to its director.
+MAIL_FROM_CLUBS = "puggles=puggles@kvbchurch.org"
 
 [[durable_objects.bindings]]
 name = "SYNC"

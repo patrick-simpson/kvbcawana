@@ -1925,7 +1925,9 @@ are the director.
 **How.** Microsoft Graph, client credentials: secrets `MS_TENANT_ID`, `MS_CLIENT_ID`,
 `MS_CLIENT_SECRET` (application permissions `Mail.Send` and `Mail.ReadWrite`, limited to
 the one mailbox; setup in `worker/README.md`), mailbox `MAIL_FROM` (default
-awana@kvbchurch.org). Without them the sending routes answer 503 `not-configured`. The
+awana@kvbchurch.org); a club listed in `MAIL_FROM_CLUBS` ("club=address, ...") is drafted
+in and sent from its own mailbox instead, and `GET /v1/mail/me` names each club's `from`.
+Without them the sending routes answer 503 `not-configured`. The
 Worker builds the HTML from the page's blocks (`p`, `h`, `ul`, `img`); a page never sends
 HTML. Files: at most 10 and 18 MB together (pictures, PDF, Office, text, calendar); a file
 under about 3 MB is uploaded as base64 text and attached in one request, a bigger one as

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { SyncCore } from '../src/sync.js';
 import {
   CODE_FAILS_IP, MAIL_PART, MAIL_SENDS_PER_DAY, MAIL_SMALL_BYTES, MAIL_STEP_PARTS,
-  cleanBlocks, cleanClubs, newCode, normalCode, recipientsByClub, renderMail,
+  cleanBlocks, cleanClubs, clubMailboxes, newCode, normalCode, recipientsByClub, renderMail,
 } from '../src/clubmail.js';
 import { memoryStore, signInV2 } from './helpers.js';
 
@@ -19,6 +19,7 @@ const ROSTER = {
     ['4', 'Dan', 'Gone', 'Sparks', 'Y', 'gone@example.com', ''],
     ['5', 'Eli', 'Pike', 'Trek', '', 'pike@example.com; not-an-address', ''],
     ['6', 'Fay', 'Hill', 'T&T ', '', 'hill@example.com', ''],
+    ['7', 'Gus', 'Lane', 'Puggles', '', 'lane@example.com', ''],
   ],
 };
 const OWNER = 'owner-code-1234';
@@ -40,10 +41,11 @@ async function setup(env = MS) {
       calls.push({ kind: 'put', range: init.headers['Content-Range'], bytes: init.body.length, auth: init.headers.Authorization });
       return Response.json({}, { status: 200 });
     }
-    if (u.startsWith('https://graph.microsoft.com/v1.0/users/awana%40kvbchurch.org/')) {
-      const path = u.split('/users/awana%40kvbchurch.org')[1];
+    const box = /^https:\/\/graph\.microsoft\.com\/v1\.0\/users\/((?:awana|puggles)%40kvbchurch\.org)(\/.*)$/.exec(u);
+    if (box) {
+      const path = box[2];
       const body = init.body ? JSON.parse(init.body) : null;
-      calls.push({ kind: 'graph', method: init.method, path, body, auth: init.headers.Authorization });
+      calls.push({ kind: 'graph', mailbox: decodeURIComponent(box[1]), method: init.method, path, body, auth: init.headers.Authorization });
       if (path === '/sendMail') return new Response(null, { status: 202 });
       if (path === '/messages') return Response.json({ id: 'MSG1' }, { status: 201 });
       if (path.endsWith('/attachments')) return Response.json({ id: 'ATT' }, { status: 201 });
@@ -176,7 +178,7 @@ describe('club email: directors and signing in', () => {
     expect((await s.call('GET', '/v1/mail/directors', undefined, d.auth)).status).toBe(401);
     expect((await s.call('GET', '/v1/mail/me', undefined, {})).status).toBe(401);
     const me = await s.call('GET', '/v1/mail/me', undefined, d.auth);
-    expect(me.body).toMatchObject({ name: 'Dana Cole', office: false, clubs: [{ id: 'sparks', name: 'Sparks' }], from: 'awana@kvbchurch.org' });
+    expect(me.body).toMatchObject({ name: 'Dana Cole', office: false, clubs: [{ id: 'sparks', name: 'Sparks', from: 'awana@kvbchurch.org' }], from: 'awana@kvbchurch.org' });
     expect((await s.call('GET', '/v1/mail/recipients?club=trek', undefined, d.auth)).body.reason).toBe('not-your-club');
     const r = await s.call('GET', '/v1/mail/recipients?club=sparks', undefined, d.auth);
     expect(r.body).toEqual({ ok: true, club: 'sparks', name: 'Sparks', addresses: 2, kids: 3, kidsWithoutEmail: 1 });
@@ -227,6 +229,32 @@ describe('club email: a message', () => {
     const log = await s.call('GET', '/v1/mail/log');
     expect(log.body.sends[0]).toMatchObject({ name: 'Dana Cole', club: 'sparks', subject: 'Shoeboxes Wednesday', recipients: 2 });
     expect(JSON.stringify([...s.storage.map.values()])).not.toContain('stone@example.com');
+  });
+
+  it('a club with a mailbox of its own sends from it; the others and the login mails stay on the Awana one', async () => {
+    expect(clubMailboxes(' Puggle = Puggles@KVBChurch.org , nope=x@example.com; sparks=not-an-address, trek ')).toEqual({ puggles: 'puggles@kvbchurch.org' });
+    expect(clubMailboxes(undefined)).toEqual({});
+    const s = await setup({ ...MS, MAIL_FROM_CLUBS: 'puggles=puggles@kvbchurch.org' });
+    const d = await s.director({ name: 'Pat Bean', replyTo: 'puggles@kvbchurch.org', clubs: ['puggles', 'sparks'] });
+    // The login code and the notice still come from the Awana mailbox.
+    expect(s.graph().filter((c) => c.path === '/sendMail').map((c) => c.mailbox)).toEqual(['awana@kvbchurch.org', 'awana@kvbchurch.org']);
+    const me = await s.call('GET', '/v1/mail/me', undefined, d.auth);
+    expect(me.body.from).toBe('awana@kvbchurch.org');
+    expect(me.body.clubs).toEqual([{ id: 'puggles', name: 'Puggles', from: 'puggles@kvbchurch.org' }, { id: 'sparks', name: 'Sparks', from: 'awana@kvbchurch.org' }]);
+    const send = async (club) => {
+      const id = (await s.call('POST', '/v1/mail/drafts', { club, subject: 'Hello', blocks: WORDS, files: [] }, d.auth)).body.id;
+      const before = s.graph().length;
+      await s.call('POST', `/v1/mail/drafts/${id}/send`, {}, d.auth);
+      expect((await run(s, id, d.auth)).body).toMatchObject({ done: true, stage: 'sent' });
+      return s.graph().slice(before);
+    };
+    const pug = await send('puggles');
+    expect(pug.map((c) => c.path)).toEqual(['/messages', '/messages/MSG1/send']);
+    expect(pug.every((c) => c.mailbox === 'puggles@kvbchurch.org')).toBe(true);
+    expect(pug[0].body.bccRecipients.map((r) => r.emailAddress.address)).toEqual(['lane@example.com']);
+    expect(pug[0].body.replyTo).toEqual([{ emailAddress: { address: 'puggles@kvbchurch.org', name: 'Pat Bean' } }]);
+    const sparks = await send('sparks');
+    expect(sparks.every((c) => c.mailbox === 'awana@kvbchurch.org')).toBe(true);
   });
 
   it('a test goes to the sender alone and leaves the message ready', async () => {

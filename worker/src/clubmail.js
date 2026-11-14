@@ -21,7 +21,12 @@
 //
 // HOW. Microsoft Graph with an app registration (client credentials): secrets
 // MS_TENANT_ID, MS_CLIENT_ID, MS_CLIENT_SECRET; the mailbox is MAIL_FROM (default
-// awana@kvbchurch.org). Without them every sending route answers 503
+// awana@kvbchurch.org). A club may have a mailbox of its own (owner 2026-11-13:
+// puggles@ is "the address that messages from the puggles director sends from"):
+// MAIL_FROM_CLUBS, "club=address, club=address"; that club's messages are drafted
+// in and sent from it, every other club's and the login mails from MAIL_FROM. The
+// app must be allowed each such mailbox (the AwanaMailApp group, worker/README.md).
+// Without the secrets every sending route answers 503
 // `not-configured`. A message is a draft in the mailbox, its files are attached,
 // then it is sent; the PAGE drives that one small step per request (`/step`), so
 // no request does much work (the free plan). The step that sends is marked BEFORE
@@ -116,6 +121,24 @@ export function cleanFileName(v) {
 export function cleanClubs(v) {
   const got = new Set((Array.isArray(v) ? v : []).map((c) => clubIdByAlias(String(c ?? ''))));
   return CLUB_IDS.filter((id) => got.has(id));
+}
+
+/**
+ * The clubs with a mailbox of their own, from `MAIL_FROM_CLUBS`
+ * ("puggles=puggles@kvbchurch.org, sparks=..."): known clubs and valid addresses
+ * only, anything else is left out (that club then sends from the Awana mailbox).
+ * @param {unknown} v @returns {Record<string, string>}
+ */
+export function clubMailboxes(v) {
+  /** @type {Record<string, string>} */
+  const out = {};
+  for (const pair of String(v ?? '').split(/[,;\n]+/)) {
+    const at = pair.indexOf('=');
+    if (at < 0) continue;
+    const club = clubIdByAlias(pair.slice(0, at).trim()), address = cleanEmail(pair.slice(at + 1));
+    if (CLUB_IDS.includes(club) && address) out[club] = address;
+  }
+  return out;
 }
 
 /**
@@ -233,6 +256,8 @@ export class ClubMail {
   }
 
   from() { return cleanEmail(this.env()?.MAIL_FROM) || MAIL_FROM_DEFAULT; }
+  /** The mailbox one club's messages are sent from: its own (MAIL_FROM_CLUBS), else the Awana one. @param {string} club */
+  fromFor(club) { return clubMailboxes(this.env()?.MAIL_FROM_CLUBS)[club] || this.from(); }
   configured() { const e = this.env() || {}; return Boolean(e.MS_TENANT_ID && e.MS_CLIENT_ID && e.MS_CLIENT_SECRET); }
 
   // ── directors ───────────────────────────────────────────────────────────────
@@ -505,7 +530,7 @@ export class ClubMail {
   me(who) {
     return json({
       ok: true, ready: this.configured(), name: who.name, replyTo: who.replyTo, office: who.office, from: this.from(),
-      clubs: who.clubs.map((/** @type {string} */ id) => ({ id, name: clubName(id) })),
+      clubs: who.clubs.map((/** @type {string} */ id) => ({ id, name: clubName(id), from: this.fromFor(id) })),
       limits: { totalBytes: MAIL_TOTAL_BYTES, files: MAIL_FILES_MAX, subject: MAIL_SUBJECT_MAX, text: MAIL_TEXT_MAX, part: MAIL_PART, smallBytes: MAIL_SMALL_BYTES },
     });
   }
@@ -619,7 +644,8 @@ export class ClubMail {
     const run = draft?.run;
     if (!draft || !run) return fail('There is no email on its way by that name.', 404, { reason: 'no-run' });
     const save = () => this.storage.put(draftKey(who.id), draft);
-    const base = `/users/${encodeURIComponent(this.from())}`;
+    // The club's own mailbox when it has one: the same answer at every step of one message.
+    const base = `/users/${encodeURIComponent(this.fromFor(draft.club))}`;
     if (run.stage === 'sent' || run.stage === 'unknown') return json({ ok: true, ...this.progress(draft) });
 
     if (run.stage === 'draft') {

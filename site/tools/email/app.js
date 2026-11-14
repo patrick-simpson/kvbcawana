@@ -171,7 +171,6 @@ async function enter(directors) {
   $('pick-file').accept = FILE_ACCEPT;
   $('setup').hidden = me.ready;
   $('setup').textContent = me.ready ? '' : 'Sending is not set up yet: the Microsoft app for the Awana mailbox has not been added (worker/README.md, "Club email"). You can write, but not send.';
-  $('env-from').textContent = `KVBC Awana <${me.from}>`;
   $('env-reply').textContent = `${me.name} <${me.replyTo}>`;
   $('directors-card').hidden = !me.office;
   if (me.office) drawDirectors(directors || (await request('/v1/mail/directors')).body);
@@ -186,12 +185,15 @@ function readDraft() {
   try { const d = JSON.parse(store.get(DRAFT_KEY) || '{}'); return { club: String(d.club || ''), subject: String(d.subject || ''), text: String(d.text || '') }; } catch { return { club: '', subject: '', text: '' }; }
 }
 const clubNow = () => (me ? me.clubs.find((c) => c.id === $('club').value) || me.clubs[0] : null);
+/** The mailbox the chosen club's email is sent from: its own when it has one (Puggles), else the Awana one. */
+const fromNow = () => clubNow()?.from || me.from;
 
 function draw() {
   if (!me) return;
   const subject = $('subject').value.trim(), text = $('text').value;
   store.set(DRAFT_KEY, subject || text.trim() ? JSON.stringify({ club: $('club').value, subject, text }) : null);
   const blocks = parseMessage(text, files);
+  $('env-from').textContent = `KVBC Awana <${fromNow()}>`;
   $('env-subject').textContent = subject || '(no subject yet)';
   $('preview').innerHTML = hasWords(blocks)
     ? previewHtml(blocks, files, { sender: me.name, club: clubNow().name })
@@ -352,7 +354,7 @@ async function steps() {
       $('progress').value = 60 + Math.round(res.body.percent * 0.4);
       if (res.body.stage === 'unknown') {
         running = null;
-        setStatus('status', `Microsoft did not answer when the email was sent, so it may or may not have gone out. Do NOT send it again yet: look in the Sent folder of ${me.from} first.`, 'bad');
+        setStatus('status', `Microsoft did not answer when the email was sent, so it may or may not have gone out. Do NOT send it again yet: look in the Sent folder of ${fromNow()} first.`, 'bad');
         return;
       }
       if (res.body.done) {

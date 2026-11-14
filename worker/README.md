@@ -226,6 +226,11 @@ A Microsoft 365 admin of the church does this once:
 | `MAIL_OWNER_CODE` | the owner's own code, 12 characters or more, made up by the owner. With the church passphrase it opens the Directors card; nobody else needs it |
 
 The mailbox is awana@kvbchurch.org (`MAIL_FROM` in `wrangler.toml` `[vars]` changes it).
+A club may send from a mailbox of its own: `MAIL_FROM_CLUBS` in `[vars]`
+(`"puggles=puggles@kvbchurch.org"`; Puggles since 2026-11-13). Such a mailbox must be a
+member of `AwanaMailApp` too (`Add-DistributionGroupMember AwanaMailApp -Member <address>`),
+or Microsoft refuses that club's sends. For parents' replies to go to the club's address,
+add the club's director on the page with that address as theirs.
 "Microsoft refused" on the page means the secret ended or the permission was taken away.
 
 ## Developing
