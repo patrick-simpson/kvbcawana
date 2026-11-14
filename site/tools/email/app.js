@@ -15,7 +15,7 @@
 import {
   FILE_ACCEPT, INLINE_TYPES, PICTURE_KEEP_BYTES, PICTURE_MAX_PX, hasWords, parseMessage, pictureLine,
   previewHtml, problemWords, recipientWords, sizeWords, stepRetryable, totalWords,
-  blocksToText, boldEdit, bounceWords, cleanLink, laterTime, linesEdit, linkEdit, whenWords,
+  blocksToText, boldEdit, bounceWords, cleanLink, laterTime, linesEdit, linkEdit, secretWords, whenWords,
 } from './logic.js';
 
 const SYNC_INDEX = new URL('/lobby/shared/sync.json', location.href).href;
@@ -171,8 +171,9 @@ async function enter(directors) {
   if (saved.club && clubChoices().some((c) => c.id === saved.club)) $('club').value = saved.club;
   $('subject').value = saved.subject; $('text').value = saved.text;
   $('pick-file').accept = FILE_ACCEPT;
-  $('setup').hidden = me.ready;
-  $('setup').textContent = me.ready ? '' : 'Sending is not set up yet: the Microsoft app for the Awana mailbox has not been added (worker/README.md, "Club email"). You can write, but not send.';
+  const notice = me.ready ? secretWords(me.secretDaysLeft) : 'Sending is not set up yet: the Microsoft app for the Awana mailbox has not been added (worker/README.md, "Club email"). You can write, but not send.';
+  $('setup').hidden = !notice;
+  $('setup').textContent = notice;
   $('env-reply').textContent = `${me.name} <${me.replyTo}>`;
   $('directors-card').hidden = !me.office;
   if (me.office) drawDirectors(directors || (await request('/v1/mail/directors')).body);

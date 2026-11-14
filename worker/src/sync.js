@@ -1303,6 +1303,8 @@ export class SyncCore {
     await this.desk.sweepTestDay();
     // "Not here the last two club nights": a club night with no rows is read from TwoTimTwo once.
     await this.recent.backfill();
+    // Club email: a weekly warning in the last month of its Microsoft secret (never throws).
+    await this.clubMail.secretCheck();
     // Club email's "send later": the safety net for its alarm.
     await this.clubMail.arm().catch((err) => console.error('[mail] could not set the alarm', err));
     await this.history.flush().catch((err) => console.error('[history] flush failed', err));

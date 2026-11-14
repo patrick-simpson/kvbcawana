@@ -1946,6 +1946,11 @@ puts it back to `send` (it may be tried again), no answer leaves it `unknown` an
 never sent again. A test (`{test: true}`) goes to the sender alone, subject `[Test] ...`,
 reads no roster, and leaves the draft ready. At most 6 real sends a director a day.
 `mail:log` keeps the last 50 sends: when, who, club, subject, how many; no address.
+**The secret's end.** `MS_SECRET_ENDS` (`[vars]`, "YYYY-MM-DD") is the day the app's client
+secret ends. In its last 30 days the cron mails the Awana mailbox once a week
+(`ClubMail.secretCheck`, storage `mail:secret:told`), and `GET /v1/mail/me` answers the
+owner `secretDaysLeft` (null for a director, and while it is more than 30 days off).
+
 **Send later** (owner 2026-11-14). `POST .../later {at}` takes a finished draft out of the
 sender's one draft slot (`mail:later:<id>`, its line in `mail:later`; its files' pieces stay
 until it goes). The Durable Object's alarm walks the SAME steps, one per alarm

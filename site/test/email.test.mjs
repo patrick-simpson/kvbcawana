@@ -6,7 +6,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  blocksToText, boldEdit, bounceWords, cleanLink, hasWords, laterTime, inlineHtml, linesEdit, linkEdit, parseMessage, pictureLine, previewHtml, problemWords, recipientWords, sizeWords, stepRetryable, totalWords,
+  blocksToText, boldEdit, bounceWords, cleanLink, hasWords, laterTime, secretWords, inlineHtml, linesEdit, linkEdit, parseMessage, pictureLine, previewHtml, problemWords, recipientWords, sizeWords, stepRetryable, totalWords,
 } from '../tools/email/logic.js';
 import { cleanBlocks, linked } from '../../worker/src/clubmail.js';
 
@@ -79,6 +79,15 @@ test('send later takes a time from five minutes to four weeks off', () => {
   assert.match(laterTime('2026-11-14T12:03', now).problem, /five minutes/);
   assert.match(laterTime('2026-11-13T09:00', now).problem, /five minutes/);
   assert.match(laterTime('2027-02-01T09:00', now).problem, /four weeks/);
+});
+
+test('the owner is told when the Microsoft secret is about to end', () => {
+  assert.equal(secretWords(null), '');
+  assert.equal(secretWords(undefined), '');
+  assert.match(secretWords(18), /ends in 18 days\. After that nobody can send\./);
+  assert.match(secretWords(1), /ends in 1 day\./);
+  assert.match(secretWords(0), /ends today\./);
+  assert.match(secretWords(-3), /^Sending has stopped/);
 });
 
 test('the formatting buttons edit the typed text', () => {

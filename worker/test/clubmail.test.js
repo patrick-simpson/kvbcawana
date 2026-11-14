@@ -204,6 +204,42 @@ describe('club email: directors and signing in', () => {
   });
 });
 
+describe('club email: the Microsoft secret\'s end', () => {
+  it('warns the Awana mailbox weekly in the last month, and the owner on the page', async () => {
+    // The tests' clock is 2026-11-13 15:00 UTC.
+    const far = await setup({ ...MS, MS_SECRET_ENDS: '2028-11-12' });
+    expect(far.core.clubMail.secretDaysLeft()).toBe(730);
+    expect(await far.core.clubMail.secretCheck()).toBe(false);
+    expect((await far.call('GET', '/v1/mail/me')).body.secretDaysLeft).toBe(null);
+    expect((await setup()).core.clubMail.secretDaysLeft()).toBe(null);   // not named: nothing is said
+
+    const s = await setup({ ...MS, MS_SECRET_ENDS: '2026-12-01' });
+    const d = await s.director();
+    const before = s.graph().length;
+    expect(s.core.clubMail.secretDaysLeft()).toBe(18);
+    expect(await s.core.clubMail.secretCheck()).toBe(true);
+    const note = s.graph().slice(before);
+    expect(note).toHaveLength(1);
+    expect(note[0].body.message.subject).toBe('Club email stops in 18 days unless its Microsoft secret is renewed');
+    expect(note[0].body.message.toRecipients).toEqual([{ emailAddress: { address: 'awana@kvbchurch.org' } }]);
+    expect(note[0].body.message.body.content).toContain('2026-12-01');
+    // Once a week, not at every cron.
+    s.tick(6 * 60 * 60 * 1000);
+    expect(await s.core.clubMail.secretCheck()).toBe(false);
+    s.tick(7 * 24 * 60 * 60 * 1000);
+    expect(await s.core.clubMail.secretCheck()).toBe(true);
+    // The owner sees it on the page; a director does not.
+    expect((await s.call('GET', '/v1/mail/me')).body.secretDaysLeft).toBe(11);
+    expect((await s.call('GET', '/v1/mail/me', undefined, d.auth)).body.secretDaysLeft).toBe(null);
+    // Once it has ended nothing can be mailed: no try.
+    s.tick(30 * 24 * 60 * 60 * 1000);
+    const count = s.graph().length;
+    expect(await s.core.clubMail.secretCheck()).toBe(false);
+    expect(s.graph()).toHaveLength(count);
+    expect((await s.call('GET', '/v1/mail/me')).body.secretDaysLeft).toBeLessThan(0);
+  });
+});
+
 describe('club email: send later', () => {
   const AT = '2026-11-18T14:00:00.000Z';   // five days after the tests' clock
   /** A director's finished draft, given a time. */

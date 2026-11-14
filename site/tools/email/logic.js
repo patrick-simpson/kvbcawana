@@ -69,6 +69,17 @@ export function bounceWords(n, mailbox) {
   return `${n} came back undelivered (see the ${mailbox} inbox)`;
 }
 
+/**
+ * The owner's notice about the Microsoft secret ('' when there is nothing to say).
+ * @param {number|null|undefined} days whole days left; negative once it has ended
+ */
+export function secretWords(days) {
+  if (days === null || days === undefined) return '';
+  const how = 'Make a new one and save it (worker/README.md, "Club email").';
+  if (days < 0) return `Sending has stopped: the Microsoft secret this page sends with has ended. ${how}`;
+  return `The Microsoft secret this page sends with ends ${days === 0 ? 'today' : `in ${days} ${days === 1 ? 'day' : 'days'}`}. After that nobody can send. ${how}`;
+}
+
 /** Send later: the soonest and furthest time the Worker takes. */
 export const LATER_MIN_MS = 5 * 60 * 1000;
 export const LATER_MAX_MS = 28 * 24 * 60 * 60 * 1000;

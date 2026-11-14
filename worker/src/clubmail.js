@@ -92,6 +92,9 @@ export const CODE_FAILS_IP = 8;
 export const CODE_FAILS_ALL = 60;
 export const CODE_WINDOW_MS = 10 * 60 * 1000;
 export const MAIL_LOG_MAX = 50;
+/** The Microsoft secret's end (`MS_SECRET_ENDS`): the owner is warned from this many days before, this often. */
+export const SECRET_WARN_DAYS = 30;
+export const SECRET_TOLD_MS = 7 * 24 * 60 * 60 * 1000;
 /** Send later: how soon and how far off a time may be, how many may wait (a sender, everyone). */
 export const LATER_MIN_MS = 5 * 60 * 1000;
 export const LATER_MAX_MS = 28 * 24 * 60 * 60 * 1000;
@@ -112,6 +115,7 @@ const TOKENS_KEY = 'mail:tokens';
 const LOG_KEY = 'mail:log';
 const draftKey = (/** @type {string} */ who) => `mail:draft:${who}`;
 const LATER_KEY = 'mail:later';
+const SECRET_TOLD_KEY = 'mail:secret:told';
 const laterKey = (/** @type {string} */ id) => `mail:later:${id}`;
 const bodyKey = (/** @type {string} */ id) => `mail:body:${id}`;
 const partKey = (/** @type {string} */ id, /** @type {number} */ f, /** @type {number} */ n) => `mail:part:${id}:${f}:${n}`;
@@ -602,6 +606,8 @@ export class ClubMail {
     return json({
       ok: true, ready: this.configured(), name: who.name, replyTo: who.replyTo, office: who.office, from: this.from(),
       clubs: who.clubs.map((/** @type {string} */ id) => ({ id, name: clubName(id), from: this.fromFor(id) })),
+      // The owner alone is told when the Microsoft secret is about to end (or has).
+      secretDaysLeft: who.office && this.secretDaysLeft() !== null && /** @type {number} */ (this.secretDaysLeft()) <= SECRET_WARN_DAYS ? this.secretDaysLeft() : null,
       // Every club at once, for a sender with more than one.
       all: who.clubs.length > 1 ? { id: MAIL_ALL, name: who.office ? 'All clubs' : 'All my clubs', label: this.clubLabel(who, MAIL_ALL), from: this.fromFor(MAIL_ALL) } : null,
       limits: { totalBytes: MAIL_TOTAL_BYTES, files: MAIL_FILES_MAX, subject: MAIL_SUBJECT_MAX, text: MAIL_TEXT_MAX, part: MAIL_PART, smallBytes: MAIL_SMALL_BYTES },
@@ -834,6 +840,48 @@ export class ClubMail {
     const out = { ok: true, ...this.progress(draft) };
     for (let fi = 0; fi < draft.files.length; fi += 1) for (let n = 0; n < draft.files[fi].parts; n += 1) await this.storage.delete(partKey(draft.id, fi, n));
     return json(out);
+  }
+
+  // ── the Microsoft secret's end ─────────────────────────────────────────────
+
+  /**
+   * Whole days until the app's client secret ends, from `MS_SECRET_ENDS` ("YYYY-MM-DD",
+   * wrangler.toml; the Worker cannot ask Microsoft for it). null = not named.
+   * 0 = it ends today; negative = it has ended.
+   */
+  secretDaysLeft() {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(this.env()?.MS_SECRET_ENDS || '').trim());
+    if (!m) return null;
+    return Math.ceil((Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])) - this.now()) / 86400000);
+  }
+
+  /**
+   * The cron's look (owner 2026-11-14): in the last 30 days of the secret the Awana
+   * mailbox is mailed once a week that sending is about to stop, and how to renew.
+   * Never throws. @returns {Promise<boolean>} was a warning mailed?
+   */
+  async secretCheck() {
+    try {
+      const days = this.secretDaysLeft();
+      if (days === null || days > SECRET_WARN_DAYS || days < 0 || !this.configured()) return false;
+      const t = this.now();
+      const told = Number(await this.storage.get(SECRET_TOLD_KEY)) || 0;
+      if (told && t - told < SECRET_TOLD_MS) return false;
+      const ends = String(this.env().MS_SECRET_ENDS).trim();
+      const r = await this.graph('POST', `/users/${encodeURIComponent(this.from())}/sendMail`, {
+        message: {
+          subject: `Club email stops ${days === 0 ? 'today' : `in ${days} ${days === 1 ? 'day' : 'days'}`} unless its Microsoft secret is renewed`,
+          body: { contentType: 'text', content: `The club email page (awana.kvbchurch.org/tools/email/) sends through a Microsoft app whose client secret ends on ${ends}. After that day no director can send until a new secret is saved.\n\nTo renew: Microsoft Entra admin center, App registrations, "KVBC Awana club email", Certificates and secrets, New client secret. Save its Value as the GitHub secret MS_CLIENT_SECRET, set MS_SECRET_ENDS in worker/wrangler.toml to the new end date, and run CI with "Redeploy the sync Worker" ticked. The steps are in worker/README.md, "Club email".\n\nThis reminder comes once a week until the date is changed.\n` },
+          toRecipients: [{ emailAddress: { address: this.from() } }],
+        },
+      });
+      if (!r.ok) return false;
+      await this.storage.put(SECRET_TOLD_KEY, t);
+      return true;
+    } catch (err) {
+      this.log(`[mail] the secret's end could not be checked: ${String(/** @type {any} */ (err)?.message || err)}`);
+      return false;
+    }
   }
 
   // ── send later ─────────────────────────────────────────────────────────────

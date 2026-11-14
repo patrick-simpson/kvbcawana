@@ -53,6 +53,10 @@ SWITCHES_STORED = "on"
 # allowed each one: the mailbox is a member of the AwanaMailApp group (README).
 # Owner 2026-11-13: Puggles sends from puggles@, which forwards to its director.
 MAIL_FROM_CLUBS = "puggles=puggles@kvbchurch.org"
+# The day the Microsoft app's client secret ends (the secret made 2026-11-13, 24 months).
+# From 30 days before, the Worker mails awana@ once a week and the owner sees it on the
+# page. CHANGE THIS when a new secret is saved, or the warning never comes (or never stops).
+MS_SECRET_ENDS = "2028-11-12"
 
 [[durable_objects.bindings]]
 name = "SYNC"

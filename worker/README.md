@@ -216,7 +216,9 @@ A Microsoft 365 admin of the church does this once:
    then check with `Test-ApplicationAccessPolicy -Identity <another mailbox> -AppId <client id>`
    (it must say Denied).
 4. Certificates and secrets, New client secret. Note the day it ends: sending stops that
-   day until a new secret is saved here.
+   day until a new secret is saved here. Put that day in `MS_SECRET_ENDS` in
+   `wrangler.toml` `[vars]` (`"2028-11-12"` now): from 30 days before it, the Worker mails
+   awana@ once a week and the owner sees a notice on the page.
 
 | GitHub secret | What it is |
 |---|---|
