@@ -538,7 +538,7 @@ async function laterPressed() {
     files = []; uploadedId = '';
     $('subject').value = ''; $('text').value = ''; $('later-at').value = '';
     draw();
-    setStatus('status', `Set to send ${whenWords(t.at)}. It goes to whoever is on the club's list then. Cancel it under Waiting to send.`, 'good');
+    setStatus('status', `Scheduled for ${whenWords(t.at)}. You can cancel it under Waiting to send.`, 'good');
     loadLater();
   } finally {
     busy = false;
