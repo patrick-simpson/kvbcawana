@@ -177,9 +177,23 @@ export function cleanBlocks(v, files) {
   return out.some((b) => b.t !== 'img') || out.length ? out : null;
 }
 
-/** Text with its web addresses made links (https only shown as written). @param {string} text */
-function linked(text) {
-  return esc(text).replace(/\bhttps?:\/\/[^\s<>"]+[^\s<>".,;:!?)]/g, (u) => `<a href="${u}" style="color:#0B5CAD">${u}</a>`).replace(/\n/g, '<br>');
+/**
+ * A paragraph's text as HTML: escaped first, then `**bold**`, `[words](https://address)`
+ * and bare web addresses as links (owner 2026-11-14: the page's Bold and Link buttons).
+ * Only these three; the page's `inlineHtml` (site/tools/email/logic.js) is the same rule.
+ * @param {string} text
+ */
+export function linked(text) {
+  const a = (/** @type {string} */ href, /** @type {string} */ words) => `<a href="${href}" style="color:#0B5CAD">${words}</a>`;
+  const bold = (/** @type {string} */ s) => s.replace(/\*\*([^*\n](?:[^\n]*?[^*\n])?)\*\*/g, '<b>$1</b>');
+  const plain = (/** @type {string} */ s) => bold(s.replace(/\bhttps?:\/\/[^\s<>"]+[^\s<>".,;:!?)*]/g, (u) => a(u, u)));
+  const e = esc(text);
+  let out = '', last = 0;
+  for (const m of e.matchAll(/\[([^\]\n]{1,200})\]\((https?:\/\/[^\s<>"()]+)\)/g)) {
+    out += plain(e.slice(last, m.index)) + a(m[2], bold(m[1]));
+    last = (m.index || 0) + m[0].length;
+  }
+  return (out + plain(e.slice(last))).replace(/\n/g, '<br>');
 }
 
 /**

@@ -6,9 +6,9 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  hasWords, parseMessage, pictureLine, previewHtml, problemWords, recipientWords, sizeWords, stepRetryable, totalWords,
+  boldEdit, cleanLink, hasWords, inlineHtml, linesEdit, linkEdit, parseMessage, pictureLine, previewHtml, problemWords, recipientWords, sizeWords, stepRetryable, totalWords,
 } from '../tools/email/logic.js';
-import { cleanBlocks } from '../../worker/src/clubmail.js';
+import { cleanBlocks, linked } from '../../worker/src/clubmail.js';
 
 const DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'tools', 'email');
 const html = readFileSync(path.join(DIR, 'index.html'), 'utf8');
@@ -39,6 +39,46 @@ test('the preview never runs a director\'s markup', () => {
   assert.ok(out.includes('&lt;img src=x'));
   assert.ok(out.includes('<a href="https://example.org/a">https://example.org/a</a>.'));
   assert.ok(out.includes('Sent by Dana &lt;b&gt; for Sparks'));
+});
+
+test('bold and links: the preview and the real email follow one rule', () => {
+  const samples = [
+    'Bring **one shoebox** on Wednesday.',
+    'Sign up at [the church site](https://example.org/sign-up?a=1&b=2), please.',
+    'See https://example.org/list. Or **https://example.org/b**',
+    'A [**bold** link](https://example.org/x) and 2 * 3 ** 4 stars',
+    '<b>not markup</b> [x](javascript:alert(1)) **<i>**',
+    'line one\n**line two**',
+  ];
+  // The Worker's copy only adds the link colour.
+  for (const s of samples) assert.equal(linked(s).replaceAll(' style="color:#0B5CAD"', ''), inlineHtml(s), s);
+  assert.equal(inlineHtml(samples[0]), 'Bring <b>one shoebox</b> on Wednesday.');
+  assert.equal(inlineHtml(samples[1]), 'Sign up at <a href="https://example.org/sign-up?a=1&amp;b=2">the church site</a>, please.');
+  assert.equal(inlineHtml(samples[2]), 'See <a href="https://example.org/list">https://example.org/list</a>. Or <b><a href="https://example.org/b">https://example.org/b</a></b>');
+  assert.equal(inlineHtml(samples[3]), 'A <a href="https://example.org/x"><b>bold</b> link</a> and 2 * 3 ** 4 stars');
+  const unsafe = inlineHtml(samples[4]);
+  assert.ok(!unsafe.includes('<a') && !unsafe.includes('<i>') && unsafe.includes('&lt;b&gt;not markup'));
+  assert.equal(inlineHtml(samples[5]), 'line one<br><b>line two</b>');
+});
+
+test('the formatting buttons edit the typed text', () => {
+  assert.deepEqual(boldEdit('Bring a box today', 8, 11), { value: 'Bring a **box** today', start: 10, end: 13 });
+  assert.deepEqual(boldEdit('Hi ', 3, 3), { value: 'Hi **bold words**', start: 5, end: 15 });
+  assert.deepEqual(boldEdit('a word here', 1, 7), { value: 'a **word** here', start: 4, end: 8 });   // spaces stay outside
+  const h = linesEdit('Hello there\nShoeboxes\nBring one.', 14, 14, 'heading');
+  assert.equal(h.value, 'Hello there\n\n# Shoeboxes\n\nBring one.');
+  assert.equal(h.value.slice(h.start, h.end), 'Shoeboxes');
+  assert.deepEqual(parseMessage(h.value, []), [{ t: 'p', text: 'Hello there' }, { t: 'h', text: 'Shoeboxes' }, { t: 'p', text: 'Bring one.' }]);
+  const l = linesEdit('Bring:\ncars\n- crayons\nThanks', 7, 20, 'list');
+  assert.equal(l.value, 'Bring:\n\n- cars\n- crayons\n\nThanks');
+  assert.deepEqual(parseMessage(l.value, [])[1], { t: 'ul', items: ['cars', 'crayons'] });
+  assert.equal(linesEdit('', 0, 0, 'list').value, '- First thing');
+  assert.equal(linesEdit('', 0, 0, 'heading').value, '# Heading');
+  assert.equal(cleanLink(' kvbchurch.org/alerts '), 'https://kvbchurch.org/alerts');
+  assert.equal(cleanLink('http://example.org'), 'http://example.org');
+  for (const bad of ['', 'https://', 'not a link', 'javascript:alert(1)', 'x"y.com', null]) assert.equal(cleanLink(bad), '', String(bad));
+  assert.deepEqual(linkEdit('See the list now', 8, 12, 'https://example.org'), { value: 'See the [list](https://example.org) now', start: 9, end: 13 });
+  assert.equal(linkEdit('Go ', 3, 3, 'https://example.org').value, 'Go [link words](https://example.org)');
 });
 
 test('the words for who it goes to, sizes and problems', () => {

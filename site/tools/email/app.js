@@ -15,6 +15,7 @@
 import {
   FILE_ACCEPT, INLINE_TYPES, PICTURE_KEEP_BYTES, PICTURE_MAX_PX, hasWords, parseMessage, pictureLine,
   previewHtml, problemWords, recipientWords, sizeWords, stepRetryable, totalWords,
+  boldEdit, cleanLink, linesEdit, linkEdit,
 } from './logic.js';
 
 const SYNC_INDEX = new URL('/lobby/shared/sync.json', location.href).href;
@@ -252,6 +253,27 @@ async function loadLog() {
       Object.assign(document.createElement('span'), { textContent: `${when} · ${s.clubName} · ${s.recipients} addresses${me.office ? ` · ${s.name}` : ''}` }));
     return li;
   }));
+}
+
+// ── formatting ────────────────────────────────────────────────────────────────
+
+/** Run one of logic.js's text edits on the message and keep the cursor where the edit put it. */
+function format(edit) {
+  const ta = $('text');
+  const r = edit(ta.value, ta.selectionStart ?? ta.value.length, ta.selectionEnd ?? ta.value.length);
+  if (!r) return;
+  ta.value = r.value;
+  ta.focus();
+  ta.setSelectionRange(r.start, r.end);
+  changed();
+  draw();
+}
+
+function addLink() {
+  const url = cleanLink(window.prompt('Web address for the link', 'https://'));
+  if (!url) { setStatus('status', 'That is not a web address, so no link was added.', 'bad'); return; }
+  setStatus('status', '');
+  format((v, s, e) => linkEdit(v, s, e, url));
 }
 
 // ── pictures and files ────────────────────────────────────────────────────────
@@ -510,6 +532,10 @@ async function start() {
   $('add-director').addEventListener('submit', addDirector);
   $('club').addEventListener('change', () => { changed(); draw(); loadCount(); });
   for (const id of ['subject', 'text']) $(id).addEventListener('input', () => { changed(); clearTimeout(drawTimer); drawTimer = setTimeout(draw, 250); });
+  $('fmt-bold').addEventListener('click', () => format(boldEdit));
+  $('fmt-heading').addEventListener('click', () => format((v, s, e) => linesEdit(v, s, e, 'heading')));
+  $('fmt-list').addEventListener('click', () => format((v, s, e) => linesEdit(v, s, e, 'list')));
+  $('fmt-link').addEventListener('click', addLink);
   $('add-picture').addEventListener('click', () => $('pick-picture').click());
   $('add-file').addEventListener('click', () => $('pick-file').click());
   $('pick-picture').addEventListener('change', (e) => { changed(); addFiles(e.target.files, true).then(() => { e.target.value = ''; }); });

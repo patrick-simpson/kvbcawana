@@ -54,7 +54,73 @@ export function parseMessage(text, files) {
 export const hasWords = (blocks) => blocks.some((b) => b.t !== 'img');
 
 const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-const linked = (s) => esc(s).replace(/\bhttps?:\/\/[^\s<>"]+[^\s<>".,;:!?)]/g, (u) => `<a href="${u}">${u}</a>`).replace(/\n/g, '<br>');
+/**
+ * A paragraph's text as HTML, as the Worker's `linked` makes it: escaped first, then
+ * `**bold**`, `[words](https://address)` and bare web addresses as links.
+ * @param {string} text
+ */
+export function inlineHtml(text) {
+  const a = (href, words) => `<a href="${href}">${words}</a>`;
+  const bold = (s) => s.replace(/\*\*([^*\n](?:[^\n]*?[^*\n])?)\*\*/g, '<b>$1</b>');
+  const plain = (s) => bold(s.replace(/\bhttps?:\/\/[^\s<>"]+[^\s<>".,;:!?)*]/g, (u) => a(u, u)));
+  const e = esc(text);
+  let out = '', last = 0;
+  for (const m of e.matchAll(/\[([^\]\n]{1,200})\]\((https?:\/\/[^\s<>"()]+)\)/g)) {
+    out += plain(e.slice(last, m.index)) + a(m[2], bold(m[1]));
+    last = m.index + m[0].length;
+  }
+  return (out + plain(e.slice(last))).replace(/\n/g, '<br>');
+}
+const linked = inlineHtml;
+
+// The formatting buttons (owner 2026-11-14): each is a plain edit of the typed text, so
+// what a button does and what a director types by hand are the same thing. Each takes
+// the text and the selection and answers the new text and selection.
+
+/** Bold: the selected words between `**`, or a placeholder to type over. */
+export function boldEdit(value, start, end) {
+  const words = value.slice(start, end) || 'bold words';
+  const lead = words.length - words.trimStart().length, tail = words.length - words.trimEnd().length;
+  const core = words.trim() || 'bold words';
+  const next = `${value.slice(0, start)}${words.slice(0, lead)}**${core}**${tail ? words.slice(-tail) : ''}${value.slice(end)}`;
+  const at = start + lead + 2;
+  return { value: next, start: at, end: at + core.length };
+}
+
+/**
+ * Heading or list: the selected lines become a part of their own (a blank line before
+ * and after), a heading from its first line (`# `) or a list of every line (`- `).
+ * @param {'heading'|'list'} kind
+ */
+export function linesEdit(value, start, end, kind) {
+  const from = value.lastIndexOf('\n', start - 1) + 1;
+  const stop = value.indexOf('\n', Math.max(end, start));
+  const to = stop < 0 ? value.length : stop;
+  const bare = (l) => l.replace(/^\s*(?:#|[-*])\s+/, '').trim();
+  let lines = value.slice(from, to).split('\n').map(bare).filter(Boolean);
+  if (!lines.length) lines = [kind === 'heading' ? 'Heading' : 'First thing'];
+  const made = kind === 'heading' ? [`# ${lines[0]}`, ...(lines.length > 1 ? ['', lines.slice(1).join('\n')] : [])].join('\n') : lines.map((l) => `- ${l}`).join('\n');
+  const before = value.slice(0, from).replace(/\s+$/, ''), after = value.slice(to).replace(/^\s+/, '');
+  const head = before ? `${before}\n\n` : '';
+  const next = `${head}${made}${after ? `\n\n${after}` : ''}`;
+  const mark = kind === 'heading' ? 2 : 2;
+  return { value: next, start: head.length + mark, end: head.length + (kind === 'heading' ? 2 + lines[0].length : made.length) };
+}
+
+/** A web address as typed, made whole (`https://` when it has none), or '' when it is not one. */
+export function cleanLink(typed) {
+  const t = String(typed || '').trim();
+  if (!t || /\s|[<>"()]/.test(t)) return '';
+  const url = /^https?:\/\//i.test(t) ? t : `https://${t}`;
+  return /^https?:\/\/[^/.]+\.[^/]+/.test(url) ? url : '';
+}
+
+/** Link: the selected words (or a placeholder) as `[words](address)`. */
+export function linkEdit(value, start, end, url) {
+  const words = value.slice(start, end).trim().replace(/[\[\]\n]/g, ' ') || 'link words';
+  const next = `${value.slice(0, start)}[${words}](${url})${value.slice(end)}`;
+  return { value: next, start: start + 1, end: start + 1 + words.length };
+}
 
 /**
  * What the email will look like (the Worker's renderMail, as a preview).
