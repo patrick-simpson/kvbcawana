@@ -1920,7 +1920,8 @@ then 429 `locked`.
 one read clock) when a count or a send asks: active children of the club, Email and Alt
 Email, each address once, at most 450. They stay in memory at most 5 minutes and are
 NEVER stored, logged or answered: a page gets counts. Parents are BCC; To and Reply-To
-are the director.
+are the director. The Awana mailbox (`MAIL_FROM`) is BCC'd on every real send as well
+(owner 2026-11-14), unless it is already the To; never on a test, never in the count.
 
 **How.** Microsoft Graph, client credentials: secrets `MS_TENANT_ID`, `MS_CLIENT_ID`,
 `MS_CLIENT_SECRET` (application permissions `Mail.Send` and `Mail.ReadWrite`, limited to

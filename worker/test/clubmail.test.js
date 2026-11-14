@@ -216,7 +216,8 @@ describe('club email: a message', () => {
     expect(done.body).toMatchObject({ done: true, stage: 'sent', percent: 100, recipients: 2 });
     const made = s.graph().find((c) => c.path === '/messages');
     expect(made.body.subject).toBe('Shoeboxes Wednesday');
-    expect(made.body.bccRecipients.map((r) => r.emailAddress.address)).toEqual(['dad.stone@example.com', 'stone@example.com']);
+    // The parents, then the Awana mailbox's own copy (never counted: `recipients: 2` above).
+    expect(made.body.bccRecipients.map((r) => r.emailAddress.address)).toEqual(['dad.stone@example.com', 'stone@example.com', 'awana@kvbchurch.org']);
     expect(made.body.toRecipients).toEqual([{ emailAddress: { address: 'dana@example.com', name: 'Dana Cole' } }]);
     expect(made.body.replyTo).toEqual(made.body.toRecipients);
     expect(made.body.body.content).toContain('<a href="https://example.org/list"');
@@ -251,7 +252,7 @@ describe('club email: a message', () => {
     const pug = await send('puggles');
     expect(pug.map((c) => c.path)).toEqual(['/messages', '/messages/MSG1/send']);
     expect(pug.every((c) => c.mailbox === 'puggles@kvbchurch.org')).toBe(true);
-    expect(pug[0].body.bccRecipients.map((r) => r.emailAddress.address)).toEqual(['lane@example.com']);
+    expect(pug[0].body.bccRecipients.map((r) => r.emailAddress.address)).toEqual(['lane@example.com', 'awana@kvbchurch.org']);
     expect(pug[0].body.replyTo).toEqual([{ emailAddress: { address: 'puggles@kvbchurch.org', name: 'Pat Bean' } }]);
     const sparks = await send('sparks');
     expect(sparks.every((c) => c.mailbox === 'awana@kvbchurch.org')).toBe(true);

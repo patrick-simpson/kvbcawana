@@ -18,6 +18,7 @@
 // and Alt Email, each address once. They are held in memory only, a few minutes,
 // and are NEVER stored, logged or answered to a page: a page gets counts.
 // Parents are always BCC; the visible To is the director; Reply-To is the director.
+// The Awana mailbox is BCC'd on every real send too (never on a test, never counted).
 //
 // HOW. Microsoft Graph with an app registration (client credentials): secrets
 // MS_TENANT_ID, MS_CLIENT_ID, MS_CLIENT_SECRET; the mailbox is MAIL_FROM (default
@@ -659,12 +660,16 @@ export class ClubMail {
       }
       const m = renderMail({ blocks: draft.blocks, files: draft.files, club: draft.club, sender: who.name, replyTo: who.replyTo, test: run.test });
       const person = { emailAddress: { address: who.replyTo, name: who.name } };
+      // The Awana mailbox gets a copy of every real send (owner 2026-11-14: "copy the Awana
+      // email on every message sent through this"): BCC, unless it is already the To.
+      const copy = this.from();
+      const hidden = !run.test && copy !== who.replyTo && !bcc.includes(copy) ? [...bcc, copy] : bcc;
       const r = await this.graph('POST', `${base}/messages`, {
         subject: `${run.test ? '[Test] ' : ''}${draft.subject}`,
         body: { contentType: 'html', content: m.html },
         toRecipients: [person],
         replyTo: [person],
-        bccRecipients: bcc.map((address) => ({ emailAddress: { address } })),
+        bccRecipients: hidden.map((address) => ({ emailAddress: { address } })),
       });
       if (!r.ok || !r.body?.id) return this.graphFailed(r);
       run.graphId = String(r.body.id);
