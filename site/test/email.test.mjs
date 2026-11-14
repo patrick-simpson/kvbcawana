@@ -6,7 +6,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  boldEdit, cleanLink, hasWords, inlineHtml, linesEdit, linkEdit, parseMessage, pictureLine, previewHtml, problemWords, recipientWords, sizeWords, stepRetryable, totalWords,
+  blocksToText, boldEdit, bounceWords, cleanLink, hasWords, inlineHtml, linesEdit, linkEdit, parseMessage, pictureLine, previewHtml, problemWords, recipientWords, sizeWords, stepRetryable, totalWords,
 } from '../tools/email/logic.js';
 import { cleanBlocks, linked } from '../../worker/src/clubmail.js';
 
@@ -59,6 +59,17 @@ test('bold and links: the preview and the real email follow one rule', () => {
   const unsafe = inlineHtml(samples[4]);
   assert.ok(!unsafe.includes('<a') && !unsafe.includes('<i>') && unsafe.includes('&lt;b&gt;not markup'));
   assert.equal(inlineHtml(samples[5]), 'line one<br><b>line two</b>');
+});
+
+test('a sent message comes back as the text that makes it', () => {
+  const blocks = [{ t: 'h', text: 'Shoeboxes' }, { t: 'p', text: 'Bring **one**.\nThanks!' }, { t: 'ul', items: ['cars', 'crayons'] }, { t: 'p', text: 'See you there.' }];
+  const text = blocksToText([...blocks, { t: 'img', file: 0 }]);
+  assert.equal(text, '# Shoeboxes\n\nBring **one**.\nThanks!\n\n- cars\n- crayons\n\nSee you there.');
+  assert.deepEqual(parseMessage(text, []), blocks);
+  assert.equal(blocksToText(null), '');
+  assert.equal(bounceWords(2, 'awana@kvbchurch.org'), '2 came back undelivered (see the awana@kvbchurch.org inbox)');
+  assert.equal(bounceWords(0, 'x'), '');
+  assert.equal(bounceWords(null, 'x'), '');
 });
 
 test('the formatting buttons edit the typed text', () => {

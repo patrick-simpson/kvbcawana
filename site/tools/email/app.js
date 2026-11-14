@@ -15,7 +15,7 @@
 import {
   FILE_ACCEPT, INLINE_TYPES, PICTURE_KEEP_BYTES, PICTURE_MAX_PX, hasWords, parseMessage, pictureLine,
   previewHtml, problemWords, recipientWords, sizeWords, stepRetryable, totalWords,
-  boldEdit, cleanLink, linesEdit, linkEdit,
+  blocksToText, boldEdit, bounceWords, cleanLink, linesEdit, linkEdit,
 } from './logic.js';
 
 const SYNC_INDEX = new URL('/lobby/shared/sync.json', location.href).href;
@@ -24,6 +24,7 @@ const TOKEN_KEY = 'awanaMailToken.v1';
 const DRAFT_KEY = 'awanaClubMailDraft.v1';
 const TIMEOUT_MS = 30000;
 const CONFIRM_MS = 4000;
+const BOUNCE_LOOK_MS = 7 * 24 * 60 * 60 * 1000;
 const STEP_TRIES = 5;
 const STEP_WAIT_MS = 3000;
 
@@ -246,13 +247,48 @@ async function loadLog() {
   const res = await request('/v1/mail/log');
   const sends = res.ok && res.body ? res.body.sends : [];
   $('log-card').hidden = !sends.length;
-  $('log').replaceChildren(...sends.slice(0, 8).map((s) => {
+  $('log').replaceChildren(...sends.slice(0, 8).map((s, i) => {
     const li = document.createElement('li');
     const when = new Date(s.at).toLocaleString('en-US', { timeZone: 'America/New_York', weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
-    li.append(Object.assign(document.createElement('b'), { textContent: s.subject }),
-      Object.assign(document.createElement('span'), { textContent: `${when} · ${s.clubName} · ${s.recipients} addresses${me.office ? ` · ${s.name}` : ''}` }));
+    const words = Object.assign(document.createElement('div'), { className: 'id' });
+    const back = Object.assign(document.createElement('span'), { className: 'back' });
+    words.append(Object.assign(document.createElement('b'), { textContent: s.subject }),
+      Object.assign(document.createElement('span'), { textContent: `${when} · ${s.clubName} · ${s.recipients} addresses${me.office ? ` · ${s.name}` : ''}` }), back);
+    li.append(words);
+    if (s.id) {
+      const again = Object.assign(document.createElement('button'), { type: 'button', className: 'quiet', textContent: 'Use again' });
+      again.addEventListener('click', () => useAgain(s.id, again));
+      li.append(again);
+      // The newest few, for a week: did any come back? (One small question each; the Worker keeps the answer ten minutes.)
+      if (i < 3 && Date.now() - Date.parse(s.at) < BOUNCE_LOOK_MS) {
+        request(`/v1/mail/log/${s.id}/bounces`).then((res) => { if (res.ok && res.body) back.textContent = bounceWords(res.body.bounced, res.body.mailbox); });
+      }
+    }
     return li;
   }));
+}
+
+/** Start a new message from a sent one: its club, subject and words (no pictures or files). */
+async function useAgain(id, button) {
+  if (busy) return;
+  if (($('subject').value.trim() || $('text').value.trim()) && button.dataset.armed !== '1') {
+    // What is being written would be replaced: ask with a second tap.
+    button.dataset.armed = '1'; button.classList.add('armed'); button.textContent = 'Tap again: replaces your draft';
+    setTimeout(() => { button.dataset.armed = ''; button.classList.remove('armed'); button.textContent = 'Use again'; }, CONFIRM_MS);
+    return;
+  }
+  const res = await request(`/v1/mail/log/${id}`);
+  if (!res.ok || !res.body) { setStatus('status', problemWords(res), 'bad'); return; }
+  for (const f of files) if (f.url) URL.revokeObjectURL(f.url);
+  files = [];
+  if (clubChoices().some((c) => c.id === res.body.club)) $('club').value = res.body.club;
+  $('subject').value = res.body.subject;
+  $('text').value = blocksToText(res.body.blocks);
+  changed();
+  draw();
+  loadCount();
+  setStatus('status', 'Copied into the message. Pictures and files are not copied.');
+  $('subject').focus();
 }
 
 // ── formatting ────────────────────────────────────────────────────────────────

@@ -30,7 +30,7 @@ async function setup(env = MS) {
   let t = Date.parse('2026-11-13T15:00:00Z');
   /** @type {any[]} */
   const calls = [];
-  const answers = { send: 202, tokenStatus: 200, sendThrows: false };
+  const answers = { send: 202, tokenStatus: 200, sendThrows: false, inbox: /** @type {any} */ ([]) };
   const fetchFn = async (url, init = {}) => {
     const u = String(url);
     if (u.startsWith('https://login.microsoftonline.com/')) {
@@ -47,6 +47,7 @@ async function setup(env = MS) {
       const body = init.body ? JSON.parse(init.body) : null;
       calls.push({ kind: 'graph', mailbox: decodeURIComponent(box[1]), method: init.method, path, body, auth: init.headers.Authorization });
       if (path === '/sendMail') return new Response(null, { status: 202 });
+      if (path.startsWith('/mailFolders/inbox/messages?')) return answers.inbox ? Response.json({ value: answers.inbox }) : new Response('{}', { status: 503 });
       if (path === '/messages') return Response.json({ id: 'MSG1' }, { status: 201 });
       if (path.endsWith('/attachments')) return Response.json({ id: 'ATT' }, { status: 201 });
       if (path.endsWith('/createUploadSession')) return Response.json({ uploadUrl: 'https://upload.test/session' }, { status: 201 });
@@ -294,6 +295,51 @@ describe('club email: a message', () => {
     expect(new Set(all).size).toBe(many);
     expect(s.graph().filter((c) => c.path === '/messages/MSG1/send')).toHaveLength(2);
     expect((await s.call('GET', '/v1/mail/log')).body.sends).toHaveLength(1);
+  });
+
+  it('a sent message can be started from again, by its sender or the office', async () => {
+    const s = await setup();
+    const d = await s.director();
+    const other = await s.director({ name: 'Eve', replyTo: 'eve@example.com', clubs: ['sparks'] });
+    const words = [{ t: 'h', text: 'Shoeboxes' }, { t: 'p', text: 'Bring **one** Wednesday.' }, { t: 'ul', items: ['cars', 'crayons'] }];
+    const id = (await s.call('POST', '/v1/mail/drafts', { club: 'sparks', subject: 'Shoeboxes', blocks: words, files: [] }, d.auth)).body.id;
+    expect((await s.call('GET', `/v1/mail/log/${id}`, undefined, d.auth)).status).toBe(404);   // not sent yet
+    await s.call('POST', `/v1/mail/drafts/${id}/send`, {}, d.auth);
+    await run(s, id, d.auth);
+    const line = (await s.call('GET', '/v1/mail/log', undefined, d.auth)).body.sends[0];
+    expect(line.id).toBe(id);
+    expect((await s.call('GET', `/v1/mail/log/${id}`, undefined, d.auth)).body).toEqual({ ok: true, club: 'sparks', subject: 'Shoeboxes', blocks: words });
+    expect((await s.call('GET', `/v1/mail/log/${id}`)).status).toBe(200);
+    expect((await s.call('GET', `/v1/mail/log/${id}`, undefined, other.auth)).body.reason).toBe('no-send');
+    expect((await s.call('GET', '/v1/mail/log/nope', undefined, d.auth)).status).toBe(404);
+    // Kept with no address.
+    expect(JSON.stringify(await s.storage.get(`mail:body:${id}`))).not.toContain('@');
+  });
+
+  it('counts the mail that came back, by subject, in the sending mailbox; never an address', async () => {
+    const s = await setup();
+    const d = await s.director();
+    const id = (await s.call('POST', '/v1/mail/drafts', { club: 'sparks', subject: 'Shoeboxes', blocks: WORDS, files: [] }, d.auth)).body.id;
+    await s.call('POST', `/v1/mail/drafts/${id}/send`, {}, d.auth);
+    await run(s, id, d.auth);
+    s.answers.inbox = [{ subject: 'Undeliverable: Shoeboxes' }, { subject: 'Undeliverable: Shoeboxes ' }, { subject: 'Undeliverable: Something else' }];
+    const b = await s.call('GET', `/v1/mail/log/${id}/bounces`, undefined, d.auth);
+    expect(b.body).toEqual({ ok: true, bounced: 2, mailbox: 'awana@kvbchurch.org' });
+    const asked = s.graph().filter((c) => c.path.startsWith('/mailFolders/inbox/messages?'));
+    expect(asked).toHaveLength(1);
+    expect(decodeURIComponent(asked[0].path)).toContain("receivedDateTime ge 2026-11-13T15:00:00.000Z and startswith(subject,'Undeliverable')");
+    // Kept ten minutes: a second look asks Microsoft nothing.
+    s.answers.inbox = [];
+    expect((await s.call('GET', `/v1/mail/log/${id}/bounces`, undefined, d.auth)).body.bounced).toBe(2);
+    s.tick(11 * 60 * 1000);
+    expect((await s.call('GET', `/v1/mail/log/${id}/bounces`, undefined, d.auth)).body.bounced).toBe(0);
+    // Microsoft not answering, or a send older than a week: not known, never a guess.
+    s.tick(11 * 60 * 1000);
+    s.answers.inbox = null;
+    expect((await s.call('GET', `/v1/mail/log/${id}/bounces`, undefined, d.auth)).body.bounced).toBe(null);
+    s.tick(8 * 24 * 60 * 60 * 1000);
+    s.answers.inbox = [{ subject: 'Undeliverable: Shoeboxes' }];
+    expect((await s.call('GET', `/v1/mail/log/${id}/bounces`, undefined, d.auth)).body.bounced).toBe(null);
   });
 
   it('a test goes to the sender alone and leaves the message ready', async () => {

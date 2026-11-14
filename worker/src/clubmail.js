@@ -45,6 +45,8 @@
 //   mail:draft:<who>      the one message a director is working on (no addresses)
 //   mail:part:<id>:<f>:<n> one piece of one file (text for a small file, bytes for a big one)
 //   mail:log              the last sends: when, who, club, subject, how many (no addresses)
+//   mail:body:<id>        a sent message's words (its blocks, no picture, no address), kept
+//                         while its line is in the log, so it can be started from again
 
 import { CLUB_TABLE, clubIdByAlias } from '../../shared/clubs.js';
 import { randomBytes, safeEqual, toBase64Url, toHex } from './crypto.js';
@@ -80,6 +82,9 @@ export const CODE_FAILS_IP = 8;
 export const CODE_FAILS_ALL = 60;
 export const CODE_WINDOW_MS = 10 * 60 * 1000;
 export const MAIL_LOG_MAX = 50;
+/** Mail that came back is looked for this long after a send, and an answer is kept this long. */
+export const BOUNCE_LOOK_MS = 7 * 24 * 60 * 60 * 1000;
+export const BOUNCE_FRESH_MS = 10 * 60 * 1000;
 /** The owner's code is at least this long, or the owner's part stays shut. */
 export const OWNER_CODE_MIN = 12;
 
@@ -87,6 +92,7 @@ const DIRECTORS_KEY = 'mail:directors';
 const TOKENS_KEY = 'mail:tokens';
 const LOG_KEY = 'mail:log';
 const draftKey = (/** @type {string} */ who) => `mail:draft:${who}`;
+const bodyKey = (/** @type {string} */ id) => `mail:body:${id}`;
 const partKey = (/** @type {string} */ id, /** @type {number} */ f, /** @type {number} */ n) => `mail:part:${id}:${f}:${n}`;
 const GRAPH = 'https://graph.microsoft.com/v1.0';
 const CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
@@ -273,6 +279,8 @@ export class ClubMail {
     this.roster = null;
     /** @type {{ ip: string, at: number }[]} */
     this.codeFails = [];
+    /** @type {Map<string, { at: number, bounced: number }>} How many came back, per send: memory only. */
+    this.bounces = new Map();
   }
 
   from() { return cleanEmail(this.env()?.MAIL_FROM) || MAIL_FROM_DEFAULT; }
@@ -793,18 +801,63 @@ export class ClubMail {
     draft.sent = this.now();
     await save();
     const log = await this.sendLog();
-    log.unshift({ at: draft.sent, who: who.id, name: who.name, club: draft.club, label: this.clubLabel(who, draft.club), subject: draft.subject, recipients: run.count, files: draft.files.length });
+    log.unshift({ id: draft.id, at: draft.sent, who: who.id, name: who.name, club: draft.club, label: this.clubLabel(who, draft.club), subject: draft.subject, recipients: run.count, files: draft.files.length });
+    // The words are kept with the log line (to start from again), and go when it does.
+    await this.storage.put(bodyKey(draft.id), { blocks: draft.blocks.filter((/** @type {any} */ b) => b.t !== 'img') });
+    for (const old of log.slice(MAIL_LOG_MAX)) if (old.id) await this.storage.delete(bodyKey(old.id));
     await this.storage.put(LOG_KEY, log.slice(0, MAIL_LOG_MAX));
     const out = { ok: true, ...this.progress(draft) };
     for (let fi = 0; fi < draft.files.length; fi += 1) for (let n = 0; n < draft.files[fi].parts; n += 1) await this.storage.delete(partKey(draft.id, fi, n));
     return json(out);
   }
 
+  /**
+   * GET /v1/mail/log/:id: a sent message's subject and words, to start a new one from
+   * (owner 2026-11-14). No picture, no file, no address.
+   * @param {any} who @param {string} id
+   */
+  async again(who, id) {
+    const line = await logLine(this, who, id);
+    const body = line ? await this.storage.get(bodyKey(id)) : null;
+    if (!line || !body) return fail('That email is no longer kept.', 404, { reason: 'no-send' });
+    return json({ ok: true, club: line.club, subject: line.subject, blocks: body.blocks });
+  }
+
+  /**
+   * GET /v1/mail/log/:id/bounces: how many of a send came back undelivered, counted in
+   * the sending mailbox's inbox (Microsoft's "Undeliverable: <subject>" notices since
+   * the send). A count only, never an address; `bounced: null` = not known (older than
+   * a week, or Microsoft did not answer).
+   * @param {any} who @param {string} id
+   */
+  async bounced(who, id) {
+    const line = await logLine(this, who, id);
+    if (!line) return fail('That email is no longer kept.', 404, { reason: 'no-send' });
+    const t = this.now();
+    const mailbox = this.fromFor(line.club);
+    if (t - line.at > BOUNCE_LOOK_MS) return json({ ok: true, bounced: null, mailbox });
+    const kept = this.bounces.get(id);
+    if (kept && t - kept.at < BOUNCE_FRESH_MS) return json({ ok: true, bounced: kept.bounced, mailbox });
+    const filter = `receivedDateTime ge ${new Date(line.at).toISOString()} and startswith(subject,'Undeliverable')`;
+    const r = await this.graph('GET', `/users/${encodeURIComponent(mailbox)}/mailFolders/inbox/messages?$select=subject&$top=200&$filter=${encodeURIComponent(filter)}`);
+    if (!r.ok || !Array.isArray(r.body?.value)) return json({ ok: true, bounced: null, mailbox });
+    const want = `Undeliverable: ${line.subject}`;
+    const bounced = r.body.value.filter((/** @type {any} */ m) => String(m?.subject || '').trim() === want).length;
+    this.bounces.set(id, { at: t, bounced });
+    if (this.bounces.size > MAIL_LOG_MAX) this.bounces.delete(this.bounces.keys().next().value);
+    return json({ ok: true, bounced, mailbox });
+  }
+
   /** GET /v1/mail/log: the office sees every send, a director their own. @param {any} who */
   async history(who) {
     const log = (await this.sendLog()).filter((l) => who.office || l.who === who.id);
-    return json({ ok: true, sends: log.map((l) => ({ at: new Date(l.at).toISOString(), name: l.name, club: l.club, clubName: l.label || clubName(l.club), subject: l.subject, recipients: l.recipients, files: l.files })) });
+    return json({ ok: true, sends: log.map((l) => ({ id: l.id || '', at: new Date(l.at).toISOString(), name: l.name, club: l.club, clubName: l.label || clubName(l.club), subject: l.subject, recipients: l.recipients, files: l.files })) });
   }
+}
+
+/** One line of the log the asker may see (the office every line, a director their own). @this {ClubMail} */
+async function logLine(/** @type {ClubMail} */ mail, /** @type {any} */ who, /** @type {string} */ id) {
+  return (await mail.sendLog()).find((l) => l.id === id && (who.office || l.who === who.id)) || null;
 }
 
 /**
@@ -843,6 +896,8 @@ export function mountClubMail(registry, core) {
   registry.add('POST', '/v1/mail/logout', 'public', async ({ request }) => m().logout(request));
   registry.add('GET', '/v1/mail/me', 'public', sender(async (_ctx, who) => m().me(who)));
   registry.add('GET', '/v1/mail/log', 'public', sender(async (_ctx, who) => m().history(who)));
+  registry.add('GET', '/v1/mail/log/:id', 'public', draftId(async ({ params }, who) => m().again(who, params.id)));
+  registry.add('GET', '/v1/mail/log/:id/bounces', 'public', draftId(ready(async (ctx) => m().bounced(await m().who(ctx.request, () => core.authorized(ctx.request), ctx.ip), ctx.params.id))));
   registry.add('GET', '/v1/mail/recipients', 'public', sender(async ({ url }, who) => m().recipients(who, clubOf(url.searchParams.get('club')))));
   registry.add('POST', '/v1/mail/drafts', 'public', sender(async ({ body }, who) => m().start(who, await body())));
   registry.add('PUT', '/v1/mail/drafts/:id/files/:f/:n', 'public', draftId(async ({ params, request }, who) => m().part(who, params.id, params.f, params.n, request)));

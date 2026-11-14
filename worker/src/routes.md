@@ -1946,6 +1946,11 @@ puts it back to `send` (it may be tried again), no answer leaves it `unknown` an
 never sent again. A test (`{test: true}`) goes to the sender alone, subject `[Test] ...`,
 reads no roster, and leaves the draft ready. At most 6 real sends a director a day.
 `mail:log` keeps the last 50 sends: when, who, club, subject, how many; no address.
+A sent message's words (`mail:body:<id>`: its blocks, no picture, no address) stay while
+its line is in the log, so the page's "Use again" can start a new message from it
+(owner 2026-11-14). For a week after a send the page asks how many came back: the Worker
+counts the "Undeliverable: <subject>" notices in the sending mailbox's inbox since the
+send (one Graph read, kept 10 minutes in memory) and answers a number, never an address.
 
 | Route | Auth | Body | Answer |
 |---|---|---|---|
@@ -1956,9 +1961,11 @@ reads no roster, and leaves the draft ready. At most 6 real sends a director a d
 | `DELETE /v1/mail/directors/:id` | session + owner | | `{ok}` |
 | `POST /v1/mail/login` | public | `{code}` | `{token, name}`; 401 `bad-code`, 429 `locked` |
 | `POST /v1/mail/logout` | public | | `{ok}` |
-| `GET /v1/mail/me` | sender | | `{ready, name, replyTo, office, from, clubs, limits}`; 401 `signed-out` |
+| `GET /v1/mail/me` | sender | | `{ready, name, replyTo, office, from, clubs: [{id, name, from}], all, limits}`; 401 `signed-out` |
 | `GET /v1/mail/recipients?club=` | sender | | `{club, name, addresses, kids, kidsWithoutEmail}` (counts only); 403 `not-your-club`, 502 `roster`, 503 `read-busy` |
-| `GET /v1/mail/log` | sender | | `{sends}` (the owner: all; a director: their own) |
+| `GET /v1/mail/log` | sender | | `{sends: [{id, at, name, club, clubName, subject, recipients, files}]}` (the owner: all; a director: their own) |
+| `GET /v1/mail/log/:id` | sender | | `{club, subject, blocks}` of one of those sends; 404 `no-send` |
+| `GET /v1/mail/log/:id/bounces` | sender | | `{bounced, mailbox}`; `bounced: null` = not known (over a week old, or Microsoft did not answer) |
 | `POST /v1/mail/drafts` | sender | `{club, subject, blocks, files: [{name, type, size, inline}]}` | `{id, part, files: [{enc: b64|raw, parts}]}`; 400 `subject`/`empty`/`files`/`file-type`/`file-size`/`too-big` |
 | `PUT /v1/mail/drafts/:id/files/:f/:n` | sender | one piece (text or bytes) | `{next}`; 409 `order`, 400 `size` |
 | `POST /v1/mail/drafts/:id/send` | sender | `{test?}` | the progress; 409 `sent`/`running`, 400 `parts`, 429 `daily-limit` |

@@ -50,6 +50,25 @@ export function parseMessage(text, files) {
   return blocks;
 }
 
+/**
+ * The Worker's blocks back as typed text (a sent message started from again): what
+ * `parseMessage` reads back as the same blocks. Pictures are left out.
+ * @param {any[]} blocks
+ */
+export function blocksToText(blocks) {
+  return (Array.isArray(blocks) ? blocks : []).map((b) => {
+    if (b.t === 'h') return `# ${b.text}`;
+    if (b.t === 'ul') return b.items.map((i) => `- ${i}`).join('\n');
+    return b.t === 'p' ? b.text : '';
+  }).filter(Boolean).join('\n\n');
+}
+
+/** The mail that came back, in words ('' when none or not known). @param {number|null} n @param {string} mailbox */
+export function bounceWords(n, mailbox) {
+  if (!n) return '';
+  return `${n} came back undelivered (see the ${mailbox} inbox)`;
+}
+
 /** Does the message say anything (pictures alone are not a message)? */
 export const hasWords = (blocks) => blocks.some((b) => b.t !== 'img');
 
