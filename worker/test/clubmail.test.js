@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { SyncCore } from '../src/sync.js';
 import {
-  CODE_FAILS_IP, MAIL_PART, MAIL_RECIPIENTS_MAX, MAIL_SENDS_PER_DAY, MAIL_SMALL_BYTES, MAIL_STEP_PARTS,
+  CODE_FAILS_IP, LATER_PER_SENDER, LATER_STEP_MS, LATER_TRIES, MAIL_PART, MAIL_RECIPIENTS_MAX, MAIL_SENDS_PER_DAY, MAIL_SMALL_BYTES, MAIL_STEP_PARTS,
   cleanBlocks, cleanClubs, clubMailboxes, newCode, normalCode, recipientsByClub, renderMail,
 } from '../src/clubmail.js';
 import { memoryStore, signInV2 } from './helpers.js';
@@ -201,6 +201,121 @@ describe('club email: directors and signing in', () => {
     const again = await s.director({ name: 'Eve', replyTo: 'eve@example.com', clubs: ['trek'] });
     expect((await s.call('DELETE', `/v1/mail/directors/${again.id}`)).status).toBe(200);
     expect((await s.call('GET', '/v1/mail/me', undefined, again.auth)).status).toBe(401);
+  });
+});
+
+describe('club email: send later', () => {
+  const AT = '2026-11-18T14:00:00.000Z';   // five days after the tests' clock
+  /** A director's finished draft, given a time. */
+  async function waiting(s, d, at = AT, subject = 'Tonight') {
+    const id = (await s.call('POST', '/v1/mail/drafts', { club: 'sparks', subject, blocks: WORDS, files: [] }, d.auth)).body.id;
+    return { id, res: await s.call('POST', `/v1/mail/drafts/${id}/later`, { at }, d.auth) };
+  }
+  /** The alarm, until nothing is due (the clock moves on between its steps). */
+  async function alarms(s) {
+    let n = 0;
+    while (n < 60 && await s.core.clubMail.tick()) { n += 1; s.tick(LATER_STEP_MS); }
+    return n;
+  }
+
+  it('waits for its time, then goes out by the alarm with the parents read at that moment', async () => {
+    const s = await setup();
+    const set = [];
+    s.core.clubMail.alarms = () => ({ get: () => set.at(-1) ?? null, set: (at) => { set.push(at); } });
+    const d = await s.director();
+    expect((await waiting(s, d, '2026-11-13T15:02:00.000Z')).res.body.reason).toBe('too-soon');
+    expect((await waiting(s, d, '2027-01-13T15:00:00.000Z')).res.body.reason).toBe('too-far');
+    expect((await waiting(s, d, 'soon')).res.body.reason).toBe('too-soon');
+    const { id, res } = await waiting(s, d);
+    expect(res.body).toEqual({ ok: true, id, at: AT });
+    expect(set).toEqual([Date.parse(AT)]);   // the alarm is pulled to its time
+    expect(s.rosterReads()).toBe(0);
+    // It left the draft slot: nothing to send by hand, and a new message can be written.
+    expect((await s.call('POST', `/v1/mail/drafts/${id}/send`, {}, d.auth)).status).toBe(404);
+    const list = await s.call('GET', '/v1/mail/later', undefined, d.auth);
+    expect(list.body.later).toEqual([{ id, at: AT, name: 'Dana Cole', club: 'sparks', clubName: 'Sparks', subject: 'Tonight', files: 0, state: 'waiting', problem: '' }]);
+    expect((await s.call('GET', '/v1/mail/later')).body.later).toHaveLength(1);   // the office sees it too
+    // Before its time the alarm does nothing.
+    expect(await s.core.clubMail.tick()).toBe(false);
+    expect(s.graph().filter((c) => c.path === '/messages')).toHaveLength(0);
+    s.tick(Date.parse(AT) - Date.parse('2026-11-13T15:00:00Z'));
+    s.setRoster({ ok: true, roster: { header: ROSTER.header, rows: [['9', 'Zed', 'New', 'Sparks', '', 'new@example.com', '']] } });
+    expect(await alarms(s)).toBe(2);   // its draft, its send
+    const made = s.graph().filter((c) => c.path === '/messages');
+    expect(made).toHaveLength(1);
+    expect(made[0].body.bccRecipients.map((r) => r.emailAddress.address)).toEqual(['new@example.com', 'awana@kvbchurch.org']);
+    expect(s.graph().filter((c) => c.path === '/messages/MSG1/send')).toHaveLength(1);
+    expect((await s.call('GET', '/v1/mail/later', undefined, d.auth)).body.later).toEqual([]);
+    expect((await s.call('GET', '/v1/mail/log', undefined, d.auth)).body.sends[0]).toMatchObject({ id, subject: 'Tonight', recipients: 1 });
+    expect(await s.storage.get(`mail:later:${id}`)).toBeUndefined();
+    expect(await s.core.clubMail.tick()).toBe(false);   // never twice
+    expect(await s.core.clubMail.wake()).toBe(null);
+  });
+
+  it('can be cancelled, is limited, and goes with its director', async () => {
+    const s = await setup();
+    const d = await s.director();
+    const other = await s.director({ name: 'Eve', replyTo: 'eve@example.com', clubs: ['sparks'] });
+    const first = await waiting(s, d);
+    expect((await s.call('DELETE', `/v1/mail/later/${first.id}`, undefined, other.auth)).body.reason).toBe('no-later');
+    expect((await s.call('DELETE', `/v1/mail/later/${first.id}`, undefined, d.auth)).status).toBe(200);
+    expect((await s.call('GET', '/v1/mail/later', undefined, d.auth)).body.later).toEqual([]);
+    for (let i = 0; i < LATER_PER_SENDER; i += 1) expect((await waiting(s, d, AT, `No ${i}`)).res.status).toBe(200);
+    expect((await waiting(s, d)).res.body.reason).toBe('later-full');
+    expect((await waiting(s, other)).res.status).toBe(200);
+    expect((await s.call('DELETE', `/v1/mail/directors/${d.id}`)).status).toBe(200);
+    expect((await s.call('GET', '/v1/mail/later')).body.later.map((x) => x.name)).toEqual(['Eve']);
+    s.tick(6 * 24 * 60 * 60 * 1000);
+    await alarms(s);
+    expect(s.graph().filter((c) => c.path === '/messages')).toHaveLength(1);   // only Eve's
+  });
+
+  it('tries again when the parents cannot be read, then gives up and tells the sender', async () => {
+    const s = await setup();
+    const d = await s.director();
+    const { id } = await waiting(s, d);
+    s.tick(6 * 24 * 60 * 60 * 1000);
+    s.setRoster({ ok: false, error: 'roster' });
+    expect(await s.core.clubMail.tick()).toBe(true);
+    expect(await s.core.clubMail.tick()).toBe(false);   // it waits before the next try
+    expect((await s.call('GET', '/v1/mail/later', undefined, d.auth)).body.later[0]).toMatchObject({ state: 'waiting' });
+    // The parents can be read again: it goes out.
+    s.tick(3 * 60 * 1000);
+    s.setRoster({ ok: true, roster: ROSTER });
+    await alarms(s);
+    expect(s.graph().filter((c) => c.path === '/messages/MSG1/send')).toHaveLength(1);
+
+    const again = await waiting(s, d, new Date(Date.parse(AT) + 8 * 24 * 60 * 60 * 1000).toISOString(), 'Never');
+    expect(again.res.status).toBe(200);
+    s.tick(8 * 24 * 60 * 60 * 1000);
+    s.setRoster({ ok: false, error: 'roster' });
+    for (let i = 0; i < LATER_TRIES; i += 1) { expect(await s.core.clubMail.tick()).toBe(true); s.tick(16 * 60 * 1000); }
+    expect(await s.core.clubMail.tick()).toBe(false);
+    const line = (await s.call('GET', '/v1/mail/later', undefined, d.auth)).body.later[0];
+    expect(line).toMatchObject({ id: again.id, state: 'failed' });
+    expect(line.problem).toContain(`tried ${LATER_TRIES} times`);
+    const note = s.graph().filter((c) => c.path === '/sendMail').pop();
+    expect(note.body.message.subject).toBe('Not sent: Never');
+    expect(note.body.message.toRecipients[0].emailAddress.address).toBe('dana@example.com');
+    expect(await s.storage.get(`mail:later:${again.id}`)).toBeUndefined();
+    expect(id).not.toBe(again.id);
+    // The failed line is the sender's to clear.
+    expect((await s.call('DELETE', `/v1/mail/later/${again.id}`, undefined, d.auth)).status).toBe(200);
+  });
+
+  it('never sends twice when Microsoft does not answer the send', async () => {
+    const s = await setup();
+    const d = await s.director();
+    await waiting(s, d);
+    s.tick(6 * 24 * 60 * 60 * 1000);
+    s.answers.sendThrows = true;
+    await alarms(s);
+    s.answers.sendThrows = false;
+    s.tick(60 * 60 * 1000);
+    await alarms(s);
+    expect(s.graph().filter((c) => c.path === '/messages/MSG1/send')).toHaveLength(1);
+    expect((await s.call('GET', '/v1/mail/later', undefined, d.auth)).body.later[0].state).toBe('failed');
+    expect(s.graph().filter((c) => c.path === '/sendMail').pop().body.message.subject).toBe('Check: Tonight');
   });
 });
 

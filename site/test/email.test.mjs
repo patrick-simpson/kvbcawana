@@ -6,7 +6,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  blocksToText, boldEdit, bounceWords, cleanLink, hasWords, inlineHtml, linesEdit, linkEdit, parseMessage, pictureLine, previewHtml, problemWords, recipientWords, sizeWords, stepRetryable, totalWords,
+  blocksToText, boldEdit, bounceWords, cleanLink, hasWords, laterTime, inlineHtml, linesEdit, linkEdit, parseMessage, pictureLine, previewHtml, problemWords, recipientWords, sizeWords, stepRetryable, totalWords,
 } from '../tools/email/logic.js';
 import { cleanBlocks, linked } from '../../worker/src/clubmail.js';
 
@@ -70,6 +70,15 @@ test('a sent message comes back as the text that makes it', () => {
   assert.equal(bounceWords(2, 'awana@kvbchurch.org'), '2 came back undelivered (see the awana@kvbchurch.org inbox)');
   assert.equal(bounceWords(0, 'x'), '');
   assert.equal(bounceWords(null, 'x'), '');
+});
+
+test('send later takes a time from five minutes to four weeks off', () => {
+  const now = new Date(2026, 10, 14, 12, 0).getTime();
+  assert.deepEqual(laterTime('2026-11-18T09:00', now), { at: new Date(2026, 10, 18, 9, 0).getTime(), problem: '' });
+  assert.match(laterTime('', now).problem, /Pick a day and time/);
+  assert.match(laterTime('2026-11-14T12:03', now).problem, /five minutes/);
+  assert.match(laterTime('2026-11-13T09:00', now).problem, /five minutes/);
+  assert.match(laterTime('2027-02-01T09:00', now).problem, /four weeks/);
 });
 
 test('the formatting buttons edit the typed text', () => {

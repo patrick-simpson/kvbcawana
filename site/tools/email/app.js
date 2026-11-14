@@ -15,7 +15,7 @@
 import {
   FILE_ACCEPT, INLINE_TYPES, PICTURE_KEEP_BYTES, PICTURE_MAX_PX, hasWords, parseMessage, pictureLine,
   previewHtml, problemWords, recipientWords, sizeWords, stepRetryable, totalWords,
-  blocksToText, boldEdit, bounceWords, cleanLink, linesEdit, linkEdit,
+  blocksToText, boldEdit, bounceWords, cleanLink, laterTime, linesEdit, linkEdit, whenWords,
 } from './logic.js';
 
 const SYNC_INDEX = new URL('/lobby/shared/sync.json', location.href).href;
@@ -179,6 +179,7 @@ async function enter(directors) {
   draw();
   loadCount();
   loadLog();
+  loadLater();
 }
 
 // ── the message ───────────────────────────────────────────────────────────────
@@ -223,6 +224,7 @@ function refreshButtons() {
   const ready = Boolean(me && me.ready && $('subject').value.trim() && hasWords(blocks) && !totalWords(files, me.limits.totalBytes).over);
   $('test').disabled = busy || !ready;
   $('send').disabled = busy || !ready || !(toCount && toCount.addresses > 0);
+  $('later-btn').disabled = $('send').disabled || Boolean(running);
   if (!armed) $('send').textContent = running && !running.test ? 'Carry on sending' : (toCount && toCount.addresses ? `Send to ${toCount.addresses} ${toCount.addresses === 1 ? 'address' : 'addresses'}` : 'Send to parents');
 }
 
@@ -477,6 +479,73 @@ async function go(test) {
   }
 }
 
+// ── send later ────────────────────────────────────────────────────────────────
+
+/** The messages waiting for their time, each with Cancel (a failed one: Clear). */
+async function loadLater() {
+  const res = await request('/v1/mail/later');
+  const later = res.ok && res.body ? res.body.later : [];
+  $('later-card').hidden = !later.length;
+  $('later-list').replaceChildren(...later.map((x) => {
+    const li = document.createElement('li');
+    const words = Object.assign(document.createElement('div'), { className: 'id' });
+    const state = x.state === 'failed' ? 'Not sent' : (x.state === 'sending' ? 'Going out now' : `Sends ${whenWords(x.at)}`);
+    words.append(Object.assign(document.createElement('b'), { textContent: x.subject }),
+      Object.assign(document.createElement('span'), { textContent: `${state} · ${x.clubName}${me.office ? ` · ${x.name}` : ''}` }),
+      Object.assign(document.createElement('span'), { className: 'back', textContent: x.state === 'failed' ? x.problem : '' }));
+    li.append(words);
+    if (x.state !== 'sending') {
+      const failed = x.state === 'failed';
+      const rm = Object.assign(document.createElement('button'), { type: 'button', className: 'quiet', textContent: failed ? 'Clear' : 'Cancel' });
+      const cancel = async () => {
+        const out = await request(`/v1/mail/later/${x.id}`, { method: 'DELETE' });
+        setStatus('later-status', out.ok || out.status === 404 ? '' : problemWords(out), 'bad');
+        loadLater();
+      };
+      if (failed) rm.addEventListener('click', cancel); else twoTaps(rm, 'Tap again: it will not be sent', cancel);
+      li.append(rm);
+    }
+    return li;
+  }));
+}
+
+let laterArmed = 0;
+async function laterPressed() {
+  if (busy || !me) return;
+  const t = laterTime($('later-at').value, Date.now());
+  if (t.problem) { setStatus('status', t.problem, 'bad'); return; }
+  const button = $('later-btn');
+  if (Date.now() - laterArmed > CONFIRM_MS) {
+    // The first tap only asks: a second within four seconds sets it.
+    laterArmed = Date.now();
+    button.classList.add('armed');
+    button.textContent = `Tap again: sends ${whenWords(t.at)}`;
+    setTimeout(() => { if (Date.now() - laterArmed >= CONFIRM_MS) { laterArmed = 0; button.classList.remove('armed'); button.textContent = 'Send later'; } }, CONFIRM_MS + 50);
+    return;
+  }
+  laterArmed = 0; button.classList.remove('armed'); button.textContent = 'Send later';
+  busy = true;
+  $('progress').hidden = false; $('progress').value = 0;
+  refreshButtons();
+  try {
+    setStatus('status', files.length ? 'Uploading the pictures and files…' : 'Getting it ready…');
+    const id = uploadedId || await upload();
+    if (!id) return;
+    const res = await request(`/v1/mail/drafts/${id}/later`, { method: 'POST', body: { at: new Date(t.at).toISOString() } });
+    if (!res.ok) { if (res.status === 404) uploadedId = ''; setStatus('status', res.status === 404 ? 'That took too long and the upload was cleared. Press the button again.' : problemWords(res), 'bad'); return; }
+    for (const f of files) if (f.url) URL.revokeObjectURL(f.url);
+    files = []; uploadedId = '';
+    $('subject').value = ''; $('text').value = ''; $('later-at').value = '';
+    draw();
+    setStatus('status', `Set to send ${whenWords(t.at)}. It goes to whoever is on the club's list then. Cancel it under Waiting to send.`, 'good');
+    loadLater();
+  } finally {
+    busy = false;
+    $('progress').hidden = true;
+    refreshButtons();
+  }
+}
+
 function sendPressed() {
   if (busy) return;
   if (running && !running.test) { go(false); return; }
@@ -578,6 +647,7 @@ async function start() {
   $('pick-file').addEventListener('change', (e) => { changed(); addFiles(e.target.files, false).then(() => { e.target.value = ''; }); });
   $('test').addEventListener('click', () => go(true));
   $('send').addEventListener('click', sendPressed);
+  $('later-btn').addEventListener('click', laterPressed);
   try {
     if (typeof window.clubMailBase === 'string') base = window.clubMailBase;
     else {

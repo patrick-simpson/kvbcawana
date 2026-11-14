@@ -1946,6 +1946,19 @@ puts it back to `send` (it may be tried again), no answer leaves it `unknown` an
 never sent again. A test (`{test: true}`) goes to the sender alone, subject `[Test] ...`,
 reads no roster, and leaves the draft ready. At most 6 real sends a director a day.
 `mail:log` keeps the last 50 sends: when, who, club, subject, how many; no address.
+**Send later** (owner 2026-11-14). `POST .../later {at}` takes a finished draft out of the
+sender's one draft slot (`mail:later:<id>`, its line in `mail:later`; its files' pieces stay
+until it goes). The Durable Object's alarm walks the SAME steps, one per alarm
+(`ClubMail.tick`, 1.5 s apart; `ClubMail.arm` only ever pulls the watcher's alarm earlier,
+and the cron arms it again), so the parents are read at that moment and the Awana copy,
+the long-list messages and the log are as for a send by hand. A step that fails waits
+(2 min x tries, at most 15) and is tried again; after 8 failures, or when it never can
+work (no parent address, the sender removed or no longer on that club, Microsoft refusing
+the app), the wait ends: its line reads `failed` with the reason and the sender is MAILED
+"Not sent: <subject>". A send Microsoft never answered is not sent again: `failed`, and
+the sender is mailed "Check: <subject>" (look in Sent Items). The daily limit does not
+count a waiting message until it is sent.
+
 A sent message's words (`mail:body:<id>`: its blocks, no picture, no address) stay while
 its line is in the log, so the page's "Use again" can start a new message from it
 (owner 2026-11-14). For a week after a send the page asks how many came back: the Worker
@@ -1969,6 +1982,9 @@ send (one Graph read, kept 10 minutes in memory) and answers a number, never an 
 | `POST /v1/mail/drafts` | sender | `{club, subject, blocks, files: [{name, type, size, inline}]}` | `{id, part, files: [{enc: b64|raw, parts}]}`; 400 `subject`/`empty`/`files`/`file-type`/`file-size`/`too-big` |
 | `PUT /v1/mail/drafts/:id/files/:f/:n` | sender | one piece (text or bytes) | `{next}`; 409 `order`, 400 `size` |
 | `POST /v1/mail/drafts/:id/send` | sender | `{test?}` | the progress; 409 `sent`/`running`, 400 `parts`, 429 `daily-limit` |
+| `POST /v1/mail/drafts/:id/later` | sender | `{at}` (ISO time) | `{id, at}`: the draft waits and is sent then; 400 `too-soon` (under 5 min)/`too-far` (over 4 weeks)/`parts`, 409 `later-full` (3 a sender, 12 in all)/`sent`/`running` |
+| `GET /v1/mail/later` | sender | | `{later: [{id, at, name, club, clubName, subject, files, state: waiting\|sending\|failed, problem}]}` (the owner: all) |
+| `DELETE /v1/mail/later/:id` | sender | | `{ok}`: cancelled (or a failed line cleared); 409 `running` once it is going out |
 | `POST /v1/mail/drafts/:id/step` | sender | `{}` | `{stage, test, done, percent, recipients}`; 409 `no-recipients`, 502 `graph`/`graph-auth`/`roster`, 503 `read-busy` |
 
 "sender" = a director's `X-Mail-Token`, or the owner's session + `X-Mail-Owner`.

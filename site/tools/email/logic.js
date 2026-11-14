@@ -69,6 +69,27 @@ export function bounceWords(n, mailbox) {
   return `${n} came back undelivered (see the ${mailbox} inbox)`;
 }
 
+/** Send later: the soonest and furthest time the Worker takes. */
+export const LATER_MIN_MS = 5 * 60 * 1000;
+export const LATER_MAX_MS = 28 * 24 * 60 * 60 * 1000;
+
+/**
+ * Send later: the time typed into the page's date-and-time box (the device's own
+ * time), as a moment, or the words for why it will not do.
+ * @param {string} typed `2026-11-18T09:00` @param {number} now
+ * @returns {{ at: number, problem: string }}
+ */
+export function laterTime(typed, now) {
+  const at = typed ? new Date(typed).getTime() : NaN;
+  if (!Number.isFinite(at)) return { at: 0, problem: 'Pick a day and time first.' };
+  if (at < now + LATER_MIN_MS) return { at: 0, problem: 'Pick a time at least five minutes from now.' };
+  if (at > now + LATER_MAX_MS) return { at: 0, problem: 'Pick a time within the next four weeks.' };
+  return { at, problem: '' };
+}
+
+/** "Wed, Nov 18, 9:00 AM" in the device's own time. @param {number|string} at */
+export const whenWords = (at) => new Date(at).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+
 /** Does the message say anything (pictures alone are not a message)? */
 export const hasWords = (blocks) => blocks.some((b) => b.t !== 'img');
 

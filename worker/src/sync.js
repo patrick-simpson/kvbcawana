@@ -348,6 +348,7 @@ export class SyncCore {
     this.clubMail = new ClubMail({
       storage: this.storage, now: this.now, env: () => this.rawEnv || {}, fetchFn: this.fetchFn,
       client: () => this.watcher.clientFor(), log: (line) => console.warn(line),
+      alarms: () => this.watcher.alarms,   // send later: its steps run from the alarm (clubMail.tick)
     });
     mountClubMail(this.registry, this);   // /v1/mail/* (routes.md 10.19)
     // The change log (changes.js, routes.md 10.5): every write path below logs who
@@ -411,6 +412,10 @@ export class SyncCore {
     const r = await this.watcher.tick();
     await this.wakeStations();   // a TwoTimTwo-page check-in the tick queued
     await this.healthCall.tick();   // 5:12, 5:47 and 6:15 pm on a club night: start the health check job (never throws, waits at most 8 s)
+    // Club email's "send later" (clubmail.js): one step of a message whose time has come,
+    // then the alarm pulled earlier if one is still waiting (after the watcher set its own).
+    await this.clubMail.tick();
+    await this.clubMail.arm().catch((err) => console.error('[mail] could not set the alarm', err));
     return r;
   }
 
@@ -1298,6 +1303,8 @@ export class SyncCore {
     await this.desk.sweepTestDay();
     // "Not here the last two club nights": a club night with no rows is read from TwoTimTwo once.
     await this.recent.backfill();
+    // Club email's "send later": the safety net for its alarm.
+    await this.clubMail.arm().catch((err) => console.error('[mail] could not set the alarm', err));
     await this.history.flush().catch((err) => console.error('[history] flush failed', err));
     const res = await this.refreshCalendar();
     return res.status;

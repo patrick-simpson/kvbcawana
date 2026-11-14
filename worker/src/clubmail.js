@@ -36,6 +36,14 @@
 // no request does much work (the free plan). The step that sends is marked BEFORE
 // Microsoft is asked: an answer that never came is "unknown", never sent again.
 //
+// SEND LATER (owner 2026-11-14). A finished draft may be given a time instead of being
+// sent: it leaves the sender's one draft slot, waits (`mail:later`), and the Durable
+// Object's alarm walks the same steps the page would, one per alarm (`tick`; the alarm is
+// the watcher's, `arm` only ever pulls it EARLIER). The parents are read at that moment.
+// A step that fails is tried again later; one that cannot work (or 8 failures) ends the
+// wait and MAILS the sender why; a send Microsoft never answered is not sent again, and
+// the sender is told to look in Sent Items. A waiting message can be cancelled.
+//
 // The Worker builds the HTML itself from plain blocks (paragraph, heading, list,
 // picture); a page never hands it HTML.
 //
@@ -45,6 +53,8 @@
 //   mail:draft:<who>      the one message a director is working on (no addresses)
 //   mail:part:<id>:<f>:<n> one piece of one file (text for a small file, bytes for a big one)
 //   mail:log              the last sends: when, who, club, subject, how many (no addresses)
+//   mail:later            the messages waiting for their time: [{id, who, name, club, label, subject, at, ...}] (no addresses)
+//   mail:later:<id>       one of them: the draft as uploaded, its files' pieces under mail:part as usual
 //   mail:body:<id>        a sent message's words (its blocks, no picture, no address), kept
 //                         while its line is in the log, so it can be started from again
 
@@ -82,6 +92,15 @@ export const CODE_FAILS_IP = 8;
 export const CODE_FAILS_ALL = 60;
 export const CODE_WINDOW_MS = 10 * 60 * 1000;
 export const MAIL_LOG_MAX = 50;
+/** Send later: how soon and how far off a time may be, how many may wait (a sender, everyone). */
+export const LATER_MIN_MS = 5 * 60 * 1000;
+export const LATER_MAX_MS = 28 * 24 * 60 * 60 * 1000;
+export const LATER_PER_SENDER = 3;
+export const LATER_ALL = 12;
+/** Send later: the wait between its steps, after a failed one (times the tries, at most 15 min), and the tries. */
+export const LATER_STEP_MS = 1500;
+export const LATER_RETRY_MS = 2 * 60 * 1000;
+export const LATER_TRIES = 8;
 /** Mail that came back is looked for this long after a send, and an answer is kept this long. */
 export const BOUNCE_LOOK_MS = 7 * 24 * 60 * 60 * 1000;
 export const BOUNCE_FRESH_MS = 10 * 60 * 1000;
@@ -92,6 +111,8 @@ const DIRECTORS_KEY = 'mail:directors';
 const TOKENS_KEY = 'mail:tokens';
 const LOG_KEY = 'mail:log';
 const draftKey = (/** @type {string} */ who) => `mail:draft:${who}`;
+const LATER_KEY = 'mail:later';
+const laterKey = (/** @type {string} */ id) => `mail:later:${id}`;
 const bodyKey = (/** @type {string} */ id) => `mail:body:${id}`;
 const partKey = (/** @type {string} */ id, /** @type {number} */ f, /** @type {number} */ n) => `mail:part:${id}:${f}:${n}`;
 const GRAPH = 'https://graph.microsoft.com/v1.0';
@@ -264,9 +285,11 @@ export function recipientsByClub(roster) {
 export class ClubMail {
   /**
    * @param {{ storage: any, now: () => number, env: () => Record<string, any>, fetchFn: typeof fetch,
-   *   client: () => any, log?: (line: string) => void }} deps
+   *   client: () => any, log?: (line: string) => void,
+   *   alarms?: () => ({ set(atMs: number): any, get(): any } | undefined) }} deps
    */
-  constructor({ storage, now, env, fetchFn, client, log }) {
+  constructor({ storage, now, env, fetchFn, client, log, alarms }) {
+    this.alarms = alarms || (() => undefined);
     this.storage = storage;
     this.now = now;
     this.env = env;
@@ -413,6 +436,7 @@ export class ClubMail {
     if (doc.list.length !== before) { doc.rev += 1; await this.storage.put(DIRECTORS_KEY, doc); }
     await this.dropTokens(id);
     await this.dropDraft(await this.storage.get(draftKey(id)));
+    for (const x of await this.laterList()) if (x.who === id) await this.dropLater(x.id);
     return json({ ok: true });
   }
 
@@ -689,13 +713,14 @@ export class ClubMail {
   /**
    * POST /v1/mail/drafts/:id/step: ONE piece of work, then the progress.
    * Stages: draft -> files -> send -> sent; `unknown` when the send had no answer.
-   * @param {any} who @param {string} id
+   * @param {any} who @param {string} id @param {{ draft: any, save: () => Promise<any> }} [held]
    */
-  async step(who, id) {
-    const draft = await this.draft(who.id, id);
+  async step(who, id, held) {
+    // `held`: a message waiting for its time (send later), walked by the alarm, kept under its own key.
+    const draft = held ? held.draft : await this.draft(who.id, id);
     const run = draft?.run;
     if (!draft || !run) return fail('There is no email on its way by that name.', 404, { reason: 'no-run' });
-    const save = () => this.storage.put(draftKey(who.id), draft);
+    const save = held ? held.save : () => this.storage.put(draftKey(who.id), draft);
     // The club's own mailbox when it has one: the same answer at every step of one message.
     const base = `/users/${encodeURIComponent(this.fromFor(draft.club))}`;
     if (run.stage === 'sent' || run.stage === 'unknown') return json({ ok: true, ...this.progress(draft) });
@@ -811,6 +836,154 @@ export class ClubMail {
     return json(out);
   }
 
+  // ── send later ─────────────────────────────────────────────────────────────
+
+  /** @returns {Promise<any[]>} */
+  async laterList() { const l = await this.storage.get(LATER_KEY); return Array.isArray(l) ? l : []; }
+
+  /** A waiting message is forgotten: its pieces, itself, its line. @param {string} id */
+  async dropLater(id) {
+    const draft = await this.storage.get(laterKey(id));
+    if (draft) for (let f = 0; f < draft.files.length; f += 1) for (let n = 0; n < draft.files[f].parts; n += 1) await this.storage.delete(partKey(id, f, n));
+    await this.storage.delete(laterKey(id));
+    await this.storage.put(LATER_KEY, (await this.laterList()).filter((x) => x.id !== id));
+  }
+
+  /**
+   * POST /v1/mail/drafts/:id/later {at}: send this draft at that time instead of now.
+   * @param {any} who @param {string} id @param {any} body
+   */
+  async later(who, id, body) {
+    const draft = await this.draft(who.id, id);
+    if (!draft) return fail('There is no email by that name.', 404, { reason: 'no-draft' });
+    if (draft.sent) return fail('That email was already sent.', 409, { reason: 'sent' });
+    if (draft.run && draft.run.stage !== 'failed') return fail('That email is already on its way.', 409, { reason: 'running' });
+    if (draft.files.some((/** @type {any} */ f) => f.next !== f.parts)) return fail('Part of a file did not arrive. Try again.', 400, { reason: 'parts' });
+    const at = Date.parse(String(body?.at ?? '')), t = this.now();
+    if (!Number.isFinite(at) || at < t + LATER_MIN_MS - 60 * 1000) return fail('Pick a time at least five minutes from now.', 400, { reason: 'too-soon' });
+    if (at > t + LATER_MAX_MS) return fail('Pick a time within the next four weeks.', 400, { reason: 'too-far' });
+    const list = await this.laterList();
+    const waiting = list.filter((x) => x.state !== 'failed');
+    if (waiting.filter((x) => x.who === who.id).length >= LATER_PER_SENDER) return fail(`You already have ${LATER_PER_SENDER} emails waiting to be sent. Cancel one first.`, 409, { reason: 'later-full' });
+    if (waiting.length >= LATER_ALL) return fail('Too many emails are waiting to be sent. Try again after one has gone.', 409, { reason: 'later-full' });
+    draft.sendAt = at;
+    draft.run = { test: false, stage: 'draft', graphId: '', file: 0, offset: 0, uploadUrl: '', count: 0, batch: 0, batches: 1, done: 0 };
+    await this.storage.put(laterKey(draft.id), draft);
+    await this.storage.delete(draftKey(who.id));
+    list.push({ id: draft.id, who: who.id, name: who.name, club: draft.club, label: this.clubLabel(who, draft.club), subject: draft.subject, files: draft.files.length, at, made: t, state: 'waiting', tries: 0, wakeAt: at, problem: '' });
+    await this.storage.put(LATER_KEY, list);
+    await this.arm();
+    return json({ ok: true, id: draft.id, at: new Date(at).toISOString() });
+  }
+
+  /** GET /v1/mail/later: the messages waiting (the office: everyone's). @param {any} who */
+  async waiting(who) {
+    const list = (await this.laterList()).filter((x) => who.office || x.who === who.id).sort((a, b) => a.at - b.at);
+    return json({ ok: true, later: list.map((x) => ({ id: x.id, at: new Date(x.at).toISOString(), name: x.name, club: x.club, clubName: x.label || clubName(x.club), subject: x.subject, files: x.files, state: x.state, problem: x.problem || '' })) });
+  }
+
+  /** DELETE /v1/mail/later/:id: cancel one (not once it has begun to go). @param {any} who @param {string} id */
+  async cancel(who, id) {
+    const x = (await this.laterList()).find((y) => y.id === id && (who.office || y.who === who.id));
+    if (!x) return fail('That email is not waiting any more.', 404, { reason: 'no-later' });
+    if (x.state === 'sending') return fail('That email is going out now.', 409, { reason: 'running' });
+    await this.dropLater(id);
+    return json({ ok: true });
+  }
+
+  /** The sender of a waiting message as they are now (the office, or a director still on the list). @param {string} id */
+  async senderNow(id) {
+    if (id === 'office') return { id: 'office', name: 'The Awana office', replyTo: this.from(), clubs: CLUB_IDS.slice(), office: true };
+    const d = (await this.directors()).list.find((x) => x.id === id);
+    return d ? { id: d.id, name: d.name, replyTo: d.replyTo, clubs: d.clubs, office: false } : null;
+  }
+
+  /** When the alarm is next wanted for a waiting message (ms), or null. */
+  async wake() {
+    const due = (await this.laterList()).filter((x) => x.state !== 'failed').map((x) => x.wakeAt || x.at);
+    return due.length ? Math.min(...due) : null;
+  }
+
+  /** Pull the Durable Object's alarm EARLIER when a waiting message needs it sooner; never later. */
+  async arm() {
+    const alarms = this.alarms();
+    const wake = await this.wake();
+    if (!alarms || wake === null) return false;
+    const t = this.now(), want = Math.max(wake, t + 1000);
+    const at = await alarms.get();
+    if (typeof at === 'number' && at > t && at <= want) return false;
+    await alarms.set(want);
+    return true;
+  }
+
+  /**
+   * The alarm's part: ONE step of the waiting message that is due (the oldest first).
+   * Never throws. @returns {Promise<boolean>} was there anything to do?
+   */
+  async tick() {
+    try {
+      const t = this.now();
+      const list = await this.laterList();
+      const x = list.filter((y) => y.state !== 'failed' && (y.wakeAt || y.at) <= t).sort((a, b) => a.at - b.at)[0];
+      if (!x) return false;
+      const put = () => this.storage.put(LATER_KEY, list);
+      const draft = await this.storage.get(laterKey(x.id));
+      const who = draft ? await this.senderNow(x.who) : null;
+      /** The wait ends without a send: the pieces go, the line stays (failed) for the sender to see, and they are mailed why. */
+      const giveUp = async (/** @type {string} */ why, /** @type {string} */ advice) => {
+        Object.assign(x, { state: 'failed', problem: why, wakeAt: 0 });
+        await put();
+        if (draft) for (let f = 0; f < draft.files.length; f += 1) for (let n = 0; n < draft.files[f].parts; n += 1) await this.storage.delete(partKey(x.id, f, n));
+        await this.storage.delete(laterKey(x.id));
+        if (who) await this.tell(who, `Not sent: ${x.subject}`, `${who.name},\n\nThe email "${x.subject}" you set to send later was NOT sent to parents.\n\n${why}\n\n${advice}\n\nPage: https://awana.kvbchurch.org/tools/email/\n\nKVBC Awana\n`);
+        return true;
+      };
+      if (!draft) { list.splice(list.indexOf(x), 1); await put(); return true; }
+      if (!who || !this.mayWrite(who, draft.club)) return giveUp('Its sender can no longer email that club.', 'Ask the Awana director if that is a mistake.');
+      if (!this.configured()) return giveUp('Sending is not set up on the service.', 'Tell the Awana director.');
+      const res = await this.step(who, x.id, { draft, save: () => this.storage.put(laterKey(x.id), draft) });
+      const body = await res.json().catch(() => null);
+      if (res.status === 200 && body?.stage === 'unknown') {
+        // Microsoft never answered the send: it may have gone. Never sent again.
+        Object.assign(x, { state: 'failed', problem: 'Microsoft did not answer when it was sent, so it may or may not have gone out.', wakeAt: 0 });
+        await put();
+        await this.storage.delete(laterKey(x.id));
+        await this.tell(who, `Check: ${x.subject}`, `${who.name},\n\nThe email "${x.subject}" you set to send later may or may not have gone out: Microsoft did not answer when it was sent.\n\nDo NOT send it again yet. Look in the Sent folder of ${this.fromFor(draft.club)} first (you were on the To line, so check your own inbox too).\n\nKVBC Awana\n`);
+        return true;
+      }
+      if (res.status === 200 && body?.done) {
+        await this.storage.delete(laterKey(x.id));
+        list.splice(list.indexOf(x), 1);
+        await put();
+        return true;
+      }
+      if (res.status === 200) {
+        Object.assign(x, { state: 'sending', tries: 0, wakeAt: this.now() + LATER_STEP_MS });
+        await put();
+        return true;
+      }
+      // A step that did not work. Nothing has been sent by it; some reasons never will.
+      const reason = String(body?.reason || '');
+      const words = String(body?.error || 'It could not be sent.');
+      if (['no-recipients', 'not-your-club', 'graph-auth', 'no-run'].includes(reason)) return giveUp(words, 'Open the page to write it again.');
+      x.tries = (x.tries || 0) + 1;
+      if (x.tries >= LATER_TRIES) return giveUp(`${words} (It was tried ${LATER_TRIES} times.)`, 'Open the page to send it again.');
+      Object.assign(x, { problem: words, wakeAt: this.now() + Math.min(LATER_RETRY_MS * x.tries, 15 * 60 * 1000) });
+      await put();
+      return true;
+    } catch (err) {
+      this.log(`[mail] a waiting email's step failed: ${String(/** @type {any} */ (err)?.message || err)}`);
+      return false;
+    }
+  }
+
+  /** A plain note to a sender from the Awana mailbox (send later's news). Best effort. @param {any} who @param {string} subject @param {string} content */
+  async tell(who, subject, content) {
+    return this.graph('POST', `/users/${encodeURIComponent(this.from())}/sendMail`, {
+      message: { subject, body: { contentType: 'text', content }, toRecipients: [{ emailAddress: { address: who.replyTo, name: who.name } }] },
+    });
+  }
+
   /**
    * GET /v1/mail/log/:id: a sent message's subject and words, to start a new one from
    * (owner 2026-11-14). No picture, no file, no address.
@@ -902,5 +1075,8 @@ export function mountClubMail(registry, core) {
   registry.add('POST', '/v1/mail/drafts', 'public', sender(async ({ body }, who) => m().start(who, await body())));
   registry.add('PUT', '/v1/mail/drafts/:id/files/:f/:n', 'public', draftId(async ({ params, request }, who) => m().part(who, params.id, params.f, params.n, request)));
   registry.add('POST', '/v1/mail/drafts/:id/send', 'public', draftId(ready(async (ctx) => m().begin(await m().who(ctx.request, () => core.authorized(ctx.request), ctx.ip), ctx.params.id, await ctx.body()))));
+  registry.add('POST', '/v1/mail/drafts/:id/later', 'public', draftId(ready(async (ctx) => m().later(await m().who(ctx.request, () => core.authorized(ctx.request), ctx.ip), ctx.params.id, await ctx.body()))));
+  registry.add('GET', '/v1/mail/later', 'public', sender(async (_ctx, who) => m().waiting(who)));
+  registry.add('DELETE', '/v1/mail/later/:id', 'public', draftId(async ({ params }, who) => m().cancel(who, params.id)));
   registry.add('POST', '/v1/mail/drafts/:id/step', 'public', draftId(ready(async (ctx) => m().step(await m().who(ctx.request, () => core.authorized(ctx.request), ctx.ip), ctx.params.id))));
 }
