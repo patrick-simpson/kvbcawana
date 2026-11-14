@@ -45,6 +45,7 @@ test('the words for who it goes to, sizes and problems', () => {
   assert.equal(recipientWords({ name: 'Sparks', addresses: 41, kids: 46, kidsWithoutEmail: 3 }), 'Goes to 41 parent addresses for 46 Sparks children. 3 children have no email on file, so their family will not get it.');
   assert.equal(recipientWords({ name: 'Trek', addresses: 1, kids: 1, kidsWithoutEmail: 0 }), 'Goes to 1 parent address for 1 Trek child.');
   assert.equal(recipientWords({ name: 'Puggles', addresses: 0, kids: 2, kidsWithoutEmail: 2 }), 'TwoTimTwo has no parent email address for Puggles.');
+  assert.equal(recipientWords({ club: 'all', name: 'all clubs', addresses: 120, kids: 140, kidsWithoutEmail: 0 }), 'Goes to 120 parent addresses for 140 children in all clubs.');
   assert.equal(sizeWords(300 * 1024), '300 KB');
   assert.equal(sizeWords(1.5 * 1048576), '1.5 MB');
   assert.deepEqual(totalWords([{ size: 1048576 }, { size: 1048576 }], 18 * 1048576), { total: 2097152, over: false, words: '2.0 MB of 18 MB' });

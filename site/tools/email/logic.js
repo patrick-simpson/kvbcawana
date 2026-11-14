@@ -81,12 +81,13 @@ export function sizeWords(n) {
 
 /**
  * Who the email goes to, in words, from the Worker's counts.
- * @param {{ name: string, addresses: number, kids: number, kidsWithoutEmail: number }|null} r
+ * `club: 'all'` is every club the sender has; its `name` is then "all clubs" or the clubs' names.
+ * @param {{ club?: string, name: string, addresses: number, kids: number, kidsWithoutEmail: number }|null} r
  */
 export function recipientWords(r) {
   if (!r) return '';
   if (!r.addresses) return `TwoTimTwo has no parent email address for ${r.name}.`;
-  const kids = `${r.kids} ${r.name} ${r.kids === 1 ? 'child' : 'children'}`;
+  const kids = r.club === 'all' ? `${r.kids} ${r.kids === 1 ? 'child' : 'children'} in ${r.name}` : `${r.kids} ${r.name} ${r.kids === 1 ? 'child' : 'children'}`;
   const none = r.kidsWithoutEmail ? ` ${r.kidsWithoutEmail} ${r.kidsWithoutEmail === 1 ? 'child has' : 'children have'} no email on file, so their family will not get it.` : '';
   return `Goes to ${r.addresses} parent ${r.addresses === 1 ? 'address' : 'addresses'} for ${kids}.${none}`;
 }

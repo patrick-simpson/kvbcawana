@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { SyncCore } from '../src/sync.js';
 import {
-  CODE_FAILS_IP, MAIL_PART, MAIL_SENDS_PER_DAY, MAIL_SMALL_BYTES, MAIL_STEP_PARTS,
+  CODE_FAILS_IP, MAIL_PART, MAIL_RECIPIENTS_MAX, MAIL_SENDS_PER_DAY, MAIL_SMALL_BYTES, MAIL_STEP_PARTS,
   cleanBlocks, cleanClubs, clubMailboxes, newCode, normalCode, recipientsByClub, renderMail,
 } from '../src/clubmail.js';
 import { memoryStore, signInV2 } from './helpers.js';
@@ -256,6 +256,44 @@ describe('club email: a message', () => {
     expect(pug[0].body.replyTo).toEqual([{ emailAddress: { address: 'puggles@kvbchurch.org', name: 'Pat Bean' } }]);
     const sparks = await send('sparks');
     expect(sparks.every((c) => c.mailbox === 'awana@kvbchurch.org')).toBe(true);
+  });
+
+  it('"all" goes to every one of the sender\'s clubs, each address once, from the Awana mailbox', async () => {
+    const s = await setup({ ...MS, MAIL_FROM_CLUBS: 'puggles=puggles@kvbchurch.org' });
+    const one = await s.director();
+    expect((await s.call('GET', '/v1/mail/me', undefined, one.auth)).body.all).toBe(null);
+    expect((await s.call('GET', '/v1/mail/recipients?club=all', undefined, one.auth)).body.reason).toBe('not-your-club');
+    expect((await s.call('POST', '/v1/mail/drafts', { club: 'all', subject: 'x', blocks: WORDS, files: [] }, one.auth)).body.reason).toBe('not-your-club');
+    const d = await s.director({ name: 'Pat Bean', replyTo: 'pat@example.com', clubs: ['puggles', 'sparks'] });
+    expect((await s.call('GET', '/v1/mail/me', undefined, d.auth)).body.all).toEqual({ id: 'all', name: 'All my clubs', label: 'Puggles and Sparks', from: 'awana@kvbchurch.org' });
+    expect((await s.call('GET', '/v1/mail/me')).body.all).toMatchObject({ name: 'All clubs', label: 'all clubs' });
+    const count = await s.call('GET', '/v1/mail/recipients?club=all', undefined, d.auth);
+    expect(count.body).toEqual({ ok: true, club: 'all', name: 'Puggles and Sparks', addresses: 3, kids: 4, kidsWithoutEmail: 1 });
+    const id = (await s.call('POST', '/v1/mail/drafts', { club: 'all', subject: 'No club tonight', blocks: WORDS, files: [] }, d.auth)).body.id;
+    const before = s.graph().length;
+    await s.call('POST', `/v1/mail/drafts/${id}/send`, {}, d.auth);
+    expect((await run(s, id, d.auth)).body).toMatchObject({ done: true, recipients: 3 });
+    const sent = s.graph().slice(before);
+    expect(sent.every((c) => c.mailbox === 'awana@kvbchurch.org')).toBe(true);
+    expect(sent[0].body.bccRecipients.map((r) => r.emailAddress.address)).toEqual(['dad.stone@example.com', 'lane@example.com', 'stone@example.com', 'awana@kvbchurch.org']);
+    expect(sent[0].body.body.content).toContain('Sent by Pat Bean for Puggles and Sparks,');
+    expect((await s.call('GET', '/v1/mail/log', undefined, d.auth)).body.sends[0]).toMatchObject({ club: 'all', clubName: 'Puggles and Sparks', recipients: 3 });
+  });
+
+  it('a list longer than one message takes goes out as several, every address once', async () => {
+    const s = await setup();
+    const many = MAIL_RECIPIENTS_MAX + 10;
+    s.setRoster({ ok: true, roster: { header: ROSTER.header, rows: Array.from({ length: many }, (_, i) => [String(i), 'Kid', `N${i}`, 'Sparks', '', `p${String(i).padStart(4, '0')}@example.com`, '']) } });
+    const d = await s.director();
+    const id = (await s.call('POST', '/v1/mail/drafts', { club: 'sparks', subject: 'Big', blocks: WORDS, files: [] }, d.auth)).body.id;
+    await s.call('POST', `/v1/mail/drafts/${id}/send`, {}, d.auth);
+    expect((await run(s, id, d.auth)).body).toMatchObject({ done: true, percent: 100, recipients: many });
+    const made = s.graph().filter((c) => c.path === '/messages');
+    expect(made.map((c) => c.body.bccRecipients.length)).toEqual([MAIL_RECIPIENTS_MAX + 1, 10]);   // + the Awana copy, once
+    const all = made.flatMap((c) => c.body.bccRecipients.map((r) => r.emailAddress.address)).filter((a) => a !== 'awana@kvbchurch.org');
+    expect(new Set(all).size).toBe(many);
+    expect(s.graph().filter((c) => c.path === '/messages/MSG1/send')).toHaveLength(2);
+    expect((await s.call('GET', '/v1/mail/log')).body.sends).toHaveLength(1);
   });
 
   it('a test goes to the sender alone and leaves the message ready', async () => {

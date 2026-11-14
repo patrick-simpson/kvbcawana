@@ -19,6 +19,9 @@
 // and are NEVER stored, logged or answered to a page: a page gets counts.
 // Parents are always BCC; the visible To is the director; Reply-To is the director.
 // The Awana mailbox is BCC'd on every real send too (never on a test, never counted).
+// Club "all" (a sender with more than one club) is every one of their clubs' parents,
+// each address once, from the Awana mailbox. More addresses than one message takes
+// (MAIL_RECIPIENTS_MAX) go out as several messages, one after the other.
 //
 // HOW. Microsoft Graph with an app registration (client credentials): secrets
 // MS_TENANT_ID, MS_CLIENT_ID, MS_CLIENT_SECRET; the mailbox is MAIL_FROM (default
@@ -48,6 +51,8 @@ import { randomBytes, safeEqual, toBase64Url, toHex } from './crypto.js';
 import { fail, json } from './http.js';
 
 export const MAIL_FROM_DEFAULT = 'awana@kvbchurch.org';
+/** The club id of a message to every club the sender has (owner 2026-11-14: several clubs at once). */
+export const MAIL_ALL = 'all';
 /** One stored piece of a file: this many base64 chars (a small file) or bytes (a big one). */
 export const MAIL_PART = 96 * 1024;
 /** A file under this goes to Microsoft in one request, as base64 the browser made. */
@@ -179,7 +184,7 @@ function linked(text) {
 
 /**
  * The email's HTML and plain text, from cleaned blocks.
- * @param {{ blocks: any[], files: { name: string, inline: boolean }[], club: string, sender: string, replyTo: string, test: boolean }} m
+ * @param {{ blocks: any[], files: { name: string, inline: boolean }[], club: string, label?: string, sender: string, replyTo: string, test: boolean }} m
  */
 export function renderMail(m) {
   const font = "font-family:-apple-system,'Segoe UI',Helvetica,Arial,sans-serif";
@@ -191,7 +196,7 @@ export function renderMail(m) {
     else if (b.t === 'ul') { html.push(`<ul style="margin:0 0 14px;padding-left:22px">${b.items.map((/** @type {string} */ i) => `<li style="margin:0 0 4px">${linked(i)}</li>`).join('')}</ul>`); text.push(b.items.map((/** @type {string} */ i) => `- ${i}`).join('\n')); }
     else if (b.t === 'img' && m.files[b.file]?.inline) html.push(`<p style="margin:0 0 14px"><img src="cid:f${b.file}" alt="${esc(m.files[b.file].name)}" style="max-width:100%;height:auto;border:0"></p>`);
   }
-  const foot = `Sent by ${m.sender} for ${clubName(m.club)}, Kennebec Valley Baptist Church Awana. Reply to this email to reach ${m.sender}.`;
+  const foot = `Sent by ${m.sender} for ${m.label || clubName(m.club)}, Kennebec Valley Baptist Church Awana. Reply to this email to reach ${m.sender}.`;
   const note = m.test ? 'TEST: only you received this. Parents have not been sent anything.' : '';
   return {
     html: `<div style="${font};color:#231F20;font-size:16px;line-height:1.5;max-width:640px">`
@@ -259,6 +264,25 @@ export class ClubMail {
   from() { return cleanEmail(this.env()?.MAIL_FROM) || MAIL_FROM_DEFAULT; }
   /** The mailbox one club's messages are sent from: its own (MAIL_FROM_CLUBS), else the Awana one. @param {string} club */
   fromFor(club) { return clubMailboxes(this.env()?.MAIL_FROM_CLUBS)[club] || this.from(); }
+  /** May this sender write to that club ("all" needs more than one club)? @param {any} who @param {string} club */
+  mayWrite(who, club) { return club === MAIL_ALL ? who.clubs.length > 1 : who.clubs.includes(club); }
+  /** The club in words; "all" is every club for the office, the sender's own clubs otherwise. @param {any} who @param {string} club */
+  clubLabel(who, club) {
+    if (club !== MAIL_ALL) return clubName(club);
+    return who.office ? 'all clubs' : who.clubs.map(clubName).join(' and ');
+  }
+  /**
+   * Who one message goes to: the club's parents, or for "all" every one of the sender's
+   * clubs' parents, each address once.
+   * @param {ReturnType<typeof recipientsByClub>} by @param {any} who @param {string} club
+   */
+  addressesOf(by, who, club) {
+    if (club !== MAIL_ALL) return by[club];
+    const set = new Set();
+    let kids = 0, noEmail = 0;
+    for (const c of who.clubs) { for (const e of by[c].emails) set.add(e); kids += by[c].kids; noEmail += by[c].noEmail; }
+    return { emails: [...set].sort(), kids, noEmail };
+  }
   configured() { const e = this.env() || {}; return Boolean(e.MS_TENANT_ID && e.MS_CLIENT_ID && e.MS_CLIENT_SECRET); }
 
   // ── directors ───────────────────────────────────────────────────────────────
@@ -518,11 +542,11 @@ export class ClubMail {
 
   /** GET /v1/mail/recipients?club=: counts only, never an address. @param {any} who @param {string} club */
   async recipients(who, club) {
-    if (!who.clubs.includes(club)) return fail('That is not one of your clubs.', 403, { reason: 'not-your-club' });
+    if (!this.mayWrite(who, club)) return fail('That is not one of your clubs.', 403, { reason: 'not-your-club' });
     const r = await this.readRoster();
     if (!r.ok) return this.rosterFailed(r.error);
-    const c = r.by[club];
-    return json({ ok: true, club, name: clubName(club), addresses: c.emails.length, kids: c.kids, kidsWithoutEmail: c.noEmail });
+    const c = this.addressesOf(r.by, who, club);
+    return json({ ok: true, club, name: this.clubLabel(who, club), addresses: c.emails.length, kids: c.kids, kidsWithoutEmail: c.noEmail });
   }
 
   // ── a message ───────────────────────────────────────────────────────────────
@@ -532,6 +556,8 @@ export class ClubMail {
     return json({
       ok: true, ready: this.configured(), name: who.name, replyTo: who.replyTo, office: who.office, from: this.from(),
       clubs: who.clubs.map((/** @type {string} */ id) => ({ id, name: clubName(id), from: this.fromFor(id) })),
+      // Every club at once, for a sender with more than one.
+      all: who.clubs.length > 1 ? { id: MAIL_ALL, name: who.office ? 'All clubs' : 'All my clubs', label: this.clubLabel(who, MAIL_ALL), from: this.fromFor(MAIL_ALL) } : null,
       limits: { totalBytes: MAIL_TOTAL_BYTES, files: MAIL_FILES_MAX, subject: MAIL_SUBJECT_MAX, text: MAIL_TEXT_MAX, part: MAIL_PART, smallBytes: MAIL_SMALL_BYTES },
     });
   }
@@ -553,8 +579,8 @@ export class ClubMail {
 
   /** POST /v1/mail/drafts {club, subject, blocks, files}: a new message (it replaces the last). @param {any} who @param {any} body */
   async start(who, body) {
-    const club = clubIdByAlias(String(body?.club ?? ''));
-    if (!who.clubs.includes(club)) return fail('That is not one of your clubs.', 403, { reason: 'not-your-club' });
+    const club = body?.club === MAIL_ALL ? MAIL_ALL : clubIdByAlias(String(body?.club ?? ''));
+    if (!this.mayWrite(who, club)) return fail('That is not one of your clubs.', 403, { reason: 'not-your-club' });
     const subject = oneLine(body?.subject, MAIL_SUBJECT_MAX);
     if (!subject) return fail('The email needs a subject.', 400, { reason: 'subject' });
     const raw = Array.isArray(body?.files) ? body.files : [];
@@ -621,7 +647,7 @@ export class ClubMail {
       const mine = (await this.sendLog()).filter((l) => l.who === who.id && l.at > day).length;
       if (mine >= MAIL_SENDS_PER_DAY) return fail(`That is ${MAIL_SENDS_PER_DAY} emails in a day, the most this page sends. Try again tomorrow.`, 429, { reason: 'daily-limit' });
     }
-    draft.run = { test, stage: 'draft', graphId: '', file: 0, offset: 0, uploadUrl: '', count: 0 };
+    draft.run = { test, stage: 'draft', graphId: '', file: 0, offset: 0, uploadUrl: '', count: 0, batch: 0, batches: 1, done: 0 };
     await this.storage.put(draftKey(who.id), draft);
     return json({ ok: true, ...this.progress(draft) });
   }
@@ -629,9 +655,12 @@ export class ClubMail {
   /** @param {any} draft */
   progress(draft) {
     const run = draft.run;
-    const total = draft.files.reduce((/** @type {number} */ a, /** @type {any} */ f) => a + f.parts, 0) + 2;
-    const done = run.stage === 'draft' ? 0 : run.stage === 'sent' ? total
+    // One message's work: its draft, each file's parts, its send. A long list is several messages.
+    const each = draft.files.reduce((/** @type {number} */ a, /** @type {any} */ f) => a + f.parts, 0) + 2;
+    const total = each * Math.max(1, run.batches || 1);
+    const here = run.stage === 'draft' ? 0
       : 1 + draft.files.slice(0, run.file).reduce((/** @type {number} */ a, /** @type {any} */ f) => a + f.parts, 0) + (run.stage === 'files' ? run.offset : 0);
+    const done = run.stage === 'sent' ? total : each * (run.batch || 0) + here;
     return { stage: run.stage, test: run.test, done: run.stage === 'sent', percent: Math.min(100, Math.round((100 * done) / total)), recipients: run.count };
   }
 
@@ -655,15 +684,19 @@ export class ClubMail {
       if (!run.test) {
         const r = await this.readRoster();
         if (!r.ok) return this.rosterFailed(r.error);
-        bcc = r.by[draft.club].emails.filter((e) => e !== who.replyTo).slice(0, MAIL_RECIPIENTS_MAX);
-        if (!bcc.length) return fail('TwoTimTwo has no parent email address for that club.', 409, { reason: 'no-recipients' });
+        if (!this.mayWrite(who, draft.club)) return fail('That is not one of your clubs.', 403, { reason: 'not-your-club' });
+        const all = this.addressesOf(r.by, who, draft.club).emails.filter((e) => e !== who.replyTo);
+        if (!all.length) return fail('TwoTimTwo has no parent email address for that club.', 409, { reason: 'no-recipients' });
+        // More than one message takes: this message's share of the list (the list in order).
+        run.batches = Math.max(run.batches || 1, (run.batch || 0) + 1, Math.ceil(all.length / MAIL_RECIPIENTS_MAX));
+        bcc = all.slice((run.batch || 0) * MAIL_RECIPIENTS_MAX, ((run.batch || 0) + 1) * MAIL_RECIPIENTS_MAX);
       }
-      const m = renderMail({ blocks: draft.blocks, files: draft.files, club: draft.club, sender: who.name, replyTo: who.replyTo, test: run.test });
+      const m = renderMail({ blocks: draft.blocks, files: draft.files, club: draft.club, label: this.clubLabel(who, draft.club), sender: who.name, replyTo: who.replyTo, test: run.test });
       const person = { emailAddress: { address: who.replyTo, name: who.name } };
       // The Awana mailbox gets a copy of every real send (owner 2026-11-14: "copy the Awana
       // email on every message sent through this"): BCC, unless it is already the To.
       const copy = this.from();
-      const hidden = !run.test && copy !== who.replyTo && !bcc.includes(copy) ? [...bcc, copy] : bcc;
+      const hidden = !run.test && !(run.batch > 0) && copy !== who.replyTo && !bcc.includes(copy) ? [...bcc, copy] : bcc;
       const r = await this.graph('POST', `${base}/messages`, {
         subject: `${run.test ? '[Test] ' : ''}${draft.subject}`,
         body: { contentType: 'html', content: m.html },
@@ -673,7 +706,7 @@ export class ClubMail {
       });
       if (!r.ok || !r.body?.id) return this.graphFailed(r);
       run.graphId = String(r.body.id);
-      run.count = bcc.length;
+      run.count = (run.done || 0) + bcc.length;
       run.stage = draft.files.length ? 'files' : 'send';
       await save();
       return json({ ok: true, ...this.progress(draft) });
@@ -728,6 +761,13 @@ export class ClubMail {
       return this.graphFailed(r);
     }
     if (!r.ok) return json({ ok: true, ...this.progress(draft) });   // unknown: the page says to look in Sent Items
+    run.done = run.count;
+    if (!run.test && (run.batch || 0) + 1 < (run.batches || 1)) {
+      // The rest of a long list: the next message, from its draft.
+      Object.assign(run, { batch: (run.batch || 0) + 1, stage: 'draft', graphId: '', file: 0, offset: 0, uploadUrl: '' });
+      await save();
+      return json({ ok: true, ...this.progress(draft) });
+    }
     run.stage = 'sent';
     if (run.test) {
       // A test leaves the message ready for the real send.
@@ -739,7 +779,7 @@ export class ClubMail {
     draft.sent = this.now();
     await save();
     const log = await this.sendLog();
-    log.unshift({ at: draft.sent, who: who.id, name: who.name, club: draft.club, subject: draft.subject, recipients: run.count, files: draft.files.length });
+    log.unshift({ at: draft.sent, who: who.id, name: who.name, club: draft.club, label: this.clubLabel(who, draft.club), subject: draft.subject, recipients: run.count, files: draft.files.length });
     await this.storage.put(LOG_KEY, log.slice(0, MAIL_LOG_MAX));
     const out = { ok: true, ...this.progress(draft) };
     for (let fi = 0; fi < draft.files.length; fi += 1) for (let n = 0; n < draft.files[fi].parts; n += 1) await this.storage.delete(partKey(draft.id, fi, n));
@@ -749,7 +789,7 @@ export class ClubMail {
   /** GET /v1/mail/log: the office sees every send, a director their own. @param {any} who */
   async history(who) {
     const log = (await this.sendLog()).filter((l) => who.office || l.who === who.id);
-    return json({ ok: true, sends: log.map((l) => ({ at: new Date(l.at).toISOString(), name: l.name, club: l.club, clubName: clubName(l.club), subject: l.subject, recipients: l.recipients, files: l.files })) });
+    return json({ ok: true, sends: log.map((l) => ({ at: new Date(l.at).toISOString(), name: l.name, club: l.club, clubName: l.label || clubName(l.club), subject: l.subject, recipients: l.recipients, files: l.files })) });
   }
 }
 
@@ -760,6 +800,7 @@ export class ClubMail {
  * @param {any} core
  */
 export function mountClubMail(registry, core) {
+  const clubOf = (/** @type {string|null} */ v) => (v === MAIL_ALL ? MAIL_ALL : clubIdByAlias(v || ''));
   const m = () => /** @type {ClubMail} */ (core.clubMail);
   /** @typedef {import('./registry.js').RouteContext} Ctx */
   const ready = (/** @type {(ctx: Ctx) => Promise<Response>} */ fn) => async (/** @type {Ctx} */ ctx) => (m().configured() ? fn(ctx) : json({ ok: false, reason: 'not-configured' }, 503));
@@ -788,7 +829,7 @@ export function mountClubMail(registry, core) {
   registry.add('POST', '/v1/mail/logout', 'public', async ({ request }) => m().logout(request));
   registry.add('GET', '/v1/mail/me', 'public', sender(async (_ctx, who) => m().me(who)));
   registry.add('GET', '/v1/mail/log', 'public', sender(async (_ctx, who) => m().history(who)));
-  registry.add('GET', '/v1/mail/recipients', 'public', sender(async ({ url }, who) => m().recipients(who, clubIdByAlias(url.searchParams.get('club') || ''))));
+  registry.add('GET', '/v1/mail/recipients', 'public', sender(async ({ url }, who) => m().recipients(who, clubOf(url.searchParams.get('club')))));
   registry.add('POST', '/v1/mail/drafts', 'public', sender(async ({ body }, who) => m().start(who, await body())));
   registry.add('PUT', '/v1/mail/drafts/:id/files/:f/:n', 'public', draftId(async ({ params, request }, who) => m().part(who, params.id, params.f, params.n, request)));
   registry.add('POST', '/v1/mail/drafts/:id/send', 'public', draftId(ready(async (ctx) => m().begin(await m().who(ctx.request, () => core.authorized(ctx.request), ctx.ip), ctx.params.id, await ctx.body()))));

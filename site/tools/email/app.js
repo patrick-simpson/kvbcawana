@@ -163,10 +163,10 @@ async function enter(directors) {
   $('signin').hidden = true; $('owner-signin').hidden = true; $('swap').hidden = true;
   $('app').hidden = false; $('who').hidden = false;
   $('who-name').textContent = me.name;
-  $('club').replaceChildren(...me.clubs.map((c) => new Option(c.name, c.id)));
+  $('club').replaceChildren(...clubChoices().map((c) => new Option(c.name, c.id)));
   $('club-field').hidden = me.clubs.length < 2;
   const saved = readDraft();
-  if (saved.club && me.clubs.some((c) => c.id === saved.club)) $('club').value = saved.club;
+  if (saved.club && clubChoices().some((c) => c.id === saved.club)) $('club').value = saved.club;
   $('subject').value = saved.subject; $('text').value = saved.text;
   $('pick-file').accept = FILE_ACCEPT;
   $('setup').hidden = me.ready;
@@ -184,7 +184,9 @@ async function enter(directors) {
 function readDraft() {
   try { const d = JSON.parse(store.get(DRAFT_KEY) || '{}'); return { club: String(d.club || ''), subject: String(d.subject || ''), text: String(d.text || '') }; } catch { return { club: '', subject: '', text: '' }; }
 }
-const clubNow = () => (me ? me.clubs.find((c) => c.id === $('club').value) || me.clubs[0] : null);
+/** The clubs to choose from: each of the sender's, then all of them at once when there is more than one. */
+const clubChoices = () => (me ? [...me.clubs, ...(me.all ? [me.all] : [])] : []);
+const clubNow = () => (me ? clubChoices().find((c) => c.id === $('club').value) || me.clubs[0] : null);
 /** The mailbox the chosen club's email is sent from: its own when it has one (Puggles), else the Awana one. */
 const fromNow = () => clubNow()?.from || me.from;
 
@@ -196,7 +198,7 @@ function draw() {
   $('env-from').textContent = `KVBC Awana <${fromNow()}>`;
   $('env-subject').textContent = subject || '(no subject yet)';
   $('preview').innerHTML = hasWords(blocks)
-    ? previewHtml(blocks, files, { sender: me.name, club: clubNow().name })
+    ? previewHtml(blocks, files, { sender: me.name, club: clubNow().label || clubNow().name })
     : '<p class="empty">Your message shows here as you type.</p>';
   const t = totalWords(files, me.limits.totalBytes);
   $('total').textContent = t.words;

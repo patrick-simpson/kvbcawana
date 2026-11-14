@@ -1922,6 +1922,10 @@ Email, each address once, at most 450. They stay in memory at most 5 minutes and
 NEVER stored, logged or answered: a page gets counts. Parents are BCC; To and Reply-To
 are the director. The Awana mailbox (`MAIL_FROM`) is BCC'd on every real send as well
 (owner 2026-11-14), unless it is already the To; never on a test, never in the count.
+Club `all` (a sender with more than one club; `GET /v1/mail/me` then answers `all {id, name,
+label, from}`) is every one of the sender's clubs, each address once, from `MAIL_FROM`.
+A list over 450 addresses goes out as several messages, one after the other (`/step`
+walks them; the log keeps one line).
 
 **How.** Microsoft Graph, client credentials: secrets `MS_TENANT_ID`, `MS_CLIENT_ID`,
 `MS_CLIENT_SECRET` (application permissions `Mail.Send` and `Mail.ReadWrite`, limited to
