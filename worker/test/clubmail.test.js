@@ -189,6 +189,28 @@ describe('club email: directors and signing in', () => {
     expect(office.body.clubs).toHaveLength(6);
   });
 
+  it('the owner can change a director\'s email address; their code and sign-in stay', async () => {
+    const s = await setup();
+    const d = await s.director();
+    const other = await s.director({ name: 'Eve', replyTo: 'eve@example.com', clubs: ['trek'] });
+    expect((await s.call('PUT', `/v1/mail/directors/${d.id}`, { replyTo: 'new@example.com' }, d.auth)).status).toBe(401);   // the owner only
+    expect((await s.call('PUT', `/v1/mail/directors/${d.id}`, { replyTo: 'not an address' })).body.reason).toBe('bad-director');
+    expect((await s.call('PUT', `/v1/mail/directors/${d.id}`, { replyTo: 'EVE@example.com' })).body.reason).toBe('exists');
+    const put = await s.call('PUT', `/v1/mail/directors/${d.id}`, { replyTo: ' Dana.New@Example.com ' });
+    expect(put.body.director).toMatchObject({ id: d.id, name: 'Dana Cole', replyTo: 'dana.new@example.com', clubs: ['sparks'] });
+    expect((await s.call('PUT', `/v1/mail/directors/${d.id}`, { replyTo: 'dana.new@example.com' })).status).toBe(200);   // the same again is fine
+    // Still signed in, and the same code still works.
+    expect((await s.call('GET', '/v1/mail/me', undefined, d.auth)).body.replyTo).toBe('dana.new@example.com');
+    expect((await s.call('POST', '/v1/mail/login', { code: d.code }, {})).status).toBe(200);
+    // The next send's To and Reply-To are the new address.
+    const id = (await s.call('POST', '/v1/mail/drafts', { club: 'sparks', subject: 'Hello', blocks: WORDS, files: [] }, d.auth)).body.id;
+    await s.call('POST', `/v1/mail/drafts/${id}/send`, {}, d.auth);
+    await run(s, id, d.auth);
+    const made = s.graph().filter((c) => c.path === '/messages').pop();
+    expect(made.body.replyTo).toEqual([{ emailAddress: { address: 'dana.new@example.com', name: 'Dana Cole' } }]);
+    expect((await s.call('GET', '/v1/mail/me', undefined, other.auth)).body.replyTo).toBe('eve@example.com');
+  });
+
   it('locks a network after too many wrong codes; a new code ends the old sign-in', async () => {
     const s = await setup();
     const d = await s.director();

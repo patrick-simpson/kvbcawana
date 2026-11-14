@@ -578,6 +578,16 @@ function drawDirectors(d) {
     const li = document.createElement('li');
     const id = Object.assign(document.createElement('div'), { className: 'id' });
     id.append(Object.assign(document.createElement('b'), { textContent: p.name }), Object.assign(document.createElement('span'), { textContent: `${p.clubs.map((c) => names[c] || c).join(', ')} · ${p.replyTo}` }));
+    const edit = Object.assign(document.createElement('button'), { type: 'button', className: 'quiet', textContent: 'Change email' });
+    edit.addEventListener('click', async () => {
+      const typed = window.prompt(`New email address for ${p.name}`, p.replyTo);
+      if (typed === null || typed.trim().toLowerCase() === p.replyTo) return;
+      edit.disabled = true;
+      const res = await request(`/v1/mail/directors/${p.id}`, { method: 'PUT', body: { replyTo: typed.trim() } });
+      edit.disabled = false;
+      setStatus('d-status', res.ok ? `${p.name}'s email is now ${res.body.director.replyTo}. Their code still works.` : problemWords(res), res.ok ? 'good' : 'bad');
+      if (res.ok) drawDirectors((await request('/v1/mail/directors')).body);
+    });
     const code = Object.assign(document.createElement('button'), { type: 'button', className: 'quiet', textContent: 'Email a new code' });
     const rm = Object.assign(document.createElement('button'), { type: 'button', className: 'quiet', textContent: 'Remove' });
     twoTaps(code, 'Tap again: the old code stops', async () => {
@@ -589,7 +599,7 @@ function drawDirectors(d) {
       setStatus('d-status', res.ok ? `${p.name} was removed and can no longer sign in.` : problemWords(res), res.ok ? 'good' : 'bad');
       if (res.ok) drawDirectors((await request('/v1/mail/directors')).body);
     });
-    li.append(id, code, rm);
+    li.append(id, edit, code, rm);
     return li;
   }));
 }

@@ -87,6 +87,7 @@ This one repo holds three apps for Kennebec Valley Baptist Church's Awana club:
   - Send later: `POST /v1/mail/drafts/:id/later {at}` (5 minutes to 4 weeks off; 3 waiting a sender, 12 in all), `mail:later`; the Durable Object's alarm walks the page's own steps (`ClubMail.tick`, one a alarm; `ClubMail.arm` only ever pulls the watcher's alarm EARLIER; the cron arms it again). A failed step is tried again; a send that cannot work, or 8 failures, mails the sender "Not sent"; a send Microsoft never answered is NEVER sent again (the sender is mailed "Check").
   - All clubs: club `all` for a sender with more than one club (`GET /v1/mail/me` `all`): every club's parents, each address once, from `MAIL_FROM`. A list over 450 addresses goes out as several messages (`run.batch`).
   - Bounces: for a week the newest three sends ask `GET /v1/mail/log/:id/bounces`: a COUNT of Microsoft's "Undeliverable: <subject>" notices in the sending mailbox's inbox, never an address.
+  - A director's address can be changed by the owner ("Change email" on the Directors card, `PUT /v1/mail/directors/:id {replyTo}`): the code and sign-ins stay; replies, their copy and their next code go to the new address.
   - The secret's end: `MS_SECRET_ENDS` in `wrangler.toml` (2028-11-12); in its last 30 days the cron mails awana@ weekly (`secretCheck`) and the owner sees it on the page. Change the var when a new secret is saved.
 - Tests `worker/test/clubmail.test.js`, `site/test/email.test.mjs`.
 

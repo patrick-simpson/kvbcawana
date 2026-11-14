@@ -404,15 +404,23 @@ export class ClubMail {
     return json({ ok: true, director: this.pub(d) });
   }
 
-  /** PUT /v1/mail/directors/:id {name?, clubs?}: the address never changes (remove and add). @param {string} id @param {any} body */
+  /**
+   * PUT /v1/mail/directors/:id {name?, replyTo?, clubs?}. A new address (owner 2026-11-14:
+   * "the ability to edit a directors email address") keeps the director's code and
+   * sign-ins: replies, their copy of each send and their next code go to it from now on.
+   * @param {string} id @param {any} body
+   */
   async change(id, body) {
     const doc = await this.directors();
     const d = doc.list.find((x) => x.id === id);
     if (!d) return fail('There is no director by that name.', 404, { reason: 'no-director' });
     const name = body?.name === undefined ? d.name : oneLine(body.name, 60);
+    const replyTo = body?.replyTo === undefined ? d.replyTo : cleanEmail(body.replyTo);
     const clubs = body?.clubs === undefined ? d.clubs : cleanClubs(body.clubs);
+    if (!replyTo) return fail('That is not an email address.', 400, { reason: 'bad-director' });
     if (!name || !clubs.length) return fail('A director needs a name and at least one club.', 400, { reason: 'bad-director' });
-    d.name = name; d.clubs = clubs; doc.rev += 1;
+    if (doc.list.some((x) => x.id !== id && x.replyTo === replyTo)) return fail('A director with that email address is already on the list.', 409, { reason: 'exists' });
+    d.name = name; d.replyTo = replyTo; d.clubs = clubs; doc.rev += 1;
     await this.storage.put(DIRECTORS_KEY, doc);
     return json({ ok: true, director: this.pub(d) });
   }
