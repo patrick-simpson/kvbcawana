@@ -359,7 +359,7 @@ async function steps() {
       }
       if (res.body.done) {
         running = null;
-        if (test) setStatus('status', `Test sent to ${me.replyTo}. Have a look, then send it to the parents.`, 'good');
+        if (test) setStatus('status', `Test sent to ${me.replyTo}.`, 'good');
         else finished(res.body.recipients);
         return;
       }
@@ -493,7 +493,7 @@ async function addDirector(event) {
   const res = await request('/v1/mail/directors', { method: 'POST', body: { name, replyTo, clubs } });
   $('d-add').disabled = false;
   if (!res.ok) { setStatus('d-status', problemWords(res), 'bad'); return; }
-  setStatus('d-status', `${name} was added. Their code is in their email.`, 'good');
+  setStatus('d-status', `${name} added. Their code has been emailed.`, 'good');
   $('d-name').value = ''; $('d-email').value = '';
   drawDirectors((await request('/v1/mail/directors')).body);
 }

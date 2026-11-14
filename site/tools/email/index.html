@@ -126,8 +126,8 @@
   <p class="setup" id="setup" hidden></p>
   <div class="col">
     <section class="card" aria-labelledby="write-h">
-      <h2 id="write-h">Write to your parents</h2>
-      <p class="lede">It comes from the Awana account. Parents never see each other's addresses, and their replies come to you.</p>
+      <h2 id="write-h">New email</h2>
+      <p class="lede">Parents can't see each other's addresses. Replies come to you.</p>
       <div class="field" id="club-field">
         <label for="club">Club</label>
         <select id="club"></select>
@@ -170,7 +170,7 @@
 
   <div class="col out">
     <section class="card" aria-labelledby="prev-h">
-      <h2 id="prev-h">What parents will get</h2>
+      <h2 id="prev-h">Preview</h2>
       <div class="envelope">
         <dl>
           <dt>From</dt><dd id="env-from"></dd>
@@ -182,19 +182,19 @@
     </section>
 
     <section class="card" id="log-card" aria-labelledby="log-h" hidden>
-      <h2 id="log-h">Sent lately</h2>
+      <h2 id="log-h">Sent</h2>
       <ul class="log" id="log"></ul>
     </section>
 
     <section class="card" id="directors-card" aria-labelledby="dir-h" hidden>
       <h2 id="dir-h">Directors</h2>
-      <p class="lede">Each director gets their own code by email. Only you can add or remove one.</p>
+      <p class="lede">Adding a director emails them a sign-in code.</p>
       <ul class="people" id="directors"></ul>
       <form id="add-director">
         <div class="field"><label for="d-name">Name</label><input id="d-name" type="text" maxlength="60" autocomplete="off"></div>
-        <div class="field"><label for="d-email">Their email (parents' replies go here)</label><input id="d-email" type="email" autocomplete="off"></div>
+        <div class="field"><label for="d-email">Email (replies go here)</label><input id="d-email" type="email" autocomplete="off"></div>
         <fieldset class="clubs" id="d-clubs"><legend>Clubs</legend></fieldset>
-        <div class="send"><button type="submit" class="hot" id="d-add">Add and email their code</button></div>
+        <div class="send"><button type="submit" class="hot" id="d-add">Add director</button></div>
         <p class="status" id="d-status" role="status" aria-live="polite"></p>
       </form>
     </section>
