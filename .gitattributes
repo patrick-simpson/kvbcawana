@@ -1,0 +1,15 @@
+# Every text file is LF in every checkout (owner 2026-11-15: tests failed on the
+# owner's Windows PC and passed in CI). Git for Windows checks text out as CRLF by
+# default, and many tests here read source files and match them line by line
+# (lobby: forgetPresentationKey, overlayFit, settingsCopy, WeatherScene; site: the
+# page tests), so a Windows checkout failed them with nothing wrong. The repo has
+# always stored LF; this only stops Windows turning it into CRLF on the way out.
+# shared/.gitattributes says the same for the brand kit, which is copied byte for byte.
+* text=auto eol=lf
+
+# Windows batch files are run by cmd.exe, which wants CRLF.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# A saved copy of the church's calendar page, kept exactly as it was fetched.
+lobby/src/lib/__fixtures__/calendar-2026.html -text
