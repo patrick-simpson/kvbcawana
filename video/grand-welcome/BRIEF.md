@@ -4,7 +4,7 @@ A 3D film that REPLACES the projector's 6:00 grand welcome
 (`lobby/src/presentation/views/GrandWelcome.jsx`), and one shared 3D lead-in
 that REPLACES the other screens' 5-second "Switching to opening ceremony" card
 (`lobby/src/components/MirrorSwitching.jsx`). Made in Blender 5.2 like the
-lobby's welcome video (`video/awana-intro/`), on the Windows laptop (RTX 4050),
+lobby's welcome video (`video/awana-intro/`, since removed; git history has it), on the Windows laptop (RTX 4050),
 not in the cloud (owner: "use the computer for that, not the cloud").
 
 BUILT and on the screens (2026-11-01, owner: "Make the whole thing in 1080p

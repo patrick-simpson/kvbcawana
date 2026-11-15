@@ -4,7 +4,7 @@ KVBC Awana - the new grand welcome: the FILM  (Blender 5.2 LTS)
 
 What this file does, in plain English
 -------------------------------------
-It is a recipe, like stills.py and ../awana-intro/awana_intro.py. Blender
+It is a recipe, like stills.py. Blender
 builds the whole 20-second scene from scratch out of the real brand files
 (shared/brand), then renders it frame by frame IN ITS OPEN WINDOW, so you can
 watch every frame being made, and glues the frames into an .mp4.

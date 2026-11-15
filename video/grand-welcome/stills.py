@@ -4,7 +4,7 @@ KVBC Awana - the new grand welcome: LOOK STILLS  (Blender 5.2 LTS)
 
 What this file does, in plain English
 -------------------------------------
-It is a recipe, like ../awana-intro/awana_intro.py. Blender reads it top to
+It is a recipe. Blender reads it top to
 bottom, BUILDS each little 3D scene from scratch with the real brand files in
 the repo's shared/brand folder, and takes one picture of it. Nothing here is
 the finished film: these are rough stills for choosing its look (see

@@ -2,7 +2,7 @@
 
 The 8 second film the lobby TV plays now and then over its welcome slide
 (`lobby/src/components/FlagshipIntro.jsx`). It replaced the Blender 3D film
-(`video/awana-intro/`, kept for history) on 2026-11-11: the owner found that one
+(`video/awana-intro/`, removed from the tree 2026-11-14; git history has it) on 2026-11-11: the owner found that one
 cheesy (too busy, the mascots, the 3D look itself).
 
 What happens: the welcome slide sits still, six flat doors in the six club
