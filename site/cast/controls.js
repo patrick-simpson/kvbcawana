@@ -6,8 +6,9 @@
 //                    page uses it as it is, the desk its /v1/cast/desk/ twin
 //   conn.headers()   the credential (X-Cast-Token, or the desk's sign-in)
 //   conn.live()      whether there is one at all
-//   conn.refused(w)  a 401: the page decides what that means (the presenter asks for
-//                    the code again; the desk asks the app for a newer sign-in)
+//   conn.refused(w, body)  a 401: the page decides what that means (the presenter asks
+//                    for the code again, or says calmly it passed the remote; the desk
+//                    asks the app for a newer sign-in)
 //   conn.onState(b)  every good state answer, for the page's own extras (the desk's code)
 //   conn.verb        'Tap' (the phone, the default) or 'Click' (the desk)
 //   conn.nav         true = the choices are a navigation pane (one always open) and the
@@ -118,7 +119,8 @@ export function createControls(conn) {
       () => ({ ok: false, status: 0, body: null }),
     ).then((r) => {
       // Any 401 on a presenter call: this page is no longer connected to the TV.
-      if (r.status === 401 && path !== '/v1/cast/join') conn.refused((r.body && r.body.error) || 'This page is no longer connected to the TV. Type the code on the TV again.');
+      // (`passed` = Pass the remote handed the spot on: the page says so calmly, not as an error.)
+      if (r.status === 401 && path !== '/v1/cast/join') conn.refused((r.body && r.body.error) || 'This page is no longer connected to the TV. Type the code on the TV again.', r.body);
       return r;
     });
   }

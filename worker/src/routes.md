@@ -1745,6 +1745,20 @@ every file and every token. More than `JOIN_FAILS_MAX` (20) wrong codes within `
 (10 min) refuse every join for the rest of the window; tokens stored hashed (SHA-256), at most 20,
 each good for `TOKEN_TTL_MS` (8 h).
 
+Pass the remote (owner 2026-11-15: "Hand the presenter spot to a second person with one tap, where
+today a second person is simply refused"): the presenter's `POST /v1/cast/pass` makes a one-time
+PASS CODE, stored hashed in `cast:room` as `pass {hash, at, by}` (SHA-256 of `pass:<code>`; `by` =
+the passer's token hash). `POST /v1/cast/join {code}` takes it in the same field as the TV's code:
+a live pass (within `CAST_PASS_TTL_MS`, its passer still connected) hands the spot over at once,
+whoever is presenting: the joiner's token REPLACES the passer's (`{ok, token, ttlMs, passed: true}`),
+the pass is spent, the passer's screen-share relay is revoked (what is on the TV stays), and the
+passer's token hash goes on `passed [{hash, at}]` (the last 4, each for `TOKEN_TTL_MS`), so its next
+call is 401 `passed` ("You passed the remote...") instead of 401 `token`. A wrong pass code is a
+wrong code (counted in `cast:fails`, the same 403 `refused`, whose words now say the presenter can
+tap Pass the remote); rotating the code, `leave` (the passer's own), `kick`, `reset`, `open` and
+`close` drop the pass. The desk has no pass route (it never holds the presenter's spot). Tests
+`worker/test/cast.test.js` ("Cast: pass the remote"), `site/test/cast.test.mjs`.
+
 | Route | Auth | Request | Answer |
 | --- | --- | --- | --- |
 | `POST /v1/cast/open` | session (the Cast screen) | `{}` | `{ok, code}`: a fresh code; whatever was up, every file and token gone |
@@ -1759,6 +1773,7 @@ each good for `TOKEN_TTL_MS` (8 h).
 | `POST /v1/cast/kick` | session (KVBC Awana's tray "Disconnect the presenter") | `{}` | `{ok, disconnected}`: whoever is connected is let go; what is on the TV stays |
 | `POST /v1/cast/join` | public | `{code}` (spaces ignored) | `{ok, token, ttlMs}`; 403 `off`; 403 `refused` for BOTH a wrong code and a right code while another presenter's token is live and was used within `PRESENTER_IDLE_MS` 30 min (ONE presenter at a time, owner 2026-11-08; one answer so a busy room never confirms a guess, security review 2026-11-09); 429 `locked` for a network (IPv4 address, IPv6 /64) with `JOIN_NET_FAILS_MAX` 10 wrong codes in `JOIN_WINDOW_MS` 10 min. `JOIN_FAILS_MAX` 20 wrong codes from anywhere in the window ROTATE the code (rings `changed {what: 'cast'}`, the TV reads the new one; the presenter stays connected). Counts are stored (`cast:fails`) |
 | `POST /v1/cast/leave` | public + token | `{takeDown?: true}` | `{ok}`: this presenter's token is dropped (the room is free); `takeDown` puts the TV back to its code first (the page's "Display code") |
+| `POST /v1/cast/pass` | public + token | `{}` or `{cancel: true}` | `{ok, code, ttlMs, expiresAt}`: PASS THE REMOTE (below), a one-time six-digit pass code (never the TV's code), good for `CAST_PASS_TTL_MS` 2 min, one at a time (a new one replaces it; `cancel` takes it back: `{ok}`); 429 `too-many` past `PASSES_PER_HOUR` 20 a token |
 | `GET /v1/cast/youtube?q=` | public + token | | `{ok, results: [{youtube, title, channel, seconds}]}` (at most 8; YouTube Data API with secret `YOUTUBE_API_KEY`, safe search strict, embeddable only; kept 10 min; `YOUTUBE_PER_HOUR` 60); 503 `not-configured`, 502 `youtube`, 429 `too-many` |
 | `GET /v1/cast/state` | public + token | | as `GET /v1/classroom/remote/state` (reading it is watching) plus `lineup` (the line-up, below) |
 | `PUT /v1/cast/lineup` | public + token | `{baseRev, entries: [{id, item}]}` (the whole list, in order) | `{ok, lineup}`; 409 `stale` with `lineup` as it is now; 400 `full` (more than `CAST_LINEUP_MAX` 12, or `CAST_LINEUP_CHARS_MAX`), `entry`, `file-missing`; 429 (the press pace) |

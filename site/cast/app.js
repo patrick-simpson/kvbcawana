@@ -13,10 +13,17 @@
 //   (POST /v1/cast/leave) and "Display code" also puts the TV back to its code.
 // - The TV's QR code opens this page as cast.kvbchurch.org/#code=123456: the code is read from the
 //   fragment, the address cleaned, and it connects.
+// - Pass the remote (owner 2026-11-15: "Hand the presenter spot to a second person with one
+//   tap"): the presenter asks for a one-time pass code (POST /v1/cast/pass, good 2 minutes)
+//   and shows it big with a QR of cast.kvbchurch.org/#pass=<code>. The next person scans it
+//   (or types the code on this join screen: one field takes either) and takes the spot; this
+//   page's next read is 401 `passed`, and it says calmly "You passed the remote". The card's
+//   time left is counted HERE (a one-second redraw while it is open, never a request).
 // worker/src/routes.md 10.18.
 
-import { TOKEN_KEY, TOKEN_RE, cleanCode, codeReady, formatCode, joinWords, codeFromHash } from './logic.js';
+import { TOKEN_KEY, TOKEN_RE, cleanCode, codeReady, formatCode, joinWords, codeFromHash, errorWords, passFromHash, passUrl, passWords } from './logic.js';
 import { $, createControls, replay, setText } from './controls.js';
+import { drawQrCode } from './qr.js';
 
 // The token lives in THIS tab only (sessionStorage), never localStorage: a guest's
 // laptop keeps nothing once the tab is closed.
@@ -44,13 +51,21 @@ const ui = createControls({
     return headers;
   },
   live: () => Boolean(tokenStore.get()),
-  refused: (words) => disconnected(words),
+  refused: (words, body) => disconnected(words, body),
 });
 
 /* ── Step 1: the code ── */
 
-function showJoin(note, bad) {
+const JOIN_TITLE = 'Present on the TV';
+const JOIN_LEDE = 'Type the code shown on the TV.';
+
+function showJoin(note, bad, passed = false) {
   ui.stopPolling();
+  closePass(false);
+  // Passed on (Pass the remote): the same screen, said calmly; the code field is the way back in.
+  $('join').dataset.passed = String(passed);
+  setText($('join-title'), passed ? 'You passed the remote' : JOIN_TITLE);
+  setText($('join-lede'), passed ? 'Someone else is presenting now. To present again, ask them to pass it back, or type the code on the TV once they disconnect.' : JOIN_LEDE);
   const was = $('join').hidden;
   $('present').hidden = true;
   $('leave').hidden = true;
@@ -69,11 +84,62 @@ function showPresent() {
   ui.poll();
 }
 
-function disconnected(words) {
+function disconnected(words, body) {
   if (!tokenStore.get() && $('present').hidden) return;
   tokenStore.set('');
   ui.forget();
-  showJoin(words, true);
+  if (body && body.reason === 'passed') showJoin('', false, true);
+  else showJoin(words, true);
+}
+
+/* ── Pass the remote ── */
+
+let passTimer = 0;
+let passUntil = 0;
+
+/** The card's time left (this device's clock); once it runs out, the card says so. */
+function tickPass() {
+  const w = passWords(passUntil, Date.now());
+  $('pass-card').dataset.live = String(w.live);
+  setText($('pass-note'), w.words);
+  $('pass-again').hidden = w.live;
+  setText($('pass-cancel'), w.live ? 'Cancel' : 'Close');
+  if (!w.live) { clearInterval(passTimer); passTimer = 0; }
+}
+
+async function makePass() {
+  ui.touch();
+  const btn = $('btn-pass');
+  btn.disabled = true;
+  $('pass-again').disabled = true;
+  const r = await ui.request('/v1/cast/pass', { method: 'POST', body: {} });
+  btn.disabled = false;
+  $('pass-again').disabled = false;
+  if (r.status === 401) return;
+  if (!r.ok || !r.body || !codeReady(r.body.code)) { setText($('press-note'), errorWords(r.status, r.body)); return; }
+  const card = $('pass-card');
+  passUntil = Date.now() + (Number(r.body.ttlMs) || 0);
+  $('pass-code').textContent = formatCode(r.body.code);
+  card.hidden = false;
+  btn.setAttribute('aria-expanded', 'true');
+  card.dataset.qr = 'loading';
+  // Charcoal on white: a phone's camera reads it off another phone's screen.
+  drawQrCode($('pass-qr'), passUrl(location.origin, r.body.code), { dark: '#3A332A', light: '#FFFFFF', size: 264 })
+    .then(() => { card.dataset.qr = 'ready'; }, () => { card.dataset.qr = 'none'; });
+  clearInterval(passTimer);
+  tickPass();
+  passTimer = setInterval(tickPass, 1000);
+}
+
+/** The card away; `cancel` (the presenter changed their mind) takes the pass back too. */
+function closePass(cancel) {
+  const live = $('pass-card').dataset.live === 'true' && !$('pass-card').hidden;
+  clearInterval(passTimer);
+  passTimer = 0;
+  $('pass-card').hidden = true;
+  $('pass-card').dataset.live = 'false';
+  $('btn-pass').setAttribute('aria-expanded', 'false');
+  if (cancel && live && tokenStore.get()) ui.request('/v1/cast/pass', { method: 'POST', body: { cancel: true } });
 }
 
 async function join(event) {
@@ -90,6 +156,7 @@ async function join(event) {
   tokenStore.set(r.body.token);
   $('code').value = '';
   showPresent();
+  if (r.body.passed === true) setText($('press-note'), 'The remote is yours now.');
 }
 
 /** The code field: digits only, grouped as the TV shows them ("123 456"); a paste of six digits connects. */
@@ -116,12 +183,18 @@ function start() {
   $('code').addEventListener('input', onCodeInput);
   $('leave').addEventListener('click', () => leave(false));
   $('btn-code').addEventListener('click', () => leave(true));
+  $('btn-pass').addEventListener('click', () => { if ($('pass-card').hidden) makePass(); else closePass(true); });
+  $('pass-again').addEventListener('click', makePass);
+  $('pass-cancel').addEventListener('click', () => closePass(true));
   ui.wire();
 
-  // The TV's QR code: cast.kvbchurch.org/#code=123456. The code leaves the address bar at once.
-  const fromQr = codeFromHash(location.hash);
+  // The TV's QR code: cast.kvbchurch.org/#code=123456 (a pass: #pass=123456, the same
+  // field takes it). The code leaves the address bar at once.
+  const fromPass = passFromHash(location.hash);
+  const fromQr = codeFromHash(location.hash) || fromPass;
   if (fromQr) { try { history.replaceState(null, '', location.pathname + location.search); } catch { /* fine */ } }
-  if (tokenStore.get() && base) showPresent();
+  // A pass is taken even by a tab that still holds a token (its own spot is moot).
+  if (tokenStore.get() && base && !fromPass) showPresent();
   else if (fromQr && base) { showJoin(''); $('code').value = formatCode(fromQr); join(null); }
   else showJoin('');
   if (!tokenStore.get() && !fromQr) $('code').focus();

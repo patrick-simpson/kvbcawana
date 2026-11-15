@@ -343,6 +343,31 @@ export function codeFromHash(hash) {
   return m && codeReady(m[1]) ? m[1] : '';
 }
 
+/**
+ * Pass the remote (owner 2026-11-15): the presenter's pass link is <origin>/#pass=<code>;
+ * the six digits, or '' (the join screen takes them in the code field).
+ * @param {unknown} hash
+ */
+export function passFromHash(hash) {
+  const m = /(?:^#|&)pass=(\d{6})(?:&|$)/.exec(typeof hash === 'string' ? hash : '');
+  return m && codeReady(m[1]) ? m[1] : '';
+}
+
+/** Where a pass code sends the next presenter: this page with the code in its fragment. @param {string} origin @param {string} code */
+export function passUrl(origin, code) {
+  return `${String(origin || '').replace(/\/+$/, '')}/#pass=${code}`;
+}
+
+/**
+ * The pass card's words: how long the pass is still good for, or that it ran out.
+ * @param {number} expiresAt (this device's clock) @param {number} now
+ */
+export function passWords(expiresAt, now) {
+  const left = Math.ceil((Number(expiresAt) - Number(now)) / 1000);
+  if (!(left > 0)) return { live: false, words: 'That pass ran out. Make a new one to hand over the remote.' };
+  return { live: true, words: `Good for ${clock(left)}. The other person scans it, or types the code at the Cast page. This phone lets go the moment they connect.` };
+}
+
 /** Through the shared rules, as the Worker will check it. */
 function checked(item, R) {
   const p = R.sanitizeClassroomPress('item', { item });

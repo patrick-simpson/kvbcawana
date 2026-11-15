@@ -110,6 +110,12 @@ export const CAST_TIMER_STEP_S = 15;
 /** Cast's line-up: at most this many entries, and this many characters of items in all (it is stored as one value). */
 export const CAST_LINEUP_MAX = 12;
 export const CAST_LINEUP_CHARS_MAX = 96 * 1024;
+/**
+ * Pass the remote (Cast, owner 2026-11-15: "Hand the presenter spot to a second person with
+ * one tap"): the presenter's one-time pass code is good this long, and it is six digits
+ * like the TV's code (the join screen takes either in the same field).
+ */
+export const CAST_PASS_TTL_MS = 2 * 60 * 1000;
 /** The kinds a video press works on: YouTube, an uploaded clip, a Facebook video. */
 export const CLASSROOM_PLAYABLE_KINDS = Object.freeze(['video', 'clip', 'facebook']);
 /** Everything a remote (or /settings) may ask. */

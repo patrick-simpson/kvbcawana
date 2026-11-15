@@ -14,7 +14,7 @@ import {
   TOKEN_KEY, captureWords, cleanCode, clock, codeReady, errorWords, filePress, fileProblem, formatCode,
   joinWords, linkToCopy, placeholderId, shareWords, size, textPress, titleFromName, tvWords, videoPress, volumeWords,
   SLIDES_ACCEPT, convertWords, isPresentation, slideView, slidesChoice,
-  codeFromHash, facebookPress, resultPress, CAST_HOME, presenterUrl, addressWords,
+  codeFromHash, facebookPress, resultPress, CAST_HOME, presenterUrl, addressWords, passFromHash, passUrl, passWords,
   clockPress, clockWords, createSkew, minSec, timerLeft, timerPress,
   entryWords, lineupAdd, lineupEntryFrom, lineupMove, lineupRemove, lineupView,
   scripturePagesWords, scripturePress, verseRuns,
@@ -171,7 +171,7 @@ test('the presenter\'s token lives in sessionStorage only, and every call carrie
   // One request function for every call, and a 401 drops the token.
   assert.equal((app.match(/fetch\(base \+/g) || []).length, 1);
   assert.match(controls, /r\.status === 401 && path !== '\/v1\/cast\/join'\) conn\.refused\(/);
-  assert.match(appOwn, /refused: \(words\) => disconnected\(words\),/);
+  assert.match(appOwn, /refused: \(words, body\) => disconnected\(words, body\),/);
   assert.match(appOwn, /path: \(p\) => p,/);
   assert.ok(!/Authorization/.test(app), 'a presenter never sends the church sign-in');
 });
@@ -310,6 +310,39 @@ test('Disconnect frees the room; Display code also puts the TV back to its code'
   assert.match(app, /'\/v1\/cast\/leave', \{ method: 'POST', body: takeDown \? \{ takeDown: true \} : \{\} \}/);
   assert.match(page, /id="btn-code">Display code</);
   assert.match(app, /\$\('btn-code'\)\.addEventListener\('click', \(\) => leave\(true\)\)/);
+});
+
+// Owner 2026-11-15: "Hand the presenter spot to a second person with one tap, where today a
+// second person is simply refused."
+test('pass the remote: a one-time code and its QR, taken on the join screen; the passer is told calmly', () => {
+  assert.equal(passFromHash('#pass=482913'), '482913');
+  assert.equal(passFromHash('#x=1&pass=482913'), '482913');
+  assert.equal(passFromHash('#pass=082913'), '');
+  assert.equal(passFromHash('#code=482913'), '');
+  assert.equal(passUrl('https://cast.kvbchurch.org', '482913'), 'https://cast.kvbchurch.org/#pass=482913');
+  assert.equal(passUrl('https://cast.kvbchurch.org/', '482913'), 'https://cast.kvbchurch.org/#pass=482913');
+  const t = 1_000_000;
+  assert.deepEqual(passWords(t + 120000, t).live, true);
+  assert.match(passWords(t + 114000, t).words, /^Good for 1:54\./);
+  assert.match(passWords(t + 400, t).words, /^Good for 0:01\./);
+  assert.equal(passWords(t, t).live, false);
+  assert.match(passWords(t - 5, t).words, /ran out/);
+  assert.equal(R.CAST_PASS_TTL_MS, 2 * 60 * 1000);
+  // The phone page: the button, the card with the code and its QR, a local countdown only.
+  assert.match(page, /id="btn-pass"[^>]*>Pass the remote</);
+  assert.match(page, /id="pass-card" hidden/);
+  assert.match(page, /id="pass-qr"/);
+  assert.match(appOwn, /'\/v1\/cast\/pass', \{ method: 'POST', body: \{\} \}/);
+  assert.match(appOwn, /'\/v1\/cast\/pass', \{ method: 'POST', body: \{ cancel: true \} \}/);
+  assert.match(appOwn, /drawQrCode\(\$\('pass-qr'\), passUrl\(location\.origin, r\.body\.code\)/);
+  assert.match(appOwn, /passTimer = setInterval\(tickPass, 1000\)/);
+  // Taken from the link or the code field; a 401 `passed` is said calmly, not in red.
+  assert.match(appOwn, /passFromHash\(location\.hash\)/);
+  assert.match(appOwn, /body\.reason === 'passed'\) showJoin\('', false, true\)/);
+  assert.match(appOwn, /'You passed the remote'/);
+  assert.match(controls, /conn\.refused\([^;]*, r\.body\)/);
+  // The desk has none of it (its Disconnect the presenter stays).
+  assert.doesNotMatch(read('cast', 'desk', 'index.html'), /btn-pass|Pass the remote/);
 });
 
 test('YouTube search results, Facebook links and video files become presses the shared rules accept', () => {

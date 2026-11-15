@@ -146,6 +146,23 @@
   .tv[data-black="true"] .dot { background: var(--charcoal); }
   #code-help { margin-top: 8px; font-size: 14px; }
 
+  /* ── Pass the remote: the one-time code and its QR, for the next presenter ── */
+  .pass { margin-top: 16px; padding: 18px 18px 16px; background: #fff; border: 1px solid var(--rule); border-top: 2px solid var(--charcoal); border-radius: 0 0 6px 6px; }
+  .pass-cap { margin: 0 0 14px; font: 500 12px/1 var(--heading); letter-spacing: .16em; text-transform: uppercase; color: var(--muted); }
+  .pass-body { display: grid; grid-template-columns: 132px minmax(0, 1fr); gap: 16px; align-items: center; }
+  .pass-qr { display: block; width: 132px; height: 132px; image-rendering: pixelated; }
+  .pass[data-qr="none"] .pass-body { grid-template-columns: 1fr; }
+  .pass[data-qr="none"] .pass-qr { display: none; }
+  .pass-code { margin: 0 0 16px; font: 400 clamp(40px, 13vw, 56px)/1 var(--heading); letter-spacing: .14em; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .pass-note { margin: 0; font-size: 14px; line-height: 1.45; color: var(--muted); }
+  .pass[data-live="false"] .pass-code { color: var(--rule); text-decoration: line-through; text-decoration-thickness: 2px; }
+  .pass[data-live="false"] .pass-qr { opacity: .15; }
+  .pass-row { display: flex; gap: 8px; margin-top: 14px; }
+  .pass-row .quiet { flex: 1; }
+  #btn-pass[aria-expanded="true"] { border-color: var(--green); color: var(--green); }
+  /* Passed on: the join screen says so calmly (never the red of a refusal). */
+  #join[data-passed="true"] .lede { color: var(--charcoal); }
+
   /* ── Send now, or add to the line-up: the two side by side under each choice ── */
   .sends { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 8px; margin-top: 20px; }
   .panel .sends .primary { margin-top: 0; }
@@ -223,6 +240,8 @@
     .strip-slide[aria-current="true"] { transition: outline-color var(--t-base) var(--ease-out); }
     .dot { transition: background-color var(--t-base) var(--ease-in-out); }
     #share-state:not([hidden]) { animation: cast-drop var(--t-base) var(--ease-out) both; }
+    .pass:not([hidden]) { animation: cast-drop var(--t-base) var(--ease-out) both; }
+    .pass-code, .pass-qr { transition: opacity var(--t-base) var(--ease-out), color var(--t-base) var(--ease-out); }
   }
 
   footer { margin-top: 48px; font-size: 13px; color: var(--muted); }
@@ -242,8 +261,8 @@
 
   <!-- Step 1: the code on the TV -->
   <main id="join">
-    <h1>Present on the TV</h1>
-    <p class="lede">Type the code shown on the TV.</p>
+    <h1 id="join-title">Present on the TV</h1>
+    <p class="lede" id="join-lede">Type the code shown on the TV.</p>
     <form id="join-form" autocomplete="off">
       <label for="code" class="eyebrow" style="margin-top:0">Code</label>
       <input id="code" name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9 ]*" maxlength="7" placeholder="000 000" aria-describedby="join-note" enterkeyhint="go">
@@ -302,8 +321,22 @@
         <button class="quiet" type="button" id="btn-down" hidden>Take it down</button>
         <button class="quiet" type="button" id="btn-black" aria-pressed="false">Black</button>
         <button class="quiet" type="button" id="btn-code">Display code</button>
+        <button class="quiet" type="button" id="btn-pass" aria-expanded="false" aria-controls="pass-card">Pass the remote</button>
       </div>
-      <p class="help" id="code-help">Black makes the TV dark until you tap Show again. Display code puts the code back on the TV and lets the next person connect.</p>
+      <p class="help" id="code-help">Black makes the TV dark until you tap Show again. Display code puts the code back on the TV and lets the next person connect. Pass the remote hands this spot straight to someone else.</p>
+      <!-- Pass the remote (owner 2026-11-15): a one-time code, good two minutes, for the next presenter. -->
+      <div class="pass" id="pass-card" hidden>
+        <p class="pass-cap">Pass the remote</p>
+        <p class="pass-code" id="pass-code" aria-label="Pass code"></p>
+        <div class="pass-body">
+          <canvas class="pass-qr" id="pass-qr" width="200" height="200" aria-hidden="true"></canvas>
+          <p class="pass-note" id="pass-note" role="status"></p>
+        </div>
+        <div class="pass-row">
+          <button class="quiet" type="button" id="pass-cancel">Cancel</button>
+          <button class="quiet" type="button" id="pass-again" hidden>Make a new one</button>
+        </div>
+      </div>
       <p class="note" id="press-note" role="status"></p>
     </section>
 

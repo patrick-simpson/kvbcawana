@@ -48,6 +48,16 @@
 // (POST /v1/cast/kick). When a token was last used is memory only (a write every poll would
 // spend the free plan's storage writes); after a restart it counts from the join.
 //
+// PASS THE REMOTE (owner 2026-11-15: "Hand the presenter spot to a second person with one
+// tap, where today a second person is simply refused"): the presenter asks for a one-time
+// PASS CODE (POST /v1/cast/pass): six digits, never the TV's code, good for
+// CAST_PASS_TTL_MS (2 min), one at a time (a new one replaces it), stored hashed in
+// `cast:room` as `pass {hash, at, by}`. Whoever types it on the join screen (or opens
+// the QR of <origin>/#pass=<code>) takes the presenter's spot: their token replaces the
+// passer's, whose hash goes on `passed` so that page is told calmly "You passed the
+// remote" (401 `passed`) instead of an error. A wrong pass code counts as a wrong code;
+// rotating the code, leave, kick, reset and a new room all drop the pass.
+//
 // YouTube search (owner 2026-11-08): GET /v1/cast/youtube?q= asks the YouTube Data
 // API with the Worker secret YOUTUBE_API_KEY (free: 100 units a search, 10,000 a day),
 // safe search strict, embeddable videos only; answers kept 10 minutes; at most
@@ -81,7 +91,7 @@ import { takeToken } from './journeyRemote.js';
 import { netOf } from './netof.js';
 import { fail, json } from './http.js';
 import {
-  CAST_LINEUP_CHARS_MAX, CAST_LINEUP_MAX, CLASSROOM_CLIP_MAX_BYTES, CLASSROOM_FILE_MAX_BYTES, CLASSROOM_FILE_TYPES,
+  CAST_LINEUP_CHARS_MAX, CAST_LINEUP_MAX, CAST_PASS_TTL_MS, CLASSROOM_CLIP_MAX_BYTES, CLASSROOM_FILE_MAX_BYTES, CLASSROOM_FILE_TYPES,
   cleanLineupEntries, fileLimits, filesOf, isClipType, sanitizeHouse, sanitizeLineup,
 } from '../../shared/classroomRemote.js';
 
@@ -130,6 +140,10 @@ export const YOUTUBE_PER_HOUR = 60;
 export const YOUTUBE_RESULTS = 8;
 const YOUTUBE_CACHE_MS = 10 * 60 * 1000;
 const TOKEN_RE = /^t[a-z0-9]{24,40}$/;
+/** Pass codes one presenter may make an hour (each one a storage write). */
+export const PASSES_PER_HOUR = 20;
+/** Passed-on tokens remembered, so their pages are told why (each at most TOKEN_TTL_MS). */
+const PASSED_MAX = 4;
 /** The desk's name in the rates and press buckets (a token's is its 64-hex hash: never equal). */
 export const DESK = 'desk';
 
@@ -214,7 +228,7 @@ export class Cast {
     const t = this.now();
     let r = this.rates.get(who);
     if (!r || t - r.since > HOUR_MS) {
-      r = { since: t, files: 0, converts: 0 };
+      r = { since: t, files: 0, converts: 0, passes: 0 };
       this.rates.set(who, r);
       while (this.rates.size > 64) this.rates.delete(/** @type {string} */ (this.rates.keys().next().value));
     }
@@ -299,10 +313,21 @@ export class Cast {
     return res;
   }
 
-  /** @returns {Promise<{ code: string | null, at: number, tokens: { hash: string, at: number }[] }>} */
+  /**
+   * @returns {Promise<{ code: string | null, at: number, tokens: { hash: string, at: number }[], revealAt: number,
+   *   pass: { hash: string, at: number, by: string } | null, passed: { hash: string, at: number }[] }>}
+   */
   async roomDoc() {
     const d = await this.storage.get(ROOM_KEY);
-    return { code: typeof d?.code === 'string' ? d.code : null, at: Number(d?.at) || 0, tokens: Array.isArray(d?.tokens) ? d.tokens : [], revealAt: Number(d?.revealAt) || 0 };
+    const pass = d?.pass && typeof d.pass.hash === 'string' && typeof d.pass.by === 'string' ? { hash: d.pass.hash, at: Number(d.pass.at) || 0, by: d.pass.by } : null;
+    return {
+      code: typeof d?.code === 'string' ? d.code : null,
+      at: Number(d?.at) || 0,
+      tokens: Array.isArray(d?.tokens) ? d.tokens : [],
+      revealAt: Number(d?.revealAt) || 0,
+      pass,
+      passed: Array.isArray(d?.passed) ? d.passed.filter((/** @type {any} */ x) => typeof x?.hash === 'string') : [],
+    };
   }
 
   /** The stage back to nothing, every file of the room gone. */
@@ -349,19 +374,36 @@ export class Cast {
   async join(body, ip = 'unknown') {
     const t = this.now();
     const net = netOf(ip);
+    const code = typeof body?.code === 'string' ? body.code.replace(/\D/g, '') : '';
+    // Every hash first: from reading the room to writing it there is no await but storage's,
+    // so two joins at once can never both take the room (or one pass twice).
+    const passHash = code.length === CODE_DIGITS ? await hashOf(`pass:${code}`) : '';
+    const token = newId('t', 28);
+    const hash = await hashOf(token);
     const fails = await this.failsDoc();
     if ((fails.nets[net] || 0) >= JOIN_NET_FAILS_MAX) return fail('Too many wrong codes. Wait a few minutes, then try again.', 429, { reason: 'locked', retryAfterMs: JOIN_WINDOW_MS - (t - fails.since) });
-    const code = typeof body?.code === 'string' ? body.code.replace(/\D/g, '') : '';
     const room = await this.roomDoc();
     if (!room.code) return fail('Cast is not turned on. Turn it on from the lobby computer, then use the code it shows.', 403, { reason: 'off' });
-    const refused = () => fail('That code did not connect. Check the code on the TV and try again. If someone else is presenting, wait until they tap Disconnect.', 403, { reason: 'refused' });
+    const refused = () => fail('That code did not connect. Check the code on the TV and try again. If someone else is presenting, they can tap Pass the remote, or wait until they tap Disconnect.', 403, { reason: 'refused' });
+    // A live pass code: the presenter's spot changes hands (whoever presents now is let go).
+    const pass = room.pass && t - room.pass.at <= CAST_PASS_TTL_MS && room.tokens.some((x) => x.hash === room.pass?.by) ? room.pass : null;
+    if (pass && code !== room.code && passHash === pass.hash) {
+      const passed = [...room.passed.filter((x) => t - (Number(x.at) || 0) <= TOKEN_TTL_MS), ...room.tokens.map((x) => ({ hash: x.hash, at: t }))].slice(-PASSED_MAX);
+      await this.storage.put(ROOM_KEY, { ...room, tokens: [{ hash, at: t }], pass: null, passed });
+      // The passer's screen share's relay goes with them (as when they leave); the TV keeps what is up.
+      const rtc = this.engine.rtc;
+      if (rtc && room.tokens.some((x) => x.hash === rtc.by)) this.engine.onShareEnd(rtc.id);
+      this.seen.clear();
+      this.seen.set(hash, t);
+      return json({ ok: true, token, ttlMs: TOKEN_TTL_MS, passed: true });
+    }
     if (code.length !== CODE_DIGITS || code !== room.code) {
       const nets = { ...fails.nets };
       if (net in nets || Object.keys(nets).length < FAILS_NETS_MAX) nets[net] = (nets[net] || 0) + 1;
       const n = fails.n + 1;
       if (n >= JOIN_FAILS_MAX) {
         // Enough guesses at this code: a new one (the TV reads it on the doorbell).
-        await this.storage.put(ROOM_KEY, { ...room, code: newCode(), at: t });
+        await this.storage.put(ROOM_KEY, { ...room, code: newCode(), at: t, pass: null });
         await this.storage.put(FAILS_KEY, { since: fails.since, n: 0, nets });
         this.ring({ what: 'cast', code: true });
       } else {
@@ -372,11 +414,9 @@ export class Cast {
     // One presenter at a time: someone live and not idle holds the room (the same answer as a wrong code).
     const busy = room.tokens.some((x) => t - x.at <= TOKEN_TTL_MS && t - (this.seen.get(x.hash) ?? x.at) <= PRESENTER_IDLE_MS);
     if (busy) return refused();
-    const token = newId('t', 28);
-    const hash = await hashOf(token);
     this.seen.clear();
     this.seen.set(hash, t);
-    await this.storage.put(ROOM_KEY, { ...room, tokens: [{ hash, at: t }] });
+    await this.storage.put(ROOM_KEY, { ...room, tokens: [{ hash, at: t }], pass: null });
     return json({ ok: true, token, ttlMs: TOKEN_TTL_MS });
   }
 
@@ -392,6 +432,42 @@ export class Cast {
     return hit ? hash : null;
   }
 
+  /** Whether the request's token was passed to someone else (its page is told why, calmly). @param {Request} request */
+  async wasPassed(request) {
+    const raw = (request.headers.get('X-Cast-Token') || '').trim();
+    if (!TOKEN_RE.test(raw)) return false;
+    const room = await this.roomDoc();
+    if (!room.code) return false;
+    const hash = await hashOf(raw);
+    return room.passed.some((x) => x.hash === hash && this.now() - (Number(x.at) || 0) <= TOKEN_TTL_MS);
+  }
+
+  /**
+   * POST /v1/cast/pass {cancel?} (the presenter's "Pass the remote"): a one-time pass code,
+   * good for CAST_PASS_TTL_MS; a new one replaces the last. `cancel` takes it back.
+   * @param {string} who @param {any} body
+   */
+  async makePass(who, body) {
+    if (body?.cancel === true) {
+      const room = await this.roomDoc();
+      if (room.pass?.by === who) await this.storage.put(ROOM_KEY, { ...room, pass: null });
+      return json({ ok: true });
+    }
+    const r = this.rateOf(who);
+    if (r.passes >= PASSES_PER_HOUR) return fail('That is a lot of passes this hour. Wait a while, then try again.', 429, { reason: 'too-many' });
+    const first = await this.roomDoc();
+    let code = newCode();
+    while (code === first.code) code = newCode();
+    const hash = await hashOf(`pass:${code}`);
+    const t = this.now();
+    // Read again after the hash: from here to the write, storage only.
+    const room = await this.roomDoc();
+    if (code === room.code || !room.tokens.some((x) => x.hash === who)) return fail('This page is no longer connected to the TV. Type the code on the TV again.', 401, { reason: 'token' });
+    await this.storage.put(ROOM_KEY, { ...room, pass: { hash, at: t, by: who } });
+    r.passes += 1;
+    return json({ ok: true, code, ttlMs: CAST_PASS_TTL_MS, expiresAt: t + CAST_PASS_TTL_MS });
+  }
+
   /** POST /v1/cast/leave {takeDown?} (the presenter): free the room; with takeDown, the TV back to its code. @param {string} who @param {any} body */
   async leave(who, body) {
     if (body?.takeDown === true) await this.engine.press('cast-presenter', { action: 'back' });
@@ -399,7 +475,7 @@ export class Cast {
     if (this.engine.rtc?.by === who) this.engine.onShareEnd(this.engine.rtc.id);
     const room = await this.roomDoc();
     // "Display code": the TV shows its code (hidden until asked, owner 2026-11-08).
-    await this.storage.put(ROOM_KEY, { ...room, tokens: room.tokens.filter((x) => x.hash !== who), ...(body?.takeDown === true ? { revealAt: this.now() } : {}) });
+    await this.storage.put(ROOM_KEY, { ...room, tokens: room.tokens.filter((x) => x.hash !== who), ...(room.pass?.by === who ? { pass: null } : {}), ...(body?.takeDown === true ? { revealAt: this.now() } : {}) });
     this.seen.delete(who);
     return json({ ok: true });
   }
@@ -408,7 +484,7 @@ export class Cast {
   async reset() {
     await this.clear();
     const room = await this.roomDoc();
-    await this.storage.put(ROOM_KEY, { ...room, tokens: [], revealAt: this.now() });
+    await this.storage.put(ROOM_KEY, { ...room, tokens: [], pass: null, passed: [], revealAt: this.now() });
     this.seen.clear();
     // The TV shows its code now, as the desk's reveal does (IP-20261111-07): on an idle
     // room clear() changed nothing on the stage, so nothing else rings.
@@ -424,7 +500,7 @@ export class Cast {
   async kick() {
     const room = await this.roomDoc();
     const had = room.tokens.length;
-    await this.storage.put(ROOM_KEY, { ...room, tokens: [] });
+    await this.storage.put(ROOM_KEY, { ...room, tokens: [], pass: null, passed: [] });
     if (this.engine.rtc) this.engine.onShareEnd(this.engine.rtc.id);
     this.seen.clear();
     return json({ ok: true, disconnected: had > 0 });
@@ -786,6 +862,8 @@ export function mountCast(registry, core) {
   /** A presenter route: refused without a live token. @param {(ctx: any, who: string) => Promise<Response>} fn */
   const presenter = (fn) => async (ctx) => {
     const who = await c().tokenOf(ctx.request);
+    // Passed to someone else (Pass the remote): said calmly, never as an error.
+    if (!who && await c().wasPassed(ctx.request)) return fail('You passed the remote. To present again, ask for it back, or type the code on the TV once they disconnect.', 401, { reason: 'passed' });
     if (!who) return fail('This page is no longer connected to the TV. Type the code on the TV again.', 401, { reason: 'token' });
     return fn(ctx, who);
   };
@@ -804,6 +882,8 @@ export function mountCast(registry, core) {
   registry.add('POST', '/v1/cast/kick', 'session', async () => c().kick());
   registry.add('POST', '/v1/cast/join', 'public', async ({ body, ip }) => c().join(await body(), ip));
   registry.add('POST', '/v1/cast/leave', 'public', presenter(async ({ body }, who) => c().leave(who, await body())));
+  // Pass the remote (owner 2026-11-15): a one-time pass code the next presenter types or scans.
+  registry.add('POST', '/v1/cast/pass', 'public', presenter(async ({ body }, who) => c().makePass(who, await body())));
   registry.add('GET', '/v1/cast/youtube', 'public', presenter(async ({ url }) => c().youtube(url.searchParams.get('q'))));
   registry.add('GET', '/v1/cast/state', 'public', presenter(async () => c().state()));
   // The line-up (owner 2026-11-11): the whole list as one edit, and one entry up (or Next).

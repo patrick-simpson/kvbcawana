@@ -1073,3 +1073,96 @@ describe('Cast: what a guest may keep in the room', () => {
     expect(over.body.reason).toBe('too-many');
   });
 });
+
+// Owner 2026-11-15: "Hand the presenter spot to a second person with one tap, where today a
+// second person is simply refused." A one-time pass code, good 2 minutes, hashed in the room.
+describe('Cast: pass the remote', () => {
+  async function passing() {
+    const s = await setup();
+    const { code } = (await s.call('POST', '/v1/cast/open', {})).body;
+    const join = (c = code) => s.call('POST', '/v1/cast/join', { code: c }, { auth: '' });
+    const a = (await join()).body.token;
+    const as = (token) => ({ auth: '', cast: token });
+    const pass = (token, body = {}) => s.call('POST', '/v1/cast/pass', body, as(token));
+    const state = (token) => s.call('GET', '/v1/cast/state', undefined, as(token));
+    return { ...s, code, join, a, as, pass, state };
+  }
+  const notThe = (code) => (code === '999999' ? '999998' : '999999');
+
+  it('the second person is refused, the presenter passes, the second takes over and the first is told calmly', async () => {
+    const s = await passing();
+    const refused = await s.join();
+    expect(refused.status).toBe(403);
+    expect(refused.body.error).toMatch(/Pass the remote/);
+    await s.call('POST', '/v1/cast/press', { action: 'item', data: { item: { id: 'bplaceholder', kind: 'text', text: 'Welcome' } } }, s.as(s.a));
+    const p = await s.pass(s.a);
+    expect(p.status).toBe(200);
+    expect(p.body.code).toMatch(/^[1-9]\d{5}$/);
+    expect(p.body.code).not.toBe(s.code);
+    expect(p.body.ttlMs).toBe(2 * 60 * 1000);
+    // Stored hashed: the pass code itself is nowhere in the room.
+    expect(JSON.stringify(await s.core.storage.get('cast:room'))).not.toContain(p.body.code);
+    const b = await s.join(p.body.code.replace(/(\d{3})/, '$1 '));
+    expect(b.status).toBe(200);
+    expect(b.body.passed).toBe(true);
+    expect((await s.state(b.body.token)).status).toBe(200);
+    const first = await s.state(s.a);
+    expect(first.status).toBe(401);
+    expect(first.body.reason).toBe('passed');
+    expect(first.body.error).toMatch(/You passed the remote/);
+    // What was up stays up.
+    expect((await s.call('GET', '/v1/cast/screen')).body.stage.show.button.text).toBe('Welcome');
+    // One time only: the same pass code again is a wrong code, counted like one.
+    expect((await s.join(p.body.code)).status).toBe(403);
+    expect((await s.core.storage.get('cast:fails')).n).toBe(1);
+    // The room's own code still finds it busy.
+    expect((await s.join()).status).toBe(403);
+    // A token nobody passed is told the ordinary words.
+    expect((await s.state('tnotarealtokenatallnotonexx')).body.reason).toBe('token');
+  });
+
+  it('a pass lasts two minutes; a new one replaces it; cancel takes it back', async () => {
+    const s = await passing();
+    const one = (await s.pass(s.a)).body.code;
+    const two = (await s.pass(s.a)).body.code;
+    if (one !== two) expect((await s.join(one)).status).toBe(403);
+    expect((await s.pass(s.a, { cancel: true })).status).toBe(200);
+    expect((await s.join(two)).status).toBe(403);
+    const three = (await s.pass(s.a)).body.code;
+    s.tick(2 * 60 * 1000 + 1);
+    expect((await s.join(three)).status).toBe(403);
+    expect((await s.state(s.a)).status).toBe(200);
+  });
+
+  it('a wrong pass code counts like a wrong code; disconnecting, the tray and a new code drop the pass', async () => {
+    const s = await passing();
+    await s.pass(s.a);
+    if (notThe(s.code) !== s.code) {
+      expect((await s.join(notThe(s.code))).status).toBe(403);
+      expect((await s.core.storage.get('cast:fails')).n).toBe(1);
+    }
+    await s.call('POST', '/v1/cast/leave', {}, s.as(s.a));
+    expect((await s.core.storage.get('cast:room')).pass).toBeFalsy();
+    const c = (await s.join()).body.token;
+    const p2 = (await s.pass(c)).body.code;
+    await s.call('POST', '/v1/cast/kick', {});
+    expect((await s.core.storage.get('cast:room')).pass).toBeFalsy();
+    expect((await s.join(p2)).status).toBe(403);
+    const d = (await s.join()).body.token;
+    await s.pass(d);
+    await s.call('POST', '/v1/cast/reset', {});
+    expect((await s.core.storage.get('cast:room')).pass).toBeFalsy();
+    const e = (await s.join()).body.token;
+    await s.pass(e);
+    await s.call('POST', '/v1/cast/open', {});
+    expect((await s.core.storage.get('cast:room')).pass).toBeFalsy();
+  });
+
+  it('only a connected presenter can make one; at most so many an hour; the desk has no pass route', async () => {
+    const s = await passing();
+    expect((await s.call('POST', '/v1/cast/pass', {}, { auth: '' })).status).toBe(401);
+    expect((await s.call('POST', '/v1/cast/desk/pass', {})).status).toBe(404);
+    for (let i = 0; i < 20; i += 1) expect((await s.pass(s.a)).status).toBe(200);
+    expect((await s.pass(s.a)).body.reason).toBe('too-many');
+  });
+});
