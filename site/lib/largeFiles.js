@@ -15,7 +15,8 @@
 // Grand Prix made by video/grand-prix/), and the opening ceremony's films
 // (/lobby/welcome/, functions/lobby/welcome; lobby/public/welcome, made by
 // video/grand-welcome/: the projector's grand welcome and the other screens'
-// see-through lead-in).
+// see-through lead-in), and the scoreboard's winner films (/lobby/finale/,
+// functions/lobby/finale; lobby/public/finale, made by video/score-finale/).
 // Anything else that big, or any other video, is a build output, and fails
 // the build rather than the deploy.
 //
@@ -29,6 +30,7 @@ export const REPO_FOLDERS = {
   '/lobby/intro/': 'lobby/public/intro/',
   '/lobby/promos/': 'lobby/public/promos/',
   '/lobby/welcome/': 'lobby/public/welcome/',
+  '/lobby/finale/': 'lobby/public/finale/',
 };
 
 export const VIDEO_RELEASE_TAG = 'journey-videos-v2';

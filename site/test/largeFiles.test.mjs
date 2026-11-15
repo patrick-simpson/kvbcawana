@@ -36,7 +36,9 @@ test('a streamed path comes from Journey\'s public files or the film\'s folder, 
   assert.equal(repoPathFor('/lobby/assets/clip.mp4'), null);
   assert.equal(repoPathFor('/lobby/welcome/grand-welcome.mp4'), 'lobby/public/welcome/grand-welcome.mp4');
   assert.equal(repoPathFor('/lobby/welcome/../promos/x.mp4'), null);
-  assert.deepEqual(Object.keys(REPO_FOLDERS).sort(), ['/journey/', '/lobby/intro/', '/lobby/promos/', '/lobby/welcome/', '/reel/']);
+  assert.deepEqual(Object.keys(REPO_FOLDERS).sort(), ['/journey/', '/lobby/finale/', '/lobby/intro/', '/lobby/promos/', '/lobby/welcome/', '/reel/']);
+  assert.equal(repoPathFor('/lobby/finale/trophy.mp4'), 'lobby/public/finale/trophy.mp4');
+  assert.equal(repoPathFor('/lobby/finale/../promos/x.mp4'), null);
 });
 
 test('the opening ceremony\'s films are committed web copies with their stills, and streamed with Range', () => {
@@ -186,4 +188,16 @@ test('the Journey Function streams GET and Range on the lesson video from the re
     { url: LARGE_FILES[LESSON], method: 'GET', range: null },
     { url: LARGE_FILES[LESSON], method: 'GET', range: 'bytes=0-1' },
   ]);
+});
+
+test('the scoreboard\'s winner films are committed, streamed, and small enough (owner 2026-11-15)', () => {
+  for (const id of ['trophy', 'stadium', 'takeover']) {
+    const film = path.join(ROOT, `lobby/public/finale/${id}.mp4`);
+    assert.ok(existsSync(film), `lobby/public/finale/${id}.mp4 is committed`);
+    assert.equal(mustStream(`/lobby/finale/${id}.mp4`, statSync(film).size), true);
+    // Caught here only to stop a lossless render slipping in: GitHub's limit is 100 MB a file.
+    assert.ok(statSync(film).size <= 12 * 1000 * 1000, `${id}.mp4 is over 12 MB`);
+  }
+  const fn = readFileSync(path.join(SITE, 'functions/lobby/finale/[[path]].js'), 'utf8');
+  assert.match(fn, /proxyLarge\(context\.request, LARGE_FILES, fetch\)/);
 });
