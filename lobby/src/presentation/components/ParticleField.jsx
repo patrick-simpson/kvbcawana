@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo } from 'react';
 import { useLowPower } from '../hooks/useLowPower.js';
 import { CELEBRATION } from '../lib/kit.js';
 
@@ -15,7 +15,8 @@ const PARTICLES = Array.from({ length: 45 }, (_, i) => ({
   color: CELEBRATION[i % CELEBRATION.length],
 }));
 
-export const ParticleField = () => {
+// Memoized: it takes no props, so a re-render of the view above does not redraw its 45 particles.
+export const ParticleField = memo(() => {
   const lowPower = useLowPower();
   if (lowPower) return null;
   return (
@@ -38,4 +39,4 @@ export const ParticleField = () => {
     ))}
   </div>
   );
-};
+});
