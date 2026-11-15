@@ -107,6 +107,11 @@
   /* Black (owner 2026-11-11, the presenter's Black button): pure black over whatever is up,
      no words. What is under it stays as it is and comes back with Show again. */
   #black { background: #000; z-index: 5; }
+  /* The slides' pointer (owner 2026-11-15: "Drag on the phone's preview and a dot follows on
+     the TV"): the church kit's flat dot, a tan disc in a charcoal ring with a thin cream
+     keyline (an outline: a ring, never a glow), over the slide, under the black. */
+  .pointer { position: fixed; left: 0; top: 0; z-index: 4; width: calc(2.6 * var(--u)); height: calc(2.6 * var(--u)); min-width: 22px; min-height: 22px; border-radius: 50%; background: #B9A48E; border: calc(.42 * var(--u)) solid #3A332A; outline: calc(.22 * var(--u)) solid #F6F2EA; pointer-events: none; opacity: 0; }
+  .pointer.is-on { opacity: 1; }
   .status small { display: block; margin-top: calc(1 * var(--u)); font: 400 calc(1.6 * var(--u))/1.4 var(--body); color: #8F8577; }
 
   /* ── Motion (church.css's language; nothing moves with "reduce motion" on) ── */
@@ -130,6 +135,9 @@
     #show.is-in .text .words { animation: cast-rise var(--t-slow) var(--ease-out) 220ms both; }
     /* A slide turning: the next page fades in over the last. */
     #show canvas.is-next { animation: cast-fade 380ms var(--ease-in-out) both; }
+    /* The dot glides between the places the phone sends (about 8 a second) and fades out. */
+    .pointer { transition: transform 130ms linear, opacity var(--t-slow) var(--ease-out); }
+    .pointer.is-jump { transition: opacity var(--t-quick) var(--ease-out); }
     /* Waiting (connecting, loading): a calm bar breathing under the words. */
     .status { animation: cast-fade var(--t-base) var(--ease-out) both; }
     .status.working::after { content: ''; display: block; width: calc(14 * var(--u)); height: 3px; margin: calc(2.4 * var(--u)) auto 0; border-radius: 3px; background: #CFC4B5; transform-origin: center; animation: cast-breathe 1.4s var(--ease-in-out) infinite alternate; }
@@ -162,6 +170,8 @@
   </section>
   <!-- Something a presenter put up -->
   <section class="layer" id="show" hidden></section>
+  <!-- The slides' pointer: a dot where the presenter drags on their preview -->
+  <div class="pointer" id="pointer" aria-hidden="true"></div>
   <!-- Black: over everything, nothing on it -->
   <div class="layer" id="black" hidden></div>
   <script type="module" src="screen.js"></script>

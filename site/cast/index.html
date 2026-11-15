@@ -111,6 +111,13 @@
   .slides { margin-top: 16px; }
   .slide-now { position: relative; aspect-ratio: 16 / 9; background: var(--charcoal); border-radius: 4px; overflow: hidden; }
   .slide-now canvas, .slide-next canvas { display: block; width: 100%; height: 100%; object-fit: contain; }
+  /* The slides' pointer: drag on the slide and the same dot moves on the TV. Flat, no glow:
+     a tan disc in a charcoal ring, a thin cream keyline so it reads on dark slides too. */
+  .slide-now { touch-action: none; cursor: crosshair; }
+  .pointer-dot { position: absolute; left: 0; top: 0; z-index: 2; width: 20px; height: 20px; border-radius: 50%; background: #B9A48E; border: 3px solid #3A332A; outline: 2px solid #F6F2EA; pointer-events: none; }
+  .pointer-dot.is-up { opacity: .45; }
+  .slide-hint { margin: 8px 0 0; font-size: 14px; color: var(--muted); }
+  .slides[data-preview="none"] .slide-hint { display: none; }
   .slides[data-preview="none"] .slide-now, .slides[data-preview="none"] .slide-next, .slides[data-preview="none"] .strip { display: none; }
   .slides[data-preview="loading"] .slide-now::after { content: 'Loading the slides…'; position: absolute; inset: 0; display: grid; place-items: center; color: var(--cream); font: 400 15px/1 var(--body); }
   .slide-row { display: grid; grid-template-columns: 42% 1fr; gap: 12px; margin-top: 12px; align-items: start; }
@@ -239,6 +246,7 @@
     .slide-now canvas.m-again, .slide-next canvas.m-again { animation-duration: 260ms; }
     .strip-slide[aria-current="true"] { transition: outline-color var(--t-base) var(--ease-out); }
     .dot { transition: background-color var(--t-base) var(--ease-in-out); }
+    .pointer-dot { transition: opacity var(--t-slow) var(--ease-out); }
     #share-state:not([hidden]) { animation: cast-drop var(--t-base) var(--ease-out) both; }
     .pass:not([hidden]) { animation: cast-drop var(--t-base) var(--ease-out) both; }
     .pass-code, .pass-qr { transition: opacity var(--t-base) var(--ease-out), color var(--t-base) var(--ease-out); }
@@ -293,6 +301,7 @@
         <div class="slide-now">
           <canvas data-slide="now" aria-hidden="true"></canvas>
         </div>
+        <p class="slide-hint">Press and drag on the slide: a dot follows on the TV.</p>
         <div class="slide-row">
           <div class="slide-next" data-slide-box="next" data-end="false">
             <span class="slide-cap">Next</span>

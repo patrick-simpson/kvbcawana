@@ -11,8 +11,71 @@
 // the TV's answer (the 2 s state poll) confirms it. Strip thumbnails are drawn only
 // when scrolled into view; the big slides keep a few drawn pages so Next is instant.
 // No pdf.js (offline, blocked): Back/Next and the slide number still work.
+//
+// The pointer (owner 2026-11-15: "Drag on the phone's preview and a dot follows on the
+// TV"): press and drag on the big slide (attachPointer, also the desk's live miniature)
+// and the finger's place goes to the TV as fractions of the slide, the newest only, at
+// most one every CAST_POINTER_GAP_MS and never a second while one is on its way; lifting
+// the finger sends one last place with `on: false`. A small dot shows here where it points.
+// Nothing is sent while no finger is down.
 
-import { slideView } from './logic.js';
+import { containRect, createPointerThrottle, pointIn, slideView } from './logic.js';
+
+/** The dot here lingers this long after the finger lifts (the TV's does too). */
+export const POINTER_LINGER_MS = 1000;
+
+/**
+ * Press-and-drag on `el` points on the TV.
+ * @param {HTMLElement} el the surface (position: relative); the dot is drawn inside it
+ * @param {{ rect: () => ({ left: number, top: number, width: number, height: number } | null), send: (p: { x: number, y: number, on: boolean }) => unknown, gapMs: number }} o
+ *   `rect` = where the slide is drawn now (client px), null when there is nothing to point at
+ */
+export function attachPointer(el, { rect, send, gapMs }) {
+  const dot = document.createElement('span');
+  dot.className = 'pointer-dot';
+  dot.setAttribute('aria-hidden', 'true');
+  dot.hidden = true;
+  el.append(dot);
+  const throttle = createPointerThrottle({ gapMs, send });
+  let id = null;
+  let last = null;
+  let hideTimer = 0;
+  function linger() {
+    dot.classList.add('is-up');
+    clearTimeout(hideTimer);
+    hideTimer = setTimeout(() => { dot.hidden = true; dot.classList.remove('is-up'); }, POINTER_LINGER_MS);
+  }
+  function place(e, on) {
+    const r = rect();
+    if (!r) return false;
+    last = { ...pointIn(r, e.clientX, e.clientY), on };
+    const box = el.getBoundingClientRect();
+    dot.style.transform = `translate(${r.left - box.left + last.x * r.width}px, ${r.top - box.top + last.y * r.height}px) translate(-50%, -50%)`;
+    clearTimeout(hideTimer);
+    dot.hidden = false;
+    dot.classList.remove('is-up');
+    if (!on) linger();
+    throttle.push(last);
+    return true;
+  }
+  el.addEventListener('pointerdown', (e) => {
+    if (id !== null || (e.pointerType === 'mouse' && e.button !== 0)) return;
+    if (!place(e, true)) return;
+    id = e.pointerId;
+    try { el.setPointerCapture(id); } catch { /* fine */ }
+    e.preventDefault();
+  });
+  el.addEventListener('pointermove', (e) => { if (e.pointerId === id) place(e, true); });
+  const end = (e) => {
+    if (e.pointerId !== id) return;
+    id = null;
+    if (e.type === 'pointerup' && place(e, false)) return;
+    // A cancelled drag (the browser took the gesture): the last place, lifted.
+    if (last) { last = { ...last, on: false }; throttle.push(last); linger(); }
+  };
+  el.addEventListener('pointerup', end);
+  el.addEventListener('pointercancel', end);
+}
 
 const PDFJS = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/';
 // Fingerprints of the exact files (subresource integrity, owner 2026-11-09: refuse an
@@ -59,9 +122,10 @@ function pdfLib() {
  *   root: HTMLElement,
  *   fetchPdf: (fileId: string) => Promise<ArrayBuffer | null>,
  *   go: (to: number, step?: number) => void,
+ *   point?: (p: { x: number, y: number, on: boolean }) => unknown, gapMs?: number,
  * }} o
  */
-export function createPreview({ root, fetchPdf, go }) {
+export function createPreview({ root, fetchPdf, go, point, gapMs = 125 }) {
   const q = (sel) => /** @type {any} */ (root.querySelector(sel));
   const nowCanvas = q('[data-slide="now"]');
   const nextCanvas = q('[data-slide="next"]');
@@ -215,6 +279,15 @@ export function createPreview({ root, fetchPdf, go }) {
     go(v.now);
   }
 
+  // The pointer: drag on the big slide (only once it is drawn).
+  if (point) {
+    attachPointer(q('.slide-now'), {
+      gapMs,
+      send: point,
+      rect: () => (root.hidden || !cur || drawn.now < 1 || !nowCanvas.height ? null : containRect(nowCanvas.getBoundingClientRect(), nowCanvas.width / nowCanvas.height)),
+    });
+  }
+
   backBtn.addEventListener('click', () => {
     const v = slideView(shownPage() - 1, pages());
     pending = { page: v.now, until: Date.now() + PENDING_MS };
@@ -243,5 +316,7 @@ export function createPreview({ root, fetchPdf, go }) {
       root.hidden = true;
       pending = null;
     },
+    /** The slide's shape (width / height) as drawn here; 0 before it is. */
+    pageRatio() { return cur && nowCanvas.height ? nowCanvas.width / nowCanvas.height : 0; },
   };
 }

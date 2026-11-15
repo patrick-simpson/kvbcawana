@@ -116,6 +116,26 @@ export const CAST_LINEUP_CHARS_MAX = 96 * 1024;
  * like the TV's code (the join screen takes either in the same field).
  */
 export const CAST_PASS_TTL_MS = 2 * 60 * 1000;
+/**
+ * The slides' pointer (Cast, owner 2026-11-15: "Drag on the phone's preview and a dot
+ * follows on the TV"): a control page sends at most one position every CAST_POINTER_GAP_MS
+ * while a finger or the mouse is down (about 8 a second), and the Worker takes at most
+ * CAST_POINTER_PER_MIN a minute from one caller. Positions are never stored.
+ */
+export const CAST_POINTER_GAP_MS = 125;
+export const CAST_POINTER_PER_MIN = 300;
+/**
+ * A pointer position: x and y as fractions of the slide (0 left/top to 1 right/bottom,
+ * clamped, four decimals) and `on` (false = the finger was lifted). Null when it is not one.
+ * @param {unknown} v
+ */
+export function sanitizePointer(v) {
+  if (!v || typeof v !== 'object') return null;
+  const p = /** @type {any} */ (v);
+  if (typeof p.on !== 'boolean' || typeof p.x !== 'number' || typeof p.y !== 'number' || !Number.isFinite(p.x) || !Number.isFinite(p.y)) return null;
+  const f = (/** @type {number} */ n) => Math.round(Math.min(1, Math.max(0, n)) * 10000) / 10000;
+  return { x: f(p.x), y: f(p.y), on: p.on };
+}
 /** The kinds a video press works on: YouTube, an uploaded clip, a Facebook video. */
 export const CLASSROOM_PLAYABLE_KINDS = Object.freeze(['video', 'clip', 'facebook']);
 /** Everything a remote (or /settings) may ask. */

@@ -46,6 +46,10 @@
 //   as one `scripture` item already cut into pages (the TV steps them with the page press,
 //   like slides). The index and books are kept in memory once read.
 // - Slides on the TV: the phone's preview (preview.js): this slide, the next, every slide.
+// - The pointer (owner 2026-11-15: "Drag on the phone's preview and a dot follows on the
+//   TV"): press and drag on the big slide (the desk: also on its live miniature of the TV)
+//   sends the place to POST /v1/cast/pointer, at most one every CAST_POINTER_GAP_MS and only
+//   while dragging; the Worker rings it on to the TV and keeps nothing.
 // - "On the TV now": the state every 2 s while the page is visible (which is also what
 //   makes the TV report), nothing while hidden, and it stops after 30 minutes with no
 //   touch (the free plan's daily requests).
@@ -60,9 +64,10 @@ import {
   clockPress, createSkew, timerPress,
   lineupAdd, lineupEntryFrom, lineupMove, lineupRemove, lineupView,
   scripturePagesWords, scripturePress, verseRuns,
+  containRect,
 } from './logic.js';
 import { pagesFor, parseReference } from './bible/reference.js';
-import { createPreview } from './preview.js';
+import { attachPointer, createPreview } from './preview.js';
 
 export const $ = (id) => /** @type {any} */ (document.getElementById(id));
 /** Play an element's ease-in again (the page's motion; nothing under "reduce motion"). */
@@ -218,6 +223,21 @@ export function createControls(conn) {
     else setText($('press-note'), errorWords(r.status, r.body));
     poll();
     return r;
+  }
+
+  /* ── The slides' pointer ── */
+
+  /** Slides on the TV and the TV not black: the pointer has something to point at. */
+  function pointing() {
+    const shown = state && state.stage.show ? state.stage.show.button : null;
+    return Boolean(shown && shown.kind === 'pdf' && !state.stage.black);
+  }
+
+  /** One place on its way to the TV (the preview's throttle sends the newest only). */
+  async function point(p) {
+    if (!pointing()) return;
+    const r = await request('/v1/cast/pointer', { method: 'POST', body: p, timeoutMs: 4000 });
+    if (r.status === 429) setText($('press-note'), errorWords(r.status, r.body));
   }
 
   /* ── The line-up ── */
@@ -987,7 +1007,24 @@ export function createControls(conn) {
         if (to) press('page', { to }, `Slide ${to} is going up`);
         else press('page', { step }, step > 0 ? 'Next slide' : 'Previous slide');
       },
+      point,
+      gapMs: R.CAST_POINTER_GAP_MS,
     });
+    // The desk's live miniature of the TV takes a drag too (its big slide steps aside for
+    // it): the TV's picture is fitted in the miniature, and the slide inside that picture.
+    const mini = $('tv-mini');
+    const shot = $('tv-shot');
+    if (mini && shot) {
+      attachPointer(mini, {
+        gapMs: R.CAST_POINTER_GAP_MS,
+        send: point,
+        rect: () => {
+          if (mini.dataset.shot !== 'true' || !pointing() || !shot.naturalHeight) return null;
+          const tv = containRect(shot.getBoundingClientRect(), shot.naturalWidth / shot.naturalHeight);
+          return tv && containRect(tv, preview.pageRatio());
+        },
+      });
+    }
     // iPhones and iPads (and most phones) cannot share a screen from a web page: say so instead.
     if ($('li-screen') && !canShareScreen()) { $('li-screen').hidden = true; $('li-noshare').hidden = false; }
     for (const ev of ['pointerdown', 'keydown']) document.addEventListener(ev, touch, { passive: true });

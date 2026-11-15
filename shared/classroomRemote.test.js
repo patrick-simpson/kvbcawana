@@ -134,3 +134,21 @@ describe('Scripture by reference (Cast): a reference and its pages, King James o
     expect(R.CLASSROOM_PLAYABLE_KINDS).not.toContain('scripture');
   });
 });
+
+// Owner 2026-11-15: "Drag on the phone's preview and a dot follows on the TV."
+describe('the slides\' pointer (Cast)', () => {
+  it('a place is two fractions of the slide, clamped to it, and whether the finger is down', () => {
+    expect(R.sanitizePointer({ x: 0.25, y: 0.75, on: true, extra: 1 })).toEqual({ x: 0.25, y: 0.75, on: true });
+    expect(R.sanitizePointer({ x: 0.123456, y: 2, on: false })).toEqual({ x: 0.1235, y: 1, on: false });
+    expect(R.sanitizePointer({ x: -1, y: 0, on: true })).toEqual({ x: 0, y: 0, on: true });
+    expect(R.sanitizePointer({ x: 0.5, y: 0.5 })).toBeNull();
+    expect(R.sanitizePointer({ x: '0.5', y: 0.5, on: true })).toBeNull();
+    expect(R.sanitizePointer({ x: Number.NaN, y: 0.5, on: true })).toBeNull();
+    expect(R.sanitizePointer(null)).toBeNull();
+  });
+
+  it('about eight a second while dragging, and a cap a minute well above a real talk', () => {
+    expect(R.CAST_POINTER_GAP_MS).toBe(125);
+    expect(R.CAST_POINTER_PER_MIN).toBe(300);
+  });
+});

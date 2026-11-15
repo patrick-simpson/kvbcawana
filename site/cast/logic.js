@@ -571,3 +571,56 @@ export function slideView(page, pages) {
     last,
   };
 }
+
+/* ── The slides' pointer (owner 2026-11-15: "Drag on the phone's preview and a dot follows on the TV") ── */
+
+/**
+ * Where content of aspect `ratio` (width / height) is drawn inside `box` when it is fitted
+ * whole and centred (object-fit: contain): the slide on the phone's canvas, the TV's
+ * picture in the desk's miniature, the slide inside that picture. Null when it cannot be.
+ * @param {{ left: number, top: number, width: number, height: number }} box @param {number} ratio
+ */
+export function containRect(box, ratio) {
+  if (!box || !(ratio > 0) || !(box.width > 0) || !(box.height > 0)) return null;
+  let width = box.width;
+  let height = width / ratio;
+  if (height > box.height) { height = box.height; width = height * ratio; }
+  return { left: box.left + (box.width - width) / 2, top: box.top + (box.height - height) / 2, width, height };
+}
+
+/**
+ * A finger's place as fractions of the slide drawn at `rect` (clamped to the slide, four decimals).
+ * @param {{ left: number, top: number, width: number, height: number }} rect @param {number} clientX @param {number} clientY
+ */
+export function pointIn(rect, clientX, clientY) {
+  const f = (/** @type {number} */ n) => Math.round(Math.min(1, Math.max(0, n)) * 10000) / 10000;
+  return { x: f((clientX - rect.left) / rect.width), y: f((clientY - rect.top) / rect.height) };
+}
+
+/**
+ * The pointer's sender: the newest place only, at most one every `gapMs`, and never a second
+ * while one is still on its way (a slow network sends fewer, never a queue). The last place
+ * (the finger lifted) is always sent. `later` is setTimeout (a test hands in its own).
+ * @param {{ gapMs: number, send: (p: any) => unknown, now?: () => number, later?: (fn: () => void, ms: number) => unknown }} o
+ */
+export function createPointerThrottle({ gapMs, send, now = () => Date.now(), later = (fn, ms) => setTimeout(fn, ms) }) {
+  let last = -Infinity;
+  let pending = null;
+  let waiting = false;
+  let busy = false;
+  function flush() {
+    waiting = false;
+    if (!pending || busy) return;
+    const t = now();
+    if (t - last < gapMs) { waiting = true; later(flush, gapMs - (t - last)); return; }
+    const p = pending;
+    pending = null;
+    last = t;
+    busy = true;
+    Promise.resolve().then(() => send(p)).catch(() => {}).finally(() => { busy = false; if (pending && !waiting) flush(); });
+  }
+  return {
+    /** The newest place (it replaces one not sent yet). */
+    push(p) { pending = p; if (!waiting) flush(); },
+  };
+}

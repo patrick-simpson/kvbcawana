@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { SyncCore } from '../src/sync.js';
 import { CAST_BYTES_MAX, CAST_UPLOAD_QUIET_MS, CAST_CONVERTS_PER_HOUR, CAST_FILES_MAX, CAST_FILES_PER_HOUR, JOIN_FAILS_MAX, JOIN_NET_FAILS_MAX, TOKEN_TTL_MS } from '../src/cast.js';
 import { memoryStore, signInV2 } from './helpers.js';
-import { CLASSROOM_CLIP_PART_BYTES, CLASSROOM_FILE_PART_BYTES, fileLinkFrom, sanitizeButtons, sanitizeClassroomPress, sanitizeSignal } from '../../shared/classroomRemote.js';
+import { CLASSROOM_CLIP_PART_BYTES, CLASSROOM_FILE_PART_BYTES, fileLinkFrom, sanitizeButtons, sanitizeClassroomPress, sanitizeSignal, CAST_POINTER_PER_MIN } from '../../shared/classroomRemote.js';
 
 // Cast (src/routes.md 10.18, owner 2026-11-08): the lobby computer's AirServer-like
 // screen opens a room and shows a code; a presenter joins with the code alone and puts
@@ -1164,5 +1164,72 @@ describe('Cast: pass the remote', () => {
     expect((await s.call('POST', '/v1/cast/desk/pass', {})).status).toBe(404);
     for (let i = 0; i < 20; i += 1) expect((await s.pass(s.a)).status).toBe(200);
     expect((await s.pass(s.a)).body.reason).toBe('too-many');
+  });
+});
+
+// Owner 2026-11-15: "Drag on the phone's preview and a dot follows on the TV."
+describe('Cast: the pointer for slides', () => {
+  const PDF = new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d, 0x31, 0x2e, 0x37, 0x0a, 1, 2, 3]);
+  async function slides() {
+    const s = await setup();
+    const { code } = (await s.call('POST', '/v1/cast/open', {})).body;
+    const token = (await s.call('POST', '/v1/cast/join', { code }, { auth: '' })).body.token;
+    const as = { auth: '', cast: token };
+    const start = await s.call('POST', '/v1/cast/files', { type: 'application/pdf', bytes: PDF.length, name: 'Talk.pdf' }, as);
+    await s.call('PUT', `/v1/cast/files/${start.body.id}/0`, PDF, { ...as, type: 'application/octet-stream' });
+    await s.call('POST', `/v1/cast/files/${start.body.id}/done`, {}, as);
+    const up = await s.call('POST', '/v1/cast/press', { action: 'item', data: { item: { id: 'bplaceholder', kind: 'pdf', file: start.body.id, type: 'application/pdf', title: 'Talk' } } }, as);
+    const point = (body, who = as) => s.call('POST', who === 'desk' ? '/v1/cast/desk/pointer' : '/v1/cast/pointer', body, who === 'desk' ? {} : who);
+    const rings = () => s.frames.filter((f) => f.e === 'changed' && f.d?.what === 'cast' && f.d.pointer);
+    return { ...s, as, button: up.body.button, point, rings };
+  }
+
+  it('rings the place straight on to the TV, cleaned, with the slides\' button; nothing is stored', async () => {
+    const s = await slides();
+    const before = JSON.stringify([...(await s.core.storage.list({ prefix: 'cast:' })).entries()]);
+    const rev = (await s.call('GET', '/v1/cast/screen')).body.stage.rev;
+    s.frames.length = 0;
+    expect((await s.point({ x: 0.25, y: 0.512345, on: true, extra: 'no' })).body).toEqual({ ok: true });
+    expect((await s.point({ x: 1.7, y: -3, on: false })).status).toBe(200);
+    expect(s.rings().map((f) => f.d)).toEqual([
+      { what: 'cast', pointer: { x: 0.25, y: 0.5123, on: true, button: s.button } },
+      { what: 'cast', pointer: { x: 1, y: 0, on: false, button: s.button } },
+    ]);
+    // A pointer ring carries no rev: the TV never reads the stage for it, and the stage did not move.
+    expect(s.rings().every((f) => !('rev' in f.d))).toBe(true);
+    expect((await s.call('GET', '/v1/cast/screen')).body.stage.rev).toBe(rev);
+    expect(JSON.stringify([...(await s.core.storage.list({ prefix: 'cast:' })).entries()])).toBe(before);
+    // The desk points too.
+    expect((await s.point({ x: 0.5, y: 0.5, on: true }, 'desk')).status).toBe(200);
+  });
+
+  it('only a place, only while slides are up and the TV is not black; never without a token', async () => {
+    const s = await slides();
+    expect((await s.point({ x: '0.5', y: 0.5, on: true })).status).toBe(400);
+    expect((await s.point({ x: 0.5, y: 0.5 })).status).toBe(400);
+    expect((await s.call('POST', '/v1/cast/pointer', { x: 0.5, y: 0.5, on: true }, { auth: '' })).status).toBe(401);
+    await s.call('POST', '/v1/cast/press', { action: 'black', data: { on: true } }, s.as);
+    expect((await s.point({ x: 0.5, y: 0.5, on: true })).body.reason).toBe('not-slides');
+    await s.call('POST', '/v1/cast/press', { action: 'back' }, s.as);
+    s.frames.length = 0;
+    expect((await s.point({ x: 0.5, y: 0.5, on: true })).body.reason).toBe('not-slides');
+    expect(s.rings()).toEqual([]);
+  });
+
+  it(`at most ${CAST_POINTER_PER_MIN} a minute from one caller; the next minute it points again`, async () => {
+    const s = await slides();
+    for (let i = 0; i < CAST_POINTER_PER_MIN; i += 1) expect((await s.point({ x: 0.1, y: 0.1, on: true })).status).toBe(200);
+    const over = await s.point({ x: 0.1, y: 0.1, on: true });
+    expect(over.status).toBe(429);
+    expect(over.body.reason).toBe('too-many');
+    // The desk has its own allowance.
+    expect((await s.point({ x: 0.1, y: 0.1, on: true }, 'desk')).status).toBe(200);
+    s.tick(60 * 1000);
+    expect((await s.point({ x: 0.1, y: 0.1, on: false })).status).toBe(200);
+  });
+
+  it('the classroom room has no pointer route', async () => {
+    const s = await setup();
+    expect((await s.call('POST', '/v1/classroom/pointer', { x: 0.5, y: 0.5, on: true })).status).toBe(404);
   });
 });

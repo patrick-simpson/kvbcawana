@@ -15,6 +15,7 @@ import {
   joinWords, linkToCopy, placeholderId, shareWords, size, textPress, titleFromName, tvWords, videoPress, volumeWords,
   SLIDES_ACCEPT, convertWords, isPresentation, slideView, slidesChoice,
   codeFromHash, facebookPress, resultPress, CAST_HOME, presenterUrl, addressWords, passFromHash, passUrl, passWords,
+  containRect, createPointerThrottle, pointIn,
   clockPress, clockWords, createSkew, minSec, timerLeft, timerPress,
   entryWords, lineupAdd, lineupEntryFrom, lineupMove, lineupRemove, lineupView,
   scripturePagesWords, scripturePress, verseRuns,
@@ -649,6 +650,81 @@ test('Scripture on both control pages and the TV: look up, preview, show or add,
 // Owner 2026-11-08: "Everything this does should have professional animations and
 // transitions" (the TV and the presenter page). Motion lives ONLY inside the
 // prefers-reduced-motion: no-preference blocks, so "reduce motion" sees the finished page.
+// Owner 2026-11-15: "Drag on the phone's preview and a dot follows on the TV."
+test('the pointer: a place is two fractions of the slide where it is drawn', () => {
+  const box = { left: 10, top: 20, width: 320, height: 180 };
+  // A 4:3 slide in a 16:9 box: pillarboxed, centred.
+  assert.deepEqual(containRect(box, 4 / 3), { left: 50, top: 20, width: 240, height: 180 });
+  // A 16:9 slide in a 4:3 box: letterboxed.
+  assert.deepEqual(containRect({ left: 0, top: 0, width: 400, height: 300 }, 16 / 9), { left: 0, top: 37.5, width: 400, height: 225 });
+  assert.equal(containRect(box, 0), null);
+  assert.equal(containRect({ left: 0, top: 0, width: 0, height: 10 }, 1), null);
+  const slide = containRect(box, 4 / 3);
+  assert.deepEqual(pointIn(slide, 170, 110), { x: 0.5, y: 0.5 });
+  assert.deepEqual(pointIn(slide, 0, 400), { x: 0, y: 1 });
+  assert.deepEqual(pointIn(slide, 50 + 240 / 3, 20), { x: 0.3333, y: 0 });
+  // Every place the page sends is one the shared rules take as it is.
+  for (const p of [pointIn(slide, 170, 110), pointIn(slide, -50, 999)]) assert.deepEqual(R.sanitizePointer({ ...p, on: true }), { ...p, on: true });
+});
+
+test('the pointer is sent the newest place only, at most one a gap, never two at once, and the lift always', async () => {
+  let t = 0;
+  const timers = [];
+  const sent = [];
+  let answer = null;
+  const th = createPointerThrottle({
+    gapMs: R.CAST_POINTER_GAP_MS,
+    now: () => t,
+    later: (fn, ms) => timers.push({ fn, at: t + ms }),
+    send: (p) => { sent.push(p); return new Promise((ok) => { answer = ok; }); },
+  });
+  const settle = () => new Promise((ok) => setTimeout(ok, 0));
+  const run = async (to) => { t = to; for (const x of timers.splice(0)) if (x.at <= t) x.fn(); else timers.push(x); await settle(); };
+  th.push({ x: 0.1, y: 0.1, on: true });
+  await settle();
+  assert.equal(sent.length, 1);
+  // While that one is on its way, and inside the gap: only the newest waits.
+  t = 30; th.push({ x: 0.2, y: 0.2, on: true });
+  t = 60; th.push({ x: 0.3, y: 0.3, on: true });
+  await run(200);
+  assert.equal(sent.length, 1, 'never a second while one is on its way');
+  answer(); await settle();
+  assert.deepEqual(sent.at(-1), { x: 0.3, y: 0.3, on: true });
+  assert.equal(sent.length, 2);
+  // The lift inside the gap still goes, after the gap.
+  answer(); await settle();
+  t = 210; th.push({ x: 0.4, y: 0.4, on: false });
+  await settle();
+  assert.equal(sent.length, 2);
+  await run(400);
+  assert.deepEqual(sent.at(-1), { x: 0.4, y: 0.4, on: false });
+  assert.equal(R.CAST_POINTER_GAP_MS, 125);
+});
+
+test('the pointer on the pages: drag on the big slide (and the desk\'s miniature), the dot on the TV from the ring alone', () => {
+  // The phone and the desk: the big slide takes the drag; the desk's live miniature too.
+  assert.match(previewJs, /export function attachPointer\(el, \{ rect, send, gapMs \}\)/);
+  assert.match(previewJs, /el\.setPointerCapture\(id\)/);
+  assert.match(previewJs, /attachPointer\(q\('\.slide-now'\)/);
+  assert.match(controls, /request\('\/v1\/cast\/pointer', \{ method: 'POST', body: p/);
+  assert.match(controls, /gapMs: R\.CAST_POINTER_GAP_MS/);
+  assert.match(controls, /attachPointer\(mini, \{/);
+  assert.match(controls, /shown\.kind === 'pdf' && !state\.stage\.black/);
+  for (const html of [page, read('cast', 'desk', 'index.html')]) {
+    assert.match(html, /\.slide-now \{ touch-action: none; cursor: crosshair; \}/);
+    assert.match(html, /class="slide-hint"/);
+  }
+  // The TV: the ring carries the place; the dot moves without a read, only over its slides.
+  assert.match(screen, /const pointer = pointerOf\(e\.data\);\n {4}if \(pointer\) \{ drawPointer\(pointer\); return; \}/);
+  assert.match(screen, /raw\.button !== shown\.id/);
+  assert.match(screen, /R\.sanitizePointer\(raw\)/);
+  assert.match(screenPage, /<div class="pointer" id="pointer" aria-hidden="true"><\/div>/);
+  // Flat, never a glow: a ring with no blur.
+  assert.match(screenPage, /\.pointer \{[^}]*outline: calc\(\.22 \* var\(--u\)\) solid #F6F2EA;/);
+  assert.doesNotMatch(screenPage.match(/\.pointer \{[^}]*\}/)[0], /blur|gradient|filter|shadow/);
+  assert.match(page, /\.pointer-dot \{[^}]*outline: 2px solid #F6F2EA;/);
+});
+
 test('every animation is inside the motion-allowed block; one shared motion language', () => {
   const outside = (src) => src.replace(/@media \(prefers-reduced-motion: no-preference\) \{[\s\S]*?\n {0,2}\}\n/g, '');
   for (const [name, src] of [['presenter', page], ['tv', screenPage], ['church.css', css]]) {

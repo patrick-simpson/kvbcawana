@@ -45,6 +45,11 @@
 //   above, verse numbers small, the words as big as fit; the page press steps it.
 // - Black (owner 2026-11-11): the stage's `black` puts pure black over whatever is up
 //   and pauses a playing video; off shows the same thing again, the video still paused.
+// - The slides' pointer (owner 2026-11-15: "Drag on the phone's preview and a dot follows
+//   on the TV"): the doorbell itself carries the place, `changed {what: 'cast', pointer:
+//   {x, y, on, button}}` (fractions of the slide), so the dot moves from the ring ALONE (no
+//   read); it shows only over the slides that button put up, and goes POINTER_LINGER_MS
+//   after the finger lifts (POINTER_QUIET_MS after the last place if the lift never comes).
 // - ?configure=1 (KVBC Awana's display Settings window, coordinator 2026-11-08): a
 //   short note only. No room is opened, no socket, nothing closed on pagehide.
 //
@@ -109,6 +114,10 @@ let closed = false;
 let revealTimer = 0;
 let revealSeen = 0; // the Worker's last revealAt this screen has acted on
 let black = false; // the presenter's Black button: the TV is black over what is up
+/** The pointer's dot goes this long after the finger lifts, or this long after its last place. */
+const POINTER_LINGER_MS = 1000;
+const POINTER_QUIET_MS = 2500;
+let pointerTimer = 0;
 
 const session = () => {
   let s = '';
@@ -302,6 +311,7 @@ async function read() {
 function setBlack(on) {
   if (on === black) return;
   black = on;
+  if (on) hidePointer();
   $('black').hidden = !on;
   if (on && media) { try { media.pause(); } catch { /* the player is not ready */ } }
   for (const f of layer.querySelectorAll('.fb-video')) {
@@ -318,6 +328,7 @@ function apply(next) {
     showKey = key;
     busy = busy.then(() => change(next.show)).catch(() => {});
   } else if (next.show && next.show.button.kind === 'pdf' && next.show.page !== shownPage) {
+    hidePointer();
     busy = busy.then(() => drawPdfPage(next.show.page)).catch(() => {});
   } else if (next.show && next.show.button.kind === 'scripture' && next.show.page !== shownPage) {
     drawScripturePage(next.show.button, next.show.page);
@@ -369,7 +380,34 @@ async function change(show) {
   report(true);
 }
 
+/* ── The slides' pointer ── */
+
+function hidePointer() {
+  clearTimeout(pointerTimer);
+  pointerTimer = 0;
+  $('pointer').classList.remove('is-on');
+}
+
+/** A place from the doorbell: the dot over the slide that is up, or nothing. @param {any} raw */
+function drawPointer(raw) {
+  const p = R.sanitizePointer(raw);
+  const shown = stage.show ? stage.show.button : null;
+  const canvas = layer.hidden ? null : layer.querySelector('canvas:last-of-type');
+  if (!p || !pdf || black || !shown || shown.kind !== 'pdf' || !R.isButtonId(raw.button) || raw.button !== shown.id || !canvas) { hidePointer(); return; }
+  const r = canvas.getBoundingClientRect();
+  const dot = $('pointer');
+  // From hidden, it appears where it is (no glide across the slide from the last place).
+  const jump = !dot.classList.contains('is-on');
+  dot.classList.toggle('is-jump', jump);
+  dot.style.transform = `translate(${r.left + p.x * r.width}px, ${r.top + p.y * r.height}px) translate(-50%, -50%)`;
+  if (jump) void dot.offsetWidth;
+  dot.classList.add('is-on');
+  clearTimeout(pointerTimer);
+  pointerTimer = setTimeout(hidePointer, p.on ? POINTER_QUIET_MS : POINTER_LINGER_MS);
+}
+
 function clear() {
+  hidePointer();
   if (media) { try { media.destroy(); } catch { /* gone */ } }
   media = null;
   if (rtc) { try { rtc.pc.close(); } catch { /* closed */ } }
@@ -911,6 +949,11 @@ const isRing = (data) => {
   try { const f = JSON.parse(data); return f?.e === 'changed' && f?.d?.what === 'cast'; } catch { return false; }
 };
 
+/** The pointer a ring carries, or null. @param {string} data */
+function pointerOf(data) {
+  try { const p = JSON.parse(data).d.pointer; return p && typeof p === 'object' ? p : null; } catch { return null; }
+}
+
 function closeLive() {
   clearTimeout(retryTimer);
   retryTimer = 0;
@@ -940,6 +983,9 @@ function openLive() {
   s.onmessage = (e) => {
     heardAt = Date.now();
     if (!isRing(e.data)) return;
+    // The slides' pointer rides the ring itself: move the dot, read nothing.
+    const pointer = pointerOf(e.data);
+    if (pointer) { drawPointer(pointer); return; }
     read().then(() => {
       try { if (JSON.parse(e.data).d.rtc === 'offer') trySignal(); } catch { /* fine */ }
     });

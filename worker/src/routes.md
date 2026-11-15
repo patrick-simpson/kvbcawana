@@ -1779,6 +1779,7 @@ tap Pass the remote); rotating the code, `leave` (the passer's own), `kick`, `re
 | `PUT /v1/cast/lineup` | public + token | `{baseRev, entries: [{id, item}]}` (the whole list, in order) | `{ok, lineup}`; 409 `stale` with `lineup` as it is now; 400 `full` (more than `CAST_LINEUP_MAX` 12, or `CAST_LINEUP_CHARS_MAX`), `entry`, `file-missing`; 429 (the press pace) |
 | `POST /v1/cast/lineup/show` | public + token | `{id}` or `{next: true}` | as `POST /v1/cast/press` `item` (`button`, `rev`, `screenOnline`) plus `lineup`; 404 `no-entry`; 409 `end` / `empty` |
 | `POST /v1/cast/press` | public + token | as `POST /v1/classroom/remote`; `item {item}` puts a video, text, picture or PDF up directly (its file a finished file of this room, else 400 `file-missing`), `screen {title?}` puts a shared screen up, `black {on: true\|false}` makes the TV black over whatever is up or shows it again (Black, below); an `item` may also be a countdown `{kind: 'timer', seconds, title?}`, the clock `{kind: 'clock'}` or Scripture `{kind: 'scripture', ref, pages}` (below) | as 10.13 plus `button` (the new stage button's id) for `item`/`screen`; `black` that changes nothing answers `{ok, already: true, rev}` |
+| `POST /v1/cast/pointer` | public + token | `{x, y, on}` (fractions of the slide, 0 to 1, clamped; `on` false = the finger lifted) | `{ok}`: THE POINTER (below), rung straight on as `changed {what: 'cast', pointer: {x, y, on, button}}` and never stored; 400 `pointer`; 409 `not-slides` (no slides up, or the TV black); 429 `too-many` past `CAST_POINTER_PER_MIN` 300 a minute from one caller |
 | `POST /v1/cast/files`, `PUT /v1/cast/files/:id/:n`, `POST /v1/cast/files/:id/done` | public + token | as 10.13 (a `{url}` copy too: a Google Slides/Docs link is copied as its PDF export) | as 10.13. The room holds at most `CAST_FILES_MAX` 12 files and `CAST_BYTES_MAX` 240 MB (one clip + two 20 MB files, unfinished uploads counted); a new one past either first deletes the room's dropped uploads (unfinished, no part for `CAST_UPLOAD_QUIET_MS` 3 min) and then its oldest finished files, never one on the TV, else 413 `room-full`. 429 `too-many`: past `CAST_FILES_PER_HOUR` 30 starts per token an hour, or the room's `CAST_UPLOAD_BYTES_PER_HOUR` 300 MB (whoever sends; a new token does not reset it). A `{url}` copy while another is still running in the room: 429 `busy`. Rates are memory only |
 | `POST /v1/cast/signal` | public + token | `{signal: {type: 'offer', id, sdp}}` (id = the screen button's) | `{ok}`; 409 `ended` |
 | `GET /v1/cast/signal?id=` | public + token | | `{signal: {type: 'answer', id, sdp} \| null, id}` |
@@ -1813,10 +1814,27 @@ screen-share signal or ICE routes (it is the TV's own computer).
 | `PUT /v1/cast/desk/house` | session | `{line}` (a string; cleaned to ONE line of at most `CAST_HOUSE_LINE_MAX` 60 with the shared `oneLine`; `''` = the logo alone) | `{ok, house: {line, savedAt}}`; rings `changed {what: 'cast', rev, house: true}` so the TV reads it at once; 400 `line` when it is not a string |
 | `POST /v1/cast/desk/reveal` | session | `{}` | `{ok}`: the TV shows its code for `REVEAL_MS` (`revealAt`); nobody is let go, nothing taken down |
 | `POST /v1/cast/desk/press` | session | as `POST /v1/cast/press` | as `POST /v1/cast/press` (Back takes down what is up) |
+| `POST /v1/cast/desk/pointer` | session | as `POST /v1/cast/pointer` | as `POST /v1/cast/pointer` (its own allowance) |
 | `PUT /v1/cast/desk/lineup`, `POST /v1/cast/desk/lineup/show` | session | as the presenter's | as the presenter's (ONE line-up for the room: the desk and the phone edit the same list) |
 | `GET /v1/cast/desk/youtube?q=` | session | | as `GET /v1/cast/youtube` |
 | `POST /v1/cast/desk/files`, `PUT /v1/cast/desk/files/:id/:n`, `POST /v1/cast/desk/files/:id/done`, `GET /v1/cast/desk/files/:id` | session | as the presenter's | as the presenter's (the same room, caps and rates; the caller `DESK`) |
 | `POST /v1/cast/desk/convert`, `PUT /v1/cast/desk/convert/:id/:n`, `POST /v1/cast/desk/convert/:id/start`, `GET /v1/cast/desk/convert/:id` | session | as the presenter's | as the presenter's |
+
+The pointer (owner 2026-11-15: "Drag on the phone's preview and a dot follows on the TV"): while
+slides (a PDF item) are up and the TV is not black, press-and-drag on the phone's big preview of the
+slide (and on the desk's big slide or its live miniature of the TV) sends the place as fractions of
+the slide, ONLY while a finger or the mouse is down: the newest place, at most one every
+`CAST_POINTER_GAP_MS` 125 ms (about 8 a second) and never a second while one is on its way, then one
+last with `on: false`. The Worker cleans it (`sanitizePointer`, shared), checks the stage, and rings
+it straight on, `changed {what: 'cast', pointer: {x, y, on, button}}` (`button` = the slides' stage
+button; no `rev`); nothing is stored and the stage does not move. The TV moves its dot from the ring
+ALONE (no read), only over the slides that button put up, gone 1 s after `on: false` (2.5 s after
+the last place when a lift never arrives), and hides it on a page turn, Black or a new item. Cost
+(the free plan's 100,000 requests a day, each `/api` call counted twice): a minute of dragging is at
+most `CAST_POINTER_PER_MIN` 300 calls from one caller (600 requests); a continuous drag of more than
+about 35 s in one minute rests the dot until the minute turns. No traffic at all when nobody drags.
+Cast only (the classroom room has no pointer route). Tests `worker/test/cast.test.js` ("Cast: the
+pointer for slides"), `shared/classroomRemote.test.js`, `site/test/cast.test.mjs`.
 
 The house slide (owner 2026-11-11: "All of those sound fantastic. Let's build them"): with nothing
 up and the code not asked for, the TV shows the church's logo on cream and ONE optional line, with a

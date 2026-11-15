@@ -58,6 +58,13 @@
 // remote" (401 `passed`) instead of an error. A wrong pass code counts as a wrong code;
 // rotating the code, leave, kick, reset and a new room all drop the pass.
 //
+// THE POINTER (owner 2026-11-15: "Drag on the phone's preview and a dot follows on the
+// TV"): while slides are up (and not black), a control page sends the finger's place as
+// fractions of the slide (POST /v1/cast/pointer, the desk's twin too), at most one every
+// CAST_POINTER_GAP_MS while dragging; the Worker rings it straight on as
+// `changed {what: 'cast', pointer: {x, y, on, button}}` and stores NOTHING. The TV moves
+// its dot from the ring alone (no read). At most CAST_POINTER_PER_MIN a minute per caller.
+//
 // YouTube search (owner 2026-11-08): GET /v1/cast/youtube?q= asks the YouTube Data
 // API with the Worker secret YOUTUBE_API_KEY (free: 100 units a search, 10,000 a day),
 // safe search strict, embeddable videos only; answers kept 10 minutes; at most
@@ -91,8 +98,8 @@ import { takeToken } from './journeyRemote.js';
 import { netOf } from './netof.js';
 import { fail, json } from './http.js';
 import {
-  CAST_LINEUP_CHARS_MAX, CAST_LINEUP_MAX, CAST_PASS_TTL_MS, CLASSROOM_CLIP_MAX_BYTES, CLASSROOM_FILE_MAX_BYTES, CLASSROOM_FILE_TYPES,
-  cleanLineupEntries, fileLimits, filesOf, isClipType, sanitizeHouse, sanitizeLineup,
+  CAST_LINEUP_CHARS_MAX, CAST_LINEUP_MAX, CAST_PASS_TTL_MS, CAST_POINTER_PER_MIN, CLASSROOM_CLIP_MAX_BYTES, CLASSROOM_FILE_MAX_BYTES, CLASSROOM_FILE_TYPES,
+  cleanLineupEntries, fileLimits, filesOf, isClipType, sanitizeHouse, sanitizeLineup, sanitizePointer,
 } from '../../shared/classroomRemote.js';
 
 const ROOM_KEY = 'cast:room';
@@ -221,6 +228,8 @@ export class Cast {
     this.lineup = new Doc(storage, LINEUP_KEY, freshLineup);
     /** Line-up edits per caller (the press bucket's pace), memory only. @type {Map<string, any>} */
     this.lineupBuckets = new Map();
+    /** Pointer moves per caller this minute, memory only. @type {Map<string, { since: number, n: number }>} */
+    this.pointers = new Map();
   }
 
   /** This token's counts for the hour. @param {string} who */
@@ -607,6 +616,31 @@ export class Cast {
     return json({ ...out, lineup: sanitizeLineup(this.lineup.data) });
   }
 
+  /**
+   * POST /v1/cast/pointer {x, y, on} (a presenter or the desk): the slides' pointer, rung
+   * straight on to the TV (never stored). Only while slides are up and the TV is not black.
+   * @param {string} who @param {any} body
+   */
+  async pointer(who, body) {
+    const p = sanitizePointer(body);
+    if (!p) return fail('That is not a place on the slide.', 400, { reason: 'pointer' });
+    const t = this.now();
+    let r = this.pointers.get(who);
+    if (!r || t - r.since >= 60 * 1000) {
+      r = { since: t, n: 0 };
+      this.pointers.delete(who);
+      this.pointers.set(who, r);
+      while (this.pointers.size > 64) this.pointers.delete(/** @type {string} */ (this.pointers.keys().next().value));
+    }
+    if (r.n >= CAST_POINTER_PER_MIN) return fail('The pointer rests for a moment. Lift your finger and try again shortly.', 429, { reason: 'too-many', retryAfterMs: 60 * 1000 - (t - r.since) });
+    const stage = await this.engine.stage();
+    const shown = stage.show?.button;
+    if (!shown || shown.kind !== 'pdf' || stage.black) return fail('The pointer works while slides are on the TV.', 409, { reason: 'not-slides' });
+    r.n += 1;
+    this.ring({ what: 'cast', pointer: { ...p, button: shown.id } });
+    return json({ ok: true });
+  }
+
   /** GET /v1/cast/youtube?q= (the presenter): YouTube's videos for the words. @param {string | null} q */
   async youtube(q) {
     const key = String(this.env()?.YOUTUBE_API_KEY || '');
@@ -890,6 +924,8 @@ export function mountCast(registry, core) {
   registry.add('PUT', '/v1/cast/lineup', 'public', presenter(async ({ body }, who) => c().putLineup(who, await body())));
   registry.add('POST', '/v1/cast/lineup/show', 'public', presenter(async ({ body }, who) => c().lineupShow(who, await body())));
   registry.add('POST', '/v1/cast/press', 'public', presenter(async ({ body }, who) => c().engine.press(who, await body())));
+  // The slides' pointer (owner 2026-11-15): rung on to the TV, never stored.
+  registry.add('POST', '/v1/cast/pointer', 'public', presenter(async ({ body }, who) => c().pointer(who, await body())));
   registry.add('POST', '/v1/cast/files', 'public', presenter(async ({ body }, who) => c().fileStart(who, await body())));
   registry.add('PUT', '/v1/cast/files/:id/:n', 'public', presenter(async ({ params, request }) => c().engine.putPart(params.id, params.n, request)));
   registry.add('POST', '/v1/cast/files/:id/done', 'public', presenter(async ({ params }) => c().engine.finishFile(params.id)));
@@ -923,6 +959,7 @@ export function mountCast(registry, core) {
   registry.add('PUT', '/v1/cast/desk/house', 'session', async ({ body }) => c().putHouse(await body()));
   registry.add('GET', '/v1/cast/desk/youtube', 'session', async ({ url }) => c().youtube(url.searchParams.get('q')));
   registry.add('POST', '/v1/cast/desk/press', 'session', async ({ body }) => c().engine.press(DESK, await body()));
+  registry.add('POST', '/v1/cast/desk/pointer', 'session', async ({ body }) => c().pointer(DESK, await body()));
   registry.add('PUT', '/v1/cast/desk/lineup', 'session', async ({ body }) => c().putLineup(DESK, await body()));
   registry.add('POST', '/v1/cast/desk/lineup/show', 'session', async ({ body }) => c().lineupShow(DESK, await body()));
   registry.add('POST', '/v1/cast/desk/files', 'session', async ({ body }) => c().fileStart(DESK, await body()));
