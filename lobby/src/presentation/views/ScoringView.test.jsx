@@ -74,7 +74,9 @@ describe('ScoringView', () => {
     expect(take.dataset.teams).toBe('red');
     expect(take.textContent).toMatch(/RED \+1!/);
     expect(take.textContent).toMatch(/10 POINTS/);
-    expect(playTones).toHaveBeenCalledTimes(1);
+    // The board arriving sweeps once (gameOnSound), then the point: its chime over a low thump.
+    expect(playTones).toHaveBeenCalledTimes(2);
+    expect(playTones.mock.calls.at(-1)[0]).toHaveLength(3);
   });
 
   it('a point that puts a team in front alone calls it: TAKES THE LEAD! (owner 2026-11-06)', () => {
@@ -83,8 +85,8 @@ describe('ScoringView', () => {
     const take = container.querySelector('.pj-take');
     expect(take.dataset.lead).toBe('red');
     expect(take.querySelector('.pj-take__lead').textContent).toMatch(/takes the lead/i);
-    // The chime climbs one more step for the lead.
-    expect(playTones.mock.calls.at(-1)[0]).toHaveLength(3);
+    // The lead: the thump and chime, then a rising sting of three more steps.
+    expect(playTones.mock.calls.at(-1)[0]).toHaveLength(6);
   });
 
   it('no lead call for the first point of a game or a team adding to its own lead', () => {
@@ -94,7 +96,8 @@ describe('ScoringView', () => {
     act(() => { vi.advanceTimersByTime(3000); });
     rerender(view(scores(0, 2, 0, 0)));
     expect(container.querySelector('.pj-take__lead')).toBeNull();
-    expect(playTones.mock.calls.at(-1)[0]).toHaveLength(2);
+    // Its second point in a row: the thump, the chime, one streak step (owner 2026-11-15).
+    expect(playTones.mock.calls.at(-1)[0]).toHaveLength(4);
   });
 
   it('the phone\'s sound switch makes the chime play even with the projector\'s own switch off', () => {
@@ -103,6 +106,25 @@ describe('ScoringView', () => {
     expect(playTones.mock.calls.at(-1)[2]).toEqual({ force: true });
     rerender(view(scores(0, 2, 0, 0), { sounds: false }));
     expect(playTones.mock.calls.at(-1)[2]).toEqual({ force: false });
+  });
+
+  it('a run of points for one team escalates: BACK TO BACK!, HAT TRICK!, ON FIRE! (owner 2026-11-15)', () => {
+    const { container, rerender } = render(view(scores(0, 0, 0, 0)));
+    const point = (s) => { act(() => { vi.advanceTimersByTime(3000); }); rerender(view(s)); return [...container.querySelectorAll('.pj-take')].at(-1); };   // an older one may still be leaving
+    expect(point(scores(0, 1, 0, 0)).querySelector('.pj-take__streak')).toBeNull();
+    expect(point(scores(0, 2, 0, 0)).querySelector('.pj-take__streak').textContent).toBe('BACK TO BACK!');
+    expect(point(scores(0, 3, 0, 0)).querySelector('.pj-take__streak').textContent).toBe('HAT TRICK!');
+    expect(point(scores(0, 4, 0, 0)).querySelector('.pj-take__streak').textContent).toBe('ON FIRE!');
+    // Another team's point ends the run.
+    expect(point(scores(1, 4, 0, 0)).querySelector('.pj-take__streak')).toBeNull();
+    expect(point(scores(1, 5, 0, 0)).querySelector('.pj-take__streak')).toBeNull();
+  });
+
+  it('a club going up opens on GAME ON! in its colour, then the plates', () => {
+    const { container } = render(view(scores(0, 0, 0, 0)));
+    expect(container.querySelector('.pj-gameon').textContent).toMatch(/game on!/i);
+    // The plates are there underneath, ready for when it wipes away (INTRO_MS).
+    expect(container.querySelectorAll('.pj-score__grid [data-team]')).toHaveLength(4);
   });
 
   it('points close together share one takeover, split', () => {
@@ -117,6 +139,7 @@ describe('ScoringView', () => {
 
   it('a removed point ticks down quietly: no takeover, no chime', () => {
     const { container, rerender } = render(view(scores(4, 0, 0, 0)));
+    playTones.mockClear();   // the board's arrival sweep
     rerender(view(scores(3, 0, 0, 0)));
     expect(container.querySelector('.pj-take')).toBeNull();
     expect(playTones).not.toHaveBeenCalled();

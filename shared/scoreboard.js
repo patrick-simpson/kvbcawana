@@ -78,10 +78,63 @@ export const TIMER_PICKS = Object.freeze([30, 60, 120, 300]);
 export const COMBINE_MS = 1500;
 /** How long a point's takeover holds the wall. */
 export const TAKEOVER_MS = 1500;
-/** How long the winner screen holds the wall after End (or a club switch). */
-export const FINALE_MS = 8000;
+/**
+ * How long the winner screen holds the wall after End (or a club switch): the winner
+ * film's 20 s and a moment on its last frame (owner 2026-11-15: "20 seconds or more").
+ */
+export const FINALE_MS = 21000;
 /** A finale older than this is never played (a screen that just loaded). */
 export const FINALE_FRESH_MS = 20000;
+/**
+ * The winner films (owner 2026-11-15: 3D for the finale only, "one of each, and each
+ * night a different one plays"; video/score-finale/). Each is rendered once in three
+ * inks and coloured live for the winner. `head` is when "<TEAM> WINS!" lands (the film's
+ * own big moment), `scores` when the final scores come up, in seconds.
+ */
+export const FINALE_FILMS = Object.freeze([
+  Object.freeze({ id: 'trophy', head: 5.5, scores: 8.5 }),
+  Object.freeze({ id: 'stadium', head: 7.7, scores: 10.5 }),
+  Object.freeze({ id: 'takeover', head: 6.4, scores: 9.5 }),
+]);
+
+/**
+ * Tonight's winner film: the films in turn, one a night, counted from the night's date
+ * (a club night is a week after the last, and 7 is not a multiple of 3, so Wednesdays
+ * walk through all three as well). Every screen picks the same one. Pure.
+ * @param {string} night `YYYY-MM-DD`
+ */
+export function finaleFilmFor(night) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(night || ''));
+  const day = m ? Math.floor(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])) / 86400000) : 0;
+  return FINALE_FILMS[((day % FINALE_FILMS.length) + FINALE_FILMS.length) % FINALE_FILMS.length];
+}
+
+/**
+ * The two colours a winner film is painted with: the winner's colour, and its deep
+ * shade, or the second tied team's colour in a tie. The leaders' ink would vanish on the
+ * film's black, so they are painted silver. Pure.
+ * @param {readonly string[]} winners the winning team, or the tied teams
+ * @returns {{ team: string, deep: string }}
+ */
+export function finaleFilmColors(winners) {
+  const paint = (t) => (t === 'leaders' ? { fill: '#D9D9DE', deep: '#8A8A93' } : SCORE_TEAM_COLORS[t] || SCORE_TEAM_COLORS.blue);
+  const a = paint(winners[0]);
+  if (winners.length > 1) return { team: a.fill, deep: paint(winners[1]).fill };
+  return { team: a.fill, deep: a.deep };
+}
+
+/**
+ * A run of points for one team (owner 2026-11-15: "Escalate with streaks"): the words
+ * that ride a takeover, from the second point in a row. Pure.
+ * @param {number} n points in a row for the same team, this one included
+ */
+export function streakWords(n) {
+  if (n >= 4) return 'ON FIRE!';
+  if (n === 3) return 'HAT TRICK!';
+  if (n === 2) return 'BACK TO BACK!';
+  return '';
+}
+
 /** The church's zone: a night is its local date. */
 export const SCORE_ZONE = 'America/New_York';
 

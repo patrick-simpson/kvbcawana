@@ -23,7 +23,8 @@ import { SetupChecklist } from './components/SetupChecklist.jsx';
 import { CountdownView } from './views/CountdownView.jsx';
 import { GameTimeView } from './views/GameTimeView.jsx';
 import { ScoringView } from './views/ScoringView.jsx';
-import { ScoreFinale } from './components/ScoreFinale.jsx';
+import { FinaleFilm } from './components/FinaleFilm.jsx';
+import { nightOf } from '../../../shared/scoreboard.js';
 import { useScoreboard } from '../hooks/useScoreboard.js';
 import { teamsFor } from '../../../shared/scoreboard.js';
 import { useLowPower } from './hooks/useLowPower.js';
@@ -373,7 +374,7 @@ export const App = () => {
       <AnimatePresence>{backup && <BackupView key={backup} what={backup} />}</AnimatePresence>
 
       <AnimatePresence>
-        {finale && <ScoreFinale key={finale.id} club={finale.club} teams={finale.teams} scores={finale.scores} still={lowPowerNow} />}
+        {finale && <FinaleFilm key={finale.id} club={finale.club} teams={finale.teams} scores={finale.scores} night={board?.night || nightOf(serverNow())} still={lowPowerNow} sounds={board?.sounds === true} />}
       </AnimatePresence>
 
       {/* The scoreboard's plates fill the wall's corners: the logo steps aside. */}

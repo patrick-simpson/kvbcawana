@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  FINALE_FILMS, finaleFilmColors, finaleFilmFor, streakWords,
   boardIsTonight,
   leadChange,
   SCORE_ALL_TEAMS,
@@ -212,5 +213,29 @@ describe('leadChange (owner 2026-11-06: "RED TAKES THE LEAD!")', () => {
   it('only the playing teams count (two-team setups)', () => {
     const before = { boys: 2, girls: 2, blue: 9 };
     expect(leadChange(before, { boys: 2, girls: 3, blue: 9 }, ['boys', 'girls'])).toBe('girls');
+  });
+});
+
+describe('the winner films and the streaks (owner 2026-11-15)', () => {
+  it('plays a different film each night, the same on every screen, through all three on Wednesdays', () => {
+    expect(FINALE_FILMS.map((f) => f.id)).toEqual(['trophy', 'stadium', 'takeover']);
+    const a = finaleFilmFor('2026-11-18'), b = finaleFilmFor('2026-11-19');
+    expect(a.id).not.toBe(b.id);
+    expect(finaleFilmFor('2026-11-18')).toBe(a);
+    const wednesdays = ['2026-11-18', '2026-11-25', '2026-12-02'].map((n) => finaleFilmFor(n).id);
+    expect(new Set(wednesdays).size).toBe(3);
+    expect(FINALE_FILMS).toContain(finaleFilmFor('not a date'));
+    for (const f of FINALE_FILMS) expect(f.head).toBeLessThan(f.scores);
+  });
+
+  it('paints the film in the winner\'s colours; a tie in both teams\'; the leaders in silver', () => {
+    expect(finaleFilmColors(['red'])).toEqual({ team: '#F04A4B', deep: '#B82B32' });
+    expect(finaleFilmColors(['blue', 'yellow'])).toEqual({ team: '#4C72B8', deep: '#FCB614' });
+    expect(finaleFilmColors(['leaders']).team).toBe('#D9D9DE');
+    expect(finaleFilmColors(['kids', 'leaders'])).toEqual({ team: '#FAA41D', deep: '#D9D9DE' });
+  });
+
+  it('calls a run of points for one team', () => {
+    expect([1, 2, 3, 4, 9].map(streakWords)).toEqual(['', 'BACK TO BACK!', 'HAT TRICK!', 'ON FIRE!', 'ON FIRE!']);
   });
 });

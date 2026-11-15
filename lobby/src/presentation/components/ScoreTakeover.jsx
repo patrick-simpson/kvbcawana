@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { SCORE_TEAMS, SCORE_TEAM_COLORS, SCORE_TEAM_WORDS } from '../../../../shared/scoreboard.js';
+import { SCORE_TEAMS, SCORE_TEAM_COLORS, SCORE_TEAM_WORDS, streakWords } from '../../../../shared/scoreboard.js';
 import { EASE } from '../lib/motion-tokens.js';
 
 /**
@@ -18,10 +18,16 @@ import { EASE } from '../lib/motion-tokens.js';
  * A point that puts its team in front alone (owner 2026-11-06: "RED TAKES THE
  * LEAD!") adds a stamp over the word, TAKES THE LEAD!, slammed in after it, and
  * the takeover holds LEAD_HOLD_MS longer; only on a one-team takeover.
- * @param {{ hits: {team: string, gained: number}[], lead?: string|null, scores: Record<string, number>, teams?: readonly string[], still: boolean }} props
+ *
+ * A streak (owner 2026-11-15: "Escalate with streaks"): the same team's second point in a
+ * row and on gets bigger each time: the word grows, BACK TO BACK! / HAT TRICK! / ON FIRE!
+ * rides under it, and from the third the wall shakes and more sparkles pop.
+ * @param {{ hits: {team: string, gained: number}[], lead?: string|null, streak?: number, scores: Record<string, number>, teams?: readonly string[], still: boolean }} props
  */
-export const ScoreTakeover = ({ hits, lead = null, scores, teams = SCORE_TEAMS, still }) => {
+export const ScoreTakeover = ({ hits, lead = null, streak = 0, scores, teams = SCORE_TEAMS, still }) => {
   const one = hits.length === 1;
+  const run = one ? streak : 0;
+  const hot = run >= 3 && !still;
   const origin = one ? originOf(hits[0].team, teams) : '50% 50%';
   return (
     <motion.div
@@ -31,13 +37,14 @@ export const ScoreTakeover = ({ hits, lead = null, scores, teams = SCORE_TEAMS, 
       data-lead={lead || undefined}
       aria-label={hits.map((h) => `${SCORE_TEAM_WORDS[h.team]} plus ${h.gained}${h.team === lead ? ', takes the lead' : ''}`).join(', ')}
       initial={still ? { opacity: 1 } : { clipPath: `circle(0% at ${origin})` }}
-      animate={{ clipPath: `circle(150% at ${origin})`, opacity: 1, transition: still ? { duration: 0 } : { duration: 0.42, ease: EASE.wipe } }}
+      data-streak={run >= 2 ? run : undefined}
+      animate={{ clipPath: `circle(150% at ${origin})`, opacity: 1, ...(hot ? { x: [0, -18, 15, -11, 8, -4, 0] } : {}), transition: still ? { duration: 0 } : { duration: 0.42, ease: EASE.wipe, x: { duration: 0.55, delay: 0.3 } } }}
       exit={{ opacity: 0, scale: still ? 1 : 1.04, transition: { duration: still ? 0 : 0.22, ease: EASE.exit } }}
     >
       {hits.map((h, i) => (
-        <Band key={h.team} hit={h} lead={one && h.team === lead} total={scores[h.team]} index={i} count={hits.length} still={still} />
+        <Band key={h.team} hit={h} lead={one && h.team === lead} run={run} total={scores[h.team]} index={i} count={hits.length} still={still} />
       ))}
-      {!still && one && <Sparkles color={SCORE_TEAM_COLORS[hits[0].team].ink === '#FFFFFF' ? '#FFFFFF' : '#231F20'} />}
+      {!still && one && <Sparkles color={SCORE_TEAM_COLORS[hits[0].team].ink === '#FFFFFF' ? '#FFFFFF' : '#231F20'} more={hot} />}
     </motion.div>
   );
 };
@@ -56,7 +63,7 @@ function originOf(team, teams) {
 /** The slant between bands, as a share of the wall's width. */
 const SLANT = 0.08;
 
-const Band = ({ hit, lead, total, index, count, still }) => {
+const Band = ({ hit, lead, run = 0, total, index, count, still }) => {
   const c = SCORE_TEAM_COLORS[hit.team];
   const w = 1 / count;
   const x0 = index * w;
@@ -68,11 +75,20 @@ const Band = ({ hit, lead, total, index, count, still }) => {
     ? undefined
     : `polygon(${pct(index === 0 ? 0 : x0 + SLANT / 2)} 0, ${pct(index === count - 1 ? 1 : x1 + SLANT / 2)} 0, ${pct(index === count - 1 ? 1 : x1 - SLANT / 2)} 100%, ${pct(index === 0 ? 0 : x0 - SLANT / 2)} 100%)`;
   const word = `${SCORE_TEAM_WORDS[hit.team]} +${hit.gained}${count === 1 ? '!' : ''}`;
-  const size = count === 1 ? 19 : count === 2 ? 10.5 : count === 3 ? 7 : 5.2;
+  const size = (count === 1 ? 19 : count === 2 ? 10.5 : count === 3 ? 7 : 5.2) * (1 + 0.07 * Math.min(Math.max(run - 1, 0), 3));
+  const callout = streakWords(run);
   const centre = (x0 + x1) / 2;
   return (
     <div className="pj-take__band" style={{ background: c.fill, clipPath: clip, '--team-deep': c.deep, '--team-ink': c.ink }}>
       <div className="pj-take__copy" style={{ left: `${(centre * 100).toFixed(2)}%` }}>
+        {lead && !still && (
+          <motion.div
+            className="pj-take__rays"
+            aria-hidden="true"
+            initial={{ scale: 0, opacity: 0 }}
+            animate={{ scale: [0, 1.15, 1], opacity: [0, 0.9, 0.55], rotate: [0, 40], transition: { duration: 1.6, delay: 0.55, ease: 'easeOut' } }}
+          />
+        )}
         {lead && (
           <motion.div
             className="pj-take__lead"
@@ -110,6 +126,16 @@ const Band = ({ hit, lead, total, index, count, still }) => {
         >
           {total} {total === 1 ? 'POINT' : 'POINTS'}
         </motion.div>
+        {callout && (
+          <motion.div
+            className="pj-take__streak"
+            data-run={run}
+            initial={still ? false : { scale: 0, opacity: 0, rotate: 8 }}
+            animate={still ? undefined : { scale: [0, 1.2, 1], opacity: [0, 1, 1], rotate: [8, 3, 3], transition: { duration: 0.45, delay: 0.5, ease: 'easeOut' } }}
+          >
+            {callout}
+          </motion.div>
+        )}
       </div>
     </div>
   );
@@ -126,9 +152,18 @@ const SPARKS = [
 ];
 const SPARKLE_PATH = 'M8.25,4.75L11.26,5.74C11.82,5.91 11.82,6.70 11.26,6.88L8.25,7.86C8.06,7.92 7.92,8.06 7.86,8.25L6.88,11.26C6.70,11.82 5.92,11.82 5.73,11.26L4.75,8.25C4.69,8.06 4.55,7.92 4.37,7.86L1.36,6.88C0.80,6.70 0.80,5.91 1.36,5.74L4.37,4.75C4.55,4.69 4.69,4.55 4.75,4.37L5.73,1.35C5.92,0.80 6.70,0.80 6.88,1.35L7.86,4.37C7.92,4.55 8.06,4.69 8.25,4.75';
 
-const Sparkles = ({ color }) => (
+const MORE_SPARKS = [
+  { x: 46, y: 6, s: 6.4, r: -8, d: 0.42 },
+  { x: 92, y: 42, s: 5.2, r: 18, d: 0.46 },
+  { x: 5, y: 45, s: 6.0, r: -22, d: 0.5 },
+  { x: 40, y: 90, s: 5.6, r: 6, d: 0.54 },
+  { x: 74, y: 30, s: 3.4, r: 24, d: 0.58 },
+  { x: 22, y: 60, s: 3.8, r: -14, d: 0.62 },
+];
+
+const Sparkles = ({ color, more = false }) => (
   <>
-    {SPARKS.map((p, i) => (
+    {(more ? [...SPARKS, ...MORE_SPARKS] : SPARKS).map((p, i) => (
       <motion.svg
         key={i}
         className="pj-take__sparkle"

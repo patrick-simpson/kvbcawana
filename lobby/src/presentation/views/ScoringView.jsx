@@ -12,7 +12,8 @@ import { secondsUntil, windowEnd } from '../lib/schedule.js';
 import { WARNING_LABELS, WARNING_STINGER_INTENSITY, warningFor } from '../lib/gameWarning.js';
 import { WARNING_TONES } from '../lib/kit.js';
 import { DUR, EASE } from '../lib/motion-tokens.js';
-import { playStinger, playTones } from '../lib/stingers.js';
+import { playStinger } from '../lib/stingers.js';
+import { gameOnSound, pointSound } from '../lib/scoreSounds.js';
 import { BirthdayChip, countForClub, formatLeft } from './GameTimeView.jsx';
 import {
   COMBINE_MS,
@@ -21,11 +22,17 @@ import {
   SCORE_TEAM_COLORS,
   SCORE_TEAM_WORDS,
   TAKEOVER_MS,
+  anyPoints,
   leadChange,
   leaderOf,
   pointsGained,
 } from '../../../../shared/scoreboard.js';
 
+
+/** How long GAME ON! holds before the plates; how long TIME! holds; how much longer a 3+ streak's takeover stays. */
+export const INTRO_MS = 1500;
+export const TIME_UP_MS = 1800;
+export const STREAK_HOLD_MS = 350;
 /**
  * The game time scoreboard on the wall (owner 2026-11-05; approved mockup):
  * the four teams as big plates in the phone's own 2 x 2 (blue top-left, red
@@ -86,19 +93,22 @@ export const ScoringView = ({ now, club, scores, teams = SCORE_TEAMS, clock, ser
   const [takeover, setTakeover] = useState(/** @type {null | {id: number, hits: {team: string, gained: number}[], startedAt: number}} */ (null));
   const prev = useRef(scores);
   const ids = useRef(0);
+  // A run of points for one team (owner 2026-11-15: "Escalate with streaks"): another
+  // team's point, a shared takeover or a fresh game ends it.
+  const streak = useRef({ team: '', n: 0 });
   useEffect(() => {
     const gained = pointsGained(prev.current, scores, teams);
     // A team that just went in front (owner 2026-11-06: "RED TAKES THE LEAD!"), only by its own point.
     const taken = leadChange(prev.current, scores, teams);
     const lead = taken && gained.some((g) => g.team === taken) ? taken : null;
+    const fresh = !anyPoints(prev.current, teams);
     prev.current = scores;
     if (!gained.length) return;
+    if (gained.length === 1 && !fresh && streak.current.team === gained[0].team) streak.current.n += 1;
+    else streak.current = gained.length === 1 ? { team: gained[0].team, n: 1 } : { team: '', n: 0 };
+    const run = streak.current.n;
     gained.forEach((g, i) => {
-      const [a, b] = SCORE_TEAM_CHIMES[g.team];
-      const notes = [{ freq: a, at: i * 0.05, len: 0.18 }, { freq: b, at: i * 0.05 + 0.08, len: 0.32 }];
-      // The lead: the chime climbs one more step.
-      if (g.team === lead) notes.push({ freq: b * 1.5, at: i * 0.05 + 0.2, len: 0.4 });
-      playTones(notes, undefined, { force: sounds });
+      pointSound(SCORE_TEAM_CHIMES[g.team], { at: i * 0.05, lead: g.team === lead, streak: gained.length === 1 ? run : 1, force: sounds });
     });
     const t = performance.now();
     setTakeover((cur) => {
@@ -113,21 +123,40 @@ export const ScoringView = ({ now, club, scores, teams = SCORE_TEAMS, clock, ser
         hits.sort((x, y) => teams.indexOf(x.team) - teams.indexOf(y.team));
         // The lead call belongs to a one-team takeover: a shared one drops it.
         const keep = hits.length === 1 ? lead || cur.lead : null;
-        return { id: cur.id, hits, startedAt: cur.startedAt, last: t, lead: keep };
+        return { id: cur.id, hits, startedAt: cur.startedAt, last: t, lead: keep, streak: hits.length === 1 ? run : 0 };
       }
       ids.current += 1;
-      return { id: ids.current, hits: gained, startedAt: t, last: t, lead: gained.length === 1 ? lead : null };
+      return { id: ids.current, hits: gained, startedAt: t, last: t, lead: gained.length === 1 ? lead : null, streak: gained.length === 1 ? run : 0 };
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scores]);
   useEffect(() => {
     if (!takeover) return undefined;
-    const timer = window.setTimeout(() => setTakeover(null), TAKEOVER_MS + (takeover.lead ? LEAD_HOLD_MS : 0) + (takeover.last - takeover.startedAt));
+    const timer = window.setTimeout(() => setTakeover(null), TAKEOVER_MS + (takeover.lead ? LEAD_HOLD_MS : 0) + (takeover.streak >= 3 ? STREAK_HOLD_MS : 0) + (takeover.last - takeover.startedAt));
     return () => window.clearTimeout(timer);
   }, [takeover]);
 
   const leader = leaderOf(scores, teams);
   const compact = Boolean(clock);
+
+  // The board arriving (owner 2026-11-15): GAME ON! in the club's colour for a moment, with
+  // a sweep, before the plates slam in. Once per club going up (a re-render never replays it).
+  const [intro, setIntro] = useState(!lowPower);
+  useEffect(() => {
+    gameOnSound(sounds);
+    if (lowPower) return undefined;
+    const t = window.setTimeout(() => setIntro(false), INTRO_MS);
+    return () => window.clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [club]);
+
+  // A timer reaching zero: TIME! over the whole wall for a moment (the clock buzzes).
+  const [timeFlash, setTimeFlash] = useState(/** @type {number|null} */ (null));
+  useEffect(() => {
+    if (timeFlash === null) return undefined;
+    const t = window.setTimeout(() => setTimeFlash(null), TIME_UP_MS);
+    return () => window.clearTimeout(t);
+  }, [timeFlash]);
 
   // The strip's game clock drops in from the middle of the wall.
   const u = useFrameUnit();
@@ -163,7 +192,7 @@ export const ScoringView = ({ now, club, scores, teams = SCORE_TEAMS, clock, ser
               animate={{ opacity: 1, scale: 1, transition: { duration: DUR.pop, ease: EASE.pop } }}
               exit={{ opacity: 0, scale: 0.85, transition: { duration: DUR.exit, ease: EASE.exit } }}
             >
-              <ScoreClock clock={clock} serverNow={serverNow} accent={info.color} size="calc(19 * var(--u))" sounds={sounds} />
+              <ScoreClock clock={clock} serverNow={serverNow} accent={info.color} size="calc(19 * var(--u))" sounds={sounds} onDone={lowPower ? undefined : () => setTimeFlash(clock.id)} />
             </motion.div>
           )}
         </AnimatePresence>
@@ -204,7 +233,43 @@ export const ScoringView = ({ now, club, scores, teams = SCORE_TEAMS, clock, ser
       </div>
 
       <AnimatePresence>
-        {takeover && <ScoreTakeover key={takeover.id} hits={takeover.hits} lead={takeover.lead} scores={scores} teams={teams} still={lowPower} />}
+        {takeover && <ScoreTakeover key={takeover.id} hits={takeover.hits} lead={takeover.lead} streak={takeover.streak || 0} scores={scores} teams={teams} still={lowPower} />}
+        <AnimatePresence>
+          {intro && (
+            <motion.div
+              key="intro"
+              className="pj-gameon"
+              style={{ '--club': info.color }}
+              initial={{ clipPath: 'inset(0 100% 0 0)' }}
+              animate={{ clipPath: 'inset(0 0% 0 0)', transition: { duration: 0.32, ease: EASE.wipe } }}
+              exit={{ clipPath: 'inset(0 0 0 100%)', transition: { duration: 0.32, ease: EASE.wipe } }}
+              aria-hidden="true"
+            >
+              <motion.span className="pj-gameon__club" initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0, transition: { delay: 0.18, duration: 0.3 } }}>{info.name}</motion.span>
+              <motion.span
+                className="pj-gameon__word"
+                initial={{ scale: 2.8, opacity: 0 }}
+                animate={{ scale: [2.8, 0.9, 1.05, 1], opacity: [0, 1, 1, 1], transition: { delay: 0.22, duration: 0.6, times: [0, 0.45, 0.72, 1] } }}
+              >
+                Game on!
+              </motion.span>
+            </motion.div>
+          )}
+        </AnimatePresence>
+        <AnimatePresence>
+          {timeFlash !== null && (
+            <motion.div
+              key={`time-${timeFlash}`}
+              className="pj-timeup"
+              aria-hidden="true"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: [0, 1, 0.85, 1], x: [0, -14, 12, -8, 6, 0], transition: { duration: 0.6 } }}
+              exit={{ opacity: 0, transition: { duration: 0.3 } }}
+            >
+              <motion.span initial={{ scale: 3 }} animate={{ scale: [3, 0.92, 1.04, 1], transition: { duration: 0.55, times: [0, 0.5, 0.75, 1] } }}>Time!</motion.span>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </AnimatePresence>
     </div>
   );

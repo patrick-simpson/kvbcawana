@@ -22,7 +22,7 @@ import { playTones } from '../lib/stingers.js';
  *   sounds?: boolean,
  * }} props
  */
-export const ScoreClock = ({ clock, serverNow, accent, size, sounds = false }) => {
+export const ScoreClock = ({ clock, serverNow, accent, size, sounds = false, onDone }) => {
   const mainRef = useRef(/** @type {HTMLSpanElement|null} */ (null));
   const tenthRef = useRef(/** @type {HTMLSpanElement|null} */ (null));
   const barRef = useRef(/** @type {HTMLSpanElement|null} */ (null));
@@ -30,6 +30,9 @@ export const ScoreClock = ({ clock, serverNow, accent, size, sounds = false }) =
   const buzzed = useRef(/** @type {number|null} */ (null));
   const soundsRef = useRef(sounds);
   useEffect(() => { soundsRef.current = sounds; }, [sounds]);
+  // The wall's TIME! moment (ScoringView), called once per timer, with the buzzer.
+  const doneRef = useRef(onDone);
+  useEffect(() => { doneRef.current = onDone; }, [onDone]);
 
   useEffect(() => {
     let raf = 0;
@@ -50,6 +53,7 @@ export const ScoreClock = ({ clock, serverNow, accent, size, sounds = false }) =
         if (r.done && buzzed.current !== clock.id) {
           buzzed.current = clock.id;
           buzz(soundsRef.current);
+          if (clock.kind === 'timer') doneRef.current?.();
         }
       }
       raf = requestAnimationFrame(draw);

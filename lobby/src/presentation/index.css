@@ -1297,6 +1297,48 @@
   animation-play-state: paused !important;
 }
 
+/* ── The scoreboard, epic (owner 2026-11-15) ── */
+/* The winner film: full wall, painted live (FinaleFilm.jsx); the words and scores over it. */
+.pj-film { position: absolute; inset: 0; z-index: 45; background: #000000; }
+.pj-film__video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.pj-film__frame { display: flex; flex-direction: column; align-items: center; color: #ffffff; }
+.pj-film__head { font-size: calc(12.5 * var(--u)); filter: drop-shadow(0 0 calc(2 * var(--u)) rgba(0, 0, 0, 0.55)); }
+.pj-film__kick { text-shadow: 0 0 calc(1 * var(--u)) rgba(0, 0, 0, 0.8); }
+/* GAME ON! as a club goes up (ScoringView). */
+.pj-gameon { position: absolute; inset: 0; z-index: 42; background: var(--club); display: flex; flex-direction: column; align-items: center; justify-content: center; color: #ffffff; }
+.pj-gameon__club { font-family: var(--font-condensed); text-transform: uppercase; letter-spacing: 0.08em; font-size: calc(4.2 * var(--u)); line-height: 1; }
+.pj-gameon__word { font-family: var(--font-display); text-transform: uppercase; font-size: calc(17 * var(--u)); line-height: 0.95; text-shadow: calc(0.8 * var(--u)) calc(0.8 * var(--u)) 0 rgba(0, 0, 0, 0.35); }
+/* TIME! over the wall when a timer reaches zero. */
+.pj-timeup { position: absolute; inset: 0; z-index: 43; background: rgba(241, 90, 40, 0.92); display: flex; align-items: center; justify-content: center; }
+.pj-timeup span { font-family: var(--font-display); text-transform: uppercase; color: #ffffff; font-size: calc(26 * var(--u)); line-height: 1; text-shadow: calc(1 * var(--u)) calc(1 * var(--u)) 0 #9e3512; }
+/* A streak's call under the total, and the lead's rays behind its stamp. */
+.pj-take__streak {
+  margin-top: calc(1.6 * var(--u));
+  display: inline-block;
+  padding: calc(0.5 * var(--u)) calc(2 * var(--u));
+  border-radius: calc(1 * var(--u));
+  background: #ffffff;
+  color: var(--team-deep);
+  font-family: var(--font-display);
+  text-transform: uppercase;
+  font-size: calc(4.6 * var(--u));
+  line-height: 1.05;
+  box-shadow: calc(0.4 * var(--u)) calc(0.4 * var(--u)) 0 var(--team-deep);
+}
+.pj-take__streak[data-run='3'] { font-size: calc(5.4 * var(--u)); }
+.pj-take__streak[data-run='4'], .pj-take__streak[data-run='5'] { font-size: calc(6.2 * var(--u)); background: #fcb614; color: #231f20; }
+.pj-take__rays {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: calc(150 * var(--u));
+  height: calc(150 * var(--u));
+  margin: calc(-75 * var(--u)) 0 0 calc(-75 * var(--u));
+  border-radius: 50%;
+  background: repeating-conic-gradient(rgba(255, 255, 255, 0.28) 0deg 7deg, transparent 7deg 20deg);
+  pointer-events: none;
+}
+
 /* ════════════════════════════════════════════════════════════════════
    Phones and tablets (lib/touch.js). Everything below is gated on the
    PRIMARY pointer, never on the window's size: the projector PC (a mouse
