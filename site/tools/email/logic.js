@@ -3,6 +3,8 @@
 // email's real HTML itself (worker/src/clubmail.js); `previewHtml` here only
 // shows the director what that will look like.
 
+import { linked, mailHtml } from './mailhtml.js';
+
 /** A picture placed in the text is a line of its own: [picture: name.jpg] */
 export const PICTURE_LINE = /^\[picture:\s*(.+?)\s*\]$/i;
 export const pictureLine = (name) => `[picture: ${name}]`;
@@ -104,25 +106,8 @@ export const whenWords = (at) => new Date(at).toLocaleString('en-US', { weekday:
 /** Does the message say anything (pictures alone are not a message)? */
 export const hasWords = (blocks) => blocks.some((b) => b.t !== 'img');
 
-const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-/**
- * A paragraph's text as HTML, as the Worker's `linked` makes it: escaped first, then
- * `**bold**`, `[words](https://address)` and bare web addresses as links.
- * @param {string} text
- */
-export function inlineHtml(text) {
-  const a = (href, words) => `<a href="${href}">${words}</a>`;
-  const bold = (s) => s.replace(/\*\*([^*\n](?:[^\n]*?[^*\n])?)\*\*/g, '<b>$1</b>');
-  const plain = (s) => bold(s.replace(/\bhttps?:\/\/[^\s<>"]+[^\s<>".,;:!?)*]/g, (u) => a(u, u)));
-  const e = esc(text);
-  let out = '', last = 0;
-  for (const m of e.matchAll(/\[([^\]\n]{1,200})\]\((https?:\/\/[^\s<>"()]+)\)/g)) {
-    out += plain(e.slice(last, m.index)) + a(m[2], bold(m[1]));
-    last = m.index + m[0].length;
-  }
-  return (out + plain(e.slice(last))).replace(/\n/g, '<br>');
-}
-const linked = inlineHtml;
+/** A paragraph's text as HTML: the email's own rule (mailhtml.js `linked`). */
+export const inlineHtml = linked;
 
 // The formatting buttons (owner 2026-11-14): each is a plain edit of the typed text, so
 // what a button does and what a director types by hand are the same thing. Each takes
@@ -174,21 +159,33 @@ export function linkEdit(value, start, end, url) {
 }
 
 /**
- * What the email will look like (the Worker's renderMail, as a preview).
+ * What the email will look like: the email's own HTML (mailhtml.js, the file the Worker
+ * builds the real one with), with the pictures from this page and the header picture
+ * from beside it.
  * @param {any[]} blocks @param {{ name: string, url?: string }[]} files
- * @param {{ sender: string, club: string }} who
+ * @param {{ sender: string, club: string, style?: any, art?: string }} who `style` null = the plain look
  */
 export function previewHtml(blocks, files, who) {
-  const out = blocks.map((b) => {
-    if (b.t === 'h') return `<h2>${esc(b.text)}</h2>`;
-    if (b.t === 'p') return `<p>${linked(b.text)}</p>`;
-    if (b.t === 'ul') return `<ul>${b.items.map((i) => `<li>${linked(i)}</li>`).join('')}</ul>`;
-    const f = files[b.file];
-    return f && f.url ? `<p><img src="${esc(f.url)}" alt="${esc(f.name)}"></p>` : '';
+  return mailHtml({
+    blocks, files: files.map((f) => ({ name: f.name, inline: Boolean(f.url) })),
+    foot: `Sent by ${who.sender} for ${who.club}, Kennebec Valley Baptist Church Awana. Reply to this email to reach ${who.sender}.`,
+    style: who.style || null, src: (i) => (files[i] && files[i].url) || '', art: who.art,
   });
-  out.push(`<p class="foot">Sent by ${esc(who.sender)} for ${esc(who.club)}, Kennebec Valley Baptist Church Awana. Reply to this email to reach ${esc(who.sender)}.</p>`);
-  return out.join('');
 }
+
+/**
+ * The designs a message may wear, in words, for the chosen club: the club's own (not
+ * for "all clubs"), the Awana one, or none.
+ * @param {string[]} looks the Worker's list @param {{ id: string, name: string }} club
+ * @returns {{ id: string, name: string }[]}
+ */
+export function lookChoices(looks, club) {
+  const words = { club: `${club.name} design`, awana: 'Awana design', plain: 'No design (plain email)' };
+  return (Array.isArray(looks) ? looks : []).filter((l) => words[l] && !(l === 'club' && club.id === 'all')).map((l) => ({ id: l, name: words[l] }));
+}
+
+/** The colours and picture of the chosen design (null = plain). @param {string} look @param {any} club @param {any} awana */
+export const lookStyle = (look, club, awana) => (look === 'plain' ? null : (look === 'club' && club && club.style) || awana || null);
 
 /** "1.4 MB", "320 KB" @param {number} n */
 export function sizeWords(n) {

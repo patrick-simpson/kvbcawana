@@ -1946,6 +1946,17 @@ puts it back to `send` (it may be tried again), no answer leaves it `unknown` an
 never sent again. A test (`{test: true}`) goes to the sender alone, subject `[Test] ...`,
 reads no roster, and leaves the draft ready. At most 6 real sends a director a day.
 `mail:log` keeps the last 50 sends: when, who, club, subject, how many; no address.
+**The looks** (owner 2026-11-14). A draft carries `look`: `club` (the default: the club's
+colour, mark and wave from the catalog kit), `awana` (the church's Awana Clubs look; always
+used for club `all`) or `plain` (no design: the words alone, as every email was before).
+The HTML is built by ONE file, `site/tools/email/mailhtml.js`, which the Worker imports
+and the page's preview uses, so the preview is the email. A design's header is one
+picture, `https://awana.kvbchurch.org/tools/email/art/<name>.png` (committed; drawn from
+the kit by `scripts/email-art/make.mjs`); with pictures off a mail app shows its alt words
+in white on the club's colour. `GET /v1/mail/me` answers `looks`, each club's `style` and
+`awana` (the colours), so the page needs no table of its own. ci.yml deploys the Worker
+when mailhtml.js changes.
+
 **The secret's end.** `MS_SECRET_ENDS` (`[vars]`, "YYYY-MM-DD") is the day the app's client
 secret ends. In its last 30 days the cron mails the Awana mailbox once a week
 (`ClubMail.secretCheck`, storage `mail:secret:told`), and `GET /v1/mail/me` answers the
@@ -1984,7 +1995,7 @@ send (one Graph read, kept 10 minutes in memory) and answers a number, never an 
 | `GET /v1/mail/log` | sender | | `{sends: [{id, at, name, club, clubName, subject, recipients, files}]}` (the owner: all; a director: their own) |
 | `GET /v1/mail/log/:id` | sender | | `{club, subject, blocks}` of one of those sends; 404 `no-send` |
 | `GET /v1/mail/log/:id/bounces` | sender | | `{bounced, mailbox}`; `bounced: null` = not known (over a week old, or Microsoft did not answer) |
-| `POST /v1/mail/drafts` | sender | `{club, subject, blocks, files: [{name, type, size, inline}]}` | `{id, part, files: [{enc: b64|raw, parts}]}`; 400 `subject`/`empty`/`files`/`file-type`/`file-size`/`too-big` |
+| `POST /v1/mail/drafts` | sender | `{club, look?, subject, blocks, files: [{name, type, size, inline}]}` | `{id, part, files: [{enc: b64|raw, parts}]}`; 400 `subject`/`empty`/`files`/`file-type`/`file-size`/`too-big` |
 | `PUT /v1/mail/drafts/:id/files/:f/:n` | sender | one piece (text or bytes) | `{next}`; 409 `order`, 400 `size` |
 | `POST /v1/mail/drafts/:id/send` | sender | `{test?}` | the progress; 409 `sent`/`running`, 400 `parts`, 429 `daily-limit` |
 | `POST /v1/mail/drafts/:id/later` | sender | `{at}` (ISO time) | `{id, at}`: the draft waits and is sent then; 400 `too-soon` (under 5 min)/`too-far` (over 4 weeks)/`parts`, 409 `later-full` (3 a sender, 12 in all)/`sent`/`running` |

@@ -59,6 +59,10 @@
 //                         while its line is in the log, so it can be started from again
 
 import { CLUB_TABLE, clubIdByAlias } from '../../shared/clubs.js';
+// The email's looks and its HTML: one copy, the page's preview is drawn by the same file.
+import { AWANA_STYLE, MAIL_LOOKS, clubStyle, linked, mailHtml } from '../../site/tools/email/mailhtml.js';
+
+export { linked };
 import { randomBytes, safeEqual, toBase64Url, toHex } from './crypto.js';
 import { fail, json } from './http.js';
 
@@ -135,7 +139,6 @@ const manyLines = (/** @type {unknown} */ v, /** @type {number} */ max) => Strin
 /** A valid address, lower case, or ''. @param {unknown} v */
 export const cleanEmail = (v) => { const s = String(v ?? '').trim().toLowerCase(); return s.length <= 254 && EMAIL_RE.test(s) ? s : ''; };
 const newId = () => toHex(randomBytes(8));
-const esc = (/** @type {string} */ s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 async function sha256Hex(/** @type {string} */ s) {
   return toHex(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s))));
 }
@@ -209,45 +212,22 @@ export function cleanBlocks(v, files) {
 }
 
 /**
- * A paragraph's text as HTML: escaped first, then `**bold**`, `[words](https://address)`
- * and bare web addresses as links (owner 2026-11-14: the page's Bold and Link buttons).
- * Only these three; the page's `inlineHtml` (site/tools/email/logic.js) is the same rule.
- * @param {string} text
- */
-export function linked(text) {
-  const a = (/** @type {string} */ href, /** @type {string} */ words) => `<a href="${href}" style="color:#0B5CAD">${words}</a>`;
-  const bold = (/** @type {string} */ s) => s.replace(/\*\*([^*\n](?:[^\n]*?[^*\n])?)\*\*/g, '<b>$1</b>');
-  const plain = (/** @type {string} */ s) => bold(s.replace(/\bhttps?:\/\/[^\s<>"]+[^\s<>".,;:!?)*]/g, (u) => a(u, u)));
-  const e = esc(text);
-  let out = '', last = 0;
-  for (const m of e.matchAll(/\[([^\]\n]{1,200})\]\((https?:\/\/[^\s<>"()]+)\)/g)) {
-    out += plain(e.slice(last, m.index)) + a(m[2], bold(m[1]));
-    last = (m.index || 0) + m[0].length;
-  }
-  return (out + plain(e.slice(last))).replace(/\n/g, '<br>');
-}
-
-/**
- * The email's HTML and plain text, from cleaned blocks.
- * @param {{ blocks: any[], files: { name: string, inline: boolean }[], club: string, label?: string, sender: string, replyTo: string, test: boolean }} m
+ * The email's HTML and plain text, from cleaned blocks. The HTML is built by the ONE
+ * copy of the looks (site/tools/email/mailhtml.js), which the page's preview uses too.
+ * @param {{ blocks: any[], files: { name: string, inline: boolean }[], club: string, label?: string, sender: string, replyTo: string, test: boolean,
+ *   style?: ReturnType<typeof clubStyle> | typeof AWANA_STYLE | null }} m `style` absent = the plain look
  */
 export function renderMail(m) {
-  const font = "font-family:-apple-system,'Segoe UI',Helvetica,Arial,sans-serif";
-  const html = [];
   const text = [];
   for (const b of m.blocks) {
-    if (b.t === 'h') { html.push(`<h2 style="font-size:18px;margin:22px 0 8px">${esc(b.text)}</h2>`); text.push(b.text.toUpperCase()); }
-    else if (b.t === 'p') { html.push(`<p style="margin:0 0 14px">${linked(b.text)}</p>`); text.push(b.text); }
-    else if (b.t === 'ul') { html.push(`<ul style="margin:0 0 14px;padding-left:22px">${b.items.map((/** @type {string} */ i) => `<li style="margin:0 0 4px">${linked(i)}</li>`).join('')}</ul>`); text.push(b.items.map((/** @type {string} */ i) => `- ${i}`).join('\n')); }
-    else if (b.t === 'img' && m.files[b.file]?.inline) html.push(`<p style="margin:0 0 14px"><img src="cid:f${b.file}" alt="${esc(m.files[b.file].name)}" style="max-width:100%;height:auto;border:0"></p>`);
+    if (b.t === 'h') text.push(b.text.toUpperCase());
+    else if (b.t === 'p') text.push(b.text);
+    else if (b.t === 'ul') text.push(b.items.map((/** @type {string} */ i) => `- ${i}`).join('\n'));
   }
   const foot = `Sent by ${m.sender} for ${m.label || clubName(m.club)}, Kennebec Valley Baptist Church Awana. Reply to this email to reach ${m.sender}.`;
   const note = m.test ? 'TEST: only you received this. Parents have not been sent anything.' : '';
   return {
-    html: `<div style="${font};color:#231F20;font-size:16px;line-height:1.5;max-width:640px">`
-      + (note ? `<p style="margin:0 0 14px;padding:8px 12px;background:#FFF3C4">${note}</p>` : '')
-      + html.join('')
-      + `<p style="margin:26px 0 0;padding-top:12px;border-top:1px solid #D9D4CC;font-size:13px;color:#6B655E">${esc(foot)}</p></div>`,
+    html: mailHtml({ blocks: m.blocks, files: m.files, foot, note, style: m.style || null, src: (i) => `cid:f${i}` }),
     text: `${note ? `${note}\n\n` : ''}${text.join('\n\n')}\n\n${foot}\n`,
   };
 }
@@ -313,6 +293,16 @@ export class ClubMail {
   from() { return cleanEmail(this.env()?.MAIL_FROM) || MAIL_FROM_DEFAULT; }
   /** The mailbox one club's messages are sent from: its own (MAIL_FROM_CLUBS), else the Awana one. @param {string} club */
   fromFor(club) { return clubMailboxes(this.env()?.MAIL_FROM_CLUBS)[club] || this.from(); }
+  /**
+   * A message's look as colours and a picture name (mailhtml.js): the club's own, the
+   * Awana one (always for "all"), or null for plain. A draft from before the looks is plain.
+   * @param {string|undefined} look @param {string} club
+   */
+  lookStyle(look, club) {
+    if (!look || look === 'plain') return null;
+    const row = look === 'club' && club !== MAIL_ALL ? CLUB_TABLE.find((c) => c.id === club) : null;
+    return row ? clubStyle(row) : AWANA_STYLE;
+  }
   /** May this sender write to that club ("all" needs more than one club)? @param {any} who @param {string} club */
   mayWrite(who, club) { return club === MAIL_ALL ? who.clubs.length > 1 : who.clubs.includes(club); }
   /** The club in words; "all" is every club for the office, the sender's own clubs otherwise. @param {any} who @param {string} club */
@@ -613,7 +603,9 @@ export class ClubMail {
   me(who) {
     return json({
       ok: true, ready: this.configured(), name: who.name, replyTo: who.replyTo, office: who.office, from: this.from(),
-      clubs: who.clubs.map((/** @type {string} */ id) => ({ id, name: clubName(id), from: this.fromFor(id) })),
+      clubs: who.clubs.map((/** @type {string} */ id) => ({ id, name: clubName(id), from: this.fromFor(id), style: this.lookStyle('club', id) })),
+      // The looks a message may have (the first is the default) and the Awana look's colours.
+      looks: MAIL_LOOKS, awana: AWANA_STYLE,
       // The owner alone is told when the Microsoft secret is about to end (or has).
       secretDaysLeft: who.office && this.secretDaysLeft() !== null && /** @type {number} */ (this.secretDaysLeft()) <= SECRET_WARN_DAYS ? this.secretDaysLeft() : null,
       // Every club at once, for a sender with more than one.
@@ -662,7 +654,8 @@ export class ClubMail {
     // A picture nobody placed is an ordinary attachment.
     files.forEach((f, i) => { if (f.inline && !blocks.some((b) => b.t === 'img' && b.file === i)) f.inline = false; });
     await this.dropDraft(await this.storage.get(draftKey(who.id)));
-    const draft = { id: newId(), who: who.id, club, subject, blocks, files, at: this.now(), run: null, sent: null };
+    const look = MAIL_LOOKS.includes(body?.look) ? body.look : MAIL_LOOKS[0];
+    const draft = { id: newId(), who: who.id, club, look, subject, blocks, files, at: this.now(), run: null, sent: null };
     await this.storage.put(draftKey(who.id), draft);
     return json({ ok: true, id: draft.id, part: MAIL_PART, files: files.map((f) => ({ enc: f.enc, parts: f.parts })) });
   }
@@ -752,7 +745,7 @@ export class ClubMail {
         run.batches = Math.max(run.batches || 1, (run.batch || 0) + 1, Math.ceil(all.length / MAIL_RECIPIENTS_MAX));
         bcc = all.slice((run.batch || 0) * MAIL_RECIPIENTS_MAX, ((run.batch || 0) + 1) * MAIL_RECIPIENTS_MAX);
       }
-      const m = renderMail({ blocks: draft.blocks, files: draft.files, club: draft.club, label: this.clubLabel(who, draft.club), sender: who.name, replyTo: who.replyTo, test: run.test });
+      const m = renderMail({ blocks: draft.blocks, files: draft.files, club: draft.club, label: this.clubLabel(who, draft.club), sender: who.name, replyTo: who.replyTo, test: run.test, style: this.lookStyle(draft.look, draft.club) });
       const person = { emailAddress: { address: who.replyTo, name: who.name } };
       // The Awana mailbox gets a copy of every real send (owner 2026-11-14: "copy the Awana
       // email on every message sent through this"): BCC, unless it is already the To.
@@ -842,7 +835,7 @@ export class ClubMail {
     const log = await this.sendLog();
     log.unshift({ id: draft.id, at: draft.sent, who: who.id, name: who.name, club: draft.club, label: this.clubLabel(who, draft.club), subject: draft.subject, recipients: run.count, files: draft.files.length });
     // The words are kept with the log line (to start from again), and go when it does.
-    await this.storage.put(bodyKey(draft.id), { blocks: draft.blocks.filter((/** @type {any} */ b) => b.t !== 'img') });
+    await this.storage.put(bodyKey(draft.id), { look: draft.look || 'plain', blocks: draft.blocks.filter((/** @type {any} */ b) => b.t !== 'img') });
     for (const old of log.slice(MAIL_LOG_MAX)) if (old.id) await this.storage.delete(bodyKey(old.id));
     await this.storage.put(LOG_KEY, log.slice(0, MAIL_LOG_MAX));
     const out = { ok: true, ...this.progress(draft) };
@@ -1049,7 +1042,7 @@ export class ClubMail {
     const line = await logLine(this, who, id);
     const body = line ? await this.storage.get(bodyKey(id)) : null;
     if (!line || !body) return fail('That email is no longer kept.', 404, { reason: 'no-send' });
-    return json({ ok: true, club: line.club, subject: line.subject, blocks: body.blocks });
+    return json({ ok: true, club: line.club, look: body.look || 'plain', subject: line.subject, blocks: body.blocks });
   }
 
   /**

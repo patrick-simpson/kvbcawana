@@ -6,9 +6,12 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  blocksToText, boldEdit, bounceWords, cleanLink, hasWords, laterTime, secretWords, inlineHtml, linesEdit, linkEdit, parseMessage, pictureLine, previewHtml, problemWords, recipientWords, sizeWords, stepRetryable, totalWords,
+  blocksToText, boldEdit, bounceWords, cleanLink, hasWords, laterTime, secretWords, inlineHtml, linesEdit, linkEdit, parseMessage, pictureLine, lookChoices, lookStyle, previewHtml, problemWords, recipientWords, sizeWords, stepRetryable, totalWords,
 } from '../tools/email/logic.js';
-import { cleanBlocks, linked } from '../../worker/src/clubmail.js';
+import { cleanBlocks, linked, renderMail } from '../../worker/src/clubmail.js';
+import { existsSync } from 'node:fs';
+import { AWANA_STYLE, MAIL_LOOKS, clubStyle } from '../tools/email/mailhtml.js';
+import { CLUB_TABLE } from '../../shared/clubs.js';
 
 const DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'tools', 'email');
 const html = readFileSync(path.join(DIR, 'index.html'), 'utf8');
@@ -37,7 +40,7 @@ test('the preview never runs a director\'s markup', () => {
   const out = previewHtml(parseMessage('<img src=x onerror=alert(1)> https://example.org/a.', []), [], { sender: 'Dana <b>', club: 'Sparks' });
   assert.ok(!out.includes('<img'));
   assert.ok(out.includes('&lt;img src=x'));
-  assert.ok(out.includes('<a href="https://example.org/a">https://example.org/a</a>.'));
+  assert.ok(out.includes('<a href="https://example.org/a" style="color:#0B5CAD">https://example.org/a</a>.'));
   assert.ok(out.includes('Sent by Dana &lt;b&gt; for Sparks'));
 });
 
@@ -50,15 +53,17 @@ test('bold and links: the preview and the real email follow one rule', () => {
     '<b>not markup</b> [x](javascript:alert(1)) **<i>**',
     'line one\n**line two**',
   ];
-  // The Worker's copy only adds the link colour.
-  for (const s of samples) assert.equal(linked(s).replaceAll(' style="color:#0B5CAD"', ''), inlineHtml(s), s);
-  assert.equal(inlineHtml(samples[0]), 'Bring <b>one shoebox</b> on Wednesday.');
-  assert.equal(inlineHtml(samples[1]), 'Sign up at <a href="https://example.org/sign-up?a=1&amp;b=2">the church site</a>, please.');
-  assert.equal(inlineHtml(samples[2]), 'See <a href="https://example.org/list">https://example.org/list</a>. Or <b><a href="https://example.org/b">https://example.org/b</a></b>');
-  assert.equal(inlineHtml(samples[3]), 'A <a href="https://example.org/x"><b>bold</b> link</a> and 2 * 3 ** 4 stars');
-  const unsafe = inlineHtml(samples[4]);
+  // One rule: the page's is the Worker's own function (mailhtml.js).
+  assert.equal(inlineHtml, linked);
+  const real = inlineHtml;
+  const bare = (s) => real(s).replaceAll(' style="color:#0B5CAD"', '');
+  assert.equal(bare(samples[0]), 'Bring <b>one shoebox</b> on Wednesday.');
+  assert.equal(bare(samples[1]), 'Sign up at <a href="https://example.org/sign-up?a=1&amp;b=2">the church site</a>, please.');
+  assert.equal(bare(samples[2]), 'See <a href="https://example.org/list">https://example.org/list</a>. Or <b><a href="https://example.org/b">https://example.org/b</a></b>');
+  assert.equal(bare(samples[3]), 'A <a href="https://example.org/x"><b>bold</b> link</a> and 2 * 3 ** 4 stars');
+  const unsafe = bare(samples[4]);
   assert.ok(!unsafe.includes('<a') && !unsafe.includes('<i>') && unsafe.includes('&lt;b&gt;not markup'));
-  assert.equal(inlineHtml(samples[5]), 'line one<br><b>line two</b>');
+  assert.equal(bare(samples[5]), 'line one<br><b>line two</b>');
 });
 
 test('a sent message comes back as the text that makes it', () => {
@@ -108,6 +113,30 @@ test('the formatting buttons edit the typed text', () => {
   for (const bad of ['', 'https://', 'not a link', 'javascript:alert(1)', 'x"y.com', null]) assert.equal(cleanLink(bad), '', String(bad));
   assert.deepEqual(linkEdit('See the list now', 8, 12, 'https://example.org'), { value: 'See the [list](https://example.org) now', start: 9, end: 13 });
   assert.equal(linkEdit('Go ', 3, 3, 'https://example.org').value, 'Go [link words](https://example.org)');
+});
+
+test('the designs: the preview IS the email, in every look', () => {
+  assert.deepEqual(MAIL_LOOKS, ['club', 'awana', 'plain']);
+  const sparks = CLUB_TABLE.find((c) => c.id === 'sparks');
+  const blocks = parseMessage('# Tonight\n\nBring **one** box. See [the list](https://example.org/l).\n\n- cars\n- crayons', []);
+  for (const style of [clubStyle(sparks), AWANA_STYLE, null]) {
+    const email = renderMail({ blocks, files: [], club: 'sparks', sender: 'Dana Cole', replyTo: 'd@example.com', test: false, style }).html;
+    const preview = previewHtml(blocks, [], { sender: 'Dana Cole', club: 'Sparks', style });
+    assert.equal(preview, email);
+  }
+  // Every design's header picture is a file of the site, and the preview reads it from beside the page.
+  for (const art of ['awana', ...CLUB_TABLE.map((c) => clubStyle(c).art)]) assert.ok(existsSync(path.join(DIR, 'art', `${art}.png`)), art);
+  assert.ok(previewHtml(blocks, [], { sender: 'D', club: 'Sparks', style: clubStyle(sparks), art: './art/' }).includes('src="./art/sparks.png"'));
+  // White words on every header's colour, for when a mail app hides pictures.
+  const lum = (hex) => { const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255).map((v) => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4)); return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
+  for (const st of [AWANA_STYLE, ...CLUB_TABLE.map(clubStyle)]) assert.ok(1.05 / (lum(st.field) + 0.05) >= 4.5, st.art);
+  // The choices: the club's own first (the default), never for "all clubs".
+  assert.deepEqual(lookChoices(MAIL_LOOKS, { id: 'sparks', name: 'Sparks' }).map((c) => c.name), ['Sparks design', 'Awana design', 'No design (plain email)']);
+  assert.deepEqual(lookChoices(MAIL_LOOKS, { id: 'all', name: 'All clubs' }).map((c) => c.id), ['awana', 'plain']);
+  assert.equal(lookStyle('club', { style: { art: 'sparks' } }, AWANA_STYLE).art, 'sparks');
+  assert.equal(lookStyle('club', { id: 'all' }, AWANA_STYLE), AWANA_STYLE);
+  assert.equal(lookStyle('awana', { style: { art: 'sparks' } }, AWANA_STYLE), AWANA_STYLE);
+  assert.equal(lookStyle('plain', { style: { art: 'sparks' } }, AWANA_STYLE), null);
 });
 
 test('the words for who it goes to, sizes and problems', () => {

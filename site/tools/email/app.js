@@ -15,7 +15,7 @@
 import {
   FILE_ACCEPT, INLINE_TYPES, PICTURE_KEEP_BYTES, PICTURE_MAX_PX, hasWords, parseMessage, pictureLine,
   previewHtml, problemWords, recipientWords, sizeWords, stepRetryable, totalWords,
-  blocksToText, boldEdit, bounceWords, cleanLink, laterTime, linesEdit, linkEdit, secretWords, whenWords,
+  blocksToText, boldEdit, bounceWords, cleanLink, laterTime, lookChoices, lookStyle, linesEdit, linkEdit, secretWords, whenWords,
 } from './logic.js';
 
 const SYNC_INDEX = new URL('/lobby/shared/sync.json', location.href).href;
@@ -169,6 +169,7 @@ async function enter(directors) {
   $('club-field').hidden = me.clubs.length < 2;
   const saved = readDraft();
   if (saved.club && clubChoices().some((c) => c.id === saved.club)) $('club').value = saved.club;
+  drawLooks(saved.look);
   $('subject').value = saved.subject; $('text').value = saved.text;
   $('pick-file').accept = FILE_ACCEPT;
   const notice = me.ready ? secretWords(me.secretDaysLeft) : 'Sending is not set up yet: the Microsoft app for the Awana mailbox has not been added (worker/README.md, "Club email"). You can write, but not send.';
@@ -186,23 +187,35 @@ async function enter(directors) {
 // ── the message ───────────────────────────────────────────────────────────────
 
 function readDraft() {
-  try { const d = JSON.parse(store.get(DRAFT_KEY) || '{}'); return { club: String(d.club || ''), subject: String(d.subject || ''), text: String(d.text || '') }; } catch { return { club: '', subject: '', text: '' }; }
+  try { const d = JSON.parse(store.get(DRAFT_KEY) || '{}'); return { club: String(d.club || ''), look: String(d.look || ''), subject: String(d.subject || ''), text: String(d.text || '') }; } catch { return { club: '', look: '', subject: '', text: '' }; }
 }
 /** The clubs to choose from: each of the sender's, then all of them at once when there is more than one. */
 const clubChoices = () => (me ? [...me.clubs, ...(me.all ? [me.all] : [])] : []);
 const clubNow = () => (me ? clubChoices().find((c) => c.id === $('club').value) || me.clubs[0] : null);
+/** The design the director wants (the club's own until they pick another); "all clubs" has no club design, so it shows the next one without forgetting this. */
+let lookWant = '';
+/** The designs the chosen club's email may wear. @param {string} [want] a design to choose (a saved draft's, a sent email's) */
+function drawLooks(want) {
+  if (want) lookWant = want;
+  const choices = lookChoices(me.looks, clubNow());
+  $('look').replaceChildren(...choices.map((c) => new Option(c.name, c.id)));
+  if (choices.some((c) => c.id === lookWant)) $('look').value = lookWant;
+}
+
 /** The mailbox the chosen club's email is sent from: its own when it has one (Puggles), else the Awana one. */
 const fromNow = () => clubNow()?.from || me.from;
 
 function draw() {
   if (!me) return;
   const subject = $('subject').value.trim(), text = $('text').value;
-  store.set(DRAFT_KEY, subject || text.trim() ? JSON.stringify({ club: $('club').value, subject, text }) : null);
+  store.set(DRAFT_KEY, subject || text.trim() ? JSON.stringify({ club: $('club').value, look: $('look').value, subject, text }) : null);
   const blocks = parseMessage(text, files);
   $('env-from').textContent = `KVBC Awana <${fromNow()}>`;
   $('env-subject').textContent = subject || '(no subject yet)';
+  const style = lookStyle($('look').value, clubNow(), me.awana);
+  $('preview').className = style ? 'designed' : '';
   $('preview').innerHTML = hasWords(blocks)
-    ? previewHtml(blocks, files, { sender: me.name, club: clubNow().label || clubNow().name })
+    ? previewHtml(blocks, files, { sender: me.name, club: clubNow().label || clubNow().name, style, art: './art/' })
     : '<p class="empty">Your message shows here as you type.</p>';
   const t = totalWords(files, me.limits.totalBytes);
   $('total').textContent = t.words;
@@ -285,6 +298,7 @@ async function useAgain(id, button) {
   for (const f of files) if (f.url) URL.revokeObjectURL(f.url);
   files = [];
   if (clubChoices().some((c) => c.id === res.body.club)) $('club').value = res.body.club;
+  drawLooks(res.body.look);
   $('subject').value = res.body.subject;
   $('text').value = blocksToText(res.body.blocks);
   changed();
@@ -382,7 +396,7 @@ function toBase64(bytes) {
 /** Upload the message and its files; answers the draft's id or null (the status says why). */
 async function upload() {
   const blocks = parseMessage($('text').value, files);
-  const start = await request('/v1/mail/drafts', { method: 'POST', body: { club: $('club').value, subject: $('subject').value, blocks, files: files.map((f) => ({ name: f.name, type: f.type, size: f.size, inline: f.inline })) } });
+  const start = await request('/v1/mail/drafts', { method: 'POST', body: { club: $('club').value, look: $('look').value, subject: $('subject').value, blocks, files: files.map((f) => ({ name: f.name, type: f.type, size: f.size, inline: f.inline })) } });
   if (!start.ok || !start.body) { setStatus('status', problemWords(start), 'bad'); return null; }
   const { id, part } = start.body;
   const pieces = start.body.files.reduce((a, f) => a + f.parts, 0);
@@ -646,7 +660,8 @@ async function start() {
   $('swap-btn').addEventListener('click', () => showSignedOut('', $('owner-signin').hidden));
   $('signout').addEventListener('click', signOut);
   $('add-director').addEventListener('submit', addDirector);
-  $('club').addEventListener('change', () => { changed(); draw(); loadCount(); });
+  $('club').addEventListener('change', () => { changed(); drawLooks(); draw(); loadCount(); });
+  $('look').addEventListener('change', () => { lookWant = $('look').value; changed(); draw(); });
   for (const id of ['subject', 'text']) $(id).addEventListener('input', () => { changed(); clearTimeout(drawTimer); drawTimer = setTimeout(draw, 250); });
   $('fmt-bold').addEventListener('click', () => format(boldEdit));
   $('fmt-heading').addEventListener('click', () => format((v, s, e) => linesEdit(v, s, e, 'heading')));

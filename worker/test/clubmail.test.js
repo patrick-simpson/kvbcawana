@@ -179,7 +179,7 @@ describe('club email: directors and signing in', () => {
     expect((await s.call('GET', '/v1/mail/directors', undefined, d.auth)).status).toBe(401);
     expect((await s.call('GET', '/v1/mail/me', undefined, {})).status).toBe(401);
     const me = await s.call('GET', '/v1/mail/me', undefined, d.auth);
-    expect(me.body).toMatchObject({ name: 'Dana Cole', office: false, clubs: [{ id: 'sparks', name: 'Sparks', from: 'awana@kvbchurch.org' }], from: 'awana@kvbchurch.org' });
+    expect(me.body).toMatchObject({ name: 'Dana Cole', office: false, clubs: [{ id: 'sparks', name: 'Sparks', from: 'awana@kvbchurch.org' }], from: 'awana@kvbchurch.org', looks: ['club', 'awana', 'plain'] });
     expect((await s.call('GET', '/v1/mail/recipients?club=trek', undefined, d.auth)).body.reason).toBe('not-your-club');
     const r = await s.call('GET', '/v1/mail/recipients?club=sparks', undefined, d.auth);
     expect(r.body).toEqual({ ok: true, club: 'sparks', name: 'Sparks', addresses: 2, kids: 3, kidsWithoutEmail: 1 });
@@ -419,7 +419,7 @@ describe('club email: a message', () => {
     expect(s.graph().filter((c) => c.path === '/sendMail').map((c) => c.mailbox)).toEqual(['awana@kvbchurch.org', 'awana@kvbchurch.org']);
     const me = await s.call('GET', '/v1/mail/me', undefined, d.auth);
     expect(me.body.from).toBe('awana@kvbchurch.org');
-    expect(me.body.clubs).toEqual([{ id: 'puggles', name: 'Puggles', from: 'puggles@kvbchurch.org' }, { id: 'sparks', name: 'Sparks', from: 'awana@kvbchurch.org' }]);
+    expect(me.body.clubs).toMatchObject([{ id: 'puggles', name: 'Puggles', from: 'puggles@kvbchurch.org' }, { id: 'sparks', name: 'Sparks', from: 'awana@kvbchurch.org' }]);
     const send = async (club) => {
       const id = (await s.call('POST', '/v1/mail/drafts', { club, subject: 'Hello', blocks: WORDS, files: [] }, d.auth)).body.id;
       const before = s.graph().length;
@@ -485,7 +485,7 @@ describe('club email: a message', () => {
     await run(s, id, d.auth);
     const line = (await s.call('GET', '/v1/mail/log', undefined, d.auth)).body.sends[0];
     expect(line.id).toBe(id);
-    expect((await s.call('GET', `/v1/mail/log/${id}`, undefined, d.auth)).body).toEqual({ ok: true, club: 'sparks', subject: 'Shoeboxes', blocks: words });
+    expect((await s.call('GET', `/v1/mail/log/${id}`, undefined, d.auth)).body).toEqual({ ok: true, club: 'sparks', look: 'club', subject: 'Shoeboxes', blocks: words });
     expect((await s.call('GET', `/v1/mail/log/${id}`)).status).toBe(200);
     expect((await s.call('GET', `/v1/mail/log/${id}`, undefined, other.auth)).body.reason).toBe('no-send');
     expect((await s.call('GET', '/v1/mail/log/nope', undefined, d.auth)).status).toBe(404);
@@ -517,6 +517,37 @@ describe('club email: a message', () => {
     s.tick(8 * 24 * 60 * 60 * 1000);
     s.answers.inbox = [{ subject: 'Undeliverable: Shoeboxes' }];
     expect((await s.call('GET', `/v1/mail/log/${id}/bounces`, undefined, d.auth)).body.bounced).toBe(null);
+  });
+
+  it('wears the club\'s look unless another is asked for; "all clubs" wears the Awana one', async () => {
+    const s = await setup();
+    const d = await s.director({ name: 'Pat Bean', replyTo: 'pat@example.com', clubs: ['puggles', 'sparks'] });
+    const me = (await s.call('GET', '/v1/mail/me', undefined, d.auth)).body;
+    expect(me.clubs[1].style).toEqual({ art: 'sparks', field: '#B82B32', deep: '#B82B32', tint: '#FDDACF', stripe: ['#F04A4B'], alt: 'Sparks · KVBC Awana' });
+    expect(me.awana.art).toBe('awana');
+    const made = async (club, look) => {
+      const id = (await s.call('POST', '/v1/mail/drafts', { club, look, subject: 'Hello', blocks: [{ t: 'h', text: 'Tonight' }, ...WORDS], files: [] }, d.auth)).body.id;
+      await s.call('POST', `/v1/mail/drafts/${id}/send`, { test: true }, d.auth);
+      await run(s, id, d.auth);
+      return s.graph().filter((c) => c.path === '/messages').pop().body.body.content;
+    };
+    const club = await made('sparks', undefined);   // nothing asked: the club's own
+    expect(club).toContain('src="https://awana.kvbchurch.org/tools/email/art/sparks.png"');
+    expect(club).toContain('alt="Sparks · KVBC Awana"');
+    expect(club).toContain('bgcolor="#B82B32"');
+    expect(club).toContain('color:#B82B32">Tonight</h2>');
+    expect(club).toContain('Sent by Pat Bean for Sparks,');
+    expect(club).toContain('TEST: only you received this.');
+    expect(await made('sparks', 'nonsense')).toContain('art/sparks.png');
+    const awana = await made('sparks', 'awana');
+    expect(awana).toContain('art/awana.png');
+    expect(awana).toContain('bgcolor="#4C72B8"');
+    expect(await made('all', 'club')).toContain('art/awana.png');
+    expect(await made('t&t', 'club').catch(() => '')).not.toContain('art/t&t');   // not this sender's club: nothing made
+    const plain = await made('sparks', 'plain');
+    expect(plain).not.toContain('<img');
+    expect(plain).not.toContain('<table');
+    expect(plain).toContain('<h2 style="font-size:18px');
   });
 
   it('a test goes to the sender alone and leaves the message ready', async () => {

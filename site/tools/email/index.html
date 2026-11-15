@@ -70,6 +70,8 @@
   .envelope { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
   .envelope dl { margin: 0; padding: 12px 16px; background: var(--paper); display: grid; grid-template-columns: auto 1fr; gap: 2px 12px; font-size: 14px; }
   .envelope dt { color: var(--muted); } .envelope dd { margin: 0; font-weight: 600; overflow-wrap: anywhere; }
+  #preview.designed { padding: 0; }
+  #preview.designed .empty { padding: 18px 16px; }
   #preview { padding: 18px 16px; font: 400 16px/1.5 -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif; overflow-wrap: anywhere; min-height: 120px; }
   #preview h2 { font: 700 18px/1.3 -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif; text-transform: none; color: inherit; margin: 22px 0 8px; } #preview h2:first-child { margin-top: 0; }
   #preview p { margin: 0 0 14px; } #preview ul { margin: 0 0 14px; padding-left: 22px; }
@@ -137,6 +139,10 @@
         <select id="club"></select>
       </div>
       <p id="to-line" role="status" aria-live="polite"></p>
+      <div class="field">
+        <label for="look">Design</label>
+        <select id="look"></select>
+      </div>
       <div class="field">
         <label for="subject">Subject</label>
         <input id="subject" type="text" maxlength="150" autocomplete="off">

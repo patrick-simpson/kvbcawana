@@ -171,7 +171,9 @@ run(`node scripts/stamp-build.mjs ${hashTree(path.join(ROOT, 'classroom', 'publi
 {
   const toolOut = path.join(OUT, 'tools', 'email');
   mkdirSync(path.join(toolOut, 'shared'), { recursive: true });
-  for (const f of ['index.html', 'app.js', 'logic.js']) cpSync(path.join(ROOT, 'site', 'tools', 'email', f), path.join(toolOut, f));
+  // mailhtml.js is the email's HTML (the Worker imports the same file); art/ holds each design's header picture.
+  for (const f of ['index.html', 'app.js', 'logic.js', 'mailhtml.js']) cpSync(path.join(ROOT, 'site', 'tools', 'email', f), path.join(toolOut, f));
+  cpSync(path.join(ROOT, 'site', 'tools', 'email', 'art'), path.join(toolOut, 'art'), { recursive: true });
   for (const f of ['sync-protocol.js', 'cloud-crypto.js']) cpSync(path.join(ROOT, 'shared', f), path.join(toolOut, 'shared', f));
 }
 
@@ -469,7 +471,7 @@ for (const must of ['index.html', 'app.js', 'controls.js', 'logic.js', 'preview.
   if (!existsSync(path.join(CAST_OUT, must))) throw new Error(`the Cast site build is missing ${must}`);
 }
 
-for (const must of ['index.html', 'lobby/index.html', 'lobby/countdown.html', 'lobby/settings.html', 'lobby/projector-remote.html', 'lobby/scoreboard.html', 'journey/index.html', 'journey/remote/index.html', 'classroom/index.html', 'classroom/version.json', 'classroom/src/logic.js', 'classroom/src/stage.js', 'classroom/src/shared/classroomRemote.js', 'classroom/src/shared/screenShare.js', 'classroom/remote/index.html', 'classroom/remote/remote.js', 'journey/remote/remote.js', 'journey/src/shared/journeyRemote.js', 'lobby/shared/sync.json', 'checkin/index.html', 'checkin/ym/index.html', 'checkin/desk-transport.js', 'checkin/cloud-crypto.js', 'checkin/clubs.js', 'checkin/brand/fonts.css', 'links/index.html', 'logo/index.html', 'tools/handbook-form/index.html', 'tools/print/index.html', 'tools/email/index.html', 'tools/email/app.js', 'tools/email/logic.js', 'tools/email/shared/sync-protocol.js', 'tools/print/shared/letterhead.js', 'tools/tally/index.html', 'presentation/index.html', 'presentation/app.js', 'presentation/shared/cloud-crypto.js', 'classic.html', 'robots.txt', 'lobby/showcase.html', 'lobby/countdown-showcase.html', 'lobby/settings-showcase.html', 'journey/showcase.html', 'journey/remote/showcase.html', 'checkin/showcase.html']) {
+for (const must of ['index.html', 'lobby/index.html', 'lobby/countdown.html', 'lobby/settings.html', 'lobby/projector-remote.html', 'lobby/scoreboard.html', 'journey/index.html', 'journey/remote/index.html', 'classroom/index.html', 'classroom/version.json', 'classroom/src/logic.js', 'classroom/src/stage.js', 'classroom/src/shared/classroomRemote.js', 'classroom/src/shared/screenShare.js', 'classroom/remote/index.html', 'classroom/remote/remote.js', 'journey/remote/remote.js', 'journey/src/shared/journeyRemote.js', 'lobby/shared/sync.json', 'checkin/index.html', 'checkin/ym/index.html', 'checkin/desk-transport.js', 'checkin/cloud-crypto.js', 'checkin/clubs.js', 'checkin/brand/fonts.css', 'links/index.html', 'logo/index.html', 'tools/handbook-form/index.html', 'tools/print/index.html', 'tools/email/index.html', 'tools/email/app.js', 'tools/email/logic.js', 'tools/email/mailhtml.js', 'tools/email/art/awana.png', 'tools/email/art/tnt.png', 'tools/email/shared/sync-protocol.js', 'tools/print/shared/letterhead.js', 'tools/tally/index.html', 'presentation/index.html', 'presentation/app.js', 'presentation/shared/cloud-crypto.js', 'classic.html', 'robots.txt', 'lobby/showcase.html', 'lobby/countdown-showcase.html', 'lobby/settings-showcase.html', 'journey/showcase.html', 'journey/remote/showcase.html', 'checkin/showcase.html']) {
   if (!existsSync(path.join(OUT, must))) throw new Error(`site build is missing ${must}`);
 }
 console.log(`\n✓ site/dist built for ${ORIGIN} (build ${BUILD_ID.slice(0, 7)})`);
