@@ -39,6 +39,19 @@ describe('ScoreTicker', () => {
     expect(container.querySelector('[data-team="blue"] .score-ticker__plus')).toBeNull();
   });
 
+  it('a point rolls the number over like a cube turning up: old on the front, new below; the text is only the new number (owner 2026-11-15)', () => {
+    const { container, rerender } = render(bar(view(scores(0, 9, 0, 0))));
+    expect(container.querySelector('[data-cube]')).toBeNull();
+    rerender(bar(view(scores(0, 10, 0, 0))));
+    const red = container.querySelector('[data-team="red"]');
+    expect(red.querySelector('[data-cube] .score-ticker__cube-face--old').dataset.n).toBe('9');
+    expect(red.querySelector('.score-ticker__cube-face--new').textContent).toBe('10');
+    expect(red.querySelector('.score-ticker__num').textContent).toBe('10');
+    // A removed point is no cube.
+    rerender(bar(view(scores(0, 9, 0, 0))));
+    expect(container.querySelector('[data-cube]')).toBeNull();
+  });
+
   it('a removed point ticks down quietly', () => {
     const { container, rerender } = render(bar(view(scores(4, 0, 0, 0))));
     rerender(bar(view(scores(3, 0, 0, 0))));

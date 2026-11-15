@@ -3,7 +3,7 @@ import { AnimatePresence } from 'framer-motion';
 import { M } from '../lib/motion.jsx';
 import { DUR, EASE, beats } from '../lib/brand.js';
 import { holdThenLand } from '../lib/lobbyMotion.js';
-import { squishBump, squishLand, withSquish } from '../lib/squish.js';
+import { squishLand, withSquish } from '../lib/squish.js';
 import { getClubPalette } from '../lib/clubs.js';
 import schedule from '../../../shared/schedule.json';
 import {
@@ -23,7 +23,9 @@ import {
 //   club    0.2        the club's mark and words land (settle)
 //   chips   0.3 + 0.1n each team's chip pops in, squashing onto the bar
 //   clock   0.3 + 0.1n the clock lands after the last chip
-//   point   0 - 0.46   the chip bumps (1.12) and its number pops, a white ring
+//   point   0 - 0.6    the chip bumps (1.12) and its number rolls over like a
+//                      cube turning up (CubeNum: the old number tips away over
+//                      the top, the new one comes up from below), a white ring
 //                      flashes round it (0.9 s), "+1" rises over it and goes
 //                      (1.1 s), and a band in the team's colour sweeps the
 //                      bar left to right (0.64 s)
@@ -33,11 +35,37 @@ import {
 // so zero animation shows the bar at rest with the new numbers.
 // No sound: the chimes are the gym's (the projector), never the lobby's.
 
-/** A count that changes pops in place and squashes as it lands (the tonight strip's pop). */
-const VALUE_POP = withSquish(
-  holdThenLand(0, DUR.pop, { scale: 1.3, opacity: 0.6 }, { scale: 1, opacity: 1 }, EASE.pop),
-  squishBump('figure'),
-);
+/**
+ * A team's number on a point (owner 2026-11-15: "when the score changes on the lobby
+ * screen, I kind of want it to do a cube rotating animation to increase the next
+ * number"): a cube whose front face is the old number and whose bottom face is the
+ * new one turns a quarter up (rotateX 0 -> 90deg), a 0.7 s turn with a small overshoot,
+ * the face turning away going dark. Its last keyframe IS the new number face on, so
+ * zero animation shows the new number at rest. The old number is drawn from
+ * `data-n` (a pseudo-element), so the chip's text is only ever the new number.
+ */
+function CubeNum({ from, value }) {
+  return (
+    <span className="score-ticker__num score-ticker__cube-box" data-cube="1">
+      <M.span
+        className="score-ticker__cube"
+        initial={{ rotateX: 0 }}
+        animate={{ rotateX: 90 }}
+        transition={{ duration: 0.7, ease: [0.3, 1.35, 0.6, 1] }}
+      >
+        <M.span
+          className="score-ticker__cube-face score-ticker__cube-face--old"
+          data-n={from}
+          aria-hidden="true"
+          initial={{ opacity: 1 }}
+          animate={{ opacity: 0.25 }}
+          transition={{ duration: 0.45, ease: 'easeIn' }}
+        />
+        <span className="score-ticker__cube-face score-ticker__cube-face--new">{value}</span>
+      </M.span>
+    </span>
+  );
+}
 
 /** The game clock's words re-read once a second; the stopwatch draws per frame. */
 const GAME_CLOCK_TICK_MS = 1000;
@@ -48,6 +76,9 @@ const GAME_CLOCK_TICK_MS = 1000;
  */
 function TeamChip({ team, value, index, bump, gained, won, final }) {
   const colors = SCORE_TEAM_COLORS[team];
+  // The number before this one (adjusted during render, never in an effect): the cube's front face.
+  const [num, setNum] = useState({ value, from: value });
+  if (num.value !== value) setNum({ value, from: num.value });
   // Points from before this chip mounted (the bar rising again after a name)
   // are already in its number: only a point seen while it is up bumps it.
   const [since] = useState(bump);
@@ -75,15 +106,9 @@ function TeamChip({ team, value, index, bump, gained, won, final }) {
         transition={{ duration: DUR.pop, times: [0, 0.35, 1], ease: [EASE.pop, EASE.settle] }}
       >
         <span className="score-ticker__word">{SCORE_TEAM_WORDS[team]}</span>
-        <M.span
-          key={`v-${value}`}
-          className="score-ticker__num"
-          initial={hit ? VALUE_POP.initial : false}
-          animate={VALUE_POP.animate}
-          transition={VALUE_POP.transition}
-        >
-          {value}
-        </M.span>
+        {hit && num.from < value
+          ? <CubeNum key={`v-${value}-${hit}`} from={num.from} value={value} />
+          : <span key={`v-${value}`} className="score-ticker__num">{value}</span>}
       </M.span>
       {hit > 0 && (
         <>

@@ -2990,6 +2990,37 @@ input:focus-visible {
   line-height: 0.95;
   font-variant-numeric: tabular-nums;
 }
+/* The number's cube roll on a point (ScoreTicker CubeNum, owner 2026-11-15). The cube is
+   one number tall; its faces sit half that out from its middle. */
+.score-ticker__cube-box {
+  --cube-h: 0.95em;
+  position: relative;
+  height: var(--cube-h);
+  perspective: 3.5em;
+}
+.score-ticker__cube {
+  position: relative;
+  display: block;
+  height: 100%;
+  transform-style: preserve-3d;
+  transform-origin: 50% 50% calc(var(--cube-h) / -2);
+}
+.score-ticker__cube-face {
+  display: block;
+  height: var(--cube-h);
+  line-height: var(--cube-h);
+  text-align: center;
+  backface-visibility: hidden;
+}
+.score-ticker__cube-face--old {
+  position: absolute;
+  inset: 0 -1em;
+}
+.score-ticker__cube-face--old::before { content: attr(data-n); }
+.score-ticker__cube-face--new {
+  transform-origin: 50% 0;
+  transform: translateY(100%) rotateX(-90deg);
+}
 .score-ticker__ring {
   position: absolute;
   inset: calc(-0.45 * var(--u));
