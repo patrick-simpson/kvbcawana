@@ -1957,6 +1957,11 @@ in white on the club's colour. `GET /v1/mail/me` answers `looks`, each club's `s
 `awana` (the colours), so the page needs no table of its own. ci.yml deploys the Worker
 when mailhtml.js changes.
 
+**Starter emails** (owner 2026-11-14). `mail:starters {list: [{id, name, subject, blocks}]}`:
+emails any sender may begin a message from (no picture; at most 12). Until the owner
+changes the list it is `STARTERS_FIRST` (weekly reminder, no club, theme night). Only the
+owner's pair saves or removes one; saving a name that exists replaces it.
+
 **The secret's end.** `MS_SECRET_ENDS` (`[vars]`, "YYYY-MM-DD") is the day the app's client
 secret ends. In its last 30 days the cron mails the Awana mailbox once a week
 (`ClubMail.secretCheck`, storage `mail:secret:told`), and `GET /v1/mail/me` answers the
@@ -1999,6 +2004,9 @@ send (one Graph read, kept 10 minutes in memory) and answers a number, never an 
 | `PUT /v1/mail/drafts/:id/files/:f/:n` | sender | one piece (text or bytes) | `{next}`; 409 `order`, 400 `size` |
 | `POST /v1/mail/drafts/:id/send` | sender | `{test?}` | the progress; 409 `sent`/`running`, 400 `parts`, 429 `daily-limit` |
 | `POST /v1/mail/drafts/:id/later` | sender | `{at}` (ISO time) | `{id, at}`: the draft waits and is sent then; 400 `too-soon` (under 5 min)/`too-far` (over 4 weeks)/`parts`, 409 `later-full` (3 a sender, 12 in all)/`sent`/`running` |
+| `GET /v1/mail/starters` | sender | | `{canChange, starters: [{id, name, subject, blocks}]}` |
+| `POST /v1/mail/starters` | owner (sender routes, 403 `not-owner` for a director) | `{name, subject, blocks}` | `{id}`; 400 `bad-starter`, 409 `full` |
+| `DELETE /v1/mail/starters/:id` | owner | | `{ok}` |
 | `GET /v1/mail/later` | sender | | `{later: [{id, at, name, club, clubName, subject, files, state: waiting\|sending\|failed, problem}]}` (the owner: all) |
 | `DELETE /v1/mail/later/:id` | sender | | `{ok}`: cancelled (or a failed line cleared); 409 `running` once it is going out |
 | `POST /v1/mail/drafts/:id/step` | sender | `{}` | `{stage, test, done, percent, recipients}`; 409 `no-recipients`, 502 `graph`/`graph-auth`/`roster`, 503 `read-busy` |

@@ -284,6 +284,34 @@ describe('club email: the Microsoft secret\'s end', () => {
   });
 });
 
+describe('club email: starter emails', () => {
+  it('anyone signed in may begin from one; only the owner changes them', async () => {
+    const s = await setup();
+    const d = await s.director();
+    expect((await s.call('GET', '/v1/mail/starters', undefined, {})).status).toBe(401);
+    const first = await s.call('GET', '/v1/mail/starters', undefined, d.auth);
+    expect(first.body.canChange).toBe(false);
+    expect(first.body.starters.map((x) => x.name)).toEqual(['Weekly reminder', 'No club this week', 'Theme night']);
+    // Every first starter is a message the Worker itself would take.
+    for (const x of first.body.starters) expect(cleanBlocks(x.blocks, 0)).toEqual(x.blocks);
+    const words = [{ t: 'h', text: 'Store night' }, { t: 'p', text: 'Bring your **shares**.' }];
+    expect((await s.call('POST', '/v1/mail/starters', { name: 'Store night', subject: 'Awana store', blocks: words }, d.auth)).body.reason).toBe('not-owner');
+    expect((await s.call('DELETE', '/v1/mail/starters/weekly', undefined, d.auth)).body.reason).toBe('not-owner');
+    expect((await s.call('POST', '/v1/mail/starters', { name: '', subject: 'x', blocks: words })).body.reason).toBe('bad-starter');
+    expect((await s.call('POST', '/v1/mail/starters', { name: 'Empty', subject: 'x', blocks: [] })).body.reason).toBe('bad-starter');
+    const saved = await s.call('POST', '/v1/mail/starters', { name: ' Store night ', subject: 'Awana store', blocks: [...words, { t: 'img', file: 0 }, { t: 'script', text: 'x' }] });
+    expect(saved.status).toBe(200);
+    const mine = await s.call('GET', '/v1/mail/starters');
+    expect(mine.body.canChange).toBe(true);
+    expect(mine.body.starters.at(-1)).toEqual({ id: saved.body.id, name: 'Store night', subject: 'Awana store', blocks: words });
+    // Saving the same name again replaces it; removing one works, the first ones included.
+    await s.call('POST', '/v1/mail/starters', { name: 'store NIGHT', subject: 'New', blocks: words });
+    expect((await s.call('DELETE', '/v1/mail/starters/weekly')).status).toBe(200);
+    const after = (await s.call('GET', '/v1/mail/starters', undefined, d.auth)).body.starters;
+    expect(after.map((x) => `${x.name}|${x.subject}`)).toEqual(['No club this week|No Awana this Wednesday', 'Theme night|Theme night this Wednesday', 'store NIGHT|New']);
+  });
+});
+
 describe('club email: send later', () => {
   const AT = '2026-11-18T14:00:00.000Z';   // five days after the tests' clock
   /** A director's finished draft, given a time. */

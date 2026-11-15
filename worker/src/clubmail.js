@@ -57,6 +57,7 @@
 //   mail:log              the last sends: when, who, club, subject, how many (no addresses)
 //   mail:later            the messages waiting for their time: [{id, who, name, club, label, subject, at, ...}] (no addresses)
 //   mail:later:<id>       one of them: the draft as uploaded, its files' pieces under mail:part as usual
+//   mail:starters         the starter emails anyone may begin from: {list: [{id, name, subject, blocks}]} (the owner's to change)
 //   mail:body:<id>        a sent message's words (its blocks, no picture, no address), kept
 //                         while its line is in the log, so it can be started from again
 
@@ -98,6 +99,27 @@ export const CODE_FAILS_IP = 8;
 export const CODE_FAILS_ALL = 60;
 export const CODE_WINDOW_MS = 10 * 60 * 1000;
 export const MAIL_LOG_MAX = 50;
+/** The starter emails: how many are kept, and the ones the page begins with (the owner may replace them). */
+export const STARTERS_MAX = 12;
+export const STARTERS_FIRST = Object.freeze([
+  { id: 'weekly', name: 'Weekly reminder', subject: 'Awana this Wednesday', blocks: [
+    { t: 'p', text: 'Hi families,' },
+    { t: 'p', text: 'Club meets this Wednesday at the usual time.' },
+    { t: 'ul', items: ['Theme:', 'Bring:'] },
+    { t: 'p', text: 'See you Wednesday!' },
+  ] },
+  { id: 'no-club', name: 'No club this week', subject: 'No Awana this Wednesday', blocks: [
+    { t: 'p', text: 'Hi families,' },
+    { t: 'p', text: 'There is **no Awana this Wednesday**.' },
+    { t: 'p', text: 'We will be back the following Wednesday at the usual time.' },
+  ] },
+  { id: 'theme', name: 'Theme night', subject: 'Theme night this Wednesday', blocks: [
+    { t: 'p', text: 'Hi families,' },
+    { t: 'p', text: 'This Wednesday is a theme night.' },
+    { t: 'ul', items: ['Theme:', 'Wear:', 'Bring:'] },
+    { t: 'p', text: 'Club meets at the usual time.' },
+  ] },
+]);
 /** The Microsoft secret's end (`MS_SECRET_ENDS`): the owner is warned from this many days before, this often. */
 export const SECRET_WARN_DAYS = 30;
 export const SECRET_TOLD_MS = 7 * 24 * 60 * 60 * 1000;
@@ -121,6 +143,7 @@ const TOKENS_KEY = 'mail:tokens';
 const LOG_KEY = 'mail:log';
 const draftKey = (/** @type {string} */ who) => `mail:draft:${who}`;
 const LATER_KEY = 'mail:later';
+const STARTERS_KEY = 'mail:starters';
 const SECRET_TOLD_KEY = 'mail:secret:told';
 const laterKey = (/** @type {string} */ id) => `mail:later:${id}`;
 const bodyKey = (/** @type {string} */ id) => `mail:body:${id}`;
@@ -899,6 +922,40 @@ export class ClubMail {
     }
   }
 
+  // ── starter emails ─────────────────────────────────────────────────────────
+
+  /** The starters as kept, or the first ones until the owner has changed the list. @returns {Promise<any[]>} */
+  async starters() {
+    const s = await this.storage.get(STARTERS_KEY);
+    return s && Array.isArray(s.list) ? s.list : STARTERS_FIRST.map((x) => ({ ...x }));
+  }
+
+  /** GET /v1/mail/starters: for any sender (owner 2026-11-14: emails anyone can start from). @param {any} who */
+  async startersList(who) {
+    return json({ ok: true, canChange: Boolean(who.office), starters: (await this.starters()).map((x) => ({ id: x.id, name: x.name, subject: x.subject, blocks: x.blocks })) });
+  }
+
+  /** POST /v1/mail/starters {name, subject, blocks}: the owner saves one (a same-named one is replaced). @param {any} who @param {any} body */
+  async starterSave(who, body) {
+    if (!who.office) return fail('Only the owner changes the starter emails.', 403, { reason: 'not-owner' });
+    const name = oneLine(body?.name, 40), subject = oneLine(body?.subject, MAIL_SUBJECT_MAX);
+    const blocks = (cleanBlocks(body?.blocks, 0) || []).filter((b) => b.t !== 'img');
+    if (!name || !blocks.length) return fail('A starter needs a name and some words.', 400, { reason: 'bad-starter' });
+    const list = (await this.starters()).filter((x) => x.name.toLowerCase() !== name.toLowerCase());
+    if (list.length >= STARTERS_MAX) return fail(`That is the most starters this page keeps (${STARTERS_MAX}). Remove one first.`, 409, { reason: 'full' });
+    const made = { id: newId(), name, subject, blocks };
+    list.push(made);
+    await this.storage.put(STARTERS_KEY, { list });
+    return json({ ok: true, id: made.id });
+  }
+
+  /** DELETE /v1/mail/starters/:id (the owner). @param {any} who @param {string} id */
+  async starterRemove(who, id) {
+    if (!who.office) return fail('Only the owner changes the starter emails.', 403, { reason: 'not-owner' });
+    await this.storage.put(STARTERS_KEY, { list: (await this.starters()).filter((x) => x.id !== id) });
+    return json({ ok: true });
+  }
+
   // ── send later ─────────────────────────────────────────────────────────────
 
   /** @returns {Promise<any[]>} */
@@ -1139,6 +1196,9 @@ export function mountClubMail(registry, core) {
   registry.add('PUT', '/v1/mail/drafts/:id/files/:f/:n', 'public', draftId(async ({ params, request }, who) => m().part(who, params.id, params.f, params.n, request)));
   registry.add('POST', '/v1/mail/drafts/:id/send', 'public', draftId(ready(async (ctx) => m().begin(await m().who(ctx.request, () => core.authorized(ctx.request), ctx.ip), ctx.params.id, await ctx.body()))));
   registry.add('POST', '/v1/mail/drafts/:id/later', 'public', draftId(ready(async (ctx) => m().later(await m().who(ctx.request, () => core.authorized(ctx.request), ctx.ip), ctx.params.id, await ctx.body()))));
+  registry.add('GET', '/v1/mail/starters', 'public', sender(async (_ctx, who) => m().startersList(who)));
+  registry.add('POST', '/v1/mail/starters', 'public', sender(async ({ body }, who) => m().starterSave(who, await body())));
+  registry.add('DELETE', '/v1/mail/starters/:id', 'public', sender(async ({ params }, who) => m().starterRemove(who, String(params.id || ''))));
   registry.add('GET', '/v1/mail/later', 'public', sender(async (_ctx, who) => m().waiting(who)));
   registry.add('DELETE', '/v1/mail/later/:id', 'public', draftId(async ({ params }, who) => m().cancel(who, params.id)));
   registry.add('POST', '/v1/mail/drafts/:id/step', 'public', draftId(ready(async (ctx) => m().step(await m().who(ctx.request, () => core.authorized(ctx.request), ctx.ip), ctx.params.id))));
