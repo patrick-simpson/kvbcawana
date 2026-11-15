@@ -408,7 +408,10 @@ describe('club email: a message', () => {
 
   it('a club with a mailbox of its own sends from it; the others and the login mails stay on the Awana one', async () => {
     expect(clubMailboxes(' Puggle = Puggles@KVBChurch.org , nope=x@example.com; sparks=not-an-address, trek ')).toEqual({ puggles: 'puggles@kvbchurch.org' });
-    expect(clubMailboxes('puggles=puggles@kvbchurch.org, journey=journey@kvbchurch.org')).toEqual({ puggles: 'puggles@kvbchurch.org', journey: 'journey@kvbchurch.org' });
+    // The line in wrangler.toml: every club, T&T by its `tnt` alias.
+    expect(clubMailboxes('puggles=puggles@kvbchurch.org, cubbies=cubbies@kvbchurch.org, sparks=sparks@kvbchurch.org, tnt=tnt@kvbchurch.org, trek=trek@kvbchurch.org, journey=journey@kvbchurch.org')).toEqual({
+      puggles: 'puggles@kvbchurch.org', cubbies: 'cubbies@kvbchurch.org', sparks: 'sparks@kvbchurch.org', 't&t': 'tnt@kvbchurch.org', trek: 'trek@kvbchurch.org', journey: 'journey@kvbchurch.org',
+    });
     expect(clubMailboxes(undefined)).toEqual({});
     const s = await setup({ ...MS, MAIL_FROM_CLUBS: 'puggles=puggles@kvbchurch.org' });
     const d = await s.director({ name: 'Pat Bean', replyTo: 'puggles@kvbchurch.org', clubs: ['puggles', 'sparks'] });

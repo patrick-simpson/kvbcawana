@@ -229,8 +229,8 @@ A Microsoft 365 admin of the church does this once:
 
 The mailbox is awana@kvbchurch.org (`MAIL_FROM` in `wrangler.toml` `[vars]` changes it).
 A club may send from a mailbox of its own: `MAIL_FROM_CLUBS` in `[vars]`
-(`"puggles=puggles@kvbchurch.org, journey=journey@kvbchurch.org"`; Puggles since 2026-11-13,
-Journey since 2026-11-14). Such a mailbox must be a
+(`"puggles=puggles@kvbchurch.org, ..., journey=journey@kvbchurch.org"`; Puggles since
+2026-11-13, every club since 2026-11-14: cubbies@, sparks@, tnt@ for T&T, trek@, journey@). Such a mailbox must be a
 member of `AwanaMailApp` too (`Add-DistributionGroupMember AwanaMailApp -Member <address>`),
 or Microsoft refuses that club's sends. For parents' replies to go to the club's address,
 add the club's director on the page with that address as theirs.
