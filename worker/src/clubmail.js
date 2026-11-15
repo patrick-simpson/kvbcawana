@@ -302,10 +302,12 @@ export class ClubMail {
   /**
    * @param {{ storage: any, now: () => number, env: () => Record<string, any>, fetchFn: typeof fetch,
    *   client: () => any, log?: (line: string) => void,
-   *   alarms?: () => ({ set(atMs: number): any, get(): any } | undefined) }} deps
+   *   alarms?: () => ({ set(atMs: number): any, get(): any } | undefined), keys?: any }} deps
    */
-  constructor({ storage, now, env, fetchFn, client, log, alarms }) {
+  constructor({ storage, now, env, fetchFn, client, log, alarms, keys }) {
     this.alarms = alarms || (() => undefined);
+    /** @type {{ note(id: string, ok: boolean, status?: number): Promise<void> } | null} keys.js: does Microsoft still take the app's secret? */
+    this.keys = keys || null;
     this.storage = storage;
     this.now = now;
     this.env = env;
@@ -601,9 +603,15 @@ export class ClubMail {
         body: new URLSearchParams({ grant_type: 'client_credentials', client_id: String(e.MS_CLIENT_ID), client_secret: String(e.MS_CLIENT_SECRET), scope: 'https://graph.microsoft.com/.default' }).toString(),
       });
     } catch { return ''; }
-    if (!res.ok) { this.log(`[mail] Microsoft refused the app sign-in (${res.status})`); return ''; }
+    if (!res.ok) {
+      this.log(`[mail] Microsoft refused the app sign-in (${res.status})`);
+      // 400 and 401 are Microsoft refusing the app or its secret (ended, wrong); anything else says nothing about it.
+      if (this.keys && (res.status === 400 || res.status === 401)) await this.keys.note('mail', false, res.status);
+      return '';
+    }
     const body = await res.json().catch(() => null);
     if (!body?.access_token) return '';
+    if (this.keys) await this.keys.note('mail', true, 200);
     this.graphToken = { token: String(body.access_token), until: t + Math.max(60, Number(body.expires_in) - 300 || 0) * 1000 };
     return this.graphToken.token;
   }

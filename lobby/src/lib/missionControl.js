@@ -149,6 +149,14 @@ export function alertsFrom(overview, now = Date.now()) {
     const behind = stations.filter((/** @type {any} */ s) => Number.isFinite(s.churchRev) && s.churchRev < church.rev);
     if (behind.length) out.push({ id: 'church-behind', tone: 'warn', text: `${behind.map((/** @type {any} */ s) => s.name).join(', ')} has not picked up the latest printing settings yet.` });
   }
+  // The keys the service runs on (owner 2026-11-15; Worker keys.js): one that stopped
+  // working, or the Microsoft secret about to end.
+  const keys = Array.isArray(overview.keys) ? overview.keys : [];
+  for (const k of keys) {
+    if (!k || k.optional) continue;
+    if (k.state === 'failing') out.push({ id: `key-${k.id}`, tone: 'bad', text: `${k.name} has stopped working. ${k.fix || ''}`.trim() });
+    else if (k.state === 'ending') out.push({ id: `key-${k.id}`, tone: 'warn', text: `${k.name}: ${k.words} ${k.fix || ''}`.trim() });
+  }
   return out;
 }
 

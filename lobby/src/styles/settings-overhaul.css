@@ -183,3 +183,11 @@
   background: var(--brand-journey);
 }
 .panel .kiosk-lessons__buttons { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+
+/* The keys the service runs on (Tonight at a glance, owner 2026-11-15). */
+.mission-keys { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.35rem; }
+.mission-keys li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.4rem; }
+.mission-key__dot { width: 0.6rem; height: 0.6rem; border-radius: 50%; background: #9a9a9a; flex: none; align-self: center; }
+.mission-key__dot--ok { background: #2f8a4e; }
+.mission-key__dot--failing { background: #b82b32; }
+.mission-key__dot--ending { background: #c97a08; }

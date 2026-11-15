@@ -1233,6 +1233,16 @@ Undo presses at once run once (the second is 409 `already-undone`,
 
 ### 10.6 Tonight overview (mission control's one poll)
 
+`keys` (owner 2026-11-15, `src/keys.js`): the secrets the service runs on and whether each
+still works, as `[{id, name, optional, state: ok|failing|ending|not-set|unknown, since,
+words, fix}]`: the TwoTimTwo sign-in (from the reader's own status), the GitHub print token
+(noted by every dispatch: 204 = works; 401/403/404 = refused), the Microsoft app (noted by
+every app sign-in: 400/401 = refused; `ending` in its secret's last 30 days), the print
+jobs' key, and the two optional Cast keys (set or not). Names, states and times only,
+never a value. A key that worked and is then refused mails the Awana mailbox once (not
+again within a week; never for the mail key itself). Storage `keys:state`, written only
+when an answer changes.
+
 | Route | Auth | Answer |
 | --- | --- | --- |
 | `GET /v1/tonight/overview` | session | below: counts, codes, times, station names only |

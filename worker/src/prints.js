@@ -62,7 +62,9 @@ export function cleanName(v) {
 
 export class Prints {
   /** @param {{ storage: any, now: () => number, env: () => Record<string, any>, fetchFn: typeof fetch }} deps */
-  constructor({ storage, now, env, fetchFn }) {
+  constructor({ storage, now, env, fetchFn, keys }) {
+    /** @type {{ note(id: string, ok: boolean, status?: number): Promise<void> } | null} keys.js: is the dispatch token still taken? */
+    this.keys = keys || null;
     this.storage = storage;
     this.now = now;
     this.env = env;
@@ -119,6 +121,10 @@ export class Prints {
     } catch {
       return { ok: false, status: 0 };
     }
+    // GitHub took the token, or refused it (expired, revoked, lost its permission). Any other
+    // answer says nothing about the token.
+    if (this.keys && res.status === 204) await this.keys.note('print', true, 204);
+    else if (this.keys && [401, 403, 404].includes(res.status)) await this.keys.note('print', false, res.status);
     return { ok: res.status === 204, status: res.status };
   }
 

@@ -184,3 +184,15 @@ describe('separate machine tokens for the print and PowerPoint jobs (optional se
     expect((await job('hb')).status).toBe(401);
   });
 });
+
+describe('the print token\'s health (keys.js, owner 2026-11-15)', () => {
+  it('a dispatch GitHub takes marks the token working; one it refuses marks it failing', async () => {
+    const s = await setup();
+    expect((await s.call('POST', '/v1/prints/handbook', {})).status).toBe(200);
+    expect((await s.core.keys.list()).find((k) => k.id === 'print').state).toBe('ok');
+    s.setAnswer(401);
+    s.tick(5 * 60 * 1000);
+    await s.call('POST', '/v1/prints/handbook', {});
+    expect((await s.core.keys.list()).find((k) => k.id === 'print').state).toBe('failing');
+  });
+});

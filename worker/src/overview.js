@@ -46,7 +46,7 @@ async function part(fn) {
 export async function overview(core) {
   const now = core.now();
   const when = windowNow(now);
-  const [count, read, print, ym, notice, church, history, changes, feeds] = await Promise.all([
+  const [count, read, print, ym, notice, church, history, changes, feeds, keys] = await Promise.all([
     part(async () => {
       const s = await core.publisher.status();
       return { source: s.source, checkedIn: s.checkedIn, checkedOut: s.checkedOut, byClub: s.byClub, reportAgeMs: s.reportAgeMs, enabled: s.enabled };
@@ -86,13 +86,19 @@ export async function overview(core) {
       const h = (await core.feeds.statusView()).handOver;
       return { slipsHeld: h.slipsHeld, oldStations: h.oldStations.map((/** @type {any} */ s) => ({ name: s.name, version: s.version })) };
     }),
+    part(async () => {
+      // The keys the service runs on (keys.js): names, states and times, never a value.
+      if (!core.keys) return null;
+      const s = await core.watcher.status();
+      return core.keys.list({ read: { loginBlockedForSec: s.loginBlockedForSec, lastOkAt: s.lastOkAt }, secretDaysLeft: core.clubMail ? core.clubMail.secretDaysLeft() : null });
+    }),
   ]);
   return {
     at: new Date(now).toISOString(),
     ...when,
     count, read, print, ym,
     switches: core.switches.list(),
-    notice, church, history, changes, feeds,
+    notice, church, history, changes, feeds, keys,
   };
 }
 

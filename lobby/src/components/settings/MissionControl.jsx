@@ -129,6 +129,20 @@ export default function MissionControl({ overview, mission, error, stopped, onRe
         </p>
       )}
       {ym && <p className="hint mission-line"><strong>Trek and Journey check-out:</strong> {ym}</p>}
+
+      {Array.isArray(overview?.keys) && overview.keys.length > 0 && (
+        <>
+          <h4 className="settings-subhead">Keys the service runs on</h4>
+          <ul className="mission-keys" data-testid="mission-keys">
+            {overview.keys.map((k) => (
+              <li key={k.id} data-state={k.state}>
+                <span className={`mission-key__dot mission-key__dot--${k.state}`} aria-hidden="true" />
+                <strong>{k.name}</strong> <span className={`hint${k.state === 'failing' || k.state === 'ending' ? ' hint--warn' : ''}`}>{k.words}</span>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
       <p className="mission-desk"><a className="panel-button secondary" href="/desk">Open the desk</a></p>
     </PanelCard>
   );

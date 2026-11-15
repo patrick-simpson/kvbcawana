@@ -166,3 +166,21 @@ describe('mission control: words', () => {
     expect(ymWords({ enabled: true, checkedOut: 4, pending: 1, failed: 0, gaveUp: 0 })).toBe('4 checked out, 1 pending');
   });
 });
+
+describe('the keys the service runs on (owner 2026-11-15)', () => {
+  const now = Date.parse('2026-11-15T15:00:00Z');
+  it('a key that stopped working is a red line; the Microsoft secret ending a yellow one; optional and working keys say nothing', () => {
+    const keys = [
+      { id: 'print', name: 'Printing from the web (GitHub token)', optional: false, state: 'failing', words: 'Refused the last time it was used.', fix: 'Make a new GitHub token.' },
+      { id: 'mail', name: 'Club email (Microsoft app)', optional: false, state: 'ending', words: 'Its secret ends in 12 days.', fix: 'Make a new client secret.' },
+      { id: 'twotimtwo', name: 'TwoTimTwo sign-in', optional: false, state: 'ok', words: 'Working.', fix: '' },
+      { id: 'youtube', name: 'YouTube search (Cast)', optional: true, state: 'failing', words: 'x', fix: '' },
+    ];
+    const a = alertsFrom({ keys }, now).filter((x) => x.id.startsWith('key-'));
+    expect(a).toEqual([
+      { id: 'key-print', tone: 'bad', text: 'Printing from the web (GitHub token) has stopped working. Make a new GitHub token.' },
+      { id: 'key-mail', tone: 'warn', text: 'Club email (Microsoft app): Its secret ends in 12 days. Make a new client secret.' },
+    ]);
+    expect(alertsFrom({ keys: 'nonsense' }, now)).toEqual([]);
+  });
+});

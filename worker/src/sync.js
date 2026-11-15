@@ -85,6 +85,7 @@ import { Notices, mountNotice } from './notice.js';
 import { mountOverview } from './overview.js';
 import { mountHealth } from './health.js';
 import { HealthCall } from './healthcall.js';
+import { KeyHealth } from './keys.js';
 import { mountHandbook } from './handbook.js';
 import { netOf } from './netof.js';
 
@@ -336,7 +337,13 @@ export class SyncCore {
     mountScoreboard(this.registry, this);   // /v1/scoreboard (routes.md 10.17)
     // Print from the letterhead page (prints.js, routes.md 10.16): a PDF or the
     // handbook sheets, started as a GitHub Actions job (PRINT_DISPATCH_TOKEN).
-    this.prints = new Prints({ storage: this.storage, now: this.now, env: () => this.rawEnv || {}, fetchFn: this.fetchFn });
+    // The keys the service runs on and whether each still works (keys.js): the places that
+    // use one tell it what the other side answered; a key that stops working is mailed once.
+    this.keys = new KeyHealth({
+      storage: this.storage, now: this.now, env: () => this.rawEnv || {}, log: (line) => console.warn(line),
+      tell: (subject, text) => this.clubMail.tell({ name: 'Awana', replyTo: this.clubMail.from() }, subject, text),
+    });
+    this.prints = new Prints({ storage: this.storage, now: this.now, env: () => this.rawEnv || {}, fetchFn: this.fetchFn, keys: this.keys });
     // The Wednesday health check, started on time from the alarm (healthcall.js).
     this.healthCall = new HealthCall({
       storage: this.storage, now: this.now, clubToday: () => this.watcher.clubToday(),
@@ -347,7 +354,7 @@ export class SyncCore {
     // from the Awana mailbox (Microsoft Graph; MS_TENANT_ID, MS_CLIENT_ID, MS_CLIENT_SECRET).
     this.clubMail = new ClubMail({
       storage: this.storage, now: this.now, env: () => this.rawEnv || {}, fetchFn: this.fetchFn,
-      client: () => this.watcher.clientFor(), log: (line) => console.warn(line),
+      client: () => this.watcher.clientFor(), log: (line) => console.warn(line), keys: this.keys,
       alarms: () => this.watcher.alarms,   // send later: its steps run from the alarm (clubMail.tick)
     });
     mountClubMail(this.registry, this);   // /v1/mail/* (routes.md 10.19)
