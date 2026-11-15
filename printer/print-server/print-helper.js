@@ -36,6 +36,7 @@
 // another label's. The child's handles are unref'd: the helper never keeps Node alive.
 
 const { spawn } = require('child_process');
+const crypto = require('crypto');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
@@ -173,7 +174,7 @@ function createPrintHelper(o = {}) {
   }
 
   function start() {
-    const scriptPath = path.join(tmpDir(), `awana-print-${Date.now()}-helper-${Math.random().toString(36).slice(2, 8)}.ps1`);
+    const scriptPath = path.join(tmpDir(), `awana-print-${Date.now()}-helper-${crypto.randomBytes(4).toString('hex')}.ps1`);
     try { fs.writeFileSync(scriptPath, HELPER_PS, 'utf8'); } catch (e) { rest(`could not write the helper script (${e.message})`); return null; }
     const unlink = () => fs.unlink(scriptPath, () => {});
     let child;
