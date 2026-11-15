@@ -37,6 +37,11 @@ async function mount() {
   let utils;
   await act(async () => { utils = render(<App />); });
   await waitFor(() => expect(bound.notice).toBeTypeOf('function'));
+  // Wait for the socket to have OPENED too: App forgets the pickup list's baseline on
+  // every connection status change, and on a slow runner (CI's Windows job) the open
+  // landed between a test's first and second list, so no one "checked out".
+  await waitFor(() => expect(live.sockets[live.sockets.length - 1]?.opened).toBe(true));
+  await act(async () => {});
   return utils;
 }
 

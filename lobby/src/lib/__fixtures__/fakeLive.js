@@ -28,7 +28,8 @@ export function fakeLive() {
       this.sent = [];
       this.closed = null;
       sockets.push(this);
-      setTimeout(() => { if (this.closed === null) this.onopen?.(); }, 0);
+      this.opened = false;
+      setTimeout(() => { if (this.closed === null) { this.opened = true; this.onopen?.(); } }, 0);
     }
     /** @param {string} data */
     send(data) {
