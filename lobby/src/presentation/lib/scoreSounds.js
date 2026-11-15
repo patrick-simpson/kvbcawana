@@ -36,3 +36,10 @@ export function gameOnSound(force = false) {
   notes.push({ freq: 1047, at: 0.36, len: 0.5, type: 'triangle' }, { freq: 60, at: 0.36, len: 0.35, type: 'sine' });
   playTones(notes, 0.09, { force });
 }
+
+/** A colour burst across the wall (the winner film's way in and out): a falling whoosh and a low hit. */
+export function whooshSound(force = false) {
+  const notes = [1568, 1175, 880, 659, 494, 370].map((freq, i) => ({ freq, at: i * 0.035, len: 0.12, type: 'triangle' }));
+  notes.push({ freq: 48, at: 0.2, len: 0.45, type: 'sine' });
+  playTones(notes, 0.07, { force });
+}

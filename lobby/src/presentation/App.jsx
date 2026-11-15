@@ -108,6 +108,8 @@ export const App = () => {
   const { board, finale, serverNow } = useScoreboard({ enabled: !CONFIGURE && !MIRROR });
   const scoringClub = board?.active ?? null;
   const lowPowerNow = useLowPower();
+  // Into the scoreboard it wipes in over the old view (ScoringView); into the opening ceremony it cuts (cutsIn).
+  const layOver = scoringClub ? !lowPowerNow : cutsIn(state, now);
 
   // ?view=game (the lobby's Settings → Other screens): open on game time
   // exactly as the menu would, so the watchdog and the resume pill still
@@ -325,13 +327,17 @@ export const App = () => {
           welcome film, starts on the countdown's own picture ("0:00" alone on
           black), so it is a cut, not a fade through black: the film lands on
           top at once and the countdown is let go under it. */}
-      <AnimatePresence mode={!scoringClub && cutsIn(state, now) ? 'sync' : 'wait'} custom={!scoringClub && cutsIn(state, now)}>
+      {/* The scoreboard wipes in over the old view behind its GAME ON! (owner 2026-11-15:
+          transitions "epic and smooth"), never a fade through black: laid on top
+          at once, the old view let go under it. */}
+      <AnimatePresence mode={layOver ? 'sync' : 'wait'} custom={layOver}>
         <motion.div
           key={scoringClub ? `scoring:${scoringClub}:${board.setups[scoringClub]}` : stateKey(state)}
           className="absolute inset-0"
+          style={scoringClub && !lowPowerNow ? { zIndex: 1 } : undefined}
           data-mode={scoringClub ? 'scoring' : slugFor(state)}
           data-deck={state.mode === AppMode.SLIDESHOW ? state.deck : undefined}
-          initial={!scoringClub && cutsIn(state, now) ? false : { opacity: 0, scale: 0.985 }}
+          initial={layOver ? false : { opacity: 0, scale: 0.985 }}
           animate={{ opacity: 1, scale: 1, transition: { duration: DUR.mode, ease: EASE.settle } }}
           variants={VIEW_VARIANTS}
           exit="leave"
@@ -348,6 +354,7 @@ export const App = () => {
                 windows={effectiveWindows}
                 tally={tally}
                 sounds={board.sounds}
+                held={Boolean(finale)}
               />
             ) : (
             <ActiveView
@@ -416,8 +423,11 @@ const cutsIn = (state, now) => state.mode === AppMode.SLIDESHOW && state.deck ==
  * it is, under the new one, until it is let go; otherwise it fades.
  */
 const VIEW_VARIANTS = {
+  // A view laid over (cut or wipe) stays put under the new one until it is covered. Not
+  // opacity 1 -> 1: framer-motion finishes a move to the same value at once, and the old
+  // view vanished before the scoreboard's wipe had crossed it.
   leave: (cut) => (cut
-    ? { opacity: 1, transition: { duration: DUR.mode / 2 } }
+    ? { opacity: 0.999, transition: { duration: DUR.mode } }
     : { opacity: 0, scale: 1.01, transition: { duration: DUR.mode / 2, ease: EASE.exit } }),
 };
 

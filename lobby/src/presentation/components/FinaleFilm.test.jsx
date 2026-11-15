@@ -4,8 +4,8 @@ import { act, render } from '@testing-library/react';
 
 vi.mock('../lib/stingers.js', () => ({ playStinger: vi.fn(), playTones: vi.fn() }));
 
-import { FILM_WAIT_MS, FinaleFilm, filmSrc, inkMatrix } from './FinaleFilm.jsx';
-import { finaleFilmFor } from '../../../../shared/scoreboard.js';
+import { FILM_COVER_MIN_MS, FILM_OUTRO_MS, FILM_WAIT_MS, FinaleFilm, filmSrc, inkMatrix } from './FinaleFilm.jsx';
+import { FINALE_MS, finaleFilmFor } from '../../../../shared/scoreboard.js';
 
 // The winner film (owner 2026-11-15; video/score-finale/): tonight's film painted in the
 // winner's colours, the flat winner screen whenever the film cannot play.
@@ -50,6 +50,28 @@ describe('FinaleFilm', () => {
     act(() => { vi.advanceTimersByTime(FILM_WAIT_MS + 100); });
     expect(container.querySelector('video')).toBeNull();
     expect(container.querySelector('.pj-finale').getAttribute('aria-label')).toMatch(/RED WINS!/);
+  });
+
+  it('the winner\'s colour covers the wall until the film plays, opens onto it, and closes over its end (owner 2026-11-15)', () => {
+    const { container } = render(<FinaleFilm club="sparks" scores={SCORES} night={NIGHT} still={false} />);
+    const film = container.querySelector('.pj-film');
+    expect(film.dataset.phase).toBe('cover');
+    expect(container.querySelector('.pj-film__cover [style*="background"]')).not.toBeNull();
+    act(() => { vi.advanceTimersByTime(200); });
+    act(() => { container.querySelector('video').dispatchEvent(new Event('playing')); });
+    expect(film.dataset.phase).toBe('cover');   // the cover holds its minimum
+    act(() => { vi.advanceTimersByTime(FILM_COVER_MIN_MS); });
+    expect(film.dataset.phase).toBe('film');
+    act(() => { vi.advanceTimersByTime(FINALE_MS - FILM_OUTRO_MS - FILM_COVER_MIN_MS - 300); });
+    expect(film.dataset.phase).toBe('film');
+    act(() => { vi.advanceTimersByTime(200); });
+    expect(film.dataset.phase).toBe('out');
+  });
+
+  it('a film that never started hands over to the flat screen with no wipe of its own (it is already that colour)', () => {
+    const { container } = render(<FinaleFilm club="sparks" scores={SCORES} night={NIGHT} still={false} />);
+    act(() => { vi.advanceTimersByTime(FILM_WAIT_MS + 100); });
+    expect(container.querySelector('.pj-finale').style.clipPath).toMatch(/150%/);
   });
 
   it('low power plays the flat winner screen and never loads the film', () => {

@@ -1304,6 +1304,14 @@
 .pj-film__frame { display: flex; flex-direction: column; align-items: center; color: #ffffff; }
 .pj-film__head { font-size: calc(12.5 * var(--u)); filter: drop-shadow(0 0 calc(2 * var(--u)) rgba(0, 0, 0, 0.55)); }
 .pj-film__kick { text-shadow: 0 0 calc(1 * var(--u)) rgba(0, 0, 0, 0.8); }
+/* The film's way in and out: the winner's colour over the wall, a white ring on its edge, the flash at WINS!. */
+.pj-film__cover { position: absolute; inset: 0; }
+.pj-film__reel { position: absolute; inset: 0; overflow: hidden; }
+.pj-film__ring {
+  position: absolute; left: 50%; top: 50%; width: 240vmax; height: 240vmax; margin: -120vmax 0 0 -120vmax;
+  border-radius: 50%; border: calc(1.4 * var(--u)) solid #ffffff; pointer-events: none;
+}
+.pj-film__flash { position: absolute; inset: 0; background: #ffffff; pointer-events: none; }
 /* GAME ON! as a club goes up (ScoringView). */
 .pj-gameon { position: absolute; inset: 0; z-index: 42; background: var(--club); display: flex; flex-direction: column; align-items: center; justify-content: center; color: #ffffff; }
 .pj-gameon__club { font-family: var(--font-condensed); text-transform: uppercase; letter-spacing: 0.08em; font-size: calc(4.2 * var(--u)); line-height: 1; }

@@ -54,6 +54,14 @@ export const STREAK_HOLD_MS = 350;
  * Low power (switch or OS reduced motion): no slams, wipes or pops, the
  * takeover still shows (it is the news), held, then gone.
  *
+ * The ways in and out (owner 2026-11-15: "Make sure all the transitions to and from all
+ * of these ... are epic and smooth"): the board wipes in over whatever was on the wall
+ * behind GAME ON! (App lays it over the old view, no fade through black); the plates and
+ * the game clock wait for GAME ON! to wipe away, then slam in; while a winner is still
+ * playing over it (`held`: a switch from another club), GAME ON! waits under the winner,
+ * silent, and starts as the winner irises away. A takeover sucks back into its corner;
+ * TIME! wipes off upward; leaving with no winner, the plates fly back out to their corners.
+ *
  * @param {{
  *   now: Date,
  *   club: 'tnt'|'sparks'|'cubbies',
@@ -64,9 +72,10 @@ export const STREAK_HOLD_MS = 350;
  *   windows: any[],
  *   tally: any,
  *   sounds?: boolean,
+ *   held?: boolean,
  * }} props
  */
-export const ScoringView = ({ now, club, scores, teams = SCORE_TEAMS, clock, serverNow, windows, tally, sounds = false }) => {
+export const ScoringView = ({ now, club, scores, teams = SCORE_TEAMS, clock, serverNow, windows, tally, sounds = false, held = false }) => {
   const lowPower = useLowPower();
   const info = CLUBS[club];
   const gameWindow = useMemo(
@@ -141,14 +150,18 @@ export const ScoringView = ({ now, club, scores, teams = SCORE_TEAMS, clock, ser
 
   // The board arriving (owner 2026-11-15): GAME ON! in the club's colour for a moment, with
   // a sweep, before the plates slam in. Once per club going up (a re-render never replays it).
+  // Under a winner still playing (`held`) it waits, silent, and starts as the winner goes.
   const [intro, setIntro] = useState(!lowPower);
+  const introStarted = useRef(false);
   useEffect(() => {
+    if (held || introStarted.current) return undefined;
+    introStarted.current = true;
     gameOnSound(sounds);
     if (lowPower) return undefined;
     const t = window.setTimeout(() => setIntro(false), INTRO_MS);
-    return () => window.clearTimeout(t);
+    return () => { window.clearTimeout(t); introStarted.current = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [club]);
+  }, [club, held]);
 
   // A timer reaching zero: TIME! over the whole wall for a moment (the clock buzzes).
   const [timeFlash, setTimeFlash] = useState(/** @type {number|null} */ (null));
@@ -161,6 +174,8 @@ export const ScoringView = ({ now, club, scores, teams = SCORE_TEAMS, clock, ser
   // The strip's game clock drops in from the middle of the wall.
   const u = useFrameUnit();
   const dropFrom = lowPower ? false : { y: -26 * u, scale: 3.2, opacity: 0 };
+  // Everything on the board waits for GAME ON! to leave, then lands.
+  const waiting = intro && !lowPower;
 
   const roster = useBirthdays();
   const celebrants = birthdaysThisWeek(roster, now).filter((b) => clubIds.includes(b.club));
@@ -175,11 +190,17 @@ export const ScoringView = ({ now, club, scores, teams = SCORE_TEAMS, clock, ser
   const hm = (mins) => `${((Math.floor(mins / 60) + 11) % 12) + 1}:${String(mins % 60).padStart(2, '0')}`;
 
   return (
-    <div className="w-full h-full relative overflow-hidden" style={{ background: '#000000' }} data-scoring={club}>
+    <motion.div
+      className="w-full h-full relative overflow-hidden"
+      style={{ background: '#000000' }}
+      data-scoring={club}
+      initial={lowPower ? false : { clipPath: 'inset(0 100% 0 0)' }}
+      animate={{ clipPath: 'inset(0 0% 0 0)', transition: { duration: 0.32, ease: EASE.wipe } }}
+    >
       <div className="pj-frame pj-score" data-compact={compact ? '1' : '0'} data-count={teams.length}>
         <div className="pj-score__grid">
           {teams.map((team, i) => (
-            <TeamPlate key={team} team={team} score={scores[team]} index={i} count={teams.length} leading={leader === team} compact={compact} still={lowPower} />
+            <TeamPlate key={team} team={team} score={scores[team]} index={i} count={teams.length} leading={leader === team} compact={compact} still={lowPower} waiting={waiting} />
           ))}
         </div>
 
@@ -207,7 +228,7 @@ export const ScoringView = ({ now, club, scores, teams = SCORE_TEAMS, clock, ser
                 key="game-clock"
                 className="inline-block pj-score__gameclock"
                 initial={dropFrom}
-                animate={{ y: 0, scale: 1, opacity: 1, transition: { duration: 0.9, ease: EASE.settle, delay: 0.15 } }}
+                animate={waiting && dropFrom ? dropFrom : { y: 0, scale: 1, opacity: 1, transition: { duration: 0.9, ease: EASE.settle, delay: 0.3 } }}
                 exit={{ opacity: 0, scale: 0.8, transition: { duration: DUR.exit, ease: EASE.exit } }}
                 data-warning={warning !== 'none' ? warning : undefined}
               >
@@ -240,8 +261,9 @@ export const ScoringView = ({ now, club, scores, teams = SCORE_TEAMS, clock, ser
               key="intro"
               className="pj-gameon"
               style={{ '--club': info.color }}
-              initial={{ clipPath: 'inset(0 100% 0 0)' }}
-              animate={{ clipPath: 'inset(0 0% 0 0)', transition: { duration: 0.32, ease: EASE.wipe } }}
+              // Carried in by the board's own wipe (the root); it wipes itself away.
+              initial={false}
+              animate={{ clipPath: 'inset(0 0% 0 0)' }}
               exit={{ clipPath: 'inset(0 0 0 100%)', transition: { duration: 0.32, ease: EASE.wipe } }}
               aria-hidden="true"
             >
@@ -264,14 +286,14 @@ export const ScoringView = ({ now, club, scores, teams = SCORE_TEAMS, clock, ser
               aria-hidden="true"
               initial={{ opacity: 0 }}
               animate={{ opacity: [0, 1, 0.85, 1], x: [0, -14, 12, -8, 6, 0], transition: { duration: 0.6 } }}
-              exit={{ opacity: 0, transition: { duration: 0.3 } }}
+              exit={{ clipPath: 'inset(0 0 100% 0)', transition: { duration: 0.4, ease: EASE.wipe } }}
             >
-              <motion.span initial={{ scale: 3 }} animate={{ scale: [3, 0.92, 1.04, 1], transition: { duration: 0.55, times: [0, 0.5, 0.75, 1] } }}>Time!</motion.span>
+              <motion.span initial={{ scale: 3 }} animate={{ scale: [3, 0.92, 1.04, 1], transition: { duration: 0.55, times: [0, 0.5, 0.75, 1] } }} exit={{ scale: 1.3, y: -40, transition: { duration: 0.4, ease: 'easeIn' } }}>Time!</motion.span>
             </motion.div>
           )}
         </AnimatePresence>
       </AnimatePresence>
-    </div>
+    </motion.div>
   );
 };
 
@@ -286,23 +308,27 @@ const FROM = {
  * keyline out of register (the kit's stepped look), the name in Londrina caps,
  * the score in Paytone. A new score slams in; a lower one swaps quietly.
  */
-const TeamPlate = ({ team, score, index, count, leading, compact, still }) => {
+const TeamPlate = ({ team, score, index, count, leading, compact, still, waiting = false }) => {
   const c = SCORE_TEAM_COLORS[team];
   const from = (FROM[count] || FROM[4])[index] || { x: 0, y: 1 };
   // Up or down since the last render (adjusted during render, never in an effect).
-  const [seen, setSeen] = useState({ score, up: false });
-  if (seen.score !== score) setSeen({ score, up: score > seen.score });
+  // The first number just sits there (the plate brings it in); later ones slam or tick (`changed`).
+  const [seen, setSeen] = useState({ score, up: false, changed: false });
+  if (seen.score !== score) setSeen({ score, up: score > seen.score, changed: true });
   const up = seen.up;
   const u = useFrameUnit();
+  // Off in its corner: where it slams in from, and where it flies back to on the way out.
+  const away = { opacity: 0, x: from.x * 30 * u, y: from.y * 18 * u, scale: 0.55, rotate: from.x * from.y * 6 };
   return (
     <motion.div
       layout={!still}
       className="pj-score__team"
       data-team={team}
       style={{ '--team': c.fill, '--team-deep': c.deep, '--team-ink': c.ink }}
-      initial={still ? false : { opacity: 0, x: from.x * 30 * u, y: from.y * 18 * u, scale: 0.55, rotate: from.x * from.y * 6 }}
-      animate={{ opacity: 1, x: 0, y: 0, scale: 1, rotate: 0 }}
-      transition={{ type: 'spring', stiffness: 260, damping: 19, mass: 1, delay: still ? 0 : 0.05 * index, layout: { duration: 0.55, ease: EASE.settle } }}
+      initial={still ? false : away}
+      animate={waiting ? away : { opacity: 1, x: 0, y: 0, scale: 1, rotate: 0 }}
+      exit={still ? undefined : { ...away, transition: { duration: 0.35, ease: 'easeIn', delay: 0.03 * index } }}
+      transition={{ type: 'spring', stiffness: 260, damping: 19, mass: 1, delay: still ? 0 : 0.07 * index, layout: { duration: 0.55, ease: EASE.settle } }}
     >
       <motion.span layout={still ? false : 'position'} className="pj-score__name">{SCORE_TEAM_WORDS[team]}</motion.span>
       <AnimatePresence>
@@ -318,17 +344,16 @@ const TeamPlate = ({ team, score, index, count, leading, compact, still }) => {
         )}
       </AnimatePresence>
       <motion.span layout={still ? false : 'position'} className="pj-score__num-box">
-        <AnimatePresence mode="popLayout" initial={false}>
-          <motion.span
-            key={score}
-            className="pj-score__num"
-            initial={still || !up ? { opacity: 0 } : { opacity: 0, scale: 1.7, y: -4 * u }}
-            animate={{ opacity: 1, scale: 1, y: 0, transition: up && !still ? { type: 'spring', stiffness: 520, damping: 16 } : { duration: 0.15 } }}
-            exit={{ opacity: 0, transition: { duration: 0.08 } }}
-          >
-            {score}
-          </motion.span>
-        </AnimatePresence>
+        {/* One number at a time: the new one replaces the old in place (a fading old one
+            lingered on the plate beside it when points came in a burst). */}
+        <motion.span
+          key={score}
+          className="pj-score__num"
+          initial={!seen.changed ? false : still || !up ? { opacity: 0.35 } : { opacity: 0, scale: 1.7, y: -4 * u }}
+          animate={{ opacity: 1, scale: 1, y: 0, transition: up && !still ? { type: 'spring', stiffness: 520, damping: 16 } : { duration: 0.15 } }}
+        >
+          {score}
+        </motion.span>
       </motion.span>
     </motion.div>
   );

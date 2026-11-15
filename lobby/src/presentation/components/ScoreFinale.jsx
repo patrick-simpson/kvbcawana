@@ -3,6 +3,10 @@ import { motion } from 'framer-motion';
 import { SCORE_CLUB_WORDS, SCORE_TEAMS, SCORE_TEAM_COLORS, SCORE_TEAM_WORDS, winnerOf } from '../../../../shared/scoreboard.js';
 import { EASE } from '../lib/motion-tokens.js';
 
+/** Off the wall: a slanted edge sweeping to the right (as the winner film leaves). */
+const WIPE_ON = 'polygon(-8% 0%, 112% 0%, 112% 100%, -16% 100%)';
+const WIPE_OFF = 'polygon(120% 0%, 140% 0%, 140% 100%, 112% 100%)';
+
 /**
  * The winner (owner 2026-11-05: "Winner, then schedule"; ties "Share the win"):
  * after End, or a switch to another club, the winning team's colour floods the
@@ -10,9 +14,13 @@ import { EASE } from '../lib/motion-tokens.js';
  * lifted and keylined; a tie splits the wall into the tied teams' colours with
  * "IT'S A TIE!". Held FINALE_MS (the caller's timer) over whatever comes next.
  *
- * @param {{ club: string, scores: Record<string, number>, teams?: readonly string[], still: boolean }} props
+ * In: the colour bursts out of the middle; `covered` = the wall is already that colour
+ * (the winner film's cover, when the film could not play), so it starts full, no seam.
+ * Out: it sweeps off to the right on a slant onto whatever is next (owner 2026-11-15: transitions "epic and smooth").
+ *
+ * @param {{ club: string, scores: Record<string, number>, teams?: readonly string[], still: boolean, covered?: boolean }} props
  */
-export const ScoreFinale = ({ club, scores, teams: playing = SCORE_TEAMS, still }) => {
+export const ScoreFinale = ({ club, scores, teams: playing = SCORE_TEAMS, still, covered = false }) => {
   const w = winnerOf(scores, playing);
   const teams = w.teams.length ? w.teams : playing.slice(0, 1);
   const ink = !w.tie && SCORE_TEAM_COLORS[teams[0]].ink !== '#FFFFFF' ? 'ink' : 'white';
@@ -24,9 +32,9 @@ export const ScoreFinale = ({ club, scores, teams: playing = SCORE_TEAMS, still 
       data-winners={w.teams.join(' ')}
       role="status"
       aria-label={`${SCORE_CLUB_WORDS[club]} final: ${head}`}
-      initial={still ? { opacity: 1 } : { clipPath: 'circle(0% at 50% 50%)' }}
+      initial={still ? { opacity: 1 } : { clipPath: covered ? 'circle(150% at 50% 50%)' : 'circle(0% at 50% 50%)' }}
       animate={{ clipPath: 'circle(150% at 50% 50%)', opacity: 1, transition: still ? { duration: 0 } : { duration: 0.64, ease: EASE.wipe } }}
-      exit={{ opacity: 0, transition: { duration: still ? 0 : 0.4, ease: EASE.exit } }}
+      exit={still ? { opacity: 0, transition: { duration: 0 } } : { clipPath: [WIPE_ON, WIPE_OFF], transition: { duration: 0.55, ease: EASE.wipe } }}
     >
       <div className="pj-finale__field" aria-hidden="true">
         {teams.map((t) => (

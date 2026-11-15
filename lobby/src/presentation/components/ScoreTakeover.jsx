@@ -39,7 +39,8 @@ export const ScoreTakeover = ({ hits, lead = null, streak = 0, scores, teams = S
       initial={still ? { opacity: 1 } : { clipPath: `circle(0% at ${origin})` }}
       data-streak={run >= 2 ? run : undefined}
       animate={{ clipPath: `circle(150% at ${origin})`, opacity: 1, ...(hot ? { x: [0, -18, 15, -11, 8, -4, 0] } : {}), transition: still ? { duration: 0 } : { duration: 0.42, ease: EASE.wipe, x: { duration: 0.55, delay: 0.3 } } }}
-      exit={{ opacity: 0, scale: still ? 1 : 1.04, transition: { duration: still ? 0 : 0.22, ease: EASE.exit } }}
+      // Out: the colour sucks back into the corner it came from (owner 2026-11-15: "epic and smooth").
+      exit={still ? { opacity: 0, transition: { duration: 0 } } : { clipPath: `circle(0% at ${origin})`, transition: { duration: 0.34, ease: EASE.wipe } }}
     >
       {hits.map((h, i) => (
         <Band key={h.team} hit={h} lead={one && h.team === lead} run={run} total={scores[h.team]} index={i} count={hits.length} still={still} />

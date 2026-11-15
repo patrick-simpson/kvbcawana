@@ -127,6 +127,18 @@ describe('ScoringView', () => {
     expect(container.querySelectorAll('.pj-score__grid [data-team]')).toHaveLength(4);
   });
 
+  it('under a winner still playing, GAME ON! waits silent and starts as the winner goes (owner 2026-11-15)', () => {
+    const { container, rerender } = render(view(scores(0, 0, 0, 0), { held: true }));
+    expect(container.querySelector('.pj-gameon')).not.toBeNull();
+    expect(playTones).not.toHaveBeenCalled();
+    act(() => { vi.advanceTimersByTime(5000); });
+    expect(container.querySelector('.pj-gameon')).not.toBeNull();   // still waiting under the winner
+    rerender(view(scores(0, 0, 0, 0), { held: false }));
+    expect(playTones).toHaveBeenCalledTimes(1);   // the sweep, now
+    rerender(view(scores(0, 0, 0, 0), { held: false }));
+    expect(playTones).toHaveBeenCalledTimes(1);   // once only
+  });
+
   it('points close together share one takeover, split', () => {
     const { container, rerender } = render(view(scores(0, 0, 0, 0)));
     rerender(view(scores(0, 1, 0, 0)));
