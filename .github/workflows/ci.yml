@@ -418,6 +418,40 @@ jobs:
       - name: Test the Pages Function
         run: node --test site/test/*.test.mjs
 
+  # The unit tests again on Windows (owner 2026-11-15). The owner's own PC is Windows, and
+  # for weeks 20 tests failed there that passed here: Git for Windows had checked the
+  # sources out with CRLF line endings, and the Worker's test config built a path that only
+  # works on Linux. Nothing was wrong with the apps, but nothing here could have said so.
+  # This job is the check: the lobby's, the Worker's and the site's unit tests on a Windows
+  # checkout. It is NOT one of the deploy's needs: a Windows-only hiccup must never hold a
+  # deploy. The repo is public, so its minutes cost nothing.
+  windows:
+    name: Unit tests on Windows
+    runs-on: windows-2022
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-app
+        with:
+          lockfile: |
+            lobby/package-lock.json
+            worker/package-lock.json
+      - name: No source file was checked out with Windows line endings
+        run: |
+          crlf="$(git ls-files --eol | awk '$2 == "w/crlf" && $0 !~ /\.(bat|cmd)$/ {print}' | head -n 20)"
+          if [ -n "$crlf" ]; then echo "::error::These files were checked out with CRLF (see .gitattributes):"; echo "$crlf"; exit 1; fi
+      - name: The Worker's tests
+        working-directory: worker
+        run: npm ci && npm test
+      - name: The lobby's unit tests
+        working-directory: lobby
+        run: npm ci && npx vitest run
+      - name: The site's tests
+        run: node --test site/test/*.test.mjs
+
   deploy:
     # The site is built first (its failures are the cheap ones), then the
     # sync Worker, then the site is published, once every check above is

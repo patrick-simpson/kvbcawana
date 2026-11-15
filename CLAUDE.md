@@ -24,6 +24,7 @@ This one repo holds three apps for Kennebec Valley Baptist Church's Awana club:
 ## CI and deploy
 
 - `.github/workflows/ci.yml` runs on every push and pull request, using Node 22. It runs each app's checks.
+- The `windows` job (owner 2026-11-15) runs the lobby's, the Worker's and the site's unit tests on a Windows checkout too, and fails if a source file was checked out with CRLF. Root `.gitattributes` keeps every text file LF in every checkout (batch files CRLF). It is not one of the deploy's needs. Reason: 20 tests failed on the owner's Windows PC for weeks with nothing wrong in the apps (CRLF checkouts, and a Linux-only path in the Worker's vitest config).
 - `scripts/check-mirrors.mjs` confirms that shared files match across apps. The brand kit has one master copy, in `shared/brand/`. Copies are made at build time by `scripts/family-assets.mjs`. Do not edit the copies.
 - Deploy runs only on `main`, after all checks pass. It builds the site and publishes it to Cloudflare Pages at awana.kvbchurch.org. It deploys the sync Worker only when the Worker's files changed.
 - Every Worker deploy restarts the Durable Object and drops every screen's connection for a moment. That is accepted, so deploy the Worker whenever its changes need to go out.
