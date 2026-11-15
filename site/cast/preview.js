@@ -123,9 +123,11 @@ function pdfLib() {
  *   fetchPdf: (fileId: string) => Promise<ArrayBuffer | null>,
  *   go: (to: number, step?: number) => void,
  *   point?: (p: { x: number, y: number, on: boolean }) => unknown, gapMs?: number,
+ *   onPage?: (file: string, page: number) => void,
  * }} o
+ *   `onPage`: told the slide this page shows (at once on a press), for the speaker notes.
  */
-export function createPreview({ root, fetchPdf, go, point, gapMs = 125 }) {
+export function createPreview({ root, fetchPdf, go, point, gapMs = 125, onPage }) {
   const q = (sel) => /** @type {any} */ (root.querySelector(sel));
   const nowCanvas = q('[data-slide="now"]');
   const nextCanvas = q('[data-slide="next"]');
@@ -141,6 +143,7 @@ export function createPreview({ root, fetchPdf, go, point, gapMs = 125 }) {
   let failedFile = '';
   let tvPage = 1;
   let reported = 0;
+  let shownFile = '';
   /** @type {{ page: number, until: number } | null} */
   let pending = null;
   let drawn = { now: 0, next: -1 };
@@ -216,6 +219,7 @@ export function createPreview({ root, fetchPdf, go, point, gapMs = 125 }) {
   async function draw() {
     const v = slideView(shownPage(), pages());
     label.textContent = v.label;
+    if (onPage && shownFile) onPage(shownFile, v.now);
     backBtn.disabled = v.first;
     nextBtn.disabled = v.last;
     for (const b of strip.children) b.setAttribute('aria-current', String(Number(b.dataset.page) === v.now));
@@ -307,6 +311,7 @@ export function createPreview({ root, fetchPdf, go, point, gapMs = 125 }) {
     /** A PDF is on the TV at this page. @param {string} file @param {number} page @param {number} pagesReported */
     show(file, page, pagesReported) {
       root.hidden = false;
+      shownFile = file;
       tvPage = page || 1;
       reported = pagesReported || 0;
       if ((!cur || cur.file !== file) && loadingFile !== file && failedFile !== file) open(file);

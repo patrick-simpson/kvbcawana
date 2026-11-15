@@ -7,8 +7,10 @@ name: Cast - turn a PowerPoint into slides
 # reads it from the Worker with the machine token (CAST_CONVERT_TOKEN when that
 # secret exists, else HANDBOOK_TOKEN), opens it with the
 # key, LibreOffice Impress makes the PDF, and the PDF goes back to the Worker as a
-# file of the Cast room (scripts/cast/convert.mjs). The Worker deletes the scrambled
-# upload once the job answers. Not meant to be run by hand.
+# file of the Cast room (scripts/cast/convert.mjs). A .pptx's speaker notes go back
+# too, sealed with the same key, before the PDF (only the presenter's phone opens
+# them). The Worker deletes the scrambled upload once the job answers. Not meant to
+# be run by hand.
 #
 # The key is a dispatch input, so it shows on this run's page (the print tool's
 # accepted trade): the ciphertext also needs the machine token, and is gone once

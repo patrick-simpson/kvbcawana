@@ -38,6 +38,15 @@
 // ciphertext is deleted once the job answers, whatever happened; anything left over
 // goes with the room (a new code, Cast off) or after CONVERT_TTL_MS.
 //
+// SPEAKER NOTES (owner 2026-11-15: "The converter would pull the notes out alongside the
+// slides, and they'd show only on the presenter's phone"): the job pulls a .pptx's notes
+// out itself, seals them with the SAME per-job key and sends that ciphertext first
+// (PUT .../notes, at most CAST_NOTES_MAX_BYTES; castconvnotes:<id>); when the PDF comes
+// back it moves beside the new file (castnotes:<fileId>) and the status says `notes: true`.
+// Only a presenter reads it (GET /v1/cast/files/:id/notes, their token; never the desk or
+// the TV), and only their page holds the key. It goes with the file (deleted with the
+// room's files, evicted with it) and with a conversion that fails or runs out.
+//
 // ONE presenter at a time (owner 2026-11-08: "only one phone should connect at a
 // time"; picked: refuse the second): a join while another presenter's token is live
 // and was used within PRESENTER_IDLE_MS is refused 409 `busy`. The slot frees when
@@ -98,7 +107,7 @@ import { takeToken } from './journeyRemote.js';
 import { netOf } from './netof.js';
 import { fail, json } from './http.js';
 import {
-  CAST_LINEUP_CHARS_MAX, CAST_LINEUP_MAX, CAST_PASS_TTL_MS, CAST_POINTER_PER_MIN, CLASSROOM_CLIP_MAX_BYTES, CLASSROOM_FILE_MAX_BYTES, CLASSROOM_FILE_TYPES,
+  CAST_LINEUP_CHARS_MAX, CAST_LINEUP_MAX, CAST_NOTES_MAX_BYTES, CAST_PASS_TTL_MS, CAST_POINTER_PER_MIN, CLASSROOM_CLIP_MAX_BYTES, CLASSROOM_FILE_MAX_BYTES, CLASSROOM_FILE_TYPES,
   cleanLineupEntries, fileLimits, filesOf, isClipType, sanitizeHouse, sanitizeLineup, sanitizePointer,
 } from '../../shared/classroomRemote.js';
 
@@ -168,6 +177,9 @@ export const CONVERT_FAILS = Object.freeze(['type', 'too-big', 'convert', 'key']
 const CONV_PREFIX = 'castconv:';
 const CONV_PART_PREFIX = 'castconvpart:';
 const CONV_ID_RE = /^c[a-z0-9]{16}$/;
+/** The sealed speaker notes: a conversion's while it runs, then its slides file's. */
+const CONV_NOTES_PREFIX = 'castconvnotes:';
+const NOTES_PREFIX = 'castnotes:';
 const KEY_RE = /^[A-Za-z0-9_-]{43}$/;
 // Ciphertext = 12-byte IV + the file + 16-byte tag.
 const CONVERT_MAX_CT = CONVERT_MAX_BYTES + 28;
@@ -220,6 +232,8 @@ export class Cast {
       storage, now, ring, fetchFn,
       room: { what: 'cast', buttonsKey: 'cast:buttons', stageKey: 'cast:stage', filePrefix: 'castmeta:', partPrefix: 'castpart:', cast: true },
     });
+    // A file's speaker notes go with it, however it goes (the room cleared, an eviction).
+    this.engine.onFileDeleted = (/** @type {string} */ id) => storage.delete(NOTES_PREFIX + id);
     /** Per presenter token this hour (hash -> counts), memory only. @type {Map<string, { since: number, files: number, converts: number }>} */
     this.rates = new Map();
     /** Bytes the room took this hour, whoever sent them. */
@@ -765,6 +779,8 @@ export class Cast {
   /** Delete a conversion's ciphertext (and, with all, its record). @param {any} conv @param {boolean} [all] */
   async dropConvert(conv, all) {
     for (let n = 0; n < (conv.parts || 0); n += 1) await this.storage.delete(`${CONV_PART_PREFIX}${conv.id}:${n}`);
+    // Notes not yet moved beside a file: kept only while the job may still send its PDF.
+    if (all || conv.status !== 'converting') await this.storage.delete(CONV_NOTES_PREFIX + conv.id);
     if (all) await this.storage.delete(CONV_PREFIX + conv.id);
     else await this.storage.put(CONV_PREFIX + conv.id, { ...conv, parts: 0 });
   }
@@ -839,7 +855,7 @@ export class Cast {
   async convertStatus(id) {
     const conv = await this.convertDoc(id);
     if (!conv) return fail('There is no upload by that name.', 404, { reason: 'no-upload' });
-    return json({ ok: true, status: conv.status, ...(conv.file ? { file: conv.file } : {}), ...(conv.error ? { error: conv.error } : {}) });
+    return json({ ok: true, status: conv.status, ...(conv.file ? { file: conv.file } : {}), ...(conv.file ? { notes: conv.notes === true } : {}), ...(conv.error ? { error: conv.error } : {}) });
   }
 
   /** GET /v1/cast/convert/:id/job (the job, machine token): the ciphertext's bytes. @param {string} id */
@@ -870,8 +886,37 @@ export class Cast {
       await this.dropConvert({ ...conv, status: 'failed', error: bytes.length > 20 * 1024 * 1024 ? 'too-big' : 'convert' });
       return fail('That is not a PDF of 20 MB at most.', 400, { reason: 'type' });
     }
-    await this.dropConvert({ ...conv, status: 'done', file });
+    // The speaker notes (sent first, sealed) move beside the slides' file.
+    const notes = await this.storage.get(CONV_NOTES_PREFIX + id);
+    if (notes) {
+      await this.storage.put(NOTES_PREFIX + file.id, notes);
+      await this.storage.delete(CONV_NOTES_PREFIX + id);
+    }
+    await this.dropConvert({ ...conv, status: 'done', file, notes: Boolean(notes) });
     return json({ ok: true, id: file.id });
+  }
+
+  /**
+   * PUT /v1/cast/convert/:id/notes (the job): the speaker notes, sealed with the job's key
+   * (12-byte IV + AES-256-GCM; the Worker cannot open them). Before the PDF only.
+   * @param {string} id @param {Request} request
+   */
+  async convertNotes(id, request) {
+    const conv = await this.convertDoc(id);
+    if (!conv || conv.status !== 'converting') return fail('There is no upload by that name.', 404, { reason: 'no-upload' });
+    const bytes = new Uint8Array(await request.arrayBuffer());
+    if (bytes.length < 29) return fail('Those notes are empty.', 400, { reason: 'empty' });
+    if (bytes.length > CAST_NOTES_MAX_BYTES) return fail('Those notes are too long.', 413, { reason: 'too-big' });
+    await this.storage.put(CONV_NOTES_PREFIX + id, bytes);
+    return json({ ok: true });
+  }
+
+  /** GET /v1/cast/files/:id/notes (a presenter): the slides' sealed speaker notes. @param {string} id */
+  async fileNotes(id) {
+    if (!/^f[a-z0-9]{12,24}$/.test(id || '')) return fail('No notes came with these slides.', 404, { reason: 'no-notes' });
+    const notes = await this.storage.get(NOTES_PREFIX + id);
+    if (!notes) return fail('No notes came with these slides.', 404, { reason: 'no-notes' });
+    return new Response(new Uint8Array(notes), { headers: { 'Content-Type': 'application/octet-stream', 'Cache-Control': 'no-store' } });
   }
 
   /** POST /v1/cast/convert/:id/failed {reason} (the job). @param {string} id @param {any} body */
@@ -933,6 +978,8 @@ export function mountCast(registry, core) {
   registry.add('GET', '/v1/cast/signal', 'public', presenter(async ({ url }) => c().engine.readSignal('answer', url.searchParams.get('id'))));
   // The phone's preview of the slides on the TV: the room's own file.
   registry.add('GET', '/v1/cast/files/:id', 'public', presenter(async ({ params }) => c().engine.readFile(params.id)));
+  // The slides' speaker notes, sealed: the presenter's page alone holds the key (no desk twin).
+  registry.add('GET', '/v1/cast/files/:id/notes', 'public', presenter(async ({ params }) => c().fileNotes(params.id)));
   // PowerPoint into slides: the GitHub job's routes (the machine token: CAST_CONVERT_TOKEN
   // when set, else HANDBOOK_TOKEN),
   // registered first so `/:id/result` is never taken for a part number...
@@ -944,6 +991,7 @@ export function mountCast(registry, core) {
   registry.add('GET', '/v1/cast/convert/:id/job', 'public', machine(async ({ params }) => c().convertJob(params.id)));
   registry.add('PUT', '/v1/cast/convert/:id/result', 'public', machine(async ({ params, request }) => c().convertResult(params.id, request)));
   registry.add('POST', '/v1/cast/convert/:id/failed', 'public', machine(async ({ params, body }) => c().convertFailed(params.id, await body())));
+  registry.add('PUT', '/v1/cast/convert/:id/notes', 'public', machine(async ({ params, request }) => c().convertNotes(params.id, request)));
   // ...then the presenter's upload and status.
   registry.add('POST', '/v1/cast/convert', 'public', presenter(async ({ body }, who) => c().convertStart(await body(), who)));
   registry.add('PUT', '/v1/cast/convert/:id/:n', 'public', presenter(async ({ params, request }) => c().convertPart(params.id, params.n, request)));

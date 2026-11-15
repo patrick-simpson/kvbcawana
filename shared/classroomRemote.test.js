@@ -152,3 +152,14 @@ describe('the slides\' pointer (Cast)', () => {
     expect(R.CAST_POINTER_PER_MIN).toBe(300);
   });
 });
+
+// Owner 2026-11-15: "The converter would pull the notes out alongside the slides, and they'd
+// show only on the presenter's phone."
+describe('speaker notes (Cast)', () => {
+  it('one string per slide, line breaks kept, other control characters dropped, each cut to its limit', () => {
+    expect(R.sanitizeNotes(['One\nTwo', '', 7, null, 'a\u0000b\tc'])).toEqual(['One\nTwo', '', '', '', 'abc']);
+    expect(R.sanitizeNotes(['x'.repeat(R.CAST_NOTE_MAX + 9)])[0]).toHaveLength(R.CAST_NOTE_MAX);
+    expect(R.sanitizeNotes('notes')).toBeNull();
+    expect(R.CAST_NOTES_MAX_BYTES).toBe(256 * 1024);
+  });
+});

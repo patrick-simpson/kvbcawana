@@ -15,7 +15,7 @@ import {
   joinWords, linkToCopy, placeholderId, shareWords, size, textPress, titleFromName, tvWords, videoPress, volumeWords,
   SLIDES_ACCEPT, convertWords, isPresentation, slideView, slidesChoice,
   codeFromHash, facebookPress, resultPress, CAST_HOME, presenterUrl, addressWords, passFromHash, passUrl, passWords,
-  containRect, createPointerThrottle, pointIn,
+  containRect, createPointerThrottle, pointIn, notesView, openNotes,
   clockPress, clockWords, createSkew, minSec, timerLeft, timerPress,
   entryWords, lineupAdd, lineupEntryFrom, lineupMove, lineupRemove, lineupView,
   scripturePagesWords, scripturePress, verseRuns,
@@ -723,6 +723,40 @@ test('the pointer on the pages: drag on the big slide (and the desk\'s miniature
   assert.match(screenPage, /\.pointer \{[^}]*outline: calc\(\.22 \* var\(--u\)\) solid #F6F2EA;/);
   assert.doesNotMatch(screenPage.match(/\.pointer \{[^}]*\}/)[0], /blur|gradient|filter|shadow/);
   assert.match(page, /\.pointer-dot \{[^}]*outline: 2px solid #F6F2EA;/);
+});
+
+// Owner 2026-11-15: "The converter would pull the notes out alongside the slides, and they'd
+// show only on the presenter's phone."
+test('speaker notes: opened on the phone with the PowerPoint\'s own key, the slide\'s own shown', async () => {
+  const raw = crypto.getRandomValues(new Uint8Array(32));
+  const key = Buffer.from(raw).toString('base64url');
+  const k = await crypto.subtle.importKey('raw', raw, 'AES-GCM', false, ['encrypt']);
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ct = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, k, new TextEncoder().encode(JSON.stringify({ v: 1, notes: ['Welcome\nthen pray', '', 7] }))));
+  const sealed = new Uint8Array(12 + ct.length);
+  sealed.set(iv); sealed.set(ct, 12);
+  const notes = await openNotes(sealed, key, R);
+  assert.deepEqual(notes, ['Welcome\nthen pray', '', '']);
+  assert.equal(await openNotes(sealed, Buffer.from(new Uint8Array(32)).toString('base64url'), R), null, 'another key opens nothing');
+  assert.deepEqual(notesView(notes, 1), { where: 'Slide 1', text: 'Welcome\nthen pray', empty: false });
+  assert.deepEqual(notesView(notes, 2), { where: 'Slide 2', text: 'No notes for this slide.', empty: true });
+  assert.equal(notesView(notes, 9).text, 'No notes for this slide.');
+  assert.match(notesView('none', 1).text, /No speaker notes were found/);
+  assert.match(notesView('loading', 3).text, /Opening your notes/);
+  assert.match(notesView('failed', 3).text, /could not be opened/);
+  assert.equal(R.CAST_NOTES_MAX_BYTES, 256 * 1024);
+});
+
+test('speaker notes live on the phone page only: the key in memory, never the desk or the TV', () => {
+  assert.match(page, /<div class="notes" id="slide-notes" data-empty="true" hidden>/);
+  assert.match(page, /<span>Your notes<span id="notes-where"><\/span><\/span><span>Not on the TV<\/span>/);
+  assert.doesNotMatch(read('cast', 'desk', 'index.html'), /slide-notes/);
+  assert.doesNotMatch(screen + screenPage, /notes/i);
+  // The key stays where it was made: a Map in memory, never storage.
+  assert.match(controls, /notesKeys\.set\(st\.body\.file\.id, st\.body\.notes === true \? key : ''\)/);
+  assert.doesNotMatch(controls, /(sessionStorage|localStorage)[^\n]*notes/i);
+  assert.match(controls, /\/v1\/cast\/files\/\$\{encodeURIComponent\(id\)\}\/notes/);
+  assert.match(previewJs, /if \(onPage && shownFile\) onPage\(shownFile, v\.now\);/);
 });
 
 test('every animation is inside the motion-allowed block; one shared motion language', () => {

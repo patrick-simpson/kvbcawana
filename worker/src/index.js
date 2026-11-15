@@ -5,7 +5,7 @@
 
 import { BODY_MAX, SyncCore, json } from './sync.js';
 import { isScreenId } from '../../lobby/src/lib/syncSpecs.js';
-import { CLASSROOM_CLIP_PART_BYTES, CLASSROOM_FILE_MAX_BYTES } from '../../shared/classroomRemote.js';
+import { CAST_NOTES_MAX_BYTES, CLASSROOM_CLIP_PART_BYTES, CLASSROOM_FILE_MAX_BYTES } from '../../shared/classroomRemote.js';
 import { IMPORT_BODY_MAX, ROWS_BODY_MAX } from './history.js';
 import { readLimited } from './classroom.js';
 
@@ -44,6 +44,8 @@ const LOCAL_ORIGIN = /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/;
 export const BODY_CAPS = [
   { method: 'PUT', path: /^\/v1\/(classroom|cast|cast\/desk)\/files\/[^/]+\/\d+$/, max: CLASSROOM_CLIP_PART_BYTES },
   { method: 'PUT', path: /^\/v1\/cast\/convert\/[^/]+\/result$/, max: CLASSROOM_FILE_MAX_BYTES },
+  // The sealed speaker notes (cast.js): at most CAST_NOTES_MAX_BYTES, over the default cap.
+  { method: 'PUT', path: /^\/v1\/cast\/convert\/[^/]+\/notes$/, max: CAST_NOTES_MAX_BYTES },
   { method: 'POST', path: /^\/v1\/history\/rows$/, max: ROWS_BODY_MAX },
   { method: 'POST', path: /^\/v1\/history\/import$/, max: IMPORT_BODY_MAX },
 ];

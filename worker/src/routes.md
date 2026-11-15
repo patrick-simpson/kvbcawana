@@ -1789,10 +1789,12 @@ tap Pass the remote); rotating the code, `leave` (the passer's own), `kick`, `re
 | `POST /v1/cast/convert` | public + token | `{bytes, name}` (bytes = the SCRAMBLED PowerPoint's: 12-byte IV + AES-256-GCM ciphertext; at most `CONVERT_MAX_BYTES` 40 MB + 28) | `{ok, id, parts, partBytes}` (96 KiB); 503 `not-configured` (no `PRINT_DISPATCH_TOKEN`, or neither `CAST_CONVERT_TOKEN` nor `HANDBOOK_TOKEN`), 413 `too-big`, 413 `room-full` (no room left for the slides' PDF, as files), 429 `busy` (`CONVERT_PENDING_MAX` 3 waiting), 429 `too-many` (`CAST_CONVERTS_PER_HOUR` 6 per token an hour, or the room's byte allowance) |
 | `PUT /v1/cast/convert/:id/:n` | public + token | the part's bytes, in order | `{ok, next}`; 404 `no-upload`, 409 `order`, 400 `size` |
 | `POST /v1/cast/convert/:id/start` | public + token | `{key}` (43 chars base64url) | `{ok, status: 'converting'}`: starts GitHub `cast-convert.yml` with input `job` = `<id>.<key>` (the key in memory only); marked before the dispatch (a second tap starts nothing); 502 `dispatch` (left `uploading`, try again), 429 `too-many` (`CONVERT_PER_HOUR` 10 a room) |
-| `GET /v1/cast/convert/:id` | public + token | | `{ok, status: uploading\|converting\|done\|failed, file?, error?}`: `file` = a finished PDF file of the room (put it up with `item`); `error` one of `CONVERT_FAILS` (`type`, `too-big`, `convert`, `key`) |
+| `GET /v1/cast/convert/:id` | public + token | | `{ok, status: uploading\|converting\|done\|failed, file?, notes?, error?}`: `file` = a finished PDF file of the room (put it up with `item`), with `notes` true when speaker notes came with it (below); `error` one of `CONVERT_FAILS` (`type`, `too-big`, `convert`, `key`) |
 | `GET /v1/cast/convert/:id/job` | machine (`CAST_CONVERT_TOKEN` when that optional secret is set, and then ONLY it; else `HANDBOOK_TOKEN`; the same for `result` and `failed`) | | the ciphertext's bytes |
 | `PUT /v1/cast/convert/:id/result` | machine | the PDF's bytes (20 MB at most) | `{ok, id}`: kept as a file of the room, status `done`; not a PDF: 400 `type`, status `failed` |
 | `POST /v1/cast/convert/:id/failed` | machine | `{reason}` | `{ok}`: status `failed` |
+| `PUT /v1/cast/convert/:id/notes` | machine | the speaker notes SEALED by the job with the conversion's own key (12-byte IV + AES-256-GCM of `{v: 1, notes: [one string per slide]}`; 29 bytes to `CAST_NOTES_MAX_BYTES` 256 KiB, its own edge cap) | `{ok}`, only while `converting` (before the PDF; else 404 `no-upload`); 400 `empty`, 413 `too-big`. Kept as `castconvnotes:<id>`; the PDF's result moves it to `castnotes:<fileId>` (status then `notes: true`) |
+| `GET /v1/cast/files/:id/notes` | public + token | | the slides' sealed notes (bytes, `no-store`); 404 `no-notes`. No desk or screen twin: only the presenter's page, which made the key, opens them |
 
 **The desk** (owner 2026-11-09): KVBC Awana's back-of-house "Cast control" window on the lobby
 computer's other monitor (`https://cast.kvbchurch.org/desk/`, `site/cast/desk/`) does everything a
@@ -1913,6 +1915,19 @@ ciphertext is deleted once the job answers, records after `CONVERT_TTL_MS` (1 h)
 job's public log (the print tool's accepted trade, 10.16): the ciphertext also needs the machine
 token and is gone once the job ran. `page {to}` (a press) jumps straight to a page (the phone's
 slide strip; `page {step}` still steps).
+
+Speaker notes (owner 2026-11-15: "The converter would pull the notes out alongside the slides, and
+they'd show only on the presenter's phone"): for a .pptx (never a .ppt or .odp: the phone says no
+notes were found), the job reads the notes from the file itself (`presentation.xml`'s slide order,
+each slide's rels to its notes slide, the notes placeholder's text; a hidden slide left out, as the
+PDF leaves it out; plain JS, no package), seals them with the SAME per-job key and sends them BEFORE
+the PDF (`PUT .../notes`); a deck with no notes sends none. The Worker only stores ciphertext: as
+`castconvnotes:<id>` while converting, then beside the slides as `castnotes:<fileId>`, deleted with
+that file (the room cleared, an eviction: the engine's `onFileDeleted`), and with a conversion that
+fails or runs out. Only a presenter's token reads them (`GET /v1/cast/files/:id/notes`), and only
+the page that scrambled the PowerPoint holds the key (memory only), so the TV, the desk and the
+Worker never see them in plain text. Tests `worker/test/cast.test.js` ("speaker notes"),
+`scripts/cast/test/notes.test.mjs`, `site/test/cast.test.mjs`.
 
 Videos (owner 2026-11-08, both rooms): an uploaded video is a `clip` item (MP4, MOV or WebM, at most
 `CLASSROOM_CLIP_MAX_BYTES` 200 MB), uploaded through the same file routes in requests of

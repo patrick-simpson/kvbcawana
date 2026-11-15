@@ -50,6 +50,12 @@
 //   TV"): press and drag on the big slide (the desk: also on its live miniature of the TV)
 //   sends the place to POST /v1/cast/pointer, at most one every CAST_POINTER_GAP_MS and only
 //   while dragging; the Worker rings it on to the TV and keeps nothing.
+// - Speaker notes (owner 2026-11-15: "The converter would pull the notes out alongside the
+//   slides, and they'd show only on the presenter's phone"): a PowerPoint this page sent comes
+//   back with its notes sealed under the SAME key this page made to scramble it (kept here,
+//   in memory only, by the slides' file id); the notes box under the phone's slide
+//   (#slide-notes: the phone page only, never the desk or the TV) reads them once
+//   (GET /v1/cast/files/:id/notes), opens them here and shows the slide's own.
 // - "On the TV now": the state every 2 s while the page is visible (which is also what
 //   makes the TV report), nothing while hidden, and it stops after 30 minutes with no
 //   touch (the free plan's daily requests).
@@ -64,7 +70,7 @@ import {
   clockPress, createSkew, timerPress,
   lineupAdd, lineupEntryFrom, lineupMove, lineupRemove, lineupView,
   scripturePagesWords, scripturePress, verseRuns,
-  containRect,
+  containRect, notesView, openNotes,
 } from './logic.js';
 import { pagesFor, parseReference } from './bible/reference.js';
 import { attachPointer, createPreview } from './preview.js';
@@ -106,6 +112,10 @@ export function createControls(conn) {
   const skew = createSkew(); // the Worker's clock against this device's
   let timerTick = 0; // the countdown line's local redraw
   const pictures = []; // { file, url, title }
+  /** Slides this page made from a PowerPoint: file id -> its key ('' = it came with no notes). Memory only. */
+  const notesKeys = new Map();
+  /** Opened notes by file id: a list, or 'loading' / 'failed'. */
+  const notesOpen = new Map();
 
   /* ── Requests ── */
 
@@ -199,7 +209,7 @@ export function createControls(conn) {
     }
     if (preview) {
       if (kind === 'pdf') preview.show(shown.file, state.stage.show.page, state.now && state.now.button === shown.id ? state.now.pages || 0 : 0);
-      else preview.hide();
+      else { preview.hide(); if ($('slide-notes')) $('slide-notes').hidden = true; }
     }
     $('btn-down').hidden = !shown;
     setText($('btn-down'), shown && shown.id === shareId ? 'Stop sharing' : 'Take it down');
@@ -755,12 +765,49 @@ export function createControls(conn) {
         const st = await request(`/v1/cast/convert/${id}`);
         if (st.status === 401) return;
         if (!st.ok || !st.body) { if (st.status === 404) { say(convertWords('failed', 'convert'), true); return; } continue; }
-        if (st.body.status === 'done' && st.body.file) { pdfReady(st.body.file, titleFromName(file.name), dest); return; }
+        if (st.body.status === 'done' && st.body.file) {
+          // The notes (if any) were sealed with this very key: kept for this file, memory only.
+          if (st.body.file.id) notesKeys.set(st.body.file.id, st.body.notes === true ? key : '');
+          pdfReady(st.body.file, titleFromName(file.name), dest);
+          return;
+        }
         if (st.body.status === 'failed') { say(convertWords('failed', st.body.error), true); return; }
         say(convertWords(st.body.status, '', seconds));
       }
     } finally {
       if (converting === id) converting = '';
+    }
+  }
+
+  /* ── Speaker notes (the phone page only) ── */
+
+  /** The notes box under the slide, for the slide the preview shows. @param {string} file @param {number} page */
+  function drawNotes(file, page) {
+    const box = $('slide-notes');
+    if (!box) return;
+    if (!notesKeys.has(file)) { box.hidden = true; return; }
+    const key = notesKeys.get(file);
+    if (key && !notesOpen.has(file)) {
+      notesOpen.set(file, 'loading');
+      loadNotes(file, key).then((list) => { notesOpen.set(file, list || 'failed'); render(); });
+    }
+    const v = notesView(key ? notesOpen.get(file) : 'none', page);
+    box.hidden = false;
+    box.dataset.empty = String(v.empty);
+    if ($('notes-where').textContent !== v.where) $('notes-where').textContent = v.where;
+    if ($('notes-text').textContent !== v.text) {
+      $('notes-text').textContent = v.text;
+      $('notes-text').scrollTop = 0;
+    }
+  }
+
+  /** The slides' sealed notes from the Worker, opened here with the key. @param {string} id @param {string} key */
+  async function loadNotes(id, key) {
+    try {
+      const res = await fetch(`${base}${conn.path(`/v1/cast/files/${encodeURIComponent(id)}/notes`)}`, { headers: conn.headers(), cache: 'no-store' });
+      return res.ok ? await openNotes(new Uint8Array(await res.arrayBuffer()), key, R) : null;
+    } catch {
+      return null;
     }
   }
 
@@ -1009,6 +1056,7 @@ export function createControls(conn) {
       },
       point,
       gapMs: R.CAST_POINTER_GAP_MS,
+      onPage: drawNotes,
     });
     // The desk's live miniature of the TV takes a drag too (its big slide steps aside for
     // it): the TV's picture is fitted in the miniature, and the slide inside that picture.

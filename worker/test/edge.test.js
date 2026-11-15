@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import worker, { BODY_CAPS, bodyCapFor } from '../src/index.js';
 import { readLimited as readCapped } from '../src/classroom.js';
 import { BODY_MAX } from '../src/sync.js';
-import { CLASSROOM_CLIP_PART_BYTES, CLASSROOM_FILE_MAX_BYTES } from '../../shared/classroomRemote.js';
+import { CAST_NOTES_MAX_BYTES, CLASSROOM_CLIP_PART_BYTES, CLASSROOM_FILE_MAX_BYTES } from '../../shared/classroomRemote.js';
 import { IMPORT_BODY_MAX, ROWS_BODY_MAX } from '../src/history.js';
 
 /** A stand-in Durable Object namespace that records what reached it. */
@@ -45,12 +45,13 @@ describe('the edge body caps', () => {
     expect(bodyCapFor('PUT', '/v1/cast/files/fabc/3')).toBe(CLASSROOM_CLIP_PART_BYTES);
     expect(bodyCapFor('PUT', '/v1/classroom/files/fabc/0')).toBe(CLASSROOM_CLIP_PART_BYTES);
     expect(bodyCapFor('PUT', '/v1/cast/convert/cabc/result')).toBe(CLASSROOM_FILE_MAX_BYTES);
+    expect(bodyCapFor('PUT', '/v1/cast/convert/cabc/notes')).toBe(CAST_NOTES_MAX_BYTES);
     expect(bodyCapFor('POST', '/v1/history/rows')).toBe(ROWS_BODY_MAX);
     expect(bodyCapFor('POST', '/v1/history/import')).toBe(IMPORT_BODY_MAX);
     expect(bodyCapFor('PUT', '/v1/cast/convert/cabc/2')).toBe(BODY_MAX);
     expect(bodyCapFor('POST', '/v1/login')).toBe(BODY_MAX);
     expect(bodyCapFor('POST', '/v1/cast/files/fabc/3')).toBe(BODY_MAX);
-    expect(BODY_CAPS.length).toBe(4);
+    expect(BODY_CAPS.length).toBe(5);
   });
 
   it('lets a video clip part (960 KiB) through to the object', async () => {

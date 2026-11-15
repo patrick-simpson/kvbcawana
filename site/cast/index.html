@@ -117,6 +117,15 @@
   .pointer-dot { position: absolute; left: 0; top: 0; z-index: 2; width: 20px; height: 20px; border-radius: 50%; background: #B9A48E; border: 3px solid #3A332A; outline: 2px solid #F6F2EA; pointer-events: none; }
   .pointer-dot.is-up { opacity: .45; }
   .slide-hint { margin: 8px 0 0; font-size: 14px; color: var(--muted); }
+  /* Speaker notes: the presenter's own words for the slide on the TV, readable at a glance. */
+  .notes { margin-top: 12px; padding: 14px 16px 16px; background: #fff; border: 1px solid var(--rule); border-left: 3px solid var(--tan); border-radius: 0 6px 6px 0; }
+  .notes-cap { display: flex; justify-content: space-between; gap: 12px; margin: 0 0 8px; font: 500 12px/1.2 var(--heading); letter-spacing: .12em; text-transform: uppercase; color: #8C7760; }
+  .notes-cap > span + span { white-space: nowrap; color: var(--muted); }
+  #notes-where { font-variant-numeric: tabular-nums; }
+  #notes-where:not(:empty)::before { content: " · "; }
+  .notes-text { margin: 0; max-height: 40vh; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font: 400 18px/1.5 var(--body); color: var(--charcoal); }
+  .notes[data-empty="true"] .notes-text { font-size: 15px; color: var(--muted); }
+  .slides[data-preview="none"] .notes { margin-top: 0; }
   .slides[data-preview="none"] .slide-hint { display: none; }
   .slides[data-preview="none"] .slide-now, .slides[data-preview="none"] .slide-next, .slides[data-preview="none"] .strip { display: none; }
   .slides[data-preview="loading"] .slide-now::after { content: 'Loading the slides…'; position: absolute; inset: 0; display: grid; place-items: center; color: var(--cream); font: 400 15px/1 var(--body); }
@@ -302,6 +311,11 @@
           <canvas data-slide="now" aria-hidden="true"></canvas>
         </div>
         <p class="slide-hint">Press and drag on the slide: a dot follows on the TV.</p>
+        <!-- Speaker notes: only here, on the presenter's own page (never the TV or the desk). -->
+        <div class="notes" id="slide-notes" data-empty="true" hidden>
+          <p class="notes-cap"><span>Your notes<span id="notes-where"></span></span><span>Not on the TV</span></p>
+          <p class="notes-text" id="notes-text"></p>
+        </div>
         <div class="slide-row">
           <div class="slide-next" data-slide-box="next" data-end="false">
             <span class="slide-cap">Next</span>

@@ -122,6 +122,26 @@ export const CAST_PASS_TTL_MS = 2 * 60 * 1000;
  * while a finger or the mouse is down (about 8 a second), and the Worker takes at most
  * CAST_POINTER_PER_MIN a minute from one caller. Positions are never stored.
  */
+/**
+ * Speaker notes (Cast, owner 2026-11-15: "The converter would pull the notes out alongside
+ * the slides, and they'd show only on the presenter's phone"): the converter seals them
+ * with the PowerPoint's own key; the Worker keeps at most CAST_NOTES_MAX_BYTES of that
+ * ciphertext beside the slides, and the presenter's page opens it. One slide's notes are
+ * at most CAST_NOTE_MAX characters (scripts/cast/convert.mjs NOTE_MAX, test-pinned).
+ */
+export const CAST_NOTES_MAX_BYTES = 256 * 1024;
+export const CAST_NOTE_MAX = 4000;
+/**
+ * Opened notes as the page shows them: one string per slide (a slide with none is ''),
+ * each cut to CAST_NOTE_MAX, control characters but line breaks dropped. Null when it is
+ * not a list.
+ * @param {unknown} v
+ */
+export function sanitizeNotes(v) {
+  if (!Array.isArray(v)) return null;
+  const keep = (/** @type {string} */ c) => { const k = c.charCodeAt(0); return k === 10 || (k >= 32 && k !== 127); };
+  return v.slice(0, 1000).map((n) => (typeof n === 'string' ? [...n].filter(keep).join('').slice(0, CAST_NOTE_MAX) : ''));
+}
 export const CAST_POINTER_GAP_MS = 125;
 export const CAST_POINTER_PER_MIN = 300;
 /**

@@ -146,6 +146,8 @@ export class Classroom {
     this.seq = 0;
     /** @type {Map<string, { tokens: number, t: number }>} */
     this.buckets = new Map();
+    /** Told when a file is deleted (Cast deletes its speaker notes too). @type {((id: string) => Promise<unknown> | unknown) | null} */
+    this.onFileDeleted = null;
     /** Told when a share ends or is replaced (turn.js revokes its relay credentials). @type {(id: string) => void} */
     this.onShareEnd = () => {};
     /** @type {{ id: string, offer: any, answer: any, at: number, by?: string } | null} */
@@ -208,6 +210,8 @@ export class Classroom {
   async deleteFile(meta) {
     for (let n = 0; n < (meta.parts || 0); n += 1) await this.storage.delete(`${this.room.partPrefix}${meta.id}:${n}`);
     await this.storage.delete(this.room.filePrefix + meta.id);
+    // Cast keeps a slides file's sealed speaker notes beside it (cast.js): they go with it.
+    if (this.onFileDeleted) await this.onFileDeleted(meta.id);
   }
 
   /**

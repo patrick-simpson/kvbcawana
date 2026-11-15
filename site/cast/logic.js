@@ -624,3 +624,39 @@ export function createPointerThrottle({ gapMs, send, now = () => Date.now(), lat
     push(p) { pending = p; if (!waiting) flush(); },
   };
 }
+
+/* ── Speaker notes (owner 2026-11-15: "The converter would pull the notes out alongside the
+   slides, and they'd show only on the presenter's phone") ── */
+
+/**
+ * Opens the slides' notes with the PowerPoint's own key (the one this page made to scramble
+ * it): 12-byte IV + AES-256-GCM of {"v":1,"notes":[...]}. One string per slide, or null when
+ * they cannot be opened. `R` = the shared rules (sanitizeNotes).
+ * @param {Uint8Array} sealed @param {string} key base64url @param {any} R
+ */
+export async function openNotes(sealed, key, R) {
+  try {
+    const raw = Uint8Array.from(atob(String(key).replace(/-/g, '+').replace(/_/g, '/')), (c) => c.charCodeAt(0));
+    const k = await crypto.subtle.importKey('raw', raw, 'AES-GCM', false, ['decrypt']);
+    const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: sealed.subarray(0, 12) }, k, sealed.subarray(12));
+    const body = JSON.parse(new TextDecoder().decode(plain));
+    return body && body.v === 1 ? R.sanitizeNotes(body.notes) : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * What the notes box under the phone's slide says for slide `page` (1-based).
+ * `notes` = the opened list, 'loading', 'none' (the file had none: a .ppt or .odp, or a deck
+ * with no notes) or 'failed'.
+ * @param {string[] | 'loading' | 'none' | 'failed'} notes @param {number} page
+ */
+export function notesView(notes, page) {
+  const where = `Slide ${page}`;
+  if (notes === 'loading') return { where, text: 'Opening your notes…', empty: true };
+  if (notes === 'none') return { where: '', text: 'No speaker notes were found in this file. Notes come with a .pptx only.', empty: true };
+  if (notes === 'failed' || !Array.isArray(notes)) return { where: '', text: 'Your notes could not be opened here.', empty: true };
+  const text = notes[page - 1] || '';
+  return { where, text: text || 'No notes for this slide.', empty: !text };
+}

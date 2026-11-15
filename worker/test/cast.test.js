@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { SyncCore } from '../src/sync.js';
 import { CAST_BYTES_MAX, CAST_UPLOAD_QUIET_MS, CAST_CONVERTS_PER_HOUR, CAST_FILES_MAX, CAST_FILES_PER_HOUR, JOIN_FAILS_MAX, JOIN_NET_FAILS_MAX, TOKEN_TTL_MS } from '../src/cast.js';
 import { memoryStore, signInV2 } from './helpers.js';
-import { CLASSROOM_CLIP_PART_BYTES, CLASSROOM_FILE_PART_BYTES, fileLinkFrom, sanitizeButtons, sanitizeClassroomPress, sanitizeSignal, CAST_POINTER_PER_MIN } from '../../shared/classroomRemote.js';
+import { CLASSROOM_CLIP_PART_BYTES, CLASSROOM_FILE_PART_BYTES, fileLinkFrom, sanitizeButtons, sanitizeClassroomPress, sanitizeSignal, CAST_POINTER_PER_MIN, CAST_NOTES_MAX_BYTES } from '../../shared/classroomRemote.js';
 
 // Cast (src/routes.md 10.18, owner 2026-11-08): the lobby computer's AirServer-like
 // screen opens a room and shows a code; a presenter joins with the code alone and puts
@@ -748,6 +748,48 @@ describe('PowerPoint into slides', () => {
     expect((await s.call('GET', '/v1/cast/screen')).body.stage.show.page).toBe(12);
     expect(sanitizeClassroomPress('page', { to: 0 })).toBeNull();
     expect(sanitizeClassroomPress('page', { to: 3 })).toEqual({ action: 'page', data: { to: 3 } });
+  });
+
+  // Owner 2026-11-15: "The converter would pull the notes out alongside the slides, and they'd
+  // show only on the presenter's phone."
+  it('speaker notes: sealed by the job before the PDF, moved beside the slides, read only by a presenter, gone with the file', async () => {
+    const s = await convertSetup();
+    const id = await upload(s, new Uint8Array(40));
+    await s.call('POST', `/v1/cast/convert/${id}/start`, { key: KEY }, s.as);
+    const sealed = crypto.getRandomValues(new Uint8Array(200));
+    // The job's route needs the machine token; the notes are taken only while it converts.
+    expect((await s.raw('PUT', `/v1/cast/convert/${id}/notes`, sealed, s.as)).status).toBe(401);
+    expect((await s.call('PUT', `/v1/cast/convert/${id}/notes`, new Uint8Array(10), s.machine)).status).toBe(400);
+    expect((await s.call('PUT', `/v1/cast/convert/${id}/notes`, new Uint8Array(CAST_NOTES_MAX_BYTES + 1), s.machine)).status).toBe(413);
+    expect((await s.call('PUT', `/v1/cast/convert/${id}/notes`, sealed, s.machine)).status).toBe(200);
+    await s.call('PUT', `/v1/cast/convert/${id}/result`, PDF, s.machine);
+    const st = (await s.call('GET', `/v1/cast/convert/${id}`, undefined, s.as)).body;
+    expect(st).toMatchObject({ status: 'done', notes: true });
+    // The presenter reads exactly the ciphertext (the Worker never opens it); the desk and the TV cannot.
+    const got = await s.raw('GET', `/v1/cast/files/${st.file.id}/notes`, undefined, s.as);
+    expect(got.status).toBe(200);
+    expect(new Uint8Array(await got.arrayBuffer())).toEqual(sealed);
+    expect((await s.raw('GET', `/v1/cast/files/${st.file.id}/notes`, undefined, { auth: '' })).status).toBe(401);
+    expect((await s.raw('GET', `/v1/cast/desk/files/${st.file.id}/notes`)).status).toBe(404);
+    expect((await s.raw('GET', `/v1/cast/screen/files/${st.file.id}/notes`)).status).toBe(404);
+    expect(await s.core.storage.get(`castconvnotes:${id}`)).toBeUndefined();
+    // Too late once the PDF is back.
+    expect((await s.call('PUT', `/v1/cast/convert/${id}/notes`, sealed, s.machine)).status).toBe(404);
+    // A deck with none: the status says so, and the read is 404 no-notes.
+    const b = await upload(s, new Uint8Array(40));
+    await s.call('POST', `/v1/cast/convert/${b}/start`, { key: KEY }, s.as);
+    await s.call('PUT', `/v1/cast/convert/${b}/result`, PDF, s.machine);
+    const st2 = (await s.call('GET', `/v1/cast/convert/${b}`, undefined, s.as)).body;
+    expect(st2.notes).toBe(false);
+    expect((await s.call('GET', `/v1/cast/files/${st2.file.id}/notes`, undefined, s.as)).body.reason).toBe('no-notes');
+    // A failed job takes its notes with it; a new code takes the file's.
+    const c = await upload(s, new Uint8Array(40));
+    await s.call('POST', `/v1/cast/convert/${c}/start`, { key: KEY }, s.as);
+    await s.call('PUT', `/v1/cast/convert/${c}/notes`, sealed, s.machine);
+    await s.call('POST', `/v1/cast/convert/${c}/failed`, { reason: 'convert' }, s.machine);
+    expect(await s.core.storage.get(`castconvnotes:${c}`)).toBeUndefined();
+    await s.call('POST', '/v1/cast/open', {});
+    expect(await s.core.storage.get(`castnotes:${st.file.id}`)).toBeUndefined();
   });
 
   it('a failed job says why; a result that is not a PDF fails; the ciphertext goes either way', async () => {
