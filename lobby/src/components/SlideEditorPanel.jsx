@@ -544,10 +544,10 @@ export default function SlideEditorPanel({ config, syncedDeck, onChange, onClose
                   </span>
                 </label>
                 <div className="slide-card-controls">
-                  <button className="ghost" data-move="top" onClick={() => moveAndFocus(i, 0, slide.id, 'top')} disabled={i === 0} aria-label={`Move slide ${i + 1} to the top`}>Top</button>
-                  <button className="ghost" data-move="up" onClick={() => moveAndFocus(i, i - 1, slide.id, 'up')} disabled={i === 0} aria-label={`Move slide ${i + 1} up`}>↑</button>
-                  <button className="ghost" data-move="down" onClick={() => moveAndFocus(i, i + 1, slide.id, 'down')} disabled={i === slides.length - 1} aria-label={`Move slide ${i + 1} down`}>↓</button>
-                  <button className="ghost" data-move="bottom" onClick={() => moveAndFocus(i, slides.length - 1, slide.id, 'bottom')} disabled={i === slides.length - 1} aria-label={`Move slide ${i + 1} to the bottom`}>Bottom</button>
+                  <button className="ghost" data-move="top" onClick={() => moveAndFocus(i, 0, slide.id, 'top')} disabled={i === 0} aria-label={`Move slide ${i + 1} to the top`} title={i === 0 ? 'Already at the top' : undefined}>Top</button>
+                  <button className="ghost" data-move="up" onClick={() => moveAndFocus(i, i - 1, slide.id, 'up')} disabled={i === 0} aria-label={`Move slide ${i + 1} up`} title={i === 0 ? 'Already at the top' : undefined}>↑</button>
+                  <button className="ghost" data-move="down" onClick={() => moveAndFocus(i, i + 1, slide.id, 'down')} disabled={i === slides.length - 1} aria-label={`Move slide ${i + 1} down`} title={i === slides.length - 1 ? 'Already at the bottom' : undefined}>↓</button>
+                  <button className="ghost" data-move="bottom" onClick={() => moveAndFocus(i, slides.length - 1, slide.id, 'bottom')} disabled={i === slides.length - 1} aria-label={`Move slide ${i + 1} to the bottom`} title={i === slides.length - 1 ? 'Already at the bottom' : undefined}>Bottom</button>
                   <button className="ghost" onClick={() => duplicate(i)} disabled={slides.length >= MAX_SLIDES} aria-label={`Duplicate slide ${i + 1}`} title={slides.length >= MAX_SLIDES ? 'Maximum slides reached' : undefined}>Duplicate</button>
                   <button className="danger" onClick={() => remove(slide.id)} aria-label={`Delete slide ${i + 1}`}>Delete</button>
                 </div>
@@ -607,7 +607,7 @@ export default function SlideEditorPanel({ config, syncedDeck, onChange, onClose
             style={{ display: 'none' }}
             onChange={onVideoPick}
           />
-          <button className="ghost" onClick={exportSlides} disabled={slides.length === 0}>Export</button>
+          <button className="ghost" onClick={exportSlides} disabled={slides.length === 0} title={slides.length === 0 ? 'No slides to export' : undefined}>Export</button>
           <button className="ghost" onClick={() => fileRef.current?.click()}>Import</button>
           <input
             ref={fileRef}

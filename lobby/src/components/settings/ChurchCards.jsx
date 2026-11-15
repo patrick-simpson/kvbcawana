@@ -227,7 +227,7 @@ export function ClubLabelCard({ church }) {
         />
       </div>
       <div className="laptop-actions">
-        <button type="button" className="primary" onClick={saveAll} disabled={readOnly || !draft.dirty}>Save label layouts</button>
+        <button type="button" className="primary" onClick={saveAll} disabled={readOnly || !draft.dirty} title={!readOnly && !draft.dirty ? 'No changes to save' : undefined}>Save label layouts</button>
         <button type="button" className="ghost" disabled={readOnly} onClick={() => edit({ ...templateToForm({}) })}>Reset this club</button>
         <button type="button" className="ghost" onClick={showPreview}>Show a preview</button>
       </div>
@@ -287,7 +287,7 @@ export function ClubNightCard({ church }) {
         <span className="hint">How long after a club starts a check-in still counts as on time.</span>
       </div>
       <div className="laptop-actions">
-        <button type="button" className="primary" onClick={saveSchedule} disabled={readOnly || !(rows.dirty || late.dirty)}>Save schedule</button>
+        <button type="button" className="primary" onClick={saveSchedule} disabled={readOnly || !(rows.dirty || late.dirty)} title={!readOnly && !(rows.dirty || late.dirty) ? 'No changes to save' : undefined}>Save schedule</button>
       </div>
       <Note note={note} />
     </PanelCard>
