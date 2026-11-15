@@ -1,7 +1,7 @@
 // Club email: the page's pure rules (no DOM, no network), tested by
 // site/test/email.test.mjs. The Worker cleans everything again and builds the
-// email's real HTML itself (worker/src/clubmail.js); `previewHtml` here only
-// shows the director what that will look like.
+// email's real HTML itself, with the same file the preview here uses
+// (mailhtml.js), so `previewHtml` shows the director the email itself.
 
 import { linked, mailHtml } from './mailhtml.js';
 
@@ -134,38 +134,85 @@ export const hasWords = (blocks) => blocks.some((b) => b.t !== 'img');
 /** A paragraph's text as HTML: the email's own rule (mailhtml.js `linked`). */
 export const inlineHtml = linked;
 
-// The formatting buttons (owner 2026-11-14): each is a plain edit of the typed text, so
-// what a button does and what a director types by hand are the same thing. Each takes
-// the text and the selection and answers the new text and selection.
+// The message box shows formatting as it is typed (owner 2026-11-14: "Formatting you can
+// see while typing"): bold is bold, a heading is a heading, a picture is the picture. The
+// box is the browser's own editing; what is SENT is still read back out of it as the same
+// plain text as ever (`domToText`), so the Worker's blocks and the saved draft do not change.
 
-/** Bold: the selected words between `**`, or a placeholder to type over. */
-export function boldEdit(value, start, end) {
-  const words = value.slice(start, end) || 'bold words';
-  const lead = words.length - words.trimStart().length, tail = words.length - words.trimEnd().length;
-  const core = words.trim() || 'bold words';
-  const next = `${value.slice(0, start)}${words.slice(0, lead)}**${core}**${tail ? words.slice(-tail) : ''}${value.slice(end)}`;
-  const at = start + lead + 2;
-  return { value: next, start: at, end: at + core.length };
+const BLOCK_TAG = /^(?:DIV|P|H[1-6]|UL|OL|LI|BLOCKQUOTE|SECTION|ARTICLE|PRE|TABLE|TBODY|TR|TD)$/;
+
+/**
+ * The editing box's content as the message's text: a line per line, a blank line between
+ * paragraphs, `# ` headings, `- ` lists, `**bold**`, `[words](address)` links, and a
+ * `[picture: name]` line for a picture (an element with `data-picture`). Anything else a
+ * browser or a paste put there (colours, sizes, italics) is dropped. Takes a real element
+ * or anything shaped like one (nodeType, tagName, childNodes, nodeValue, getAttribute).
+ * @param {any} root
+ */
+export function domToText(root) {
+  const kids = (n) => Array.from((n && n.childNodes) || []);
+  const tag = (n) => (n.nodeType === 1 ? String(n.tagName || '').toUpperCase() : '');
+  const pic = (n) => (n.nodeType === 1 && n.getAttribute ? n.getAttribute('data-picture') : null);
+  const inline = (n, marks) => {
+    if (n.nodeType === 3) return String(n.nodeValue || '').replace(/\u00a0/g, ' ').replace(/[\r\n]+/g, ' ');
+    if (n.nodeType !== 1) return '';
+    const t = tag(n);
+    if (t === 'BR') return '\n';
+    const inner = kids(n).map((k) => inline(k, marks)).join('');
+    if (!marks || !inner.trim()) return inner;
+    const lead = inner.length - inner.trimStart().length, tail = inner.length - inner.trimEnd().length;
+    const around = (made) => `${inner.slice(0, lead)}${made}${tail ? inner.slice(-tail) : ''}`;
+    if (t === 'B' || t === 'STRONG') return inner.includes('\n') ? inner : around(`**${inner.trim()}**`);
+    if (t === 'A') {
+      const href = String((n.getAttribute && n.getAttribute('href')) || '');
+      if (/^https?:\/\/[^\s<>"()]+$/.test(href)) return around(inner.trim() === href ? href : `[${inner.trim().replace(/[[\]\n]/g, ' ')}](${href})`);
+    }
+    return inner;
+  };
+  const lines = [];
+  let loose = '';
+  const flush = () => { if (loose) { lines.push(...loose.replace(/\n$/, '').split('\n')); loose = ''; } };
+  const walk = (n) => {
+    const t = tag(n), p = pic(n);
+    if (p) { flush(); lines.push('', pictureLine(p), ''); return; }
+    if (/^H[1-6]$/.test(t)) { flush(); const h = inline(n, false).replace(/\s+/g, ' ').trim(); if (h) lines.push('', `# ${h}`, ''); return; }
+    if (t === 'UL' || t === 'OL') {
+      flush(); lines.push('');
+      for (const li of kids(n)) { const s = inline(li, true).replace(/\s*\n\s*/g, ' ').trim(); if (s) lines.push(`- ${s}`); }
+      lines.push('');
+      return;
+    }
+    if (BLOCK_TAG.test(t)) {
+      flush();
+      if (kids(n).some((k) => BLOCK_TAG.test(tag(k)) || pic(k))) { kids(n).forEach(walk); flush(); return; }
+      lines.push(...inline(n, true).replace(/\n$/, '').split('\n'));
+      if (t === 'P') lines.push('');
+      return;
+    }
+    loose += inline(n, true);
+  };
+  kids(root).forEach(walk);
+  flush();
+  return lines.map((l) => l.replace(/[ \t]+$/, '')).join('\n').replace(/\n{3,}/g, '\n\n').trim();
 }
 
 /**
- * Heading or list: the selected lines become a part of their own (a blank line before
- * and after), a heading from its first line (`# `) or a list of every line (`- `).
- * @param {'heading'|'list'} kind
+ * The message's blocks as what the editing box should show: one entry per line or
+ * block (`line` '' = the blank line between two paragraphs).
+ * @param {any[]} blocks
+ * @returns {({ line: string } | { heading: string } | { items: string[] } | { picture: number })[]}
  */
-export function linesEdit(value, start, end, kind) {
-  const from = value.lastIndexOf('\n', start - 1) + 1;
-  const stop = value.indexOf('\n', Math.max(end, start));
-  const to = stop < 0 ? value.length : stop;
-  const bare = (l) => l.replace(/^\s*(?:#|[-*])\s+/, '').trim();
-  let lines = value.slice(from, to).split('\n').map(bare).filter(Boolean);
-  if (!lines.length) lines = [kind === 'heading' ? 'Heading' : 'First thing'];
-  const made = kind === 'heading' ? [`# ${lines[0]}`, ...(lines.length > 1 ? ['', lines.slice(1).join('\n')] : [])].join('\n') : lines.map((l) => `- ${l}`).join('\n');
-  const before = value.slice(0, from).replace(/\s+$/, ''), after = value.slice(to).replace(/^\s+/, '');
-  const head = before ? `${before}\n\n` : '';
-  const next = `${head}${made}${after ? `\n\n${after}` : ''}`;
-  const mark = kind === 'heading' ? 2 : 2;
-  return { value: next, start: head.length + mark, end: head.length + (kind === 'heading' ? 2 + lines[0].length : made.length) };
+export function richModel(blocks) {
+  const out = [];
+  let last = '';
+  for (const b of blocks) {
+    if (b.t === 'p') { if (last === 'p') out.push({ line: '' }); for (const l of b.text.split('\n')) out.push({ line: l }); }
+    else if (b.t === 'h') out.push({ heading: b.text });
+    else if (b.t === 'ul') out.push({ items: b.items.slice() });
+    else if (b.t === 'img') out.push({ picture: b.file });
+    last = b.t;
+  }
+  return out;
 }
 
 /** A web address as typed, made whole (`https://` when it has none), or '' when it is not one. */
@@ -174,13 +221,6 @@ export function cleanLink(typed) {
   if (!t || /\s|[<>"()]/.test(t)) return '';
   const url = /^https?:\/\//i.test(t) ? t : `https://${t}`;
   return /^https?:\/\/[^/.]+\.[^/]+/.test(url) ? url : '';
-}
-
-/** Link: the selected words (or a placeholder) as `[words](address)`. */
-export function linkEdit(value, start, end, url) {
-  const words = value.slice(start, end).trim().replace(/[\[\]\n]/g, ' ') || 'link words';
-  const next = `${value.slice(0, start)}[${words}](${url})${value.slice(end)}`;
-  return { value: next, start: start + 1, end: start + 1 + words.length };
 }
 
 /**

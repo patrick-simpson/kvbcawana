@@ -6,7 +6,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  activityWords, blocksToText, boldEdit, bounceWords, cleanLink, codeFromHash, hasWords, laterTime, secretWords, inlineHtml, linesEdit, linkEdit, parseMessage, pictureLine, lookChoices, lookStyle, previewHtml, problemWords, recipientWords, sizeWords, stepRetryable, totalWords,
+  activityWords, blocksToText, bounceWords, cleanLink, codeFromHash, domToText, hasWords, laterTime, secretWords, inlineHtml, parseMessage, pictureLine, lookChoices, lookStyle, previewHtml, problemWords, richModel, recipientWords, sizeWords, stepRetryable, totalWords,
 } from '../tools/email/logic.js';
 import { cleanBlocks, linked, renderMail } from '../../worker/src/clubmail.js';
 import { existsSync } from 'node:fs';
@@ -111,48 +111,40 @@ test('the owner sees who is using the page', () => {
   assert.match(activityWords({ lastLogin: '2026-05-01T12:00:00Z', lastSent: '2026-05-01T12:00:00Z' }, now), /^Signed in on May 1, 2026 · last sent on May 1, 2026$/);
 });
 
-test('the formatting buttons edit the typed text', () => {
-  assert.deepEqual(boldEdit('Bring a box today', 8, 11), { value: 'Bring a **box** today', start: 10, end: 13 });
-  assert.deepEqual(boldEdit('Hi ', 3, 3), { value: 'Hi **bold words**', start: 5, end: 15 });
-  assert.deepEqual(boldEdit('a word here', 1, 7), { value: 'a **word** here', start: 4, end: 8 });   // spaces stay outside
-  const h = linesEdit('Hello there\nShoeboxes\nBring one.', 14, 14, 'heading');
-  assert.equal(h.value, 'Hello there\n\n# Shoeboxes\n\nBring one.');
-  assert.equal(h.value.slice(h.start, h.end), 'Shoeboxes');
-  assert.deepEqual(parseMessage(h.value, []), [{ t: 'p', text: 'Hello there' }, { t: 'h', text: 'Shoeboxes' }, { t: 'p', text: 'Bring one.' }]);
-  const l = linesEdit('Bring:\ncars\n- crayons\nThanks', 7, 20, 'list');
-  assert.equal(l.value, 'Bring:\n\n- cars\n- crayons\n\nThanks');
-  assert.deepEqual(parseMessage(l.value, [])[1], { t: 'ul', items: ['cars', 'crayons'] });
-  assert.equal(linesEdit('', 0, 0, 'list').value, '- First thing');
-  assert.equal(linesEdit('', 0, 0, 'heading').value, '# Heading');
+test('the message box is read back as the same text the Worker has always taken', () => {
+  // A stand-in for the browser's elements, shaped as Chrome leaves them after typing and the buttons.
+  const T = (s) => ({ nodeType: 3, nodeValue: s });
+  const E = (tagName, attrs, ...kids) => ({ nodeType: 1, tagName, childNodes: kids.map((k) => (typeof k === 'string' ? T(k) : k)), getAttribute: (k) => (attrs && k in attrs ? attrs[k] : null) });
+  const box = E('div', null,
+    'Hi families,',                                             // the first line, before Enter was pressed
+    E('div', null, E('br', null)),                              // a blank line
+    E('div', null, 'Bring ', E('b', null, 'one box '), 'on Wednesday.'),
+    E('div', null, 'The list is ', E('a', { href: 'https://example.org/l' }, 'here'), '. ', E('i', null, 'Thanks!')),
+    E('h2', null, 'What to ', E('b', null, 'pack')),
+    E('ul', null, E('li', null, 'cars'), E('li', null, E('span', { style: 'color:red' }, 'crayons'), E('br', null)), E('li', null, '')),
+    E('div', { 'data-picture': 'Boxes.jpg' }, E('img', { src: 'blob:x' })),
+    E('div', null, E('div', null, 'See you'), E('div', null, 'there.')),   // a pasted box inside a box
+    E('p', null, E('a', { href: 'https://example.org/x' }, 'https://example.org/x')),
+    E('div', null, E('a', { href: 'javascript:alert(1)' }, 'not a link')),
+  );
+  const text = domToText(box);
+  assert.equal(text, [
+    'Hi families,', '', 'Bring **one box** on Wednesday.', 'The list is [here](https://example.org/l). Thanks!', '',
+    '# What to pack', '', '- cars', '- crayons', '', '[picture: Boxes.jpg]', '', 'See you', 'there.', 'https://example.org/x', '', 'not a link',
+  ].join('\n'));
+  const files = [{ name: 'Boxes.jpg', inline: true }];
+  const blocks = parseMessage(text, files);
+  assert.deepEqual(blocks.map((b) => b.t), ['p', 'p', 'h', 'ul', 'img', 'p', 'p']);
+  assert.deepEqual(cleanBlocks(blocks, 1), blocks);
+  // And what the box is filled with, for a saved draft or a sent email used again.
+  assert.deepEqual(richModel(blocks.slice(0, 5)), [
+    { line: 'Hi families,' }, { line: '' }, { line: 'Bring **one box** on Wednesday.' }, { line: 'The list is [here](https://example.org/l). Thanks!' },
+    { heading: 'What to pack' }, { items: ['cars', 'crayons'] }, { picture: 0 },
+  ]);
+  assert.equal(domToText(E('div', null)), '');
   assert.equal(cleanLink(' kvbchurch.org/alerts '), 'https://kvbchurch.org/alerts');
   assert.equal(cleanLink('http://example.org'), 'http://example.org');
   for (const bad of ['', 'https://', 'not a link', 'javascript:alert(1)', 'x"y.com', null]) assert.equal(cleanLink(bad), '', String(bad));
-  assert.deepEqual(linkEdit('See the list now', 8, 12, 'https://example.org'), { value: 'See the [list](https://example.org) now', start: 9, end: 13 });
-  assert.equal(linkEdit('Go ', 3, 3, 'https://example.org').value, 'Go [link words](https://example.org)');
-});
-
-test('the designs: the preview IS the email, in every look', () => {
-  assert.deepEqual(MAIL_LOOKS, ['club', 'awana', 'plain']);
-  const sparks = CLUB_TABLE.find((c) => c.id === 'sparks');
-  const blocks = parseMessage('# Tonight\n\nBring **one** box. See [the list](https://example.org/l).\n\n- cars\n- crayons', []);
-  for (const style of [clubStyle(sparks), AWANA_STYLE, null]) {
-    const email = renderMail({ blocks, files: [], club: 'sparks', sender: 'Dana Cole', replyTo: 'd@example.com', test: false, style }).html;
-    const preview = previewHtml(blocks, [], { sender: 'Dana Cole', club: 'Sparks', style });
-    assert.equal(preview, email);
-  }
-  // Every design's header picture is a file of the site, and the preview reads it from beside the page.
-  for (const art of ['awana', ...CLUB_TABLE.map((c) => clubStyle(c).art)]) assert.ok(existsSync(path.join(DIR, 'art', `${art}.png`)), art);
-  assert.ok(previewHtml(blocks, [], { sender: 'D', club: 'Sparks', style: clubStyle(sparks), art: './art/' }).includes('src="./art/sparks.png"'));
-  // White words on every header's colour, for when a mail app hides pictures.
-  const lum = (hex) => { const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255).map((v) => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4)); return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
-  for (const st of [AWANA_STYLE, ...CLUB_TABLE.map(clubStyle)]) assert.ok(1.05 / (lum(st.field) + 0.05) >= 4.5, st.art);
-  // The choices: the club's own first (the default), never for "all clubs".
-  assert.deepEqual(lookChoices(MAIL_LOOKS, { id: 'sparks', name: 'Sparks' }).map((c) => c.name), ['Sparks design', 'Awana design', 'No design (plain email)']);
-  assert.deepEqual(lookChoices(MAIL_LOOKS, { id: 'all', name: 'All clubs' }).map((c) => c.id), ['awana', 'plain']);
-  assert.equal(lookStyle('club', { style: { art: 'sparks' } }, AWANA_STYLE).art, 'sparks');
-  assert.equal(lookStyle('club', { id: 'all' }, AWANA_STYLE), AWANA_STYLE);
-  assert.equal(lookStyle('awana', { style: { art: 'sparks' } }, AWANA_STYLE), AWANA_STYLE);
-  assert.equal(lookStyle('plain', { style: { art: 'sparks' } }, AWANA_STYLE), null);
 });
 
 test('the words for who it goes to, sizes and problems', () => {
@@ -186,6 +178,8 @@ test('the page keeps no code, passphrase or address where it should not', () => 
   // The only things saved: the director's token and the unsent draft's words.
   const saved = [...app.matchAll(/store\.set\((\w+)/g)].map((m) => m[1]);
   assert.deepEqual([...new Set(saved)].sort(), ['DRAFT_KEY', 'TOKEN_KEY']);
+  // The message box is filled from text the email's own rule escaped, never from raw markup.
+  for (const m of app.matchAll(/\.innerHTML = ([^;]+);/g)) assert.match(m[1], /^(?:linked\(|hasWords\(blocks\)\s*\?\s*previewHtml\()/, m[0]);
   // The message is built by the Worker from blocks: the page sends no HTML.
   assert.ok(!/body:\s*\{[^}]*html/.test(app));
   // A send with no answer is never asked for again by the page.

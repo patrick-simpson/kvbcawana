@@ -15,8 +15,9 @@
 import {
   FILE_ACCEPT, INLINE_TYPES, PICTURE_KEEP_BYTES, PICTURE_MAX_PX, hasWords, parseMessage, pictureLine,
   previewHtml, problemWords, recipientWords, sizeWords, stepRetryable, totalWords,
-  activityWords, blocksToText, boldEdit, bounceWords, cleanLink, codeFromHash, laterTime, lookChoices, lookStyle, linesEdit, linkEdit, secretWords, whenWords,
+  activityWords, blocksToText, bounceWords, cleanLink, codeFromHash, domToText, laterTime, lookChoices, lookStyle, richModel, secretWords, whenWords,
 } from './logic.js';
+import { linked } from './mailhtml.js';
 
 const SYNC_INDEX = new URL('/lobby/shared/sync.json', location.href).href;
 const SESSION_RE = /^v1\.\d+\.\d+\.[A-Za-z0-9_-]{20,}$/;
@@ -24,6 +25,8 @@ const TOKEN_KEY = 'awanaMailToken.v1';
 const DRAFT_KEY = 'awanaClubMailDraft.v1';
 const TIMEOUT_MS = 30000;
 const CONFIRM_MS = 4000;
+/** After the second tap on Send, this many seconds pass (with Cancel) before anything goes out (owner 2026-11-14). */
+const UNDO_S = typeof window.clubMailUndoS === 'number' ? window.clubMailUndoS : 30;
 const BOUNCE_LOOK_MS = 7 * 24 * 60 * 60 * 1000;
 const STEP_TRIES = 5;
 const STEP_WAIT_MS = 3000;
@@ -51,8 +54,11 @@ let running = null;
 /** The message as last uploaded, until anything in it changes (a test, then the real send, upload once). */
 let uploadedId = '';
 let drawTimer = 0;
+/** The countdown before a send: its timer and the seconds left. */
+let undoTimer = 0;
+let undoLeft = 0;
 /** Anything in the message changed: what was uploaded or on its way no longer matches. */
-const changed = () => { running = null; uploadedId = ''; };
+const changed = () => { running = null; uploadedId = ''; if (undoTimer) stopUndo('Not sent: the message changed.'); };
 
 const token = () => (store.get(TOKEN_KEY) || '').trim();
 
@@ -170,7 +176,7 @@ async function enter(directors) {
   const saved = readDraft();
   if (saved.club && clubChoices().some((c) => c.id === saved.club)) $('club').value = saved.club;
   drawLooks(saved.look);
-  $('subject').value = saved.subject; $('text').value = saved.text;
+  $('subject').value = saved.subject; setText(saved.text);
   $('pick-file').accept = FILE_ACCEPT;
   const notice = me.ready ? secretWords(me.secretDaysLeft) : 'Sending is not set up yet: the Microsoft app for the Awana mailbox has not been added (worker/README.md, "Club email"). You can write, but not send.';
   $('setup').hidden = !notice;
@@ -182,6 +188,7 @@ async function enter(directors) {
   loadCount();
   loadLog();
   loadLater();
+  loadStarters();
 }
 
 // ── the message ───────────────────────────────────────────────────────────────
@@ -236,10 +243,10 @@ function draw() {
 function refreshButtons() {
   const blocks = parseMessage($('text').value, files);
   const ready = Boolean(me && me.ready && $('subject').value.trim() && hasWords(blocks) && !totalWords(files, me.limits.totalBytes).over);
-  $('test').disabled = busy || !ready;
+  $('test').disabled = busy || !ready || Boolean(undoTimer);
   $('send').disabled = busy || !ready || !(toCount && toCount.addresses > 0);
-  $('later-btn').disabled = $('send').disabled || Boolean(running);
-  if (!armed) $('send').textContent = running && !running.test ? 'Carry on sending' : (toCount && toCount.addresses ? `Send to ${toCount.addresses} ${toCount.addresses === 1 ? 'address' : 'addresses'}` : 'Send to parents');
+  $('later-btn').disabled = $('send').disabled || Boolean(running) || Boolean(undoTimer);
+  if (!armed && !undoTimer) $('send').textContent = running && !running.test ? 'Carry on sending' : (toCount && toCount.addresses ? `Send to ${toCount.addresses} ${toCount.addresses === 1 ? 'address' : 'addresses'}` : 'Send to parents');
 }
 
 async function loadCount() {
@@ -284,15 +291,19 @@ async function loadLog() {
   }));
 }
 
+/** What is being written would be replaced: the first tap on `button` only asks, a second within four seconds goes on. */
+function mayReplace(button) {
+  if (!($('subject').value.trim() || $('text').value.trim()) || button.dataset.armed === '1') { button.dataset.armed = ''; return true; }
+  const words = button.textContent;
+  button.dataset.armed = '1'; button.classList.add('armed'); button.textContent = 'Tap again: replaces your draft';
+  setTimeout(() => { button.dataset.armed = ''; button.classList.remove('armed'); button.textContent = words; }, CONFIRM_MS);
+  return false;
+}
+
 /** Start a new message from a sent one: its club, subject and words (no pictures or files). */
 async function useAgain(id, button) {
   if (busy) return;
-  if (($('subject').value.trim() || $('text').value.trim()) && button.dataset.armed !== '1') {
-    // What is being written would be replaced: ask with a second tap.
-    button.dataset.armed = '1'; button.classList.add('armed'); button.textContent = 'Tap again: replaces your draft';
-    setTimeout(() => { button.dataset.armed = ''; button.classList.remove('armed'); button.textContent = 'Use again'; }, CONFIRM_MS);
-    return;
-  }
+  if (!mayReplace(button)) return;
   const res = await request(`/v1/mail/log/${id}`);
   if (!res.ok || !res.body) { setStatus('status', problemWords(res), 'bad'); return; }
   for (const f of files) if (f.url) URL.revokeObjectURL(f.url);
@@ -300,7 +311,7 @@ async function useAgain(id, button) {
   if (clubChoices().some((c) => c.id === res.body.club)) $('club').value = res.body.club;
   drawLooks(res.body.look);
   $('subject').value = res.body.subject;
-  $('text').value = blocksToText(res.body.blocks);
+  setText(blocksToText(res.body.blocks));
   changed();
   draw();
   loadCount();
@@ -308,25 +319,181 @@ async function useAgain(id, button) {
   $('subject').focus();
 }
 
-// ── formatting ────────────────────────────────────────────────────────────────
+// ── the message box ───────────────────────────────────────────────────────────
+// The box shows the message as it will look (bold, headings, lists, pictures) and is
+// the browser's own editing. The hidden #text keeps the same plain text as ever, read
+// back out of the box after every change (logic.js domToText): the preview, the saved
+// draft and the upload all still read #text.
 
-/** Run one of logic.js's text edits on the message and keep the cursor where the edit put it. */
-function format(edit) {
-  const ta = $('text');
-  const r = edit(ta.value, ta.selectionStart ?? ta.value.length, ta.selectionEnd ?? ta.value.length);
-  if (!r) return;
-  ta.value = r.value;
-  ta.focus();
-  ta.setSelectionRange(r.start, r.end);
+/** One picture as the box shows it: not editable inside, removable like a letter. */
+function pictureNode(f) {
+  const div = Object.assign(document.createElement('div'), { className: 'pic', contentEditable: 'false' });
+  div.dataset.picture = f.name;
+  div.append(Object.assign(document.createElement('img'), { src: f.url, alt: f.name }));
+  return div;
+}
+
+/** Fill the box from the text (a saved draft, a sent email used again, a starter, a removed picture). */
+function renderRich() {
+  const nodes = richModel(parseMessage($('text').value, files)).map((m) => {
+    if ('heading' in m) return Object.assign(document.createElement('h2'), { textContent: m.heading });
+    if ('items' in m) {
+      const ul = document.createElement('ul');
+      for (const i of m.items) { const li = document.createElement('li'); li.innerHTML = linked(i); ul.append(li); }
+      return ul;
+    }
+    if ('picture' in m) return pictureNode(files[m.picture]);
+    const div = document.createElement('div');
+    if (m.line) div.innerHTML = linked(m.line); else div.append(document.createElement('br'));
+    return div;
+  });
+  $('rich').replaceChildren(...nodes);
+}
+
+/** The message, set from outside the box. @param {string} text */
+function setText(text) {
+  $('text').value = text;
+  renderRich();
+}
+
+/** The box changed: read it back into the text, and draw the preview shortly. */
+function syncRich() {
+  $('text').value = domToText($('rich'));
+  // A picture deleted in the box is no longer a picture of the message.
+  const kept = new Set(Array.from($('rich').querySelectorAll('[data-picture]'), (n) => n.dataset.picture));
+  const gone = files.filter((f) => f.inline && !kept.has(f.name));
+  if (gone.length) { for (const f of gone) if (f.url) URL.revokeObjectURL(f.url); files = files.filter((f) => !gone.includes(f)); }
   changed();
-  draw();
+  clearTimeout(drawTimer);
+  drawTimer = setTimeout(draw, 250);
+}
+
+/** One of the browser's own editing commands on the box, then read it back. */
+function richCommand(name, value) {
+  $('rich').focus();
+  document.execCommand(name, false, value);
+  syncRich();
+}
+
+/** The element of that kind the cursor is in, inside the box. @param {string} tag */
+function cursorIn(tag) {
+  const sel = window.getSelection();
+  let n = sel && sel.rangeCount ? sel.anchorNode : null;
+  while (n && n !== $('rich')) { if (n.nodeType === 1 && n.tagName === tag) return n; n = n.parentNode; }
+  return null;
 }
 
 function addLink() {
+  const sel = window.getSelection();
+  const range = sel && sel.rangeCount && $('rich').contains(sel.anchorNode) ? sel.getRangeAt(0).cloneRange() : null;
   const url = cleanLink(window.prompt('Web address for the link', 'https://'));
   if (!url) { setStatus('status', 'That is not a web address, so no link was added.', 'bad'); return; }
   setStatus('status', '');
-  format((v, s, e) => linkEdit(v, s, e, url));
+  $('rich').focus();
+  if (range) { sel.removeAllRanges(); sel.addRange(range); }
+  // Selected words become the link; with nothing selected the address itself goes in (the email makes it a link).
+  if (range && !range.collapsed) richCommand('createLink', url); else richCommand('insertText', url);
+}
+
+/** The picture goes after the line the cursor is on (at the end when the cursor is elsewhere). */
+function insertPicture(f) {
+  const rich = $('rich');
+  const sel = window.getSelection();
+  let at = sel && sel.rangeCount && rich.contains(sel.anchorNode) ? sel.anchorNode : null;
+  while (at && at.parentNode !== rich) at = at.parentNode;
+  rich.insertBefore(pictureNode(f), at ? at.nextSibling : null);
+  $('text').value = domToText(rich);
+}
+
+function wireRich() {
+  const rich = $('rich');
+  try { document.execCommand('defaultParagraphSeparator', false, 'div'); } catch { /* an old browser keeps its own */ }
+  rich.addEventListener('input', syncRich);
+  // The buttons must not take the cursor out of the box.
+  for (const b of document.querySelectorAll('.fmt button')) b.addEventListener('mousedown', (e) => e.preventDefault());
+  $('fmt-bold').addEventListener('click', () => richCommand('bold'));
+  $('fmt-heading').addEventListener('click', () => richCommand('formatBlock', cursorIn('H2') ? 'div' : 'h2'));
+  $('fmt-list').addEventListener('click', () => richCommand('insertUnorderedList'));
+  $('fmt-link').addEventListener('click', addLink);
+  // Only bold is kept: the other shortcuts would show a style the email does not carry.
+  rich.addEventListener('keydown', (e) => { if ((e.ctrlKey || e.metaKey) && ['i', 'u'].includes(e.key.toLowerCase())) e.preventDefault(); });
+  // Pasted words come in as plain words; a pasted or dropped picture becomes a picture of the message.
+  rich.addEventListener('paste', (e) => {
+    e.preventDefault();
+    const dropped = Array.from((e.clipboardData && e.clipboardData.files) || []);
+    if (dropped.length) { takeFiles(dropped); return; }
+    const text = (e.clipboardData && e.clipboardData.getData('text/plain')) || '';
+    if (text) document.execCommand('insertText', false, text);
+  });
+  const card = rich.closest('.card');
+  card.addEventListener('dragover', (e) => { if (e.dataTransfer && Array.from(e.dataTransfer.types || []).includes('Files')) e.preventDefault(); });
+  card.addEventListener('drop', (e) => {
+    const dropped = Array.from((e.dataTransfer && e.dataTransfer.files) || []);
+    if (!dropped.length) return;
+    e.preventDefault();
+    takeFiles(dropped);
+  });
+}
+
+/** Pasted or dropped files: pictures go into the message, anything else is attached. @param {File[]} list */
+async function takeFiles(list) {
+  if (!me || busy) return;
+  changed();
+  const pictures = list.filter((f) => INLINE_TYPES.includes(f.type)), others = list.filter((f) => !INLINE_TYPES.includes(f.type));
+  if (pictures.length) await addFiles(pictures, true);
+  if (others.length) await addFiles(others, false);
+}
+
+// ── starter emails ────────────────────────────────────────────────────────────
+
+/** @type {{ canChange: boolean, list: any[] }} */
+let starters = { canChange: false, list: [] };
+
+async function loadStarters() {
+  const res = await request('/v1/mail/starters');
+  starters = res.ok && res.body ? { canChange: Boolean(res.body.canChange), list: res.body.starters || [] } : { canChange: false, list: [] };
+  $('starter-field').hidden = !starters.list.length && !starters.canChange;
+  $('starter').replaceChildren(...starters.list.map((s) => new Option(s.name, s.id)));
+  $('starter').hidden = !starters.list.length; $('starter-use').hidden = !starters.list.length;
+  $('starter-save').hidden = !starters.canChange;
+  $('starter-remove').hidden = !starters.canChange || !starters.list.length;
+}
+
+function useStarter(button) {
+  const s = starters.list.find((x) => x.id === $('starter').value);
+  if (!s || busy || !mayReplace(button)) return;
+  $('subject').value = s.subject;
+  setText(blocksToText(s.blocks));
+  changed();
+  draw();
+  setStatus('status', 'Starter copied in. Change what you need.');
+  $('rich').focus();
+}
+
+async function saveStarter() {
+  const blocks = parseMessage($('text').value, []).filter((b) => b.t !== 'img');
+  if (!hasWords(blocks)) { setStatus('status', 'Write the starter first, then save it.', 'bad'); return; }
+  const name = (window.prompt('Name for this starter', $('subject').value.trim()) || '').trim();
+  if (!name) return;
+  const res = await request('/v1/mail/starters', { method: 'POST', body: { name, subject: $('subject').value, blocks } });
+  setStatus('status', res.ok ? `Saved as the starter "${name}". Every director can start from it.` : problemWords(res), res.ok ? 'good' : 'bad');
+  if (res.ok) loadStarters();
+}
+
+async function removeStarter() {
+  const s = starters.list.find((x) => x.id === $('starter').value);
+  if (!s) return;
+  const res = await request(`/v1/mail/starters/${encodeURIComponent(s.id)}`, { method: 'DELETE' });
+  setStatus('status', res.ok ? `The starter "${s.name}" was removed.` : problemWords(res), res.ok ? 'good' : 'bad');
+  if (res.ok) loadStarters();
+}
+
+// ── a phone: write and preview as two tabs ────────────────────────────────────
+
+function showTab(tab) {
+  $('app').dataset.tab = tab;
+  for (const b of $('tabs').querySelectorAll('button')) b.setAttribute('aria-selected', String(b.dataset.tab === tab));
+  if (tab === 'preview') draw();
 }
 
 // ── pictures and files ────────────────────────────────────────────────────────
@@ -362,13 +529,7 @@ async function addFiles(list, inline) {
     while (files.some((f) => f.name.toLowerCase() === name.toLowerCase())) name = name.replace(/(\.[^.]+)?$/, (ext) => ` (2)${ext || ''}`);
     if (!made.bytes.length) continue;
     files.push({ name, type: made.type, size: made.bytes.length, inline: picture, bytes: made.bytes, url: picture ? URL.createObjectURL(new Blob([made.bytes], { type: made.type })) : '' });
-    if (picture) {
-      // The picture goes where the cursor is, on a line of its own.
-      const ta = $('text');
-      const at = ta.selectionStart ?? ta.value.length;
-      const before = ta.value.slice(0, at).replace(/[ \t]+$/, ''), after = ta.value.slice(at).replace(/^[ \t]+/, '');
-      ta.value = `${before}${before && !before.endsWith('\n\n') ? (before.endsWith('\n') ? '\n' : '\n\n') : ''}${pictureLine(name)}${after.startsWith('\n\n') ? '' : (after.startsWith('\n') ? '\n' : '\n\n')}${after}`;
-    }
+    if (picture) insertPicture(files[files.length - 1]);   // where the cursor is, on a line of its own
   }
   setStatus('status', '');
   draw();
@@ -379,7 +540,7 @@ function removeFile(i) {
   if (!f || busy) return;
   if (f.url) URL.revokeObjectURL(f.url);
   files.splice(i, 1);
-  if (f.inline) $('text').value = $('text').value.split('\n').filter((l) => l.trim().toLowerCase() !== pictureLine(f.name).toLowerCase()).join('\n').replace(/\n{3,}/g, '\n\n');
+  if (f.inline) setText($('text').value.split('\n').filter((l) => l.trim().toLowerCase() !== pictureLine(f.name).toLowerCase()).join('\n').replace(/\n{3,}/g, '\n\n'));
   changed();
   draw();
 }
@@ -460,7 +621,7 @@ function finished(count) {
   for (const f of files) if (f.url) URL.revokeObjectURL(f.url);
   files = [];
   uploadedId = '';
-  $('subject').value = ''; $('text').value = '';
+  $('subject').value = ''; setText('');
   draw();
   loadLog();
 }
@@ -550,7 +711,7 @@ async function laterPressed() {
     if (!res.ok) { if (res.status === 404) uploadedId = ''; setStatus('status', res.status === 404 ? 'That took too long and the upload was cleared. Press the button again.' : problemWords(res), 'bad'); return; }
     for (const f of files) if (f.url) URL.revokeObjectURL(f.url);
     files = []; uploadedId = '';
-    $('subject').value = ''; $('text').value = ''; $('later-at').value = '';
+    $('subject').value = ''; setText(''); $('later-at').value = '';
     draw();
     setStatus('status', `Scheduled for ${whenWords(t.at)}. You can cancel it under Waiting to send.`, 'good');
     loadLater();
@@ -561,8 +722,32 @@ async function laterPressed() {
   }
 }
 
+/** The countdown ends without a send (Cancel, or the message changed). @param {string} [words] */
+function stopUndo(words) {
+  clearInterval(undoTimer);
+  undoTimer = 0; undoLeft = 0;
+  if (words !== undefined) setStatus('status', words);
+  refreshButtons();
+}
+
+/** After the second tap: a short wait with Cancel, then it goes. Closing the page in the wait sends nothing. */
+function startUndo() {
+  if (UNDO_S <= 0) { go(false); return; }
+  undoLeft = UNDO_S;
+  const tick = () => {
+    if (undoLeft <= 0) { stopUndo(); go(false); return; }
+    $('send').textContent = `Cancel (${undoLeft})`;
+    setStatus('status', `Sending in ${undoLeft} ${undoLeft === 1 ? 'second' : 'seconds'}. Press Cancel to stop it.`);
+    undoLeft -= 1;
+  };
+  undoTimer = setInterval(tick, 1000);
+  tick();
+  refreshButtons();
+}
+
 function sendPressed() {
   if (busy) return;
+  if (undoTimer) { stopUndo('Not sent. Nothing went out.'); return; }
   if (running && !running.test) { go(false); return; }
   const now = Date.now();
   if (now - armed > CONFIRM_MS) {
@@ -574,14 +759,15 @@ function sendPressed() {
     return;
   }
   $('send').classList.remove('armed');
-  go(false);
+  armed = 0;
+  startUndo();
 }
 
 // ── the owner's directors ─────────────────────────────────────────────────────
 
 /** @param {any} d the Worker's list answer */
 function drawDirectors(d) {
-  if (!d) return;
+  if (!d || !Array.isArray(d.clubs) || !Array.isArray(d.directors)) return;   // the list could not be read: the rest of the page still works
   $('d-clubs').replaceChildren(Object.assign(document.createElement('legend'), { textContent: 'Clubs' }), ...d.clubs.map((c) => {
     const label = document.createElement('label');
     label.append(Object.assign(document.createElement('input'), { type: 'checkbox', value: c.id }), c.name);
@@ -663,11 +849,12 @@ async function start() {
   $('add-director').addEventListener('submit', addDirector);
   $('club').addEventListener('change', () => { changed(); drawLooks(); draw(); loadCount(); });
   $('look').addEventListener('change', () => { lookWant = $('look').value; changed(); draw(); });
-  for (const id of ['subject', 'text']) $(id).addEventListener('input', () => { changed(); clearTimeout(drawTimer); drawTimer = setTimeout(draw, 250); });
-  $('fmt-bold').addEventListener('click', () => format(boldEdit));
-  $('fmt-heading').addEventListener('click', () => format((v, s, e) => linesEdit(v, s, e, 'heading')));
-  $('fmt-list').addEventListener('click', () => format((v, s, e) => linesEdit(v, s, e, 'list')));
-  $('fmt-link').addEventListener('click', addLink);
+  $('subject').addEventListener('input', () => { changed(); clearTimeout(drawTimer); drawTimer = setTimeout(draw, 250); });
+  wireRich();
+  $('starter-use').addEventListener('click', () => useStarter($('starter-use')));
+  $('starter-save').addEventListener('click', saveStarter);
+  twoTaps($('starter-remove'), 'Tap again to remove', removeStarter);
+  for (const b of $('tabs').querySelectorAll('button')) b.addEventListener('click', () => showTab(b.dataset.tab));
   $('add-picture').addEventListener('click', () => $('pick-picture').click());
   $('add-file').addEventListener('click', () => $('pick-file').click());
   $('pick-picture').addEventListener('change', (e) => { changed(); addFiles(e.target.files, true).then(() => { e.target.value = ''; }); });

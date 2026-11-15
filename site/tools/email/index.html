@@ -46,7 +46,6 @@
   .field { display: grid; gap: 6px; margin-top: 14px; }
   #to-line { min-height: 1.5em; margin: 8px 0 0; font-weight: 600; }
   #to-line.bad { color: var(--brand-sparks-deep); }
-  textarea { width: 100%; min-height: 300px; height: 44vh; resize: vertical; font: 400 16px/1.5 var(--brand-font-body); padding: 14px; border: 2px solid var(--ink); border-radius: 12px; background: #fff; color: var(--ink); }
   .tools { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 12px; }
   .tools .total { margin-left: auto; font-weight: 600; font-size: 14px; }
   .tools .total.bad { color: var(--brand-sparks-deep); }
@@ -55,6 +54,14 @@
   ul.files li span.name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   ul.files li span.kind { font-weight: 400; color: var(--muted); white-space: nowrap; }
   .fmt { display: flex; flex-wrap: wrap; gap: 8px; }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; } .row select { flex: 1; min-width: 12rem; }
+  #rich { width: 100%; min-height: 300px; max-height: 60vh; overflow: auto; font: 400 16px/1.5 var(--brand-font-body); padding: 14px; border: 2px solid var(--ink); border-radius: 12px; background: #fff; color: var(--ink); overflow-wrap: anywhere; }
+  #rich:focus-visible { outline: 3px solid var(--brand-blue); outline-offset: 2px; }
+  #rich:empty::before { content: attr(data-empty); color: var(--muted); }
+  #rich h2 { margin: 10px 0 4px; font: 700 20px/1.25 var(--brand-font-body); text-transform: none; color: var(--ink); }
+  #rich ul { margin: 4px 0; padding-left: 22px; } #rich a { color: #0B5CAD; }
+  #rich .pic { margin: 6px 0; } #rich .pic img { display: block; max-width: min(100%, 320px); height: auto; border-radius: 6px; }
+  .tabs { display: none; }
   .card .fine { margin: 12px 0 0; }
   .fine code { background: var(--brand-cream); padding: 0 4px; border-radius: 4px; }
   .send { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 18px; }
@@ -93,7 +100,13 @@
   @media (max-width: 900px) {
     main { grid-template-columns: minmax(0, 1fr); padding: 16px; } .col.out { position: static; }
     header.bar { padding: 12px 16px; flex-wrap: wrap; } header.bar h1 { font-size: 20px; } header.bar img { width: 200px; }
-    textarea { height: 38vh; } .card { padding: 18px 16px 20px; }
+    #rich { min-height: 38vh; } .card { padding: 18px 16px 20px; }
+    /* A phone: Write and Preview are two tabs, and the send buttons stay in reach at the foot. */
+    .tabs { display: flex; gap: 8px; } .tabs button { flex: 1; } .tabs button[aria-selected="true"] { background: var(--ink); color: #fff; }
+    main[data-tab="write"] #preview-card { display: none; } main[data-tab="write"] #preview-card + .card { margin-top: 0; }
+    main[data-tab="preview"] > .col:not(.out) { display: none; }
+    .send { position: sticky; bottom: 0; z-index: 2; margin: 12px -16px 0; padding: 10px 16px 12px; background: #fff; border-top: 1px solid var(--line); }
+    .send button { flex: 1; }
   }
 </style>
 </head>
@@ -128,8 +141,12 @@
 </form>
 <p class="swap" id="swap" hidden><button type="button" id="swap-btn">Owner sign-in</button></p>
 
-<main id="app" hidden>
+<main id="app" data-tab="write" hidden>
   <p class="setup" id="setup" hidden></p>
+  <div class="tabs" id="tabs" role="tablist" aria-label="Write or preview">
+    <button type="button" role="tab" data-tab="write" aria-selected="true">Write</button>
+    <button type="button" role="tab" data-tab="preview" aria-selected="false">Preview</button>
+  </div>
   <div class="col">
     <section class="card" aria-labelledby="write-h">
       <h2 id="write-h">New email</h2>
@@ -143,19 +160,29 @@
         <label for="look">Design</label>
         <select id="look"></select>
       </div>
+      <div class="field" id="starter-field" hidden>
+        <label for="starter">Start from</label>
+        <div class="row">
+          <select id="starter"></select>
+          <button type="button" class="quiet" id="starter-use">Use</button>
+          <button type="button" class="quiet" id="starter-save" hidden>Save this email as a starter</button>
+          <button type="button" class="quiet" id="starter-remove" hidden>Remove starter</button>
+        </div>
+      </div>
       <div class="field">
         <label for="subject">Subject</label>
         <input id="subject" type="text" maxlength="150" autocomplete="off">
       </div>
       <div class="field">
-        <label for="text">Message</label>
+        <span class="label" id="text-label">Message</span>
         <div class="fmt" role="toolbar" aria-label="Formatting">
           <button type="button" class="quiet" id="fmt-bold">Bold</button>
           <button type="button" class="quiet" id="fmt-heading">Heading</button>
           <button type="button" class="quiet" id="fmt-list">List</button>
           <button type="button" class="quiet" id="fmt-link">Link</button>
         </div>
-        <textarea id="text" spellcheck="true"></textarea>
+        <div id="rich" contenteditable="true" role="textbox" aria-multiline="true" aria-labelledby="text-label" spellcheck="true" data-empty="Write your message here."></div>
+        <textarea id="text" hidden></textarea>
       </div>
       <div class="tools">
         <button type="button" id="add-picture">Add a picture</button>
@@ -165,7 +192,7 @@
       <input type="file" id="pick-picture" accept="image/jpeg,image/png,image/gif" multiple hidden>
       <input type="file" id="pick-file" multiple hidden>
       <ul class="files" id="files"></ul>
-      <p class="fine">Leave a blank line between paragraphs. A picture shows where its <code>[picture: name]</code> line is; other files are attached at the end.</p>
+      <p class="fine">Paste or drag a picture into the message to place it. Other files are attached at the end.</p>
       <div class="send">
         <button type="button" id="test">Send a test to me</button>
         <button type="button" class="hot" id="send">Send to parents</button>
@@ -181,7 +208,7 @@
   </div>
 
   <div class="col out">
-    <section class="card" aria-labelledby="prev-h">
+    <section class="card" id="preview-card" aria-labelledby="prev-h">
       <h2 id="prev-h">Preview</h2>
       <div class="envelope">
         <dl>
