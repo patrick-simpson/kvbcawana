@@ -1993,7 +1993,8 @@ send (one Graph read, kept 10 minutes in memory) and answers a number, never an 
 | `PUT /v1/mail/directors/:id` | session + owner | `{name?, replyTo?, clubs?}` | `{director}`; a new address keeps the code and sign-ins; 400 `bad-director`, 409 `exists` |
 | `POST /v1/mail/directors/:id/code` | session + owner | `{}` | `{ok}`: a new code is mailed, the old code and every sign-in stop |
 | `DELETE /v1/mail/directors/:id` | session + owner | | `{ok}` |
-| `POST /v1/mail/login` | public | `{code}` | `{token, name}`; 401 `bad-code`, 429 `locked` |
+| `POST /v1/mail/login` | public | `{code}` | `{token, name}`; 401 `bad-code`, 429 `locked`. The token lasts 180 days from its LAST use |
+| `POST /v1/mail/owner/keep` | session + owner's code | `{}` | `{token}`: this device stays signed in as the owner (a token like a director's; the code is never stored; it stops when the owner signs out or `MAIL_OWNER_CODE` changes) |
 | `POST /v1/mail/logout` | public | | `{ok}` |
 | `GET /v1/mail/me` | sender | | `{ready, name, replyTo, office, from, clubs: [{id, name, from}], all, limits}`; 401 `signed-out` |
 | `GET /v1/mail/recipients?club=` | sender | | `{club, name, addresses, kids, kidsWithoutEmail}` (counts only); 403 `not-your-club`, 502 `roster`, 503 `read-busy` |
@@ -2011,4 +2012,5 @@ send (one Graph read, kept 10 minutes in memory) and answers a number, never an 
 | `DELETE /v1/mail/later/:id` | sender | | `{ok}`: cancelled (or a failed line cleared); 409 `running` once it is going out |
 | `POST /v1/mail/drafts/:id/step` | sender | `{}` | `{stage, test, done, percent, recipients}`; 409 `no-recipients`, 502 `graph`/`graph-auth`/`roster`, 503 `read-busy` |
 
-"sender" = a director's `X-Mail-Token`, or the owner's session + `X-Mail-Owner`.
+"sender" = a director's `X-Mail-Token`, the owner's kept token, or the owner's session + `X-Mail-Owner`.
+"session + owner" = the owner's kept token, or the church session + `X-Mail-Owner`.

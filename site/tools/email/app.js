@@ -145,6 +145,11 @@ async function ownerSignIn(event) {
       return;
     }
     $('passphrase').value = ''; $('owner-code').value = '';
+    if ($('owner-keep').checked) {
+      // Stay signed in on this device: a token like a director's is kept, never the code or the passphrase.
+      const kept = await request('/v1/mail/owner/keep', { method: 'POST', body: {} });
+      if (kept.ok && kept.body && kept.body.token) { store.set(TOKEN_KEY, kept.body.token); ownerSession = ''; ownerCode = ''; }
+    }
     await enter(check.body);
   } catch {
     note.textContent = 'This browser could not sign in (it may be too old).';
@@ -164,7 +169,7 @@ async function signOut() {
 async function enter(directors) {
   const res = await request('/v1/mail/me');
   if (!res.ok || !res.body) {
-    if (res.status === 401) { store.set(TOKEN_KEY, null); showSignedOut('Your sign-in ended. Type your code again.'); } else showSignedOut(problemWords(res));
+    if (res.status === 401) { store.set(TOKEN_KEY, null); showSignedOut('Your sign-in ended. Sign in again.'); } else showSignedOut(problemWords(res));
     return;
   }
   me = res.body;
@@ -258,7 +263,7 @@ async function loadCount() {
   const club = $('club').value;
   const res = await request(`/v1/mail/recipients?club=${encodeURIComponent(club)}`, { timeoutMs: 70000 });
   if (club !== $('club').value) return;
-  if (res.status === 401) { store.set(TOKEN_KEY, null); showSignedOut('Your sign-in ended. Type your code again.'); return; }
+  if (res.status === 401) { store.set(TOKEN_KEY, null); showSignedOut('Your sign-in ended. Sign in again.'); return; }
   if (!res.ok || !res.body) { line.className = 'bad'; line.textContent = `${problemWords(res)} Reload to count again.`; return; }
   toCount = res.body;
   line.className = toCount.addresses ? '' : 'bad';

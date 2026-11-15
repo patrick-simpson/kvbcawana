@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { SyncCore } from '../src/sync.js';
 import {
-  CODE_FAILS_IP, LATER_PER_SENDER, LATER_STEP_MS, LATER_TRIES, MAIL_PART, MAIL_RECIPIENTS_MAX, MAIL_SENDS_PER_DAY, MAIL_SMALL_BYTES, MAIL_STEP_PARTS,
+  CODE_FAILS_IP, MAIL_TOKEN_MS, LATER_PER_SENDER, LATER_STEP_MS, LATER_TRIES, MAIL_PART, MAIL_RECIPIENTS_MAX, MAIL_SENDS_PER_DAY, MAIL_SMALL_BYTES, MAIL_STEP_PARTS,
   cleanBlocks, cleanClubs, clubMailboxes, newCode, normalCode, recipientsByClub, renderMail,
 } from '../src/clubmail.js';
 import { memoryStore, signInV2 } from './helpers.js';
@@ -231,6 +231,46 @@ describe('club email: directors and signing in', () => {
     expect(list.find((x) => x.name === 'New Person')).toMatchObject({ lastLogin: null, lastSent: null });
     // The director's code is not among what is answered.
     expect(JSON.stringify(list)).not.toMatch(/"code"/);
+  });
+
+  it('a sign-in lasts while it is used: 180 days from the last use, not from the first', async () => {
+    const s = await setup();
+    const d = await s.director();
+    const day = 24 * 60 * 60 * 1000;
+    for (let i = 0; i < 4; i += 1) { s.tick(100 * day); expect((await s.call('GET', '/v1/mail/me', undefined, d.auth)).status).toBe(200); }   // 400 days on, still in
+    s.tick(MAIL_TOKEN_MS + day);
+    expect((await s.call('GET', '/v1/mail/me', undefined, d.auth)).status).toBe(401);
+  });
+
+  it('the owner\'s device can stay signed in, without the code being kept anywhere', async () => {
+    const s = await setup();
+    // Making it needs the church session AND the owner's code; a director's token or the session alone do not.
+    expect((await s.call('POST', '/v1/mail/owner/keep', {}, { session: s.session })).body.reason).toBe('not-owner');
+    expect((await s.call('POST', '/v1/mail/owner/keep', {}, { owner: OWNER })).status).toBe(401);
+    const d = await s.director();
+    expect((await s.call('POST', '/v1/mail/owner/keep', {}, d.auth)).status).toBe(401);
+    const kept = await s.call('POST', '/v1/mail/owner/keep', {});
+    expect(kept.status).toBe(200);
+    const auth = { token: kept.body.token };
+    // With only that token: the owner's page, the directors, a send to any club.
+    expect((await s.call('GET', '/v1/mail/me', undefined, auth)).body).toMatchObject({ office: true, name: 'Patrick Simpson' });
+    expect((await s.call('GET', '/v1/mail/directors', undefined, auth)).body.directors).toHaveLength(1);
+    expect((await s.call('POST', '/v1/mail/directors', { name: 'Eve', replyTo: 'eve@example.com', clubs: ['trek'] }, auth)).status).toBe(200);
+    expect((await s.call('POST', '/v1/mail/drafts', { club: 'trek', subject: 'Hi', blocks: WORDS, files: [] }, auth)).status).toBe(200);
+    // A director's token is still not the owner's.
+    expect((await s.call('GET', '/v1/mail/directors', undefined, d.auth)).status).toBe(401);
+    expect((await s.call('POST', '/v1/mail/directors', { name: 'X', replyTo: 'x@example.com', clubs: ['trek'] }, d.auth)).status).toBe(401);
+    // The code is nowhere in storage, plain or as the token's mark could be turned back into.
+    expect(JSON.stringify([...s.storage.map.values()])).not.toContain(OWNER);
+    // Sign out ends it; so does changing the owner's code.
+    const second = (await s.call('POST', '/v1/mail/owner/keep', {})).body.token;
+    expect((await s.call('POST', '/v1/mail/logout', {}, auth)).status).toBe(200);
+    expect((await s.call('GET', '/v1/mail/me', undefined, auth)).status).toBe(401);
+    expect((await s.call('GET', '/v1/mail/directors', undefined, auth)).status).toBe(401);
+    expect((await s.call('GET', '/v1/mail/me', undefined, { token: second })).status).toBe(200);
+    s.core.rawEnv.MAIL_OWNER_CODE = 'a-different-code-99';
+    expect((await s.call('GET', '/v1/mail/me', undefined, { token: second })).status).toBe(401);
+    expect((await s.call('GET', '/v1/mail/directors', undefined, { token: second })).status).toBe(401);
   });
 
   it('locks a network after too many wrong codes; a new code ends the old sign-in', async () => {

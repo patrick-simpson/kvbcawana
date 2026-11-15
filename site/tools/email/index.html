@@ -34,6 +34,8 @@
   .signin label, .field > label, .field > span.label { font: 400 17px/1.1 var(--brand-font-label); letter-spacing: .06em; text-transform: uppercase; color: var(--brand-blue); margin-top: 6px; }
   .signin input, .field input[type=text], .field input[type=email], .field select { width: 100%; min-height: 48px; font: inherit; font-size: 17px; padding: 10px 12px; border: 2px solid var(--ink); border-radius: 10px; background: #fff; color: var(--ink); }
   .signin button { width: 100%; min-height: 48px; }
+  .signin label.keep { display: flex; align-items: center; gap: 8px; margin: 0; font: inherit; letter-spacing: 0; text-transform: none; color: var(--ink); }
+  .signin label.keep input { width: 22px; min-height: 22px; height: 22px; padding: 0; }
   .signin .note { min-height: 1.5em; font-size: 15px; font-weight: 600; color: var(--brand-sparks-deep); }
   .fine { font-size: 14px; color: var(--muted); }
   .swap { text-align: center; margin: 0 0 32px; font-size: 14px; }
@@ -125,7 +127,7 @@
   <input id="code" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="XXXX-XXXX-XXXX" aria-describedby="signin-note">
   <p class="note" id="signin-note" role="status" aria-live="polite"></p>
   <button class="hot" id="signin-btn" type="submit">Sign in</button>
-  <p class="fine">The code is yours alone. No code? Ask the Awana director for one.</p>
+  <p class="fine">This device stays signed in until you sign out. No code? Ask the Awana director for one.</p>
 </form>
 
 <form class="signin" id="owner-signin" hidden>
@@ -137,7 +139,8 @@
   <input id="owner-code" type="password" autocomplete="off" aria-describedby="owner-note">
   <p class="note" id="owner-note" role="status" aria-live="polite"></p>
   <button class="hot" id="owner-btn" type="submit">Sign in</button>
-  <p class="fine">Neither is saved on this device. The owner's code is asked again when the page is reopened.</p>
+  <label class="keep"><input id="owner-keep" type="checkbox" checked> Stay signed in on this device</label>
+  <p class="fine">The passphrase and the code are never saved. With the box ticked, this device stays signed in until you sign out; leave it unticked on a shared computer.</p>
 </form>
 <p class="swap" id="swap" hidden><button type="button" id="swap-btn">Owner sign-in</button></p>
 

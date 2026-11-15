@@ -86,8 +86,15 @@ export const MAIL_TEXT_MAX = 20000;
 export const MAIL_STEP_PARTS = 30;
 /** A draft nobody sent is deleted after this. */
 export const MAIL_DRAFT_TTL_MS = 3 * 60 * 60 * 1000;
-/** A director's token lasts this long. */
-export const MAIL_TOKEN_MS = 30 * 24 * 60 * 60 * 1000;
+/**
+ * A sign-in lasts this long SINCE IT WAS LAST USED (owner 2026-11-14: "make it so that logins
+ * on the email page are saved so people don't need to login multiple times"; it was 30
+ * days from the day of signing in). The owner's device may be kept signed in the same way
+ * (`keepOwner`): the owner's code itself is still never stored anywhere.
+ */
+export const MAIL_TOKEN_MS = 180 * 24 * 60 * 60 * 1000;
+/** A sign-in's clock starts again each time it is used; the new time is written at most this often. */
+export const MAIL_TOKEN_TOUCH_MS = 24 * 60 * 60 * 1000;
 /** Real sends (not tests) a director may make in a day. */
 export const MAIL_SENDS_PER_DAY = 6;
 export const MAIL_DIRECTORS_MAX = 40;
@@ -529,13 +536,43 @@ export class ClubMail {
   async who(request, sessionOk, ip) {
     const token = (request.headers.get('X-Mail-Token') || '').trim();
     if (token) {
-      const row = (await this.tokens())[await sha256Hex(token)];
-      if (!row || this.now() - row.at > MAIL_TOKEN_MS) return null;
+      const tokens = await this.tokens();
+      const row = tokens[await sha256Hex(token)];
+      const t = this.now();
+      if (!row || t - row.at > MAIL_TOKEN_MS) return null;
+      // The owner's kept sign-in: good only while the owner's code is the one it was made with.
+      if (row.d === 'office' && !(row.oc && safeEqual(String(row.oc), await this.ownerMark()))) return null;
+      if (t - row.at > MAIL_TOKEN_TOUCH_MS) { row.at = t; await this.storage.put(TOKENS_KEY, tokens); }   // used: its clock starts again
+      if (row.d === 'office') return { id: 'office', name: this.ownerName(), replyTo: this.from(), clubs: CLUB_IDS.slice(), office: true };
       const d = (await this.directors()).list.find((x) => x.id === row.d);
       return d ? { id: d.id, name: d.name, replyTo: d.replyTo, clubs: d.clubs, office: false } : null;
     }
-    if (request.headers.get('X-Mail-Owner') && (await sessionOk()) && this.ownerCheck(request, ip) === 'ok') return { id: 'office', name: 'The Awana office', replyTo: this.from(), clubs: CLUB_IDS.slice(), office: true };
+    if (request.headers.get('X-Mail-Owner') && (await sessionOk()) && this.ownerCheck(request, ip) === 'ok') return { id: 'office', name: this.ownerName(), replyTo: this.from(), clubs: CLUB_IDS.slice(), office: true };
     return null;
+  }
+
+  /** The owner's name on their own emails (owner 2026-11-14: "it should say Patrick Simpson", not "The Awana office"); `MAIL_OWNER_NAME` changes it. */
+  ownerName() { return oneLine(this.env()?.MAIL_OWNER_NAME, 60) || 'Patrick Simpson'; }
+
+  /** A mark of the owner's code as it is now ('' when none is set): a kept sign-in made under another code stops working. */
+  async ownerMark() {
+    const code = String(this.env()?.MAIL_OWNER_CODE || '');
+    return code.length >= OWNER_CODE_MIN ? sha256Hex(`mail-owner:${code}`) : '';
+  }
+
+  /**
+   * POST /v1/mail/owner/keep (the church session and the owner's code, checked by the
+   * route): this device stays signed in as the owner, by a token like a director's.
+   */
+  async keepOwner() {
+    const mark = await this.ownerMark();
+    if (!mark) return json({ ok: false, reason: 'owner-not-set' }, 503);
+    const token = toBase64Url(randomBytes(32)), t = this.now();
+    const tokens = await this.tokens();
+    for (const k of Object.keys(tokens)) if (t - tokens[k].at > MAIL_TOKEN_MS) delete tokens[k];
+    tokens[await sha256Hex(token)] = { d: 'office', at: t, oc: mark };
+    await this.storage.put(TOKENS_KEY, tokens);
+    return json({ ok: true, token });
   }
 
   /** POST /v1/mail/logout @param {Request} request */
@@ -1013,7 +1050,7 @@ export class ClubMail {
 
   /** The sender of a waiting message as they are now (the office, or a director still on the list). @param {string} id */
   async senderNow(id) {
-    if (id === 'office') return { id: 'office', name: 'The Awana office', replyTo: this.from(), clubs: CLUB_IDS.slice(), office: true };
+    if (id === 'office') return { id: 'office', name: this.ownerName(), replyTo: this.from(), clubs: CLUB_IDS.slice(), office: true };
     const d = (await this.directors()).list.find((x) => x.id === id);
     return d ? { id: d.id, name: d.name, replyTo: d.replyTo, clubs: d.clubs, office: false } : null;
   }
@@ -1169,8 +1206,15 @@ export function mountClubMail(registry, core) {
     if (!who) return fail('Not signed in.', 401, { reason: 'signed-out' });
     return fn(ctx, who);
   };
-  // The owner's routes: the church session (the route's own auth) and the owner's code.
-  const owner = (/** @type {(ctx: Ctx) => Promise<Response>} */ fn) => async (/** @type {Ctx} */ ctx) => {
+  // The owner's routes: the owner's kept sign-in (a token made by /owner/keep), or the
+  // church session AND the owner's code. The church passphrase alone opens nothing.
+  const owner = (/** @type {(ctx: Ctx) => Promise<Response>} */ fn, /** @type {{ codeOnly?: boolean }} */ opts = {}) => async (/** @type {Ctx} */ ctx) => {
+    if (!opts.codeOnly && ctx.request.headers.get('X-Mail-Token')) {
+      const who = await m().who(ctx.request, async () => false, ctx.ip);
+      if (who && who.office) return fn(ctx);
+      return fail('Not signed in.', 401, { reason: 'signed-out' });
+    }
+    if (!(await core.authorized(ctx.request))) return fail('Not signed in.', 401, { reason: 'signed-out' });
     const c = m().ownerCheck(ctx.request, ctx.ip);
     if (c === 'unset') return json({ ok: false, reason: 'owner-not-set' }, 503);
     if (c === 'locked') return fail('Too many wrong codes. Wait ten minutes and try again.', 429, { reason: 'locked' });
@@ -1179,11 +1223,12 @@ export function mountClubMail(registry, core) {
   };
   const draftId = (/** @type {(ctx: Ctx, who: any) => Promise<Response>} */ fn) => sender(async (ctx, who) => (ID_RE.test(ctx.params.id || '') ? fn(ctx, who) : fail('There is no email by that name.', 404, { reason: 'no-draft' })));
 
-  registry.add('GET', '/v1/mail/directors', 'session', owner(async () => m().list()));
-  registry.add('POST', '/v1/mail/directors', 'session', owner(ready(async ({ body }) => m().add(await body()))));
-  registry.add('PUT', '/v1/mail/directors/:id', 'session', owner(async ({ params, body }) => m().change(params.id, await body())));
-  registry.add('POST', '/v1/mail/directors/:id/code', 'session', owner(ready(async ({ params }) => m().recode(params.id))));
-  registry.add('DELETE', '/v1/mail/directors/:id', 'session', owner(async ({ params }) => m().remove(params.id)));
+  registry.add('POST', '/v1/mail/owner/keep', 'public', owner(async () => m().keepOwner(), { codeOnly: true }));
+  registry.add('GET', '/v1/mail/directors', 'public', owner(async () => m().list()));
+  registry.add('POST', '/v1/mail/directors', 'public', owner(ready(async ({ body }) => m().add(await body()))));
+  registry.add('PUT', '/v1/mail/directors/:id', 'public', owner(async ({ params, body }) => m().change(params.id, await body())));
+  registry.add('POST', '/v1/mail/directors/:id/code', 'public', owner(ready(async ({ params }) => m().recode(params.id))));
+  registry.add('DELETE', '/v1/mail/directors/:id', 'public', owner(async ({ params }) => m().remove(params.id)));
 
   registry.add('POST', '/v1/mail/login', 'public', async ({ body, ip }) => m().login(await body(), ip));
   registry.add('POST', '/v1/mail/logout', 'public', async ({ request }) => m().logout(request));
