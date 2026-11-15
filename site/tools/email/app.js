@@ -15,7 +15,7 @@
 import {
   FILE_ACCEPT, INLINE_TYPES, PICTURE_KEEP_BYTES, PICTURE_MAX_PX, hasWords, parseMessage, pictureLine,
   previewHtml, problemWords, recipientWords, sizeWords, stepRetryable, totalWords,
-  blocksToText, boldEdit, bounceWords, cleanLink, laterTime, lookChoices, lookStyle, linesEdit, linkEdit, secretWords, whenWords,
+  blocksToText, boldEdit, bounceWords, cleanLink, codeFromHash, laterTime, lookChoices, lookStyle, linesEdit, linkEdit, secretWords, whenWords,
 } from './logic.js';
 
 const SYNC_INDEX = new URL('/lobby/shared/sync.json', location.href).href;
@@ -683,6 +683,16 @@ async function start() {
       if (/^https:\/\/[^\s?#]+$/.test(url)) base = url;
     }
   } catch { /* no service named: the sign-in says so */ }
+  // The emailed sign-in link carries the code in the address's fragment: take it out of
+  // the address at once (so it is not left in the bar or the history), then sign in with it.
+  const linked = codeFromHash(location.hash);
+  if (linked) history.replaceState(null, '', location.pathname + location.search);
+  if (linked && base && !ownerCode) {
+    showSignedOut('');
+    $('code').value = linked;
+    await signIn(new Event('submit'));
+    return;
+  }
   if (!token()) { showSignedOut(base ? '' : 'The service is not reachable right now. Reload in a minute.'); return; }
   await enter();
 }

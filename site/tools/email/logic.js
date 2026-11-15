@@ -65,6 +65,16 @@ export function blocksToText(blocks) {
   }).filter(Boolean).join('\n\n');
 }
 
+/**
+ * The sign-in link's code: `#code=XXXX-XXXX-XXXX` in the address (the emailed link),
+ * or '' when the fragment is anything else. A fragment is never sent to a server.
+ * @param {string} hash `location.hash`
+ */
+export function codeFromHash(hash) {
+  const m = /^#code=([A-Za-z0-9]{4})-?([A-Za-z0-9]{4})-?([A-Za-z0-9]{4})$/.exec(String(hash || '').trim());
+  return m ? `${m[1]}-${m[2]}-${m[3]}`.toUpperCase() : '';
+}
+
 /** The mail that came back, in words ('' when none or not known). @param {number|null} n @param {string} mailbox */
 export function bounceWords(n, mailbox) {
   if (!n) return '';

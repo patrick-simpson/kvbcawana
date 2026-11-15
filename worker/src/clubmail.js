@@ -8,7 +8,9 @@
 // director (owner 2026-11-13: "Lock adding directors to me only"): the church
 // session AND the owner's own code (Worker secret MAIL_OWNER_CODE, header
 // X-Mail-Owner); the church passphrase alone opens nothing here. The Worker MAILS
-// a director's code to the director's address and never shows it on a page, and
+// a director's code to the director's address (with a link that signs them in: the code
+// rides in the link's fragment, which a browser never sends to a server) and never shows
+// it on a page, and
 // tells the awana@ mailbox a login was made. A code signs in for a token
 // (X-Mail-Token, stored as a hash). The owner may also send, to any club, with
 // replies to awana@.
@@ -360,7 +362,7 @@ export class ClubMail {
       saveToSentItems: false,   // the code is not left in the shared mailbox
       message: {
         subject: 'Your Awana club email login',
-        body: { contentType: 'text', content: `${d.name},\n\nYou can now email the parents of ${clubs} from the Awana account.\n\nPage: https://awana.kvbchurch.org/tools/email/\nYour code: ${code}\n\nThe code is yours alone: please don't share it. Parents' replies come to this address (${d.replyTo}).\n\nKVBC Awana\n` },
+        body: { contentType: 'text', content: `${d.name},\n\nYou can now email the parents of ${clubs}.\n\nSign in with this link:\nhttps://awana.kvbchurch.org/tools/email/#code=${code}\n\nIf the link does not open, go to https://awana.kvbchurch.org/tools/email/ and type the code.\nYour code: ${code}\n\nThe link and the code are yours alone: please don't forward this email. Parents' replies come to this address (${d.replyTo}).\n\nKVBC Awana\n` },
         toRecipients: [{ emailAddress: { address: d.replyTo, name: d.name } }],
       },
     });

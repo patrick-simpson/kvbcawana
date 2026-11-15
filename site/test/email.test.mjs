@@ -6,7 +6,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  blocksToText, boldEdit, bounceWords, cleanLink, hasWords, laterTime, secretWords, inlineHtml, linesEdit, linkEdit, parseMessage, pictureLine, lookChoices, lookStyle, previewHtml, problemWords, recipientWords, sizeWords, stepRetryable, totalWords,
+  blocksToText, boldEdit, bounceWords, cleanLink, codeFromHash, hasWords, laterTime, secretWords, inlineHtml, linesEdit, linkEdit, parseMessage, pictureLine, lookChoices, lookStyle, previewHtml, problemWords, recipientWords, sizeWords, stepRetryable, totalWords,
 } from '../tools/email/logic.js';
 import { cleanBlocks, linked, renderMail } from '../../worker/src/clubmail.js';
 import { existsSync } from 'node:fs';
@@ -93,6 +93,14 @@ test('the owner is told when the Microsoft secret is about to end', () => {
   assert.match(secretWords(1), /ends in 1 day\./);
   assert.match(secretWords(0), /ends today\./);
   assert.match(secretWords(-3), /^Sending has stopped/);
+});
+
+test('the emailed link signs a director in: its code is read from the fragment and taken out of the address', () => {
+  assert.equal(codeFromHash('#code=abcd-efgh-jkmn'), 'ABCD-EFGH-JKMN');
+  assert.equal(codeFromHash('#code=ABCDEFGHJKMN'), 'ABCD-EFGH-JKMN');
+  for (const bad of ['', '#', '#code=', '#code=ABCD-EFGH', '#code=ABCD-EFGH-JKMN-PQRS', '#x=ABCD-EFGH-JKMN', '#code=ABCD EFGH JKMN', undefined]) assert.equal(codeFromHash(bad), '', String(bad));
+  // The page cleans the address before it signs in, and never stores the code.
+  assert.match(app, /codeFromHash\(location\.hash\)[\s\S]{0,120}history\.replaceState\(null, '', location\.pathname \+ location\.search\)/);
 });
 
 test('the formatting buttons edit the typed text', () => {

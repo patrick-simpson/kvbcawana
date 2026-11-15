@@ -78,6 +78,8 @@ async function setup(env = MS) {
     expect(added.status).toBe(200);
     const mail = calls.filter((c) => c.path === '/sendMail' && c.body.message.toRecipients[0].emailAddress.address === d.replyTo).pop();
     const code = /Your code: (\S+)/.exec(mail.body.message.body.content)[1];
+    // The same code rides in the sign-in link's fragment (never sent to a server).
+    expect(mail.body.message.body.content).toContain(`https://awana.kvbchurch.org/tools/email/#code=${code}\n`);
     const login = await call('POST', '/v1/mail/login', { code }, {});
     expect(login.status).toBe(200);
     return { id: added.body.director.id, code, auth: { token: login.body.token } };
