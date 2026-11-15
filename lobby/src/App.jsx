@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
+import { FINALE_BAR_MS } from '../../shared/scoreboard.js';
 import { AnimatePresence, MotionConfig } from 'framer-motion';
 import { M, ZeroAnimationContext } from './lib/motion.jsx';
 import BackgroundIframe from './components/BackgroundIframe.jsx';
@@ -1023,7 +1024,8 @@ export default function App() {
   // is up on the scoreboard it has the foot the tonight strip rides in, and
   // steps aside exactly as that strip does (a name, a held slide, the pickup
   // board), rising again after.
-  const scoreboard = useScoreboard({ enabled: scoreTickerWanted({ overlay: FLAGS.overlay, configure: CONFIGURE, embedded: isEmbedded() }) });
+  // The lobby's bar holds FINAL for its own 8 s (the projector's film runs 21 s).
+  const scoreboard = useScoreboard({ enabled: scoreTickerWanted({ overlay: FLAGS.overlay, configure: CONFIGURE, embedded: isEmbedded() }), finaleMs: FINALE_BAR_MS });
   const scoreView = scoreTickerView(scoreboard.board, scoreboard.finale);
   const tickerActive = footActive && scoreView == null;
   const setupCard = useSetupCard({ status, hasDisplayKey });

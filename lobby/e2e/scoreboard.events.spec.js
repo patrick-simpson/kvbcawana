@@ -12,6 +12,9 @@ import { Scoreboard } from '../../worker/src/scoreboard.js';
 
 const CORS = { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': '*' };
 const SHOTS = process.env.SCOREBOARD_SHOTS || '';
+/** The projector's winner: the film or the flat screen; and how long until it has gone (FINALE_MS 21 s, and a margin). */
+const WINNER = '.pj-film, .pj-finale';
+const FINALE_GONE = 30000;
 const shot = async (page, name) => { if (SHOTS) await page.screenshot({ path: `${SHOTS}/${name}.png` }); };
 /** A clip the takeover's wipe opens fully within its first half second. */
 const wipeOpen = (page, sel) => page.locator(sel).evaluate((el) => getComputedStyle(el).clipPath);
@@ -193,12 +196,14 @@ test.describe('the game time scoreboard', () => {
     await expect(ph.locator('#end-btn')).toHaveText('Tap again to end');
     await shot(ph, 'phone-5-end-armed');
     await ph.locator('#end-btn').click();
-    await expect(wall.locator('.pj-finale')).toBeVisible();
-    await expect(wall.locator('.pj-finale')).toContainText('YELLOW WINS!');
+    // The winner: tonight's film, or the flat screen where the film cannot play (Playwright's
+    // own Chromium has no H.264); either names the winner (owner 2026-11-15).
+    await expect(wall.locator(WINNER)).toBeVisible();
+    await expect(wall.locator(WINNER)).toHaveAttribute('aria-label', /YELLOW WINS!/);
     await wall.waitForTimeout(1600);
     await shot(wall, 'wall-8-winner');
     await expect(wall.locator('[data-mode="game-time"]')).toBeVisible();
-    await expect(wall.locator('.pj-finale')).toHaveCount(0, { timeout: 12000 });
+    await expect(wall.locator(WINNER)).toHaveCount(0, { timeout: FINALE_GONE });
     await wall.context().close();
     await ph.context().close();
   });
@@ -216,13 +221,13 @@ test.describe('the game time scoreboard', () => {
     await ph.locator('.sb-club[data-club="cubbies"]').click();
     await expect(ph.locator('.sb-club[data-club="cubbies"]')).toHaveText('Tap again');
     await ph.locator('.sb-club[data-club="cubbies"]').click();
-    await expect(wall.locator('.pj-finale')).toContainText("IT'S A TIE!");
+    await expect(wall.locator(WINNER)).toHaveAttribute('aria-label', /IT'S A TIE!/);
     await wall.waitForTimeout(1600);
     await shot(wall, 'wall-9-tie');
     await expect(wall.locator('[data-scoring="cubbies"]')).toBeVisible();
     await expect(ph.locator('.sb-club[data-club="cubbies"]')).toHaveAttribute('aria-pressed', 'true');
     await shot(ph, 'phone-7-cubbies');
-    await expect(wall.locator('.pj-finale')).toHaveCount(0, { timeout: 12000 });
+    await expect(wall.locator(WINNER)).toHaveCount(0, { timeout: FINALE_GONE });
     await shot(wall, 'wall-10-cubbies');
 
     // The More sheet opens before any club too (the sound switch), the setups waiting for one.
@@ -249,9 +254,9 @@ test.describe('the game time scoreboard', () => {
     await expect(ph.locator('#opts-ask')).toBeVisible();
     await shot(ph, 'phone-10-ask');
     await ph.locator('#opts-zero').click();
-    await expect(wall.locator('.pj-finale')).toContainText('GIRLS WINS!');
-    await expect(wall.locator('.pj-finale__chip')).toHaveCount(2);
-    await expect(wall.locator('.pj-finale')).toHaveCount(0, { timeout: 12000 });
+    await expect(wall.locator(WINNER)).toHaveAttribute('aria-label', /GIRLS WINS!/);
+    await expect(wall.locator('.pj-finale__chip')).toHaveCount(2, { timeout: 15000 });
+    await expect(wall.locator(WINNER)).toHaveCount(0, { timeout: FINALE_GONE });
     await expect(wall.locator('[data-team="leaders"]')).toBeVisible();
     await ph.locator('.sb-plus[data-team="kids"]').click();
     await expect(wall.locator('.pj-take[data-teams="kids"]')).toBeVisible();

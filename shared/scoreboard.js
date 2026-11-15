@@ -83,6 +83,8 @@ export const TAKEOVER_MS = 1500;
  * film's 20 s and a moment on its last frame (owner 2026-11-15: "20 seconds or more").
  */
 export const FINALE_MS = 21000;
+/** The lobby's score bar holds FINAL this long after an End (it has no film: the projector's FINALE_MS is the film's). */
+export const FINALE_BAR_MS = 8000;
 /** A finale older than this is never played (a screen that just loaded). */
 export const FINALE_FRESH_MS = 20000;
 /**

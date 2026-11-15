@@ -27,10 +27,10 @@ const wallNow = () => (typeof performance !== 'undefined' && performance.timeOri
   : Date.now());
 
 /**
- * @param {{ enabled: boolean }} opts
+ * @param {{ enabled: boolean, finaleMs?: number }} opts `finaleMs`: how long a finale is held (the projector's film by default; the lobby's bar is shorter)
  * @returns {{ board: ReturnType<typeof cleanBoard>, finale: null | {id: number, club: string, scores: any}, serverNow: () => number }}
  */
-export function useScoreboard({ enabled }) {
+export function useScoreboard({ enabled, finaleMs = FINALE_MS }) {
   const { signedIn } = useSync();
   const [board, setBoard] = useState(/** @type {ReturnType<typeof cleanBoard>} */ (null));
   const rev = useRef(-1);
@@ -93,9 +93,9 @@ export function useScoreboard({ enabled }) {
 
   useEffect(() => {
     if (!finale) return undefined;
-    const t = window.setTimeout(() => setFinale(null), FINALE_MS);
+    const t = window.setTimeout(() => setFinale(null), finaleMs);
     return () => window.clearTimeout(t);
-  }, [finale]);
+  }, [finale, finaleMs]);
 
   // A board from another night reads as no board (owner's night = the church's
   // Eastern date, the Worker's own rule). The Worker's clock when a timed read
