@@ -15,7 +15,7 @@
 import {
   FILE_ACCEPT, INLINE_TYPES, PICTURE_KEEP_BYTES, PICTURE_MAX_PX, hasWords, parseMessage, pictureLine,
   previewHtml, problemWords, recipientWords, sizeWords, stepRetryable, totalWords,
-  blocksToText, boldEdit, bounceWords, cleanLink, codeFromHash, laterTime, lookChoices, lookStyle, linesEdit, linkEdit, secretWords, whenWords,
+  activityWords, blocksToText, boldEdit, bounceWords, cleanLink, codeFromHash, laterTime, lookChoices, lookStyle, linesEdit, linkEdit, secretWords, whenWords,
 } from './logic.js';
 
 const SYNC_INDEX = new URL('/lobby/shared/sync.json', location.href).href;
@@ -591,7 +591,8 @@ function drawDirectors(d) {
   $('directors').replaceChildren(...d.directors.map((p) => {
     const li = document.createElement('li');
     const id = Object.assign(document.createElement('div'), { className: 'id' });
-    id.append(Object.assign(document.createElement('b'), { textContent: p.name }), Object.assign(document.createElement('span'), { textContent: `${p.clubs.map((c) => names[c] || c).join(', ')} · ${p.replyTo}` }));
+    id.append(Object.assign(document.createElement('b'), { textContent: p.name }), Object.assign(document.createElement('span'), { textContent: `${p.clubs.map((c) => names[c] || c).join(', ')} · ${p.replyTo}` }),
+      Object.assign(document.createElement('span'), { className: 'use', textContent: activityWords(p, Date.now()) }));
     const edit = Object.assign(document.createElement('button'), { type: 'button', className: 'quiet', textContent: 'Change email' });
     edit.addEventListener('click', async () => {
       const typed = window.prompt(`New email address for ${p.name}`, p.replyTo);

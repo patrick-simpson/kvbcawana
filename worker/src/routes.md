@@ -1983,7 +1983,7 @@ send (one Graph read, kept 10 minutes in memory) and answers a number, never an 
 
 | Route | Auth | Body | Answer |
 |---|---|---|---|
-| `GET /v1/mail/directors` | session + owner | | `{ready, from, clubs, directors: [{id, name, replyTo, clubs, at}]}`; 403 `not-owner`, 503 `owner-not-set` |
+| `GET /v1/mail/directors` | session + owner | | `{ready, from, clubs, directors: [{id, name, replyTo, clubs, at, lastLogin, lastSent}]}` (when each last signed in and last sent, null = never); 403 `not-owner`, 503 `owner-not-set` |
 | `POST /v1/mail/directors` | session + owner | `{name, replyTo, clubs}` | `{director}` (the code is mailed); 400 `bad-director`, 409 `exists`/`full`, 502 `graph`/`graph-auth` |
 | `PUT /v1/mail/directors/:id` | session + owner | `{name?, replyTo?, clubs?}` | `{director}`; a new address keeps the code and sign-ins; 400 `bad-director`, 409 `exists` |
 | `POST /v1/mail/directors/:id/code` | session + owner | `{}` | `{ok}`: a new code is mailed, the old code and every sign-in stop |

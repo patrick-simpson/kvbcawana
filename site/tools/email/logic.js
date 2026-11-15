@@ -75,6 +75,21 @@ export function codeFromHash(hash) {
   return m ? `${m[1]}-${m[2]}-${m[3]}`.toUpperCase() : '';
 }
 
+/**
+ * A director's use of the page, for the owner's list: when they last signed in and sent.
+ * @param {{ lastLogin?: string|null, lastSent?: string|null }} p @param {number} now
+ */
+export function activityWords(p, now) {
+  const ago = (iso) => {
+    const days = Math.floor((now - Date.parse(iso)) / 86400000);
+    if (days <= 0) return 'today';
+    if (days === 1) return 'yesterday';
+    return days < 60 ? `${days} days ago` : `on ${new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
+  };
+  if (!p.lastLogin && !p.lastSent) return 'Has not signed in yet';
+  return `${p.lastLogin ? `Signed in ${ago(p.lastLogin)}` : 'Signed in before this was kept'} · ${p.lastSent ? `last sent ${ago(p.lastSent)}` : 'has not sent yet'}`;
+}
+
 /** The mail that came back, in words ('' when none or not known). @param {number|null} n @param {string} mailbox */
 export function bounceWords(n, mailbox) {
   if (!n) return '';

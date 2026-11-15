@@ -335,7 +335,11 @@ export class ClubMail {
   }
 
   /** A director as a page may see one (never the code's hash). @param {any} d */
-  pub(d) { return { id: d.id, name: d.name, replyTo: d.replyTo, clubs: d.clubs, at: new Date(d.at).toISOString() }; }
+  pub(d) {
+    const when = (/** @type {unknown} */ t) => (Number(t) > 0 ? new Date(Number(t)).toISOString() : null);
+    // When they last signed in and last sent (owner 2026-11-14: who is using it, who never started).
+    return { id: d.id, name: d.name, replyTo: d.replyTo, clubs: d.clubs, at: new Date(d.at).toISOString(), lastLogin: when(d.lastLogin), lastSent: when(d.lastSent) };
+  }
 
   async tokens() { return (await this.storage.get(TOKENS_KEY)) || {}; }
 
@@ -489,6 +493,8 @@ export class ClubMail {
     for (const k of Object.keys(tokens)) if (t - tokens[k].at > MAIL_TOKEN_MS) delete tokens[k];
     tokens[await sha256Hex(token)] = { d: hit.id, at: t };
     await this.storage.put(TOKENS_KEY, tokens);
+    hit.lastLogin = t;   // for the owner's list; `doc` was read above with no await since that changes it
+    await this.storage.put(DIRECTORS_KEY, doc);
     return json({ ok: true, token, name: hit.name });
   }
 
@@ -834,6 +840,12 @@ export class ClubMail {
     }
     draft.sent = this.now();
     await save();
+    if (!who.office) {
+      // For the owner's list: when this director last sent.
+      const doc = await this.directors();
+      const d = doc.list.find((x) => x.id === who.id);
+      if (d) { d.lastSent = draft.sent; await this.storage.put(DIRECTORS_KEY, doc); }
+    }
     const log = await this.sendLog();
     log.unshift({ id: draft.id, at: draft.sent, who: who.id, name: who.name, club: draft.club, label: this.clubLabel(who, draft.club), subject: draft.subject, recipients: run.count, files: draft.files.length });
     // The words are kept with the log line (to start from again), and go when it does.

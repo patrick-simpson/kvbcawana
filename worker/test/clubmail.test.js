@@ -213,6 +213,26 @@ describe('club email: directors and signing in', () => {
     expect((await s.call('GET', '/v1/mail/me', undefined, other.auth)).body.replyTo).toBe('eve@example.com');
   });
 
+  it('tells the owner when each director last signed in and last sent', async () => {
+    const s = await setup();
+    const added = await s.call('POST', '/v1/mail/directors', { name: 'New Person', replyTo: 'new@example.com', clubs: ['trek'] });
+    expect(added.body.director).toMatchObject({ lastLogin: null, lastSent: null });
+    const d = await s.director();
+    s.tick(60 * 1000);
+    const id = (await s.call('POST', '/v1/mail/drafts', { club: 'sparks', subject: 'Hello', blocks: WORDS, files: [] }, d.auth)).body.id;
+    await s.call('POST', `/v1/mail/drafts/${id}/send`, { test: true }, d.auth);
+    await run(s, id, d.auth);
+    let list = (await s.call('GET', '/v1/mail/directors')).body.directors;
+    expect(list.find((x) => x.id === d.id)).toMatchObject({ lastLogin: '2026-11-13T15:00:00.000Z', lastSent: null });   // a test is not a send
+    await s.call('POST', `/v1/mail/drafts/${id}/send`, {}, d.auth);
+    await run(s, id, d.auth);
+    list = (await s.call('GET', '/v1/mail/directors')).body.directors;
+    expect(list.find((x) => x.id === d.id)).toMatchObject({ lastLogin: '2026-11-13T15:00:00.000Z', lastSent: '2026-11-13T15:01:00.000Z' });
+    expect(list.find((x) => x.name === 'New Person')).toMatchObject({ lastLogin: null, lastSent: null });
+    // The director's code is not among what is answered.
+    expect(JSON.stringify(list)).not.toMatch(/"code"/);
+  });
+
   it('locks a network after too many wrong codes; a new code ends the old sign-in', async () => {
     const s = await setup();
     const d = await s.director();

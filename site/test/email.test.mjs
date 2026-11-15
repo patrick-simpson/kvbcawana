@@ -6,7 +6,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  blocksToText, boldEdit, bounceWords, cleanLink, codeFromHash, hasWords, laterTime, secretWords, inlineHtml, linesEdit, linkEdit, parseMessage, pictureLine, lookChoices, lookStyle, previewHtml, problemWords, recipientWords, sizeWords, stepRetryable, totalWords,
+  activityWords, blocksToText, boldEdit, bounceWords, cleanLink, codeFromHash, hasWords, laterTime, secretWords, inlineHtml, linesEdit, linkEdit, parseMessage, pictureLine, lookChoices, lookStyle, previewHtml, problemWords, recipientWords, sizeWords, stepRetryable, totalWords,
 } from '../tools/email/logic.js';
 import { cleanBlocks, linked, renderMail } from '../../worker/src/clubmail.js';
 import { existsSync } from 'node:fs';
@@ -101,6 +101,14 @@ test('the emailed link signs a director in: its code is read from the fragment a
   for (const bad of ['', '#', '#code=', '#code=ABCD-EFGH', '#code=ABCD-EFGH-JKMN-PQRS', '#x=ABCD-EFGH-JKMN', '#code=ABCD EFGH JKMN', undefined]) assert.equal(codeFromHash(bad), '', String(bad));
   // The page cleans the address before it signs in, and never stores the code.
   assert.match(app, /codeFromHash\(location\.hash\)[\s\S]{0,120}history\.replaceState\(null, '', location\.pathname \+ location\.search\)/);
+});
+
+test('the owner sees who is using the page', () => {
+  const now = Date.parse('2026-11-14T18:00:00Z');
+  assert.equal(activityWords({ lastLogin: null, lastSent: null }, now), 'Has not signed in yet');
+  assert.equal(activityWords({ lastLogin: '2026-11-14T12:00:00Z', lastSent: null }, now), 'Signed in today · has not sent yet');
+  assert.equal(activityWords({ lastLogin: '2026-11-13T12:00:00Z', lastSent: '2026-11-04T12:00:00Z' }, now), 'Signed in yesterday · last sent 10 days ago');
+  assert.match(activityWords({ lastLogin: '2026-05-01T12:00:00Z', lastSent: '2026-05-01T12:00:00Z' }, now), /^Signed in on May 1, 2026 · last sent on May 1, 2026$/);
 });
 
 test('the formatting buttons edit the typed text', () => {
