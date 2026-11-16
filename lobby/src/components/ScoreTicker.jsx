@@ -39,8 +39,9 @@ import {
  * A team's number on a point (owner 2026-11-15: "when the score changes on the lobby
  * screen, I kind of want it to do a cube rotating animation to increase the next
  * number"): a cube whose front face is the old number and whose bottom face is the
- * new one turns a quarter up (rotateX 0 -> 90deg), a 0.7 s turn with a small overshoot,
- * the face turning away going dark. Its last keyframe IS the new number face on, so
+ * new one turns a quarter up (rotateX 0 -> 90deg), a 0.85 s turn with an overshoot, the
+ * face turning away going dark and the face coming up lighting (2026-11-15, "as epic as
+ * possible": a tighter perspective so it reads as a cube across the lobby, not a squash). Its last keyframe IS the new number face on, so
  * zero animation shows the new number at rest. The old number is drawn from
  * `data-n` (a pseudo-element), so the chip's text is only ever the new number.
  */
@@ -51,17 +52,24 @@ function CubeNum({ from, value }) {
         className="score-ticker__cube"
         initial={{ rotateX: 0 }}
         animate={{ rotateX: 90 }}
-        transition={{ duration: 0.7, ease: [0.3, 1.35, 0.6, 1] }}
+        transition={{ duration: 0.85, ease: [0.3, 1.5, 0.6, 1] }}
       >
         <M.span
           className="score-ticker__cube-face score-ticker__cube-face--old"
           data-n={from}
           aria-hidden="true"
           initial={{ opacity: 1 }}
-          animate={{ opacity: 0.25 }}
-          transition={{ duration: 0.45, ease: 'easeIn' }}
+          animate={{ opacity: 0 }}
+          transition={{ duration: 0.5, ease: 'easeIn' }}
         />
-        <span className="score-ticker__cube-face score-ticker__cube-face--new">{value}</span>
+        <M.span
+          className="score-ticker__cube-face score-ticker__cube-face--new"
+          initial={{ opacity: 0.3 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.5, ease: 'easeOut' }}
+        >
+          {value}
+        </M.span>
       </M.span>
     </span>
   );

@@ -2996,7 +2996,7 @@ input:focus-visible {
   --cube-h: 0.95em;
   position: relative;
   height: var(--cube-h);
-  perspective: 3.5em;
+  perspective: 1.8em;
 }
 .score-ticker__cube {
   position: relative;
@@ -3040,7 +3040,7 @@ input:focus-visible {
   background: #fff;
   color: var(--team-deep);
   font-family: var(--font-shout);
-  font-size: calc(2.4 * var(--u));
+  font-size: calc(3.6 * var(--u));
   line-height: 1;
   box-shadow: calc(0.22 * var(--u)) calc(0.22 * var(--u)) 0 var(--team-deep);
   white-space: nowrap;
