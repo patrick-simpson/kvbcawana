@@ -22,7 +22,10 @@ one to three hours:
 
 then each film is encoded and committed to `lobby/public/finale/<film>.mp4`:
 
-    ffmpeg -framerate 60 -i <frames folder>/%04d.png -c:v libx264 -preset slow -crf 22 -pix_fmt yuv420p -movflags +faststart -an trophy.mp4
+    ffmpeg -framerate 60 -i <frames folder>/%04d.png -c:v libx264 -preset veryslow -crf 24 -pix_fmt yuv420p -movflags +faststart -an trophy.mp4
+
+(veryslow at CRF 24 keeps each film under the 12 MB the site test allows, `site/test/largeFiles.test.mjs`:
+the films stream to the projector over the church Wi-Fi.)
 
 **The inks.** A film is rendered in three pure colours on black, and the projector paints
 them (`lobby/src/presentation/components/FinaleFilm.jsx`, an SVG colour matrix): red becomes
