@@ -124,7 +124,11 @@ export function playStinger(intensity = 0.5) {
  * surprise anyone), silent on the lobby's mirror.
  * The scoreboard's own phone switch (`force`, owner 2026-11-05) turns them on
  * too; nothing ever sounds on the mirror.
- * @param {{freq: number, at: number, len: number, type?: OscillatorType}[]} notes  at/len in seconds
+ * A note of type 'noise' is filtered white noise (a drum, a cymbal, a whoosh): `freq` is
+ * the band's centre, `q` its narrowness (default 1), and `to` (Hz) sweeps the centre there
+ * over the note. `vol` scales one note against `gainMax` (default 1); `swell` ramps a note
+ * UP to its peak at its end (a roll, a swell) instead of striking and dying away.
+ * @param {{freq: number, at: number, len: number, type?: OscillatorType|'noise', vol?: number, q?: number, to?: number, swell?: boolean}[]} notes  at/len in seconds
  * @param {number} [gainMax]
  * @param {{force?: boolean}} [opts]
  */
@@ -135,19 +139,49 @@ export function playTones(notes, gainMax = 0.14, opts = {}) {
   try {
     const t0 = ac.currentTime;
     for (const n of notes) {
-      const osc = ac.createOscillator();
       const gain = ac.createGain();
-      osc.type = n.type || 'triangle';
-      osc.frequency.value = n.freq;
       const start = t0 + n.at;
-      gain.gain.setValueAtTime(0, start);
-      gain.gain.linearRampToValueAtTime(gainMax, start + 0.015);
-      gain.gain.exponentialRampToValueAtTime(0.001, start + n.len);
-      osc.connect(gain).connect(ac.destination);
-      osc.start(start);
-      osc.stop(start + n.len + 0.05);
+      const peak = gainMax * (n.vol ?? 1);
+      gain.gain.setValueAtTime(n.swell ? 0.0001 : 0, start);
+      if (n.swell) {
+        gain.gain.exponentialRampToValueAtTime(peak, start + n.len);
+        gain.gain.linearRampToValueAtTime(0, start + n.len + 0.03);
+      } else {
+        gain.gain.linearRampToValueAtTime(peak, start + 0.012);
+        gain.gain.exponentialRampToValueAtTime(0.001, start + n.len);
+      }
+      let src;
+      if (n.type === 'noise') {
+        src = ac.createBufferSource();
+        src.buffer = noiseBuffer(ac);
+        src.loop = true;
+        const band = ac.createBiquadFilter();
+        band.type = 'bandpass';
+        band.frequency.setValueAtTime(n.freq, start);
+        if (n.to) band.frequency.exponentialRampToValueAtTime(n.to, start + n.len);
+        band.Q.value = n.q ?? 1;
+        src.connect(band).connect(gain).connect(ac.destination);
+      } else {
+        src = ac.createOscillator();
+        src.type = n.type || 'triangle';
+        src.frequency.setValueAtTime(n.freq, start);
+        if (n.to) src.frequency.exponentialRampToValueAtTime(n.to, start + n.len);
+        src.connect(gain).connect(ac.destination);
+      }
+      src.start(start);
+      src.stop(start + n.len + 0.05);
     }
   } catch {
     /* audio unavailable */
   }
+}
+
+/** Two seconds of white noise, made once per audio context. */
+let noise = null;
+function noiseBuffer(ac) {
+  if (noise && noise.sampleRate === ac.sampleRate) return noise;
+  noise = ac.createBuffer(1, ac.sampleRate * 2, ac.sampleRate);
+  const d = noise.getChannelData(0);
+  for (let i = 0; i < d.length; i += 1) d[i] = Math.random() * 2 - 1;
+  return noise;
 }

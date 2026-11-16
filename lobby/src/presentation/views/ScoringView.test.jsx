@@ -74,9 +74,9 @@ describe('ScoringView', () => {
     expect(take.dataset.teams).toBe('red');
     expect(take.textContent).toMatch(/RED \+1!/);
     expect(take.textContent).toMatch(/10 POINTS/);
-    // The board arriving sweeps once (gameOnSound), then the point: its chime over a low thump.
+    // The board arriving sweeps once (gameOnSound), then the point: its chime over a low thump, and a bright top note.
     expect(playTones).toHaveBeenCalledTimes(2);
-    expect(playTones.mock.calls.at(-1)[0]).toHaveLength(3);
+    expect(playTones.mock.calls.at(-1)[0]).toHaveLength(4);
   });
 
   it('a point that puts a team in front alone calls it: TAKES THE LEAD! (owner 2026-11-06)', () => {
@@ -85,8 +85,8 @@ describe('ScoringView', () => {
     const take = container.querySelector('.pj-take');
     expect(take.dataset.lead).toBe('red');
     expect(take.querySelector('.pj-take__lead').textContent).toMatch(/takes the lead/i);
-    // The lead: the thump and chime, then a rising sting of three more steps.
-    expect(playTones.mock.calls.at(-1)[0]).toHaveLength(6);
+    // The lead: the thump, chime and top note, then a rising sting of three more steps over a cymbal swell and crash (two voices).
+    expect(playTones.mock.calls.at(-1)[0]).toHaveLength(10);
   });
 
   it('no lead call for the first point of a game or a team adding to its own lead', () => {
@@ -96,8 +96,8 @@ describe('ScoringView', () => {
     act(() => { vi.advanceTimersByTime(3000); });
     rerender(view(scores(0, 2, 0, 0)));
     expect(container.querySelector('.pj-take__lead')).toBeNull();
-    // Its second point in a row: the thump, the chime, one streak step (owner 2026-11-15).
-    expect(playTones.mock.calls.at(-1)[0]).toHaveLength(4);
+    // Its second point in a row: the thump, the chime, the top note, one streak step (owner 2026-11-15).
+    expect(playTones.mock.calls.at(-1)[0]).toHaveLength(5);
   });
 
   it('the phone\'s sound switch makes the chime play even with the projector\'s own switch off', () => {
