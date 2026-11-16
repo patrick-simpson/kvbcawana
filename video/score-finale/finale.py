@@ -37,9 +37,10 @@ OUT = argv[1] if len(argv) > 1 else os.path.join(os.path.dirname(os.path.abspath
 # The frames: first and last, or a list for a few to look at ("30,150,300").
 ONLY = [int(x) for x in argv[2].split(',')] if len(argv) > 2 and ',' in argv[2] else None
 FIRST = ONLY[0] if ONLY else int(argv[2]) if len(argv) > 2 else 1
-LAST = ONLY[-1] if ONLY else int(argv[3]) if len(argv) > 3 else 600
+LAST = ONLY[-1] if ONLY else int(argv[3]) if len(argv) > 3 else 1200
 WIDTH = int(argv[4]) if len(argv) > 4 else 1920
-FPS, SECONDS = 30, 20
+# Owner 2026-11-15: "60fps professional grade movie studio quality", however long it takes.
+FPS, SECONDS = 60, 20
 R, G, B = (1, 0, 0), (0, 1, 0), (0, 0, 1)
 rng = np.random.default_rng(7)
 TAU = math.tau
@@ -83,10 +84,52 @@ def reset():
     s.world = w
     try:
         s.eevee.use_raytracing = True
-        s.eevee.taa_render_samples = 24
+        s.eevee.taa_render_samples = 128
     except AttributeError:
         pass
+    # Studio pass: real motion blur (the frame handler places every piece at each blur
+    # step's sub-frame, so sparks streak and confetti smears as a camera would see it) and
+    # a glow round everything bright (the compositor's glare).
+    s.render.use_motion_blur = True
+    s.render.motion_blur_shutter = 0.5
+    for attr, val in (('motion_blur_steps', 4),):
+        try:
+            setattr(s.eevee, attr, val)
+        except AttributeError:
+            pass
+    glow(s)
     return s
+
+
+def glow(s):
+    """Bloom in the compositor: a soft fog glow round the bright inks, channel by channel,
+    so a red spark glows red (the projector's ink matrix still reads it)."""
+    try:
+        tree = bpy.data.node_groups.new('glow', 'CompositorNodeTree')
+        s.compositing_node_group = tree
+        tree.interface.new_socket('Image', in_out='OUTPUT', socket_type='NodeSocketColor')
+        rl = tree.nodes.new('CompositorNodeRLayers')
+        out = tree.nodes.new('NodeGroupOutput')
+        g = tree.nodes.new('CompositorNodeGlare')
+        for name, val in (('Type', 'Fog Glow'), ('Quality', 'High'), ('Threshold', 0.75), ('Strength', 0.9), ('Size', 0.55)):
+            sock = g.inputs.get(name)
+            if sock is not None:
+                try:
+                    sock.default_value = val
+                except Exception as e:
+                    print('glare', name, e)
+        tree.links.new(rl.outputs['Image'], g.inputs['Image'])
+        tree.links.new(g.outputs['Image'], out.inputs[0])
+        print('glow: compositor node group')
+    except Exception as e:
+        print('glow: falling back', e)
+        s.use_nodes = True
+        tree = s.node_tree
+        rl, comp = tree.nodes['Render Layers'], tree.nodes['Composite']
+        g = tree.nodes.new('CompositorNodeGlare')
+        g.glare_type = 'FOG_GLOW'; g.quality = 'HIGH'; g.threshold = 0.75; g.size = 7
+        tree.links.new(rl.outputs['Image'], g.inputs['Image'])
+        tree.links.new(g.outputs['Image'], comp.inputs['Image'])
 
 
 def link(o):
@@ -106,19 +149,41 @@ def mat(name, color, metallic=0.0, rough=0.4, emit=0.0):
     return m
 
 
-def emit_mat(name, color, strength):
-    """Pure light of one ink (no shading): confetti, sparks, lamps."""
+def emit_mat(name, color, strength, soft=False):
+    """Pure light of one ink (no shading): confetti, sparks, lamps. soft: a round glowing
+    point, hot in the middle and fading to nothing at its edge (sparks, crowd lights,
+    glints) in place of a flat square; it needs a Quads mesh, whose pieces carry 0-1 UVs."""
     m = bpy.data.materials.new(name); m.use_nodes = True
     nt = m.node_tree; nt.nodes.clear()
     e = nt.nodes.new('ShaderNodeEmission'); o = nt.nodes.new('ShaderNodeOutputMaterial')
     e.inputs[0].default_value = (*color, 1); e.inputs[1].default_value = strength
-    nt.links.new(e.outputs[0], o.inputs[0])
+    if not soft:
+        nt.links.new(e.outputs[0], o.inputs[0])
+        return m
+    uv = nt.nodes.new('ShaderNodeUVMap')
+    off = nt.nodes.new('ShaderNodeVectorMath'); off.operation = 'SUBTRACT'; off.inputs[1].default_value = (0.5, 0.5, 0)
+    ln = nt.nodes.new('ShaderNodeVectorMath'); ln.operation = 'LENGTH'
+    fall = nt.nodes.new('ShaderNodeMapRange'); fall.inputs['From Min'].default_value = 0.5; fall.inputs['From Max'].default_value = 0.0
+    sq = nt.nodes.new('ShaderNodeMath'); sq.operation = 'POWER'; sq.inputs[1].default_value = 2.2
+    mul = nt.nodes.new('ShaderNodeMath'); mul.operation = 'MULTIPLY'; mul.inputs[1].default_value = strength * SOFT_GAIN; mul.label = 'level'
+    tr = nt.nodes.new('ShaderNodeBsdfTransparent'); add = nt.nodes.new('ShaderNodeAddShader')
+    nt.links.new(uv.outputs['UV'], off.inputs[0]); nt.links.new(off.outputs['Vector'], ln.inputs[0])
+    nt.links.new(ln.outputs['Value'], fall.inputs['Value']); nt.links.new(fall.outputs['Result'], sq.inputs[0])
+    nt.links.new(sq.outputs[0], mul.inputs[0]); nt.links.new(mul.outputs[0], e.inputs[1])
+    nt.links.new(e.outputs[0], add.inputs[0]); nt.links.new(tr.outputs[0], add.inputs[1]); nt.links.new(add.outputs[0], o.inputs[0])
+    try: m.surface_render_method = 'BLENDED'
+    except AttributeError: m.blend_method = 'BLEND'
     return m
 
 
+SOFT_GAIN = 1.6   # a soft point's middle is brighter, so it gives about the light the square did
+
+
 def set_strength(m, strength):
+    soft = any(n.type == 'MATH' and n.label == 'level' for n in m.node_tree.nodes)
     for n in m.node_tree.nodes:
-        if n.type == 'EMISSION': n.inputs[1].default_value = strength
+        if soft and n.type == 'MATH' and n.label == 'level': n.inputs[1].default_value = strength * SOFT_GAIN
+        elif not soft and n.type == 'EMISSION': n.inputs[1].default_value = strength
 
 
 def beam_mat(name, color, strength):
@@ -197,6 +262,8 @@ class Quads:
         me = bpy.data.meshes.new(name)
         me.from_pydata(np.zeros((n * 4, 3)).tolist(), [], [(4 * i, 4 * i + 1, 4 * i + 2, 4 * i + 3) for i in range(n)])
         for m in materials: me.materials.append(m)
+        uvl = me.uv_layers.new(name='UVMap')
+        uvl.data.foreach_set('uv', np.tile(np.array([0, 0, 1, 0, 1, 1, 0, 1], dtype=np.float32), n))
         self.me = me
         self.o = link(bpy.data.objects.new(name, me))
 
@@ -269,7 +336,7 @@ def trophy():
     handles = [prim('torus', chrome, rot=(math.pi / 2, 0, 0), scale=(1, 1.35, 1), major_radius=0.42, minor_radius=0.065, major_segments=64, minor_segments=20) for _ in range(2)]
     for h, side in zip(handles, (-1, 1)):
         h.parent = cup; h.location = (side * 0.98, 0, 2.0)
-    glint_m = emit_mat('glint', G, 22)
+    glint_m = emit_mat('glint', G, 22, soft=True)
     glints = Quads('glints', 6, [glint_m])
     lathe('plinth', [(0.00, 0.00), (1.10, 0.00), (1.10, 0.14), (0.92, 0.20), (0.92, 0.70), (0.80, 0.78), (0.80, 0.86), (0.0, 0.86)], mat('deep', B, metallic=1.0, rough=0.35))
     band = emit_mat('band', G, 2.5)
@@ -301,7 +368,8 @@ def trophy():
     c_ang = rng.uniform(math.radians(55), math.radians(86), NC); c_az = rng.normal(0, 0.3, NC); c_v = rng.uniform(8.5, 15.0, NC)
     c_vel = np.stack([-c_side * np.cos(c_ang) * c_v * np.cos(c_az), np.sin(c_az) * c_v * 0.5 - 0.6, np.sin(c_ang) * c_v], 1)
     c_org = np.stack([c_side * 4.4, np.full(NC, -1.6), np.full(NC, 0.2)], 1)
-    c_delay = rng.uniform(0, 0.35, NC) + (rng.random(NC) < 0.4) * 2.6   # a second volley
+    c_roll = rng.random(NC)
+    c_delay = rng.uniform(0, 0.35, NC) + (c_roll < 0.3) * 2.6 + (c_roll > 0.68) * 8.8   # a second volley, and a third at 14 s to fill the hold
     c_spin, f_spin = tumble(NC), tumble(NF)
     f_x, f_y = rng.uniform(-9, 9, NF), rng.uniform(-3.5, 3.0, NF)
     f_speed, f_phase, f_sway = rng.uniform(0.9, 1.7, NF), rng.uniform(0, 9.5, NF), rng.uniform(0.2, 0.7, NF)
@@ -367,10 +435,14 @@ def trophy():
 # 2.5  the first rockets; a wave of the winner's colour starts round the stands
 # 8.0  the whole crowd is the winner's colour, pulsing; the bursts come faster
 # 14.0 the barrage; the camera has been rising all the while
+# Owner 2026-11-15 ("are they as epic as possible?"): the bursts were small and dim, the
+# frame read as mostly black, so every burst is half as wide again, denser, bigger sparks
+# twice as bright and longer lived, with more of them over the last six seconds.
+BURST_GROW, SPARKS_GROW = 1.45, 1.7
 def stadium():
     prim('plane', mat('pitch', (0.45, 0.0, 0.04), metallic=1.0, rough=0.24), size=260, smooth=False)
     cam = camera(lens=21)
-    crowd_m = [emit_mat('crowd team', R, 3.4), emit_mat('crowd white', G, 1.3), emit_mat('crowd deep', B, 1.5), emit_mat('crowd off', (0, 0, 0), 0)]
+    crowd_m = [emit_mat('crowd team', R, 3.4, soft=True), emit_mat('crowd white', G, 1.3, soft=True), emit_mat('crowd deep', B, 1.5, soft=True), emit_mat('crowd off', (0, 0, 0), 0)]
     pts, ang, tier_of = [], [], []
     for tier in range(12):
         rx, ry, z = 15 + tier * 1.25, 10 + tier * 1.25, 0.9 + tier * 0.62
@@ -382,7 +454,7 @@ def stadium():
     pts, ang, tier_of = np.concatenate(pts), np.concatenate(ang), np.concatenate(tier_of)
     NCROWD = len(pts)
     crowd = Quads('crowd', NCROWD, crowd_m)
-    c_size, c_phase, c_kind = rng.uniform(0.06, 0.1, NCROWD), rng.uniform(0, TAU, NCROWD), rng.random(NCROWD)
+    c_size, c_phase, c_kind = rng.uniform(0.08, 0.13, NCROWD), rng.uniform(0, TAU, NCROWD), rng.random(NCROWD)
     towers = []
     for i, (x, y) in enumerate(((-17, 9), (17, 9), (-21, -2), (21, -2))):
         prim('cylinder', mat(f'mast{i}', (0.02, 0.02, 0.02)), loc=(x, y, 6.5), scale=(0.12, 0.12, 6.5), vertices=12)
@@ -402,14 +474,18 @@ def stadium():
             (13.3, (13, 10, 15), 4.8, 2, 150), (14.4, (0, 8, 16.5), 8.2, 0, 260), (15.1, (-6.5, 13, 21.5), 4.4, 1, 130),
             (15.5, (7, 13, 22), 4.4, 0, 130), (16.3, (-17, 12, 11.5), 3.8, 0, 110), (16.6, (17, 12, 12), 3.8, 0, 110),
             (17.3, (-9.5, 10, 16), 6.0, 2, 190), (17.7, (9.5, 10, 16.5), 6.0, 0, 190), (18.5, (0, 9, 18.5), 9.0, 0, 300),
-            (18.9, (-4, 14, 24), 4.0, 1, 120), (19.2, (4.5, 14, 24.5), 4.0, 1, 120)]
-    TRAIL, LIFE = 7, 2.1
-    spark_m = [emit_mat('spark team', R, 13), emit_mat('spark white', G, 13), emit_mat('spark deep', B, 13)]
+            (18.9, (-4, 14, 24), 4.0, 1, 120), (19.2, (4.5, 14, 24.5), 4.0, 1, 120),
+            # the second wave: a ring of bursts round the headline's hold, and a closing salvo
+            (11.4, (-14, 12, 19), 4.6, 0, 140), (11.6, (14, 12, 19.5), 4.6, 0, 140), (15.8, (0, 10, 13), 6.5, 2, 200),
+            (16.9, (-11, 13, 23), 5.0, 0, 160), (17.0, (11, 13, 23.5), 5.0, 0, 160), (19.5, (0, 11, 21), 10.0, 0, 340)]
+    show = [(t0, c, rad * BURST_GROW, ink, int(n * SPARKS_GROW)) for (t0, c, rad, ink, n) in show]
+    TRAIL, LIFE = 14, 2.7
+    spark_m = [emit_mat('spark team', R, 26, soft=True), emit_mat('spark white', G, 26, soft=True), emit_mat('spark deep', B, 26, soft=True)]
     bursts = []
     for (t0, c, rad, ink, n) in show:
         d = rng.normal(0, 1, (n, 3)); d /= np.linalg.norm(d, axis=1, keepdims=True)
         bursts.append(dict(t0=t0, c=np.array(c, dtype=np.float32), d=d.astype(np.float32), speed=(rad * 3.5 * rng.uniform(0.8, 1.0, n)).astype(np.float32),
-                           size=rng.uniform(0.1, 0.17, n).astype(np.float32), ink=ink, n=n, die=rng.uniform(0.7, 1.0, n).astype(np.float32),
+                           size=rng.uniform(0.17, 0.3, n).astype(np.float32), ink=ink, n=n, die=rng.uniform(0.7, 1.0, n).astype(np.float32),
                            q=Quads(f'burst{len(bursts)}', n * TRAIL, spark_m), rocket=Quads(f'rocket{len(bursts)}', 10, spark_m)))
 
     def animate(t):
@@ -448,14 +524,14 @@ def stadium():
                 continue
             cs, ss = [], []
             for j in range(TRAIL):               # each spark drags a short tail behind it
-                tj = max(0.0, tb - j * 0.045)
+                tj = max(0.0, tb - j * 0.0225)
                 drag = (1 - math.exp(-2.4 * tj)) / 2.4
                 p = b['c'][None, :] + b['d'] * (b['speed'] * drag)[:, None] + np.array([0, 0, -1.0], dtype=np.float32) * (1.9 * tj * tj * 0.5)
                 fade = np.clip(1 - tb / (LIFE * b['die']), 0, 1) ** 0.6
                 flick = 0.75 + 0.25 * np.sin(t * 40 + np.arange(b['n']))
                 cs.append(p); ss.append(b['size'] * fade * flick * (1 - j / (TRAIL + 1.5)))
             b['q'].face(np.concatenate(cs), np.concatenate(ss), cam, np.full(b['n'] * TRAIL, b['ink']))
-            if tb < 0.5: lit.append((b['c'], (1 - tb / 0.5) ** 2 * 5200 * np.sqrt(b['n'] / 100)))
+            if tb < 0.5: lit.append((b['c'], (1 - tb / 0.5) ** 2 * 8000 * np.sqrt(b['n'] / 100)))
         lit.sort(key=lambda x: -x[1])
         for i, fl in enumerate(flashes):
             if i < len(lit): fl.location = lit[i][0].tolist(); fl.data.energy = float(lit[i][1])
@@ -488,7 +564,7 @@ def takeover():
     bpy.context.scene.eevee.use_raytracing = False
     cam = camera(lens=36)
     NS = 500
-    sparks = Quads('sparks', NS, [emit_mat('sp', G, 3.0), emit_mat('spR', R, 3.0)])
+    sparks = Quads('sparks', NS, [emit_mat('sp', G, 3.0, soft=True), emit_mat('spR', R, 3.0, soft=True)])
     s_a, s_r, s_speed, s_phase = rng.uniform(0, TAU, NS), rng.uniform(0.2, 1.0, NS), rng.uniform(0.5, 1.6, NS), rng.uniform(0, 8, NS)
     s_ink = (rng.random(NS) < 0.45).astype(np.int32)
     s_spin = tumble(NS)
@@ -520,7 +596,7 @@ def takeover():
         rr = np.where(t < 9.2, np.maximum(wave_r, 0) * (0.92 + 0.5 * (ts % 1.0)), REACH * s_r)
         up = np.where(t < 9.2, 0.0, ((ts * 1.3) % 10) - 5)
         sp = np.stack([np.cos(s_a) * rr / 0.82, -0.8 - 1.8 * (ts % 1.0), np.sin(s_a) * rr / 1.25 + up], 1)
-        u, v = s_spin(t, 0.055)
+        u, v = s_spin(t, 0.1)
         hide = np.full((NS, 1), not live)
         sparks.place(np.where(hide, 0, sp).astype(np.float32), np.where(hide, 0, u), np.where(hide, 0, v), s_ink)
     return animate
@@ -554,27 +630,7 @@ def battery_wait():
     log('battery back to 80%: carrying on')
 
 
-try:
-    os.makedirs(OUT, exist_ok=True)
-    scene = reset()
-    animate = {'trophy': trophy, 'stadium': stadium, 'takeover': takeover}[SCENE]()
-    log(f'{SCENE}: frames {FIRST} to {LAST} at {WIDTH} wide')
-    done, started = 0, time.time()
-    for f in (ONLY or range(FIRST, LAST + 1)):
-        path = os.path.join(OUT, f'{f:04d}.png')
-        if os.path.exists(path): continue
-        battery_wait()
-        scene.frame_set(f)
-        animate((f - 1) / FPS)
-        bpy.context.view_layer.update()
-        scene.render.filepath = path
-        bpy.ops.render.render(write_still=True)
-        done += 1
-        if done % 10 == 0:
-            each = (time.time() - started) / done
-            log(f'{SCENE}: frame {f} of {LAST} ({each:.1f} s a frame, battery {battery()[0]}%)')
-    log(f'{SCENE}: DONE ({done} frames rendered now)')
-except Exception:
+def failed():
     print('FAILED', flush=True)
     traceback.print_exc()
     try:
@@ -582,5 +638,76 @@ except Exception:
     except OSError:
         pass
     sys.stdout.flush(); sys.stderr.flush()
-finally:
+
+
+def show_frames():
+    """The window's big area shows each frame as it is finished (the owner watches)."""
+    try:
+        for win in bpy.context.window_manager.windows:
+            areas = sorted(win.screen.areas, key=lambda a: -a.width * a.height)
+            if not areas: continue
+            big = areas[0]
+            big.type = 'IMAGE_EDITOR'
+            img = bpy.data.images.get('Render Result')
+            if img: big.spaces.active.image = img
+    except Exception:
+        pass
+
+
+def quit_now():
     bpy.ops.wm.quit_blender()   # always close the window this opened
+
+
+try:
+    os.makedirs(OUT, exist_ok=True)
+    scene = reset()
+    animate = {'trophy': trophy, 'stadium': stadium, 'takeover': takeover}[SCENE]()
+
+    def on_frame(sc, *_):
+        animate((sc.frame_current + sc.frame_subframe - 1) / FPS)
+    bpy.app.handlers.frame_change_pre.append(on_frame)
+    log(f'{SCENE}: frames {FIRST} to {LAST} at {WIDTH} wide, {FPS} a second')
+    queue = [f for f in (ONLY or range(FIRST, LAST + 1)) if not os.path.exists(os.path.join(OUT, f'{f:04d}.png'))]
+    state = {'done': 0, 'started': time.time()}
+
+    def claim(f):
+        """Several Blenders may render one film at once (the GPU idles while one places its
+        pieces): each takes a frame by making its claim file first; a claim older than 15
+        minutes is a stopped worker's, and is taken over."""
+        png, mark = os.path.join(OUT, f'{f:04d}.png'), os.path.join(OUT, f'{f:04d}.claim')
+        if os.path.exists(png): return False
+        try:
+            os.close(os.open(mark, os.O_CREAT | os.O_EXCL | os.O_WRONLY)); return True
+        except FileExistsError:
+            try:
+                if time.time() - os.path.getmtime(mark) > 900:
+                    os.utime(mark, None); return True
+            except OSError:
+                pass
+            return False
+
+    def step():
+        try:
+            while queue and not claim(queue[0]): queue.pop(0)
+            if not queue:
+                log(f'{SCENE}: DONE ({state["done"]} frames rendered now by this worker)')
+                quit_now(); return None
+            f = queue.pop(0)
+            battery_wait()
+            scene.frame_set(f)
+            scene.render.filepath = os.path.join(OUT, f'{f:04d}.png')
+            bpy.ops.render.render(write_still=True)
+            try: os.remove(os.path.join(OUT, f'{f:04d}.claim'))
+            except OSError: pass
+            state['done'] += 1
+            if state['done'] == 1: show_frames()
+            if state['done'] % 10 == 0:
+                each = (time.time() - state['started']) / state['done']
+                log(f'{SCENE}: frame {f} of {LAST} ({each:.1f} s a frame, battery {battery()[0]}%)')
+            return 0.05
+        except Exception:
+            failed(); quit_now(); return None
+    bpy.app.timers.register(step, first_interval=1.0)
+except Exception:
+    failed()
+    quit_now()
