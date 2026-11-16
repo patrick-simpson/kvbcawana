@@ -25,7 +25,8 @@ const CONFETTI_PIECES = Array.from({ length: 100 }, (_, i) => {
 // The flight is plain CSS (index.css "The confetti burst": .pj-confetti-piece
 // and its confettiExplode keyframes), never an inline animation style: the
 // build keeps only keyframes a stylesheet rule names.
-export const ConfettiBurst = ({ onComplete }) => {
+// `colors` paints it in other colours (the winner's, white); `scale` makes the pieces bigger (a big wall, far away).
+export const ConfettiBurst = ({ onComplete, colors = null, scale = 1 }) => {
   const lowPower = useLowPower();
   useEffect(() => {
     const timer = setTimeout(() => onComplete?.(), 3500);
@@ -42,10 +43,10 @@ export const ConfettiBurst = ({ onComplete }) => {
           key={piece.id}
           className="pj-confetti-piece"
           style={{
-            width: piece.width,
-            height: piece.height,
+            width: piece.width * scale,
+            height: piece.height * scale,
             borderRadius: piece.borderRadius,
-            backgroundColor: piece.color,
+            backgroundColor: colors ? colors[piece.id % colors.length] : piece.color,
             ['--cx']: `${piece.cx}vw`,
             ['--cy']: `${piece.cy}vh`,
             ['--cr']: `${piece.rotation}deg`,

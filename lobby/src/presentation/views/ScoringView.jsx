@@ -4,7 +4,8 @@ import { CLUBS } from '../config.js';
 import { THEME, artUrl } from '../lib/shared-config.js';
 import { StepChip } from '../components/StepChip.jsx';
 import { ScoreClock } from '../components/ScoreClock.jsx';
-import { LEAD_HOLD_MS, ScoreTakeover } from '../components/ScoreTakeover.jsx';
+import { LEAD_HOLD_MS, ScoreTakeover, Sparkles } from '../components/ScoreTakeover.jsx';
+import { ConfettiBurst } from '../components/ConfettiBurst.jsx';
 import { useLowPower } from '../hooks/useLowPower.js';
 import { useBirthdays } from '../hooks/useBirthdays.js';
 import { birthdaysThisWeek, listNames } from '../lib/birthdays.js';
@@ -13,7 +14,7 @@ import { WARNING_LABELS, WARNING_STINGER_INTENSITY, warningFor } from '../lib/ga
 import { WARNING_TONES } from '../lib/kit.js';
 import { DUR, EASE } from '../lib/motion-tokens.js';
 import { playStinger } from '../lib/stingers.js';
-import { gameOnSound, pointSound } from '../lib/scoreSounds.js';
+import { gameOnSound, pointSound, streakCall, whooshSound } from '../lib/scoreSounds.js';
 import { BirthdayChip, countForClub, formatLeft } from './GameTimeView.jsx';
 import {
   COMBINE_MS,
@@ -31,8 +32,8 @@ import {
 
 /** How long GAME ON! holds before the plates; how long TIME! holds; how much longer a 3+ streak's takeover stays. */
 export const INTRO_MS = 1500;
-export const TIME_UP_MS = 1800;
-export const STREAK_HOLD_MS = 350;
+export const TIME_UP_MS = 2600;
+export const STREAK_HOLD_MS = 600;
 /**
  * The game time scoreboard on the wall (owner 2026-11-05; approved mockup):
  * the four teams as big plates in the phone's own 2 x 2 (blue top-left, red
@@ -119,6 +120,7 @@ export const ScoringView = ({ now, club, scores, teams = SCORE_TEAMS, clock, ser
     gained.forEach((g, i) => {
       pointSound(SCORE_TEAM_CHIMES[g.team], { at: i * 0.05, lead: g.team === lead, streak: gained.length === 1 ? run : 1, force: sounds });
     });
+    if (gained.length === 1) streakCall(run, sounds);
     const t = performance.now();
     setTakeover((cur) => {
       if (cur && t - cur.startedAt < COMBINE_MS) {
@@ -167,8 +169,9 @@ export const ScoringView = ({ now, club, scores, teams = SCORE_TEAMS, clock, ser
   const [timeFlash, setTimeFlash] = useState(/** @type {number|null} */ (null));
   useEffect(() => {
     if (timeFlash === null) return undefined;
-    const t = window.setTimeout(() => setTimeFlash(null), TIME_UP_MS);
+    const t = window.setTimeout(() => { whooshSound(sounds); setTimeFlash(null); }, TIME_UP_MS);
     return () => window.clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [timeFlash]);
 
   // The strip's game clock drops in from the middle of the wall.
@@ -213,7 +216,7 @@ export const ScoringView = ({ now, club, scores, teams = SCORE_TEAMS, clock, ser
               animate={{ opacity: 1, scale: 1, transition: { duration: DUR.pop, ease: EASE.pop } }}
               exit={{ opacity: 0, scale: 0.85, transition: { duration: DUR.exit, ease: EASE.exit } }}
             >
-              <ScoreClock clock={clock} serverNow={serverNow} accent={info.color} size="calc(19 * var(--u))" sounds={sounds} onDone={lowPower ? undefined : () => setTimeFlash(clock.id)} />
+              <ScoreClock clock={clock} serverNow={serverNow} accent={info.color} size="calc(19 * var(--u))" sounds={sounds} still={lowPower} onDone={lowPower ? undefined : () => setTimeFlash(clock.id)} />
             </motion.div>
           )}
         </AnimatePresence>
@@ -228,7 +231,7 @@ export const ScoringView = ({ now, club, scores, teams = SCORE_TEAMS, clock, ser
                 key="game-clock"
                 className="inline-block pj-score__gameclock"
                 initial={dropFrom}
-                animate={waiting && dropFrom ? dropFrom : { y: 0, scale: 1, opacity: 1, transition: { duration: 0.9, ease: EASE.settle, delay: 0.3 } }}
+                animate={waiting && dropFrom ? dropFrom : { y: 0, scale: 1, opacity: 1, transition: { duration: 0.9, ease: EASE.settle, delay: 0.7 } }}
                 exit={{ opacity: 0, scale: 0.8, transition: { duration: DUR.exit, ease: EASE.exit } }}
                 data-warning={warning !== 'none' ? warning : undefined}
               >
@@ -267,14 +270,29 @@ export const ScoringView = ({ now, club, scores, teams = SCORE_TEAMS, clock, ser
               exit={{ clipPath: 'inset(0 0 0 100%)', transition: { duration: 0.32, ease: EASE.wipe } }}
               aria-hidden="true"
             >
-              <motion.span className="pj-gameon__club" initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0, transition: { delay: 0.18, duration: 0.3 } }}>{info.name}</motion.span>
-              <motion.span
-                className="pj-gameon__word"
-                initial={{ scale: 2.8, opacity: 0 }}
-                animate={{ scale: [2.8, 0.9, 1.05, 1], opacity: [0, 1, 1, 1], transition: { delay: 0.22, duration: 0.6, times: [0, 0.45, 0.72, 1] } }}
+              {/* As epic as possible (owner 2026-11-15): turning rays behind, the word slams with a
+                  flash, the wall jolts, sparkles pop round it. */}
+              <motion.div
+                className="pj-take__rays pj-gameon__rays"
+                data-strong="1"
+                initial={{ scale: 0, opacity: 0 }}
+                animate={{ scale: [0, 1.25, 1.1], opacity: [0, 1, 0.75], rotate: [0, 50], transition: { duration: 1.5, delay: 0.3, ease: 'easeOut' } }}
+              />
+              <motion.div
+                className="pj-gameon__inner"
+                animate={{ x: ['0vw', '0vw', '-1.6vw', '1.3vw', '-0.9vw', '0.5vw', '0vw'], y: ['0vw', '0vw', '0.8vw', '-0.6vw', '0.4vw', '-0.2vw', '0vw'], transition: { duration: 0.75, times: [0, 0.38, 0.5, 0.62, 0.74, 0.86, 1] } }}
               >
-                Game on!
-              </motion.span>
+                <motion.span className="pj-gameon__club" initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0, transition: { delay: 0.18, duration: 0.3 } }}>{info.name}</motion.span>
+                <motion.span
+                  className="pj-gameon__word"
+                  initial={{ scale: 2.8, opacity: 0 }}
+                  animate={{ scale: [2.8, 0.9, 1.05, 1], opacity: [0, 1, 1, 1], transition: { delay: 0.22, duration: 0.6, times: [0, 0.45, 0.72, 1] } }}
+                >
+                  Game on!
+                </motion.span>
+              </motion.div>
+              <Sparkles color="#FFFFFF" more />
+              <motion.div className="pj-take__flash" initial={{ opacity: 0 }} animate={{ opacity: [0, 0, 0.65, 0], transition: { duration: 0.75, times: [0, 0.38, 0.45, 1] } }} />
             </motion.div>
           )}
         </AnimatePresence>
@@ -285,10 +303,12 @@ export const ScoringView = ({ now, club, scores, teams = SCORE_TEAMS, clock, ser
               className="pj-timeup"
               aria-hidden="true"
               initial={{ opacity: 0 }}
-              animate={{ opacity: [0, 1, 0.85, 1], x: [0, -14, 12, -8, 6, 0], transition: { duration: 0.6 } }}
+              animate={{ opacity: [0, 1, 0.85, 1], x: ['0vw', '-2.6vw', '2.2vw', '-1.6vw', '1vw', '-0.5vw', '0vw'], y: ['0vw', '1.2vw', '-1vw', '0.7vw', '-0.4vw', '0.2vw', '0vw'], transition: { duration: 0.7 } }}
               exit={{ clipPath: 'inset(0 0 100% 0)', transition: { duration: 0.4, ease: EASE.wipe } }}
             >
               <motion.span initial={{ scale: 3 }} animate={{ scale: [3, 0.92, 1.04, 1], transition: { duration: 0.55, times: [0, 0.5, 0.75, 1] } }} exit={{ scale: 1.3, y: -40, transition: { duration: 0.4, ease: 'easeIn' } }}>Time!</motion.span>
+              <motion.div className="pj-take__flash" initial={{ opacity: 0.9 }} animate={{ opacity: 0, transition: { duration: 0.5, ease: 'easeOut' } }} />
+              <ConfettiBurst scale={2.2} />
             </motion.div>
           )}
         </AnimatePresence>

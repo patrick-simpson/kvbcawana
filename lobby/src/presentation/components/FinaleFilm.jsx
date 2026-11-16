@@ -4,7 +4,8 @@ import {
   FINALE_MS, SCORE_CLUB_WORDS, SCORE_TEAMS, SCORE_TEAM_COLORS, SCORE_TEAM_WORDS, finaleFilmColors, finaleFilmFor, winnerOf,
 } from '../../../../shared/scoreboard.js';
 import { ScoreFinale } from './ScoreFinale.jsx';
-import { fanfare, whooshSound } from '../lib/scoreSounds.js';
+import { boom, drumroll, fanfare, whooshSound } from '../lib/scoreSounds.js';
+import { ConfettiBurst } from './ConfettiBurst.jsx';
 import { EASE } from '../lib/motion-tokens.js';
 
 /** Not playing this long after it appears, or stalled this long: the flat winner screen instead. */
@@ -14,6 +15,27 @@ export const FILM_STALL_MS = 3000;
 export const FILM_COVER_MIN_MS = 650;
 /** The cover closes over the film this long before the finale ends (FINALE_MS). */
 export const FILM_OUTRO_MS = 800;
+/** The drumroll starts this long before WINS! lands. */
+export const DRUMROLL_S = 1.7;
+/**
+ * The hold's payoffs (owner 2026-11-15, "as epic as possible": the scores used to sit still
+ * for ten seconds): the winner's colour bursts again with a ring, confetti in its colours
+ * and a boom, this long after the scores land, and again at FINALE_BURST2_S into the film.
+ */
+export const FINALE_BURST_AFTER_S = 3;
+export const FINALE_BURST2_S = 16.5;
+
+/**
+ * A colour lifted toward white until it reads on the film's black (a dark ink, the blue,
+ * vanished into it). Pure: '#RRGGBB' in and out.
+ */
+export function liftInk(hex, min = 0.3) {
+  const c = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
+  const lum = 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+  if (lum >= min) return hex;
+  const k = Math.min(0.5, (min - lum) / Math.max(1e-6, 1 - lum));
+  return `#${c.map((v) => Math.round((v + (1 - v) * k) * 255).toString(16).padStart(2, '0')).join('').toUpperCase()}`;
+}
 
 /** A winner film's address (lobby/public/finale/, made by video/score-finale/finale.py). */
 export const filmSrc = (id) => `./finale/${id}.mp4`;
@@ -64,7 +86,8 @@ export const FinaleFilm = ({ club, scores, teams: playing = SCORE_TEAMS, night, 
   const film = finaleFilmFor(night);
   const w = winnerOf(scores, playing);
   const winners = w.teams.length ? w.teams : playing.slice(0, 1);
-  const colors = finaleFilmColors(winners);
+  const film0 = finaleFilmColors(winners);
+  const colors = { team: liftInk(film0.team), deep: w.tie ? liftInk(film0.deep) : film0.deep };
   const head = w.tie ? "IT'S A TIE!" : `${SCORE_TEAM_WORDS[winners[0]]} WINS!`;
   const filterId = `pj-ink-${useId().replace(/[^a-zA-Z0-9]/g, '')}`;
   const video = useRef(/** @type {HTMLVideoElement|null} */ (null));
@@ -72,7 +95,12 @@ export const FinaleFilm = ({ club, scores, teams: playing = SCORE_TEAMS, night, 
   const [failed, setFailed] = useState(still ? 'early' : 'none');
   const [phase, setPhase] = useState(/** @type {'cover'|'film'|'out'} */ ('cover'));
   const [beat, setBeat] = useState(0);   // 0 the film alone, 1 the words, 2 the scores
+  const [bursts, setBursts] = useState(0);   // the hold's payoffs so far
   const played = useRef(false);
+  const rolled = useRef(false);
+  const burstsRef = useRef(0);
+  const soundsRef = useRef(sounds);
+  useEffect(() => { soundsRef.current = sounds; }, [sounds]);
 
   // The whoosh as the colour bursts in, and the outro's cover closing in before the end.
   useEffect(() => {
@@ -104,6 +132,9 @@ export const FinaleFilm = ({ club, scores, teams: playing = SCORE_TEAMS, night, 
     const onTime = () => {
       const t = v.currentTime;
       setBeat(t >= film.scores ? 2 : t >= film.head ? 1 : 0);
+      if (!rolled.current && t >= film.head - DRUMROLL_S && t < film.head) { rolled.current = true; drumroll(soundsRef.current, Math.max(0.4, film.head - t)); }
+      const due = (t >= film.scores + FINALE_BURST_AFTER_S ? 1 : 0) + (t >= FINALE_BURST2_S ? 1 : 0);
+      if (due > burstsRef.current) { burstsRef.current = due; setBursts(due); boom(soundsRef.current); }
     };
     v.addEventListener('playing', onPlaying);
     v.addEventListener('timeupdate', onTime);
@@ -158,6 +189,17 @@ export const FinaleFilm = ({ club, scores, teams: playing = SCORE_TEAMS, night, 
           <feColorMatrix type="matrix" values={inkMatrix(colors.team, colors.deep)} />
         </filter>
       </svg>
+      {/* The film's own first seconds are dark: the winner's colour glows over them and
+          clears as the film comes up to its big moment. */}
+      {phase !== 'cover' && (
+        <motion.div
+          className="pj-film__glow"
+          aria-hidden="true"
+          style={{ background: `radial-gradient(ellipse at 50% 60%, ${colors.team} 0%, ${colors.deep} 55%, #000000 100%)` }}
+          initial={{ opacity: 0.6 }}
+          animate={{ opacity: [0.6, 0.35, 0], transition: { duration: Math.max(1, film.head - 0.4), times: [0, 0.4, 1], ease: 'easeIn' } }}
+        />
+      )}
       <motion.div
         className="pj-film__reel"
         initial={{ clipPath: IRIS_SHUT }}
@@ -174,7 +216,8 @@ export const FinaleFilm = ({ club, scores, teams: playing = SCORE_TEAMS, night, 
           initial={{ scale: 1.25 }}
           animate={phase === 'cover' ? { scale: 1.25 } : leaving
             ? { scale: 1.08, transition: { duration: FILM_OUTRO_MS / 1000, ease: 'easeIn' } }
-            : { scale: 1, transition: { duration: 1.8, ease: EASE.settle } }}
+            // in from the burst, then a slow push all through the hold (never a still frame)
+            : { scale: [1.25, 1, 1.12], transition: { duration: 20, times: [0, 0.09, 1], ease: ['easeOut', 'linear'] } }}
         />
       </motion.div>
       {failed === 'none' && beat >= 1 && (
@@ -185,8 +228,15 @@ export const FinaleFilm = ({ club, scores, teams: playing = SCORE_TEAMS, night, 
           animate={{ opacity: 0, transition: { duration: 0.55, ease: 'easeOut' } }}
         />
       )}
+      {failed === 'none' && bursts > 0 && !leaving && (
+        <React.Fragment key={`burst-${bursts}`}>
+          <motion.div className="pj-film__flash" aria-hidden="true" style={{ background: colors.team }} initial={{ opacity: 0.6 }} animate={{ opacity: 0, transition: { duration: 0.7, ease: 'easeOut' } }} />
+          <motion.div className="pj-film__ring" aria-hidden="true" style={{ zIndex: 4 }} initial={{ scale: 0, opacity: 1 }} animate={{ scale: 1, opacity: 0, transition: { duration: 0.9, ease: EASE.wipe } }} />
+          <ConfettiBurst colors={[colors.team, '#FFFFFF', colors.deep]} scale={2.4} />
+        </React.Fragment>
+      )}
       {failed === 'none' && (
-        <div className="pj-frame pj-film__frame" data-ink={ink}>
+        <div className="pj-frame pj-film__frame" data-ink={ink} data-tie={w.tie ? '1' : undefined}>
           {beat >= 1 && (
             <>
               <motion.p
@@ -197,12 +247,16 @@ export const FinaleFilm = ({ club, scores, teams: playing = SCORE_TEAMS, night, 
                 {SCORE_CLUB_WORDS[club]} · Final
               </motion.p>
               <motion.p
+                key={`head-${bursts}`}
                 className="pj-finale__head pj-film__head"
-                style={{ '--offset': colors.deep }}
-                initial={{ scale: 3.2, opacity: 0, rotate: -6 }}
+                style={{ '--offset': colors.deep, '--offset2': colors.team }}
+                initial={bursts > 0 ? false : { scale: 3.2, opacity: 0, rotate: -6 }}
                 animate={leaving
                   ? { scale: 1.5, opacity: 0, rotate: 0, transition: { duration: 0.4, ease: 'easeIn' } }
-                  : { scale: [3.2, 0.88, 1.06, 1], opacity: [0, 1, 1, 1], rotate: [-6, 0, 0, 0], transition: { duration: 0.7, times: [0, 0.45, 0.72, 1] } }}
+                  : bursts > 0
+                    // each payoff kicks the words again
+                    ? { scale: [1, 1.16, 0.97, 1], opacity: 1, rotate: [0, -2, 0, 0], transition: { duration: 0.55, times: [0, 0.35, 0.7, 1] } }
+                    : { scale: [3.2, 0.88, 1.06, 1], opacity: [0, 1, 1, 1], rotate: [-6, 0, 0, 0], transition: { duration: 0.7, times: [0, 0.45, 0.72, 1] } }}
               >
                 {head}
               </motion.p>
@@ -225,7 +279,7 @@ export const FinaleFilm = ({ club, scores, teams: playing = SCORE_TEAMS, night, 
                       : { opacity: 1, y: won ? -12 : 0, transition: { delay: i * 0.08, type: 'spring', stiffness: 320, damping: 20 } }}
                   >
                     <span className="pj-finale__name">{SCORE_TEAM_WORDS[t]}</span>
-                    <span className="pj-finale__num">{scores[t]}</span>
+                    <span className="pj-finale__num"><CountUp to={scores[t]} delay={0.15 + i * 0.08} /></span>
                   </motion.div>
                 );
               })}
@@ -245,4 +299,21 @@ export const FinaleFilm = ({ club, scores, teams: playing = SCORE_TEAMS, night, 
       {failed === 'late' && <ScoreFinale club={club} scores={scores} teams={playing} still={false} />}
     </motion.div>
   );
+};
+
+/** A final score counting up from 0 as its chip lands (about a second; the last frame is the score). */
+const CountUp = ({ to, delay = 0 }) => {
+  const [n, setN] = useState(0);
+  useEffect(() => {
+    let raf = 0;
+    const t0 = performance.now() + delay * 1000;
+    const step = (now) => {
+      const k = Math.min(1, Math.max(0, (now - t0) / 900));
+      setN(Math.round(to * (1 - (1 - k) ** 3)));
+      if (k < 1) raf = requestAnimationFrame(step);
+    };
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+  }, [to, delay]);
+  return n;
 };

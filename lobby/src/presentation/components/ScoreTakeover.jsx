@@ -22,12 +22,20 @@ import { EASE } from '../lib/motion-tokens.js';
  * A streak (owner 2026-11-15: "Escalate with streaks"): the same team's second point in a
  * row and on gets bigger each time: the word grows, BACK TO BACK! / HAT TRICK! / ON FIRE!
  * rides under it, and from the third the wall shakes and more sparkles pop.
+ *
+ * As epic as possible (owner 2026-11-15): a white flash as the colour lands; the shake
+ * starts at BACK TO BACK and grows each point (`shakeFor`); the word grows twice as fast;
+ * HAT TRICK! adds turning rays; ON FIRE! sets flames along the foot of the wall
+ * (`data-fire`) with the extra sparkles; TAKES THE LEAD! is a bigger stamp with stronger
+ * rays, held LEAD_HOLD_MS.
  * @param {{ hits: {team: string, gained: number}[], lead?: string|null, streak?: number, scores: Record<string, number>, teams?: readonly string[], still: boolean }} props
  */
 export const ScoreTakeover = ({ hits, lead = null, streak = 0, scores, teams = SCORE_TEAMS, still }) => {
   const one = hits.length === 1;
   const run = one ? streak : 0;
   const hot = run >= 3 && !still;
+  const shake = still ? null : shakeFor(run);
+  const fire = run >= 4 && !still;
   const origin = one ? originOf(hits[0].team, teams) : '50% 50%';
   return (
     <motion.div
@@ -38,20 +46,43 @@ export const ScoreTakeover = ({ hits, lead = null, streak = 0, scores, teams = S
       aria-label={hits.map((h) => `${SCORE_TEAM_WORDS[h.team]} plus ${h.gained}${h.team === lead ? ', takes the lead' : ''}`).join(', ')}
       initial={still ? { opacity: 1 } : { clipPath: `circle(0% at ${origin})` }}
       data-streak={run >= 2 ? run : undefined}
-      animate={{ clipPath: `circle(150% at ${origin})`, opacity: 1, ...(hot ? { x: [0, -18, 15, -11, 8, -4, 0] } : {}), transition: still ? { duration: 0 } : { duration: 0.42, ease: EASE.wipe, x: { duration: 0.55, delay: 0.3 } } }}
+      data-fire={fire ? '1' : undefined}
+      animate={{ clipPath: `circle(150% at ${origin})`, opacity: 1, ...(shake || {}), transition: still ? { duration: 0 } : { duration: 0.42, ease: EASE.wipe, x: { duration: 0.6, delay: 0.3 }, y: { duration: 0.6, delay: 0.3 } } }}
       // Out: the colour sucks back into the corner it came from (owner 2026-11-15: "epic and smooth").
       exit={still ? { opacity: 0, transition: { duration: 0 } } : { clipPath: `circle(0% at ${origin})`, transition: { duration: 0.34, ease: EASE.wipe } }}
     >
       {hits.map((h, i) => (
-        <Band key={h.team} hit={h} lead={one && h.team === lead} run={run} total={scores[h.team]} index={i} count={hits.length} still={still} />
+        <Band key={h.team} hit={h} lead={one && h.team === lead} run={run} total={scores[h.team]} index={i} count={hits.length} still={still} fire={fire} />
       ))}
       {!still && one && <Sparkles color={SCORE_TEAM_COLORS[hits[0].team].ink === '#FFFFFF' ? '#FFFFFF' : '#231F20'} more={hot} />}
+      {!still && (
+        <motion.div
+          className="pj-take__flash"
+          aria-hidden="true"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: [0, 0.7, 0], transition: { duration: 0.45, times: [0, 0.25, 1], delay: 0.08 } }}
+        />
+      )}
     </motion.div>
   );
 };
 
 /** How much longer a takeover that calls the lead stays up. */
-export const LEAD_HOLD_MS = 700;
+export const LEAD_HOLD_MS = 1600;
+
+/**
+ * The wall's shake for a run of points (in vw, so it reads the same on any wall): none for
+ * one point, a jolt at BACK TO BACK, bigger at HAT TRICK with a bounce, biggest ON FIRE.
+ * Every list ends on 0: at rest.
+ */
+export function shakeFor(run) {
+  if (run < 2) return null;
+  const a = run >= 4 ? 3 : run === 3 ? 2.2 : 1.2;
+  const x = [0, -a, a * 0.8, -a * 0.6, a * 0.4, -a * 0.2, 0].map((v) => `${v.toFixed(2)}vw`);
+  if (run < 3) return { x };
+  const y = [0, a * 0.5, -a * 0.4, a * 0.3, -a * 0.2, a * 0.1, 0].map((v) => `${v.toFixed(2)}vw`);
+  return { x, y };
+}
 
 /** Where the team's plate sits (the wipe starts there): a corner of the 2 x 2, or a side of the two halves. */
 const CORNERS = ['0% 0%', '100% 0%', '0% 100%', '100% 100%'];
@@ -64,7 +95,7 @@ function originOf(team, teams) {
 /** The slant between bands, as a share of the wall's width. */
 const SLANT = 0.08;
 
-const Band = ({ hit, lead, run = 0, total, index, count, still }) => {
+const Band = ({ hit, lead, run = 0, total, index, count, still, fire = false }) => {
   const c = SCORE_TEAM_COLORS[hit.team];
   const w = 1 / count;
   const x0 = index * w;
@@ -76,18 +107,22 @@ const Band = ({ hit, lead, run = 0, total, index, count, still }) => {
     ? undefined
     : `polygon(${pct(index === 0 ? 0 : x0 + SLANT / 2)} 0, ${pct(index === count - 1 ? 1 : x1 + SLANT / 2)} 0, ${pct(index === count - 1 ? 1 : x1 - SLANT / 2)} 100%, ${pct(index === 0 ? 0 : x0 - SLANT / 2)} 100%)`;
   const word = `${SCORE_TEAM_WORDS[hit.team]} +${hit.gained}${count === 1 ? '!' : ''}`;
-  const size = (count === 1 ? 19 : count === 2 ? 10.5 : count === 3 ? 7 : 5.2) * (1 + 0.07 * Math.min(Math.max(run - 1, 0), 3));
+  // A streak grows the word; it never grows past its band (Paytone caps run about 0.56 em a letter).
+  const fit = ((count === 1 ? 94 : 94 / count) / (word.length * 0.56));
+  const size = Math.min((count === 1 ? 19 : count === 2 ? 10.5 : count === 3 ? 7 : 5.2) * (1 + 0.14 * Math.min(Math.max(run - 1, 0), 3)), Math.max(fit, count === 1 ? 19 : 0));
   const callout = streakWords(run);
   const centre = (x0 + x1) / 2;
   return (
     <div className="pj-take__band" style={{ background: c.fill, clipPath: clip, '--team-deep': c.deep, '--team-ink': c.ink }}>
+      {fire && <div className="pj-take__fire" aria-hidden="true"><span /><span /><span /></div>}
       <div className="pj-take__copy" style={{ left: `${(centre * 100).toFixed(2)}%` }}>
-        {lead && !still && (
+        {(lead || run >= 3) && !still && (
           <motion.div
             className="pj-take__rays"
+            data-strong={lead ? '1' : undefined}
             aria-hidden="true"
             initial={{ scale: 0, opacity: 0 }}
-            animate={{ scale: [0, 1.15, 1], opacity: [0, 0.9, 0.55], rotate: [0, 40], transition: { duration: 1.6, delay: 0.55, ease: 'easeOut' } }}
+            animate={{ scale: [0, 1.2, 1], opacity: [0, 1, 0.8], rotate: [0, 70], transition: { duration: 2.6, delay: lead ? 0.55 : 0.3, ease: 'easeOut' } }}
           />
         )}
         {lead && (
@@ -121,7 +156,7 @@ const Band = ({ hit, lead, run = 0, total, index, count, still }) => {
         </motion.div>
         <motion.div
           className="pj-take__total"
-          style={{ fontSize: `calc(${count === 1 ? 4 : 2.6} * var(--u))` }}
+          style={{ fontSize: `calc(${count === 1 ? 6 : 3.2} * var(--u))` }}
           initial={still ? false : { y: 30, opacity: 0 }}
           animate={still ? undefined : { y: 0, opacity: 1, transition: { delay: 0.38, type: 'spring', stiffness: 420, damping: 20 } }}
         >
@@ -162,7 +197,7 @@ const MORE_SPARKS = [
   { x: 22, y: 60, s: 3.8, r: -14, d: 0.62 },
 ];
 
-const Sparkles = ({ color, more = false }) => (
+export const Sparkles = ({ color, more = false }) => (
   <>
     {(more ? [...SPARKS, ...MORE_SPARKS] : SPARKS).map((p, i) => (
       <motion.svg
@@ -170,7 +205,7 @@ const Sparkles = ({ color, more = false }) => (
         className="pj-take__sparkle"
         viewBox="0 0 12.61 12.61"
         aria-hidden="true"
-        style={{ left: `${p.x}%`, top: `${p.y}%`, width: `calc(${p.s} * var(--u))`, color }}
+        style={{ left: `${p.x}%`, top: `${p.y}%`, width: `calc(${(p.s * 1.5).toFixed(2)} * var(--u))`, color }}
         initial={{ scale: 0, rotate: p.r - 90, opacity: 1 }}
         animate={{ scale: [0, 1.3, 1], rotate: p.r, transition: { duration: 0.5, delay: p.d, ease: EASE.pop } }}
       >

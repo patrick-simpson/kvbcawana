@@ -754,6 +754,33 @@
   transform-origin: left center;
 }
 
+/* A running timer's last ten seconds (ScoreClock URGENT_MS): the figures turn hot and thump
+   once a second (data-beat flips, so one of two identical animations restarts), two rings
+   pulse out behind them, the bar glows; the last three seconds thump harder. Low power
+   (data-still) keeps the colour only. Every last keyframe is the figures at rest. */
+.pj-score-clock { position: relative; }
+.pj-score-clock__bar { height: calc(2.2 * var(--u)); }
+.pj-score-clock[data-urgent='1'] .pj-score-clock__figures { color: #f15a28; }
+.pj-score-clock[data-urgent='1'] .pj-score-clock__fill { background: #ffffff; box-shadow: 0 0 calc(2 * var(--u)) #f15a28; }
+.pj-score-clock[data-urgent='1'] .pj-score-clock__kick { background: #ffffff; color: #f15a28; }
+.pj-score-clock[data-urgent='1'][data-beat='0']:not([data-still]) .pj-score-clock__figures { animation: pjClockThumpA 0.5s cubic-bezier(0.2, 0.9, 0.3, 1); }
+.pj-score-clock[data-urgent='1'][data-beat='1']:not([data-still]) .pj-score-clock__figures { animation: pjClockThumpB 0.5s cubic-bezier(0.2, 0.9, 0.3, 1); }
+.pj-score-clock[data-final='1'][data-beat='0']:not([data-still]) .pj-score-clock__figures { animation: pjClockSlamA 0.6s cubic-bezier(0.2, 0.9, 0.3, 1); }
+.pj-score-clock[data-final='1'][data-beat='1']:not([data-still]) .pj-score-clock__figures { animation: pjClockSlamB 0.6s cubic-bezier(0.2, 0.9, 0.3, 1); }
+@keyframes pjClockThumpA { 0% { transform: scale(1.12); } 100% { transform: scale(1); } }
+@keyframes pjClockThumpB { 0% { transform: scale(1.12); } 100% { transform: scale(1); } }
+@keyframes pjClockSlamA { 0% { transform: scale(1.28) rotate(-2deg); } 40% { transform: scale(0.97) rotate(0deg); } 100% { transform: scale(1); } }
+@keyframes pjClockSlamB { 0% { transform: scale(1.28) rotate(2deg); } 40% { transform: scale(0.97) rotate(0deg); } 100% { transform: scale(1); } }
+.pj-score-clock__rings { position: absolute; left: 50%; top: 55%; width: 0; height: 0; pointer-events: none; display: none; }
+.pj-score-clock[data-urgent='1'] .pj-score-clock__rings { display: block; }
+.pj-score-clock__rings > span {
+  position: absolute; left: calc(-24 * var(--u)); top: calc(-24 * var(--u)); width: calc(48 * var(--u)); height: calc(48 * var(--u));
+  border-radius: 50%; border: calc(1.1 * var(--u)) solid #f15a28; opacity: 0;
+  animation: pjClockRing 1s ease-out infinite;
+}
+.pj-score-clock__rings > span:last-child { animation-delay: 0.5s; }
+@keyframes pjClockRing { 0% { transform: scale(0.5); opacity: 1; } 100% { transform: scale(1.6); opacity: 0; } }
+
 /* A point: the team's colour over the whole wall (components/ScoreTakeover.jsx). */
 .pj-take { position: absolute; inset: 0; z-index: 40; }
 .pj-take__band { position: absolute; inset: 0; }
@@ -788,7 +815,7 @@
   margin-bottom: calc(2.4 * var(--u));
   font-family: var(--font-display);
   text-transform: uppercase;
-  font-size: calc(5.6 * var(--u));
+  font-size: calc(8 * var(--u));
   line-height: 1;
   padding: 0.2em 0.55em 0.26em;
   border-radius: calc(1.2 * var(--u));
@@ -1303,7 +1330,13 @@
 .pj-film__video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .pj-film__frame { display: flex; flex-direction: column; align-items: center; color: #ffffff; }
 .pj-film__head { font-size: calc(12.5 * var(--u)); filter: drop-shadow(0 0 calc(2 * var(--u)) rgba(0, 0, 0, 0.55)); }
-.pj-film__kick { text-shadow: 0 0 calc(1 * var(--u)) rgba(0, 0, 0, 0.8); }
+.pj-film__kick { text-shadow: 0 0 calc(1 * var(--u)) rgba(0, 0, 0, 0.8); font-size: calc(4.2 * var(--u)); }
+/* The words over a busy film (the ball wall, fireworks): a soft shade from the top. */
+.pj-film__frame { z-index: 2; }
+.pj-film__frame::before { content: ''; position: absolute; left: 0; right: 0; top: 0; height: 52%; background: linear-gradient(rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0)); pointer-events: none; z-index: -1; }
+.pj-film__glow { position: absolute; inset: 0; pointer-events: none; z-index: 1; }
+/* A tie: the words carry both teams' colours, one offset each way. */
+.pj-film__frame[data-tie='1'] .pj-film__head { text-shadow: calc(-0.7 * var(--u)) calc(0.7 * var(--u)) 0 var(--offset2), calc(0.7 * var(--u)) calc(0.7 * var(--u)) 0 var(--offset); }
 /* The film's way in and out: the winner's colour over the wall, a white ring on its edge, the flash at WINS!. */
 .pj-film__cover { position: absolute; inset: 0; }
 .pj-film__reel { position: absolute; inset: 0; overflow: hidden; }
@@ -1314,7 +1347,9 @@
 .pj-film__flash { position: absolute; inset: 0; background: #ffffff; pointer-events: none; }
 /* GAME ON! as a club goes up (ScoringView). */
 .pj-gameon { position: absolute; inset: 0; z-index: 42; background: var(--club); display: flex; flex-direction: column; align-items: center; justify-content: center; color: #ffffff; }
-.pj-gameon__club { font-family: var(--font-condensed); text-transform: uppercase; letter-spacing: 0.08em; font-size: calc(4.2 * var(--u)); line-height: 1; }
+.pj-gameon { overflow: hidden; }
+.pj-gameon__inner { position: relative; display: flex; flex-direction: column; align-items: center; }
+.pj-gameon__club { font-family: var(--font-condensed); text-transform: uppercase; letter-spacing: 0.08em; font-size: calc(7 * var(--u)); line-height: 1; text-shadow: calc(0.4 * var(--u)) calc(0.4 * var(--u)) 0 rgba(0, 0, 0, 0.3); }
 .pj-gameon__word { font-family: var(--font-display); text-transform: uppercase; font-size: calc(17 * var(--u)); line-height: 0.95; text-shadow: calc(0.8 * var(--u)) calc(0.8 * var(--u)) 0 rgba(0, 0, 0, 0.35); }
 /* TIME! over the wall when a timer reaches zero. */
 .pj-timeup { position: absolute; inset: 0; z-index: 43; background: rgba(241, 90, 40, 0.92); display: flex; align-items: center; justify-content: center; }
@@ -1343,9 +1378,32 @@
   height: calc(150 * var(--u));
   margin: calc(-75 * var(--u)) 0 0 calc(-75 * var(--u));
   border-radius: 50%;
-  background: repeating-conic-gradient(rgba(255, 255, 255, 0.28) 0deg 7deg, transparent 7deg 20deg);
+  background: repeating-conic-gradient(rgba(255, 255, 255, 0.22) 0deg 7deg, transparent 7deg 20deg);
   pointer-events: none;
 }
+.pj-take__rays[data-strong='1'] { background: repeating-conic-gradient(rgba(255, 255, 255, 0.38) 0deg 8deg, transparent 8deg 18deg); }
+/* The flash as a takeover's colour lands. */
+.pj-take__flash { position: absolute; inset: 0; background: #ffffff; pointer-events: none; }
+/* The words ride above the rays (positioned, so they paint after them). */
+.pj-take__word, .pj-take__lead, .pj-take__total, .pj-take__streak { position: relative; }
+/* ON FIRE! (a run of four and on): flames of the kit's sun and hot along the foot of the wall,
+   flickering up. Three layers, each its own rhythm; they rest at their lowest. */
+.pj-take__fire { position: absolute; left: -5%; right: -5%; bottom: 0; height: 46%; pointer-events: none; }
+.pj-take__fire > span {
+  position: absolute; inset: 0; transform-origin: 50% 100%;
+  background:
+    radial-gradient(ellipse 9% 70% at 8% 100%, #fcb614 0%, #f15a28 45%, transparent 72%),
+    radial-gradient(ellipse 7% 85% at 23% 100%, #fff2a8 0%, #fcb614 30%, #f15a28 60%, transparent 76%),
+    radial-gradient(ellipse 10% 65% at 39% 100%, #fcb614 0%, #f15a28 45%, transparent 72%),
+    radial-gradient(ellipse 8% 90% at 55% 100%, #fff2a8 0%, #fcb614 30%, #f15a28 60%, transparent 76%),
+    radial-gradient(ellipse 9% 70% at 71% 100%, #fcb614 0%, #f15a28 45%, transparent 72%),
+    radial-gradient(ellipse 8% 82% at 87% 100%, #fff2a8 0%, #fcb614 30%, #f15a28 60%, transparent 76%);
+  opacity: 0.9;
+  animation: pjFlicker 0.42s ease-in-out infinite alternate;
+}
+.pj-take__fire > span:nth-child(2) { translate: 7% 0; opacity: 0.7; animation-duration: 0.31s; animation-delay: -0.1s; }
+.pj-take__fire > span:nth-child(3) { translate: -6% 0; opacity: 0.55; animation-duration: 0.53s; animation-delay: -0.2s; }
+@keyframes pjFlicker { 0% { transform: scaleY(1.18) scaleX(1.02); } 100% { transform: scaleY(0.88) scaleX(0.98); } }
 
 /* ════════════════════════════════════════════════════════════════════
    Phones and tablets (lib/touch.js). Everything below is gated on the

@@ -1,6 +1,10 @@
 import React, { useEffect, useRef } from 'react';
 import { clockFace, clockReading } from '../../../../shared/scoreboard.js';
 import { playTones } from '../lib/stingers.js';
+import { tick } from '../lib/scoreSounds.js';
+
+/** A running timer's last stretch (owner 2026-11-15: "as epic as possible"): red figures, a pulse each second, rings, a tick. */
+export const URGENT_MS = 10000;
 
 /**
  * The scoreboard's stopwatch / countdown timer, big (owner 2026-11-05: "a high
@@ -14,6 +18,12 @@ import { playTones } from '../lib/stingers.js';
  * digits never shuffle. A timer at 0 reads TIME! in hot and sounds the buzzer
  * once per run (when the operator armed the projector's sounds).
  *
+ * The last URGENT_MS of a running timer build to it: the figures turn the kit's hot red
+ * and thump once a second (`data-urgent`, its `data-beat` flipping each second so the CSS
+ * pulse restarts), two rings pulse out behind them, the bar glows, and a tick sounds each
+ * second, higher and harder for the last three (`data-final`). `still` (low power) keeps
+ * the colour and the ticks, no thump or rings.
+ *
  * @param {{
  *   clock: NonNullable<ReturnType<typeof import('../../../../shared/scoreboard.js').cleanClock>>,
  *   serverNow: () => number,
@@ -22,7 +32,7 @@ import { playTones } from '../lib/stingers.js';
  *   sounds?: boolean,
  * }} props
  */
-export const ScoreClock = ({ clock, serverNow, accent, size, sounds = false, onDone }) => {
+export const ScoreClock = ({ clock, serverNow, accent, size, sounds = false, onDone, still = false }) => {
   const mainRef = useRef(/** @type {HTMLSpanElement|null} */ (null));
   const tenthRef = useRef(/** @type {HTMLSpanElement|null} */ (null));
   const barRef = useRef(/** @type {HTMLSpanElement|null} */ (null));
@@ -39,6 +49,7 @@ export const ScoreClock = ({ clock, serverNow, accent, size, sounds = false, onD
     let lastMain = '';
     let lastTenth = '';
     let lastState = '';
+    let lastSecond = -1;
     const draw = () => {
       const r = clockReading(clock, serverNow());
       if (r) {
@@ -50,6 +61,21 @@ export const ScoreClock = ({ clock, serverNow, accent, size, sounds = false, onD
         if (barRef.current && r.durationMs) barRef.current.style.transform = `scaleX(${(r.ms / r.durationMs).toFixed(4)})`;
         const state = r.done ? 'done' : r.running ? 'running' : 'paused';
         if (state !== lastState && rootRef.current) { rootRef.current.dataset.state = state; lastState = state; }
+        // The last ten seconds of a running timer: red, a thump and a tick each second.
+        const urgent = clock.kind === 'timer' && r.running && !r.done && r.ms <= URGENT_MS;
+        const second = urgent ? Math.ceil(r.ms / 1000) : -1;
+        if (second !== lastSecond && rootRef.current) {
+          const el = rootRef.current;
+          if (urgent) {
+            el.dataset.urgent = '1';
+            el.dataset.beat = String(second % 2);
+            if (second <= 3) el.dataset.final = '1'; else delete el.dataset.final;
+            if (lastSecond !== -1 || r.ms % 1000 > 900) tick(second, soundsRef.current);
+          } else {
+            delete el.dataset.urgent; delete el.dataset.beat; delete el.dataset.final;
+          }
+          lastSecond = second;
+        }
         if (r.done && buzzed.current !== clock.id) {
           buzzed.current = clock.id;
           buzz(soundsRef.current);
@@ -67,7 +93,10 @@ export const ScoreClock = ({ clock, serverNow, accent, size, sounds = false, onD
 
   const label = clock.kind === 'timer' ? 'Timer' : 'Stopwatch';
   return (
-    <div ref={rootRef} className="pj-score-clock" data-kind={clock.kind} data-state="running" style={{ '--pj-clock-size': size }}>
+    <div ref={rootRef} className="pj-score-clock" data-kind={clock.kind} data-state="running" data-still={still ? '1' : undefined} style={{ '--pj-clock-size': size }}>
+      {clock.kind === 'timer' && !still && (
+        <span className="pj-score-clock__rings" aria-hidden="true"><span /><span /></span>
+      )}
       <span className="pj-score-clock__kick">
         <span className="pj-score-clock__word">{label}</span>
         <span className="pj-score-clock__paused" aria-hidden="true">Paused</span>
@@ -92,12 +121,16 @@ function splitMain(main) {
   return [main.slice(0, i), main.slice(i + 1)];
 }
 
-/** The game-show buzzer: two low square blasts. */
+/** The game-show buzzer: two low square blasts and a long horn (a gym is loud), with a noise rasp. */
 export function buzz(force = false) {
   playTones([
     { freq: 196, at: 0, len: 0.42, type: 'square' },
     { freq: 147, at: 0, len: 0.42, type: 'square' },
-    { freq: 196, at: 0.5, len: 0.6, type: 'square' },
-    { freq: 147, at: 0.5, len: 0.6, type: 'square' },
-  ], 0.09, { force });
+    { freq: 196, at: 0.5, len: 0.42, type: 'square' },
+    { freq: 147, at: 0.5, len: 0.42, type: 'square' },
+    { freq: 196, at: 1.0, len: 1.3, type: 'square' },
+    { freq: 147, at: 1.0, len: 1.3, type: 'square' },
+    { freq: 98, at: 1.0, len: 1.3, type: 'sawtooth' },
+    { freq: 300, at: 0, len: 2.3, type: 'noise', q: 1.5, vol: 0.5 },
+  ], 0.16, { force });
 }
