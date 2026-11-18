@@ -191,3 +191,6 @@
 .mission-key__dot--ok { background: #2f8a4e; }
 .mission-key__dot--failing { background: #b82b32; }
 .mission-key__dot--ending { background: #c97a08; }
+
+/* Awana store night (StoreNightCard.jsx): Automatic / On / Off in one row. */
+.store-night-modes { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 4px; }

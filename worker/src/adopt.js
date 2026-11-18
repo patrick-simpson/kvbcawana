@@ -74,6 +74,8 @@ export class Adopter {
   constructor({ ledger, printq, stations, tags, secret, env, now, storage, log, friends }) {
     /** Who brought a friend tonight (friends.js), for the 6:30 email: a TwoTimTwo-page child the report marks. */
     this.friends = friends || null;
+    /** Store night share balances (shares.js), set by SyncCore. @type {import('./shares.js').Shares|null} */
+    this.shares = null;
     this.ledger = ledger;
     this.printq = printq;
     this.stations = stations;
@@ -206,6 +208,9 @@ export class Adopter {
     const c = await this.ledger.claim(e.night, e.tag, { source: 'ttt', initial: 'queued', jobId });
     if (!c.ok) return 'already';
     const record = printRecord(e, c.gen);
+    // Store night (shares.js): the coin badge's number, as the extension sent it.
+    const shares = this.shares ? this.shares.labelSharesFor(e.name) : null;
+    if (shares !== null) record.body.awanaShares = shares;
     // Who brought a friend, for the 6:30 email (the station skips it for a cloud job).
     if (e.friend && this.friends) {
       try { await this.friends.record({ name: e.name, club: e.club, clubberId: e.id, friendName: '' }); } catch (err) { console.error('[cloud] recording a friend failed', err); }

@@ -227,6 +227,8 @@ export class Desk {
     this.deskChecked = { night: '', ids: new Set() };
     /** Tonight's checked-out clubber ids (set by SyncCore from the publisher's book). @type {null | (() => Promise<Set<string>>)} */
     this.checkedOutIds = null;
+    /** Store night share balances (shares.js), set by SyncCore. @type {import('./shares.js').Shares|null} */
+    this.shares = null;
     /** The one restore of a new object (single flight; kept once it ran to its end). @type {Promise<void>|null} */
     this.restoring = null;
     /** A restore that could not run yet is not tried again before this (ms). */
@@ -598,6 +600,13 @@ export class Desk {
     // "Usually arrives first" (owner 2026-10-15, recent.js): minutes after local midnight, this season.
     const usual = this.recent ? await this.recent.usualOf(kids.map((/** @type {any} */ k) => String(k.clubberId))) : null;
     if (usual) for (const k of kids) { const u = usual.get(String(k.clubberId)); if (u != null) k.usual = u; }
+    // Store night (shares.js, owner 2026-11-18): each child's share number for the label the page seals.
+    if (this.shares) {
+      try {
+        await this.shares.prepare();
+        if (this.shares.active()) for (const k of kids) { const n = this.shares.labelShares(k.first, k.last); if (n !== null) k.shares = n; }
+      } catch (err) { console.error('[shares] roster lookup failed', err); }
+    }
     // Tonight's meeting (owner 2026-10-22): the page's Record keeping button opens TwoTimTwo's record page for it.
     const cal = typeof r.page.calendarId === 'string' && /^\d{1,9}$/.test(r.page.calendarId) ? { calendarId: r.page.calendarId } : {};
     return json({ readAt: new Date(r.readAt).toISOString(), ...flag, ...test, ...away, ...cal, kids, items: itemClubs(r.page.events || []), ...(familiesAt ? { familiesAt } : {}) });

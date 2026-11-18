@@ -488,6 +488,7 @@ export class Watcher {
       await this.adopt?.load();
       const feeds = this.feeds;
       if (feeds) await feeds.load().catch((err) => console.error('[feeds] load failed', err));
+      if (feeds && feeds.shares) await feeds.shares.prepare().catch((err) => console.error('[shares] prepare failed', err));
       const before = await this.loadStatus();
       const reportAt = this.lastWatcherRead(before) + watchIntervalAt(this.now());
       // The next report's slot is the watcher's: other reads keep clear of it.

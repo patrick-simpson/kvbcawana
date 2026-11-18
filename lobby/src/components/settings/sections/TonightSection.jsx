@@ -7,6 +7,7 @@ import { AboutCard, CalendarPhaseCard, ConnectionCard, StatusAlerts } from './St
 import MissionControl from '../MissionControl.jsx';
 import SwitchesCard from '../SwitchesCard.jsx';
 import NoticeCard from '../NoticeCard.jsx';
+import StoreNightCard from '../StoreNightCard.jsx';
 import { RecentChangesCard } from '../ChangeLogCard.jsx';
 
 /** ?mission=0 hides the mission control card (the kill switch, docs/SETTINGS-OVERHAUL.md section 10). */
@@ -82,6 +83,7 @@ export function TonightSection({
       {live && missionEnabled() && (
         <MissionControl overview={overview} mission={mission} error={error} stopped={stopped} onRetry={retry} />
       )}
+      {live && <StoreNightCard />}
       {live && <NoticeCard draft={noticeDraft} onDraft={onNoticeDraft} overviewNotice={overview ? overview.notice ?? null : undefined} />}
 
       {calendarCard}

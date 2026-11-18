@@ -167,6 +167,8 @@ export class StationFeeds {
     this.slipCursor = { night: '', at: 0 };
     /** @type {Promise<void>|null} */
     this.loading = null;
+    /** Store night share balances (shares.js), set by SyncCore; null in tests that build this alone. @type {import('./shares.js').Shares|null} */
+    this.shares = null;
   }
 
   secret() { return this.watcher.creds()?.password || null; }
@@ -289,10 +291,12 @@ export class StationFeeds {
    * the desk roster's read-ahead: the roster (child safety, about once an hour)
    * and a completed-books pass or meeting report that has waited two of its turns.
    * @param {boolean} urgent
-   * @returns {'roster'|'books'|'meeting'|null}
+   * @returns {'roster'|'books'|'meeting'|'shares'|null}
    */
   readDue(urgent) {
     if (this.rosterDue()) return 'roster';
+    // Store night: the first pass goes ahead (labels are printing), later passes wait their turn.
+    if (this.shares && this.shares.due() && (!urgent || !this.shares.map)) return 'shares';
     if (this.meetingDue(urgent)) return 'meeting';
     if (this.booksDue(urgent)) return 'books';
     return null;
@@ -306,6 +310,8 @@ export class StationFeeds {
     if (this.readDue(false)) return 0;
     /** @type {number[]} */
     const waits = [];
+    const sh = this.shares ? this.shares.wakeInMs() : null;
+    if (sh !== null) waits.push(sh);
     if (this.modern()) {
       const r = this.st.roster;
       if (r.errorAt && now - r.errorAt < ROSTER_RETRY_MS) waits.push(r.errorAt + ROSTER_RETRY_MS - now);
@@ -331,6 +337,7 @@ export class StationFeeds {
     if (this.watcher.budget.peek(false) !== 0) return false;
     const which = this.readDue(urgent);
     if (which === 'roster') return this.readRoster();
+    if (which === 'shares' && this.shares) return this.shares.readOne();
     if (which === 'meeting') return this.readMeeting();
     if (which === 'books') return this.readBooksClub();
     return false;

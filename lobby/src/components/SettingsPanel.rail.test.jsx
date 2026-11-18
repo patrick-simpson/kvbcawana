@@ -117,7 +117,7 @@ describe('the new rail on the settings page', () => {
     expect(calls).toContain('GET /v1/tonight/overview');
     // Club-night order: at a glance, the notice, the schedule, recent changes, the switches last.
     expect(cardTitles(container).filter((t) => t !== 'Needs a look'))
-      .toEqual(['Tonight at a glance', 'Notice to every screen', 'Schedule and calendar', 'Recent changes', 'Online check-in switches']);
+      .toEqual(['Tonight at a glance', 'Awana store night', 'Notice to every screen', 'Schedule and calendar', 'Recent changes', 'Online check-in switches']);
   });
 
   it('signed out, Tonight starts with the way to sign in', () => {

@@ -1205,7 +1205,7 @@ function applyRoster(data) {
     var was = old['id:' + String(k.clubberId)];
     if (hadRoster && was && !was.checkedIn && k.checkedIn && !Object.prototype.hasOwnProperty.call(STATE, 'id:' + String(k.clubberId))
       && (!ONLY || ONLY.indexOf(clubKit(k.club || '')) !== -1)) news.push({ name: (String(k.first || '') + ' ' + String(k.last || '')).trim(), out: false });
-    return { clubberId: String(k.clubberId), name: (String(k.first || '') + ' ' + String(k.last || '')).trim(), club: k.club || '', clubId: k.clubId || '', checkedIn: !!k.checkedIn, away: k.away === true };
+    return { clubberId: String(k.clubberId), name: (String(k.first || '') + ' ' + String(k.last || '')).trim(), club: k.club || '', clubId: k.clubId || '', checkedIn: !!k.checkedIn, away: k.away === true, shares: typeof k.shares === 'number' ? k.shares : null };
   }).filter(function(sk) {
     return !ONLY || ONLY.indexOf(clubKit(sk.club)) !== -1;
   }).map(function(sk) {
@@ -2259,7 +2259,7 @@ function checkInMany(entries, family) {
     enqueue({
       id: 'c:' + key,
       clubberId: k.clubberId,
-      go: function(signal) { return desk.checkIn({ clubberId: k.clubberId, name: k.name, club: k.club }, choice, { signal: signal }); },
+      go: function(signal) { return desk.checkIn({ clubberId: k.clubberId, name: k.name, club: k.club, shares: k.shares }, choice, { signal: signal }); },
       // A hiccup or a minute with no answer: sent again by itself (the claim makes it safe).
       retryOn: true,
       // The roster shows them checked in: it landed.

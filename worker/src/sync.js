@@ -72,6 +72,7 @@ import { Stations } from './stations.js';
 import { Adopter } from './adopt.js';
 import { YmCheckout } from './ymcheckout.js';
 import { StationFeeds, mountStationFeeds } from './stationfeeds.js';
+import { Shares, mountShares } from './shares.js';
 import { Desk } from './desk.js';
 import { mountCheckin } from './checkinRoutes.js';
 import { History, mountHistory } from './history.js';
@@ -275,6 +276,12 @@ export class SyncCore {
     this.feeds = new StationFeeds({ storage: this.storage, watcher: this.watcher, stations: this.stations, printq: this.printq, tags: this.tags, publisher: this.publisher, now: this.now });
     this.watcher.feeds = this.feeds;
     mountStationFeeds(this.registry, this);   // GET /v1/station/roster, books (routes.md 4)
+    // Store night share balances on the labels (shares.js, routes.md 10.20): read by the feeds' turns.
+    this.shares = new Shares({ storage: this.storage, watcher: this.watcher, now: this.now });
+    this.feeds.shares = this.shares;
+    this.desk.shares = this.shares;
+    this.adopt.shares = this.shares;
+    mountShares(this.registry, this);   // GET, PUT /v1/store-night
     mountPublisher(this.registry, this);   // /v1/desk/tonight, /v1/station/extras, /v1/publisher/status (routes.md 8)
     // The screen registry (ROADMAP.md#settings-page, phase 2): its doorbells ride the live
     // channel only, for the one screen they name.

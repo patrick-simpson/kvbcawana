@@ -45,6 +45,10 @@ export const getSwitches = () => call('/v1/switches');
  * @param {{ name: string, value: 'on' | 'off' | 'default', rev?: number, dryRun?: boolean }} body
  */
 export const putSwitch = (body) => call('/v1/switches', { method: 'PUT', body });
+/** Store night share balances on the labels (routes.md 10.20). */
+export const getStoreNight = () => call('/v1/store-night');
+/** @param {'auto' | 'on' | 'off'} mode */
+export const putStoreNight = (mode) => call('/v1/store-night', { method: 'PUT', body: { mode } });
 export const getNotice = () => call('/v1/notice');
 /** @param {{ level: 'info' | 'warn' | 'critical', message: string, durationMin: number }} body */
 export const postNotice = (body) => call('/v1/notice', { method: 'POST', body });

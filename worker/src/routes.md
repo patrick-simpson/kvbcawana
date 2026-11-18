@@ -2072,3 +2072,23 @@ send (one Graph read, kept 10 minutes in memory) and answers a number, never an 
 
 "sender" = a director's `X-Mail-Token`, the owner's kept token, or the owner's session + `X-Mail-Owner`.
 "session + owner" = the owner's kept token, or the church session + `X-Mail-Owner`.
+
+### 10.20 Awana store night share balances (BUILT, owner 2026-11-18)
+
+Owner 2026-11-18: "it should come on automatically like the calendar before and also have a
+switch in settings". The coin badge (🪙 N) the Chrome extension put on name tags until 10.0.0,
+now from the Worker (`worker/src/shares.js`):
+
+- `GET /v1/store-night` (session) -> `{mode, calendarSaysStore, active, balances, readAt,
+  clubsRead, clubs, error, changedAt, changedBy}`: counts only, never a name or a balance.
+- `PUT /v1/store-night {mode}` (session), `mode` = `auto` (today's church calendar has an
+  uncancelled event with "store" in its title) | `on` | `off`; 400 `bad-mode` otherwise.
+  Storage `store:mode`. /settings → Tonight → "Awana store night".
+- While active and the watch window is open, the feeds' turns (stationfeeds.js `readDue` kind
+  `shares`; the first pass may go ahead as urgent) read `/report/shekelBalance?club_id=N&output=csv`
+  for clubs 2-6, one per free slot of the read clock, again every `SHARES_MS` 10 min. The
+  balances (full name -> number) are held in MEMORY only.
+- The label number is balance + 1 (tonight's attendance share; the report is last week's total),
+  as the extension sent it. `GET /v1/desk/roster` adds `shares` per child; /checkin puts it on
+  the sealed `/print` body as `awanaShares`; a TwoTimTwo-page job (adopt.js) gets it too. A child
+  no report lists gets no number (no badge). A label printed before the first pass has none.
