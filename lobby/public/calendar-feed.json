@@ -1,15 +1,8 @@
 {
   "version": 1,
-  "generatedAt": "2026-11-15T15:39:06.947Z",
+  "generatedAt": "2026-11-19T17:22:15.197Z",
   "sourceUrl": "https://kvbchurch.twotimtwo.com/calendar/index",
   "events": [
-    {
-      "date": "2026-11-18",
-      "kind": "club",
-      "title": "T&T Prayer Meeting",
-      "isCancelled": false,
-      "isSpecial": true
-    },
     {
       "date": "2026-11-25",
       "kind": "club",
