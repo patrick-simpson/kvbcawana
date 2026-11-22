@@ -134,6 +134,7 @@ describe('the size guard', () => {
     const parsed = parseCheckinPage(checkinHtml(KIDS));
     expect(compactPage({ ...parsed, extra: 'x', roster: parsed.roster.map((k) => ({ ...k, allergy: 'peanuts' })) })).toEqual({
       calendarId: '368',
+      storeNight: false,
       events: [{ id: '707', clubs: ['2', '3', '6'], automatic: false, label: 'Bible' }, { id: '40', clubs: ['4', '1', '2', '3', '6'], automatic: true, label: 'Attendance' }],
       roster: [
         { clubberId: '662', clubId: '2', name: 'Zebulon Quixotewright', club: 'Sparks', checkedIn: false },

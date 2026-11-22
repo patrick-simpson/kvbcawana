@@ -2073,22 +2073,35 @@ send (one Graph read, kept 10 minutes in memory) and answers a number, never an 
 "sender" = a director's `X-Mail-Token`, the owner's kept token, or the owner's session + `X-Mail-Owner`.
 "session + owner" = the owner's kept token, or the church session + `X-Mail-Owner`.
 
-### 10.20 Awana store night share balances (BUILT, owner 2026-11-18)
+### 10.20 Share balances: the store-night tag and the lobby's "+N SHARES!" (BUILT, owner 2026-11-18, rebuilt 2026-11-22)
 
-Owner 2026-11-18: "it should come on automatically like the calendar before and also have a
-switch in settings". The coin badge (🪙 N) the Chrome extension put on name tags until 10.0.0,
-now from the Worker (`worker/src/shares.js`):
+Owner 2026-11-18: "it should come on automatically like the calendar before and also have a switch in
+settings". 2026-11-21, after store night went badly: a clear "SHARES: N" box with no streak flame beside
+it, at least 10 shares on every store-night tag, and "+N Shares!" on the lobby every club night.
+`worker/src/shares.js`:
 
-- `GET /v1/store-night` (session) -> `{mode, calendarSaysStore, active, balances, readAt,
-  clubsRead, clubs, error, changedAt, changedBy}`: counts only, never a name or a balance.
-- `PUT /v1/store-night {mode}` (session), `mode` = `auto` (today's church calendar has an
-  uncancelled event with "store" in its title) | `on` | `off`; 400 `bad-mode` otherwise.
-  Storage `store:mode`. /settings → Tonight → "Awana store night".
-- While active and the watch window is open, the feeds' turns (stationfeeds.js `readDue` kind
-  `shares`; the first pass may go ahead as urgent) read `/report/shekelBalance?club_id=N&output=csv`
-  for clubs 2-6, one per free slot of the read clock, again every `SHARES_MS` 10 min. The
-  balances (full name -> number) are held in MEMORY only.
-- The label number is balance + 1 (tonight's attendance share; the report is last week's total),
-  as the extension sent it. `GET /v1/desk/roster` adds `shares` per child; /checkin puts it on
-  the sealed `/print` body as `awanaShares`; a TwoTimTwo-page job (adopt.js) gets it too. A child
-  no report lists gets no number (no badge). A label printed before the first pass has none.
+- WHERE THE NUMBERS COME FROM: TwoTimTwo's roster export (`/clubber/csv`, read for the stations by
+  stationfeeds.js) has "Clubber ID" and "Share Balance" side by side. The FIRST read of a club night inside
+  the watch window (about 4:30 pm, before anyone checks in; `rosterDue` asks for it while `wantsRoster()`)
+  is that night's before balance per clubber id. By id, never by name (the 11-18 version matched
+  `/report/shekelBalance`'s names and missed children). Later reads that night are ignored.
+- KEPT: the newest `NIGHTS_KEPT` 4 club nights' before balances, sealed under the state key
+  (`shares:nights`, sealState: ids and numbers only, never a name), so a restarted Worker still has them
+  (the 11-18 version held them in memory and a redeploy that evening lost them).
+- `GET /v1/store-night` (session) -> `{mode, calendarSaysStore, twotimtwoSaysStore, active, balances,
+  readAt, lastNight, minimum, error, changedAt, changedBy}`: counts only, never a name or a balance.
+- `PUT /v1/store-night {mode}` (session), `mode` = `auto` (today's church calendar has an uncancelled
+  event with "store" in its title, OR TwoTimTwo's own check-in page does: `parseCheckinPage storeNight`,
+  `storeTitleOnPage`, headings and the meeting's title/event elements and the selected meeting date, never
+  the page's menu) | `on` | `off`; 400 `bad-mode` otherwise. Storage `store:mode`. /settings → Tonight →
+  "Awana store night".
+- THE TAG (store night only): `max(10, balance + 1)` (tonight's attendance share counts toward the 10; a
+  child the export does not list: 10). `GET /v1/desk/roster` adds `shares` per child; /checkin puts it on
+  the sealed `/print` body as `awanaShares`; a TwoTimTwo-page job (adopt.js) gets it too.
+- "+N" (every club night): tonight's number (the tag's on a store night, balance + 1 otherwise) minus the
+  last kept club night's before balance; only when 1..500, else nothing (spent, the same, or no last
+  week). `GET /v1/desk/roster` adds `gained`; the sealed `/print` body carries `sharesGained`; the station
+  puts it on the sealed `checkin` event (contract `sharesGained`, printer 11.3.0); the lobby draws it.
+- NOT BUILT (owner 2026-11-21 asked for it as a side project): topping a child up to 10 in TwoTimTwo
+  itself. How TwoTimTwo records shares (`/meeting/shekels`, Record Shekels role) has never been read, and
+  a guessed write to children's balances is not safe; the tag already shows at least 10.

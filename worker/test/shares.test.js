@@ -1,66 +1,123 @@
 import { describe, expect, it } from 'vitest';
-import { Shares, calendarSaysStore, parseShareBalanceCsv, shareKey } from '../src/shares.js';
+import { parseHTML } from 'linkedom';
+import {
+  NIGHTS_KEY, STORE_MIN, Shares, balancesFromRoster, calendarSaysStore, sharesGained, storeTagNumber,
+} from '../src/shares.js';
+import { storeTitleOnPage } from '../src/twotimtwo.js';
 
-const WED_5PM = Date.parse('2026-11-18T22:00:00Z');   // 5:00 pm Eastern, a club Wednesday
+// Wednesdays in the watch window (5:00 pm Eastern) and one outside it (noon).
+const NOV18_5PM = Date.parse('2026-11-18T22:00:00Z');
+const NOV25_5PM = Date.parse('2026-11-25T22:00:00Z');
+const NOV25_NOON = Date.parse('2026-11-25T17:00:00Z');
 
-function store(feed) {
-  const m = new Map(feed ? [['calendar', feed]] : []);
-  return { get: async (k) => m.get(k), put: async (k, v) => { m.set(k, v); }, delete: async (k) => m.delete(k) };
+function memory(seed = {}) {
+  const m = new Map(Object.entries(seed));
+  return { m, get: async (k) => m.get(k), put: async (k, v) => { m.set(k, v); }, delete: async (k) => m.delete(k) };
 }
 
-describe('share balance report', () => {
-  it('reads "Name","Balance" rows, skips the header and odd values', () => {
-    const map = parseShareBalanceCsv('"Name","Balance"\n"Avery  McAdam","12"\n"Ben Stone","0"\n"Bad Row","x"\n');
-    expect(Object.fromEntries(map)).toEqual({ 'avery mcadam': 12, 'ben stone': 0 });
-  });
-  it('a login page is not a report', () => {
-    expect(parseShareBalanceCsv('<html><form>login</form></html>')).toBe(null);
-  });
-  it('keys names loosely', () => { expect(shareKey('  Avery   McAdam ')).toBe('avery mcadam'); });
+const roster = (rows) => ({
+  header: ['Clubber ID', 'First Name', 'Last Name', 'Club', 'Share Balance', 'Notes'],
+  rows: rows.map(([id, bal]) => [String(id), 'A', 'B', 'Sparks', String(bal), '']),
 });
 
-describe('store night', () => {
-  const feed = { events: [{ date: '2026-11-18', title: 'Awana Store Night', isCancelled: false }] };
-  it('the calendar decides on auto', () => {
-    expect(calendarSaysStore(feed, '2026-11-18')).toBe(true);
-    expect(calendarSaysStore({ events: [{ date: '2026-11-18', title: 'T&T Prayer Meeting' }] }, '2026-11-18')).toBe(false);
-    expect(calendarSaysStore({ events: [{ ...feed.events[0], isCancelled: true }] }, '2026-11-18')).toBe(false);
+function make({ at, storage = memory(), ttt = false, cal = null }) {
+  if (cal) storage.m.set('calendar', cal);
+  const clock = { t: at };
+  const s = new Shares({ storage, watcher: {}, now: () => clock.t, secret: () => 'state-secret', tttSaysStore: () => ttt });
+  return { s, storage, clock };
+}
+
+describe('share numbers', () => {
+  it('reads balances by Clubber ID from the roster export, not by name', () => {
+    expect(balancesFromRoster(roster([[101, 7], [102, '15'], [103, ''], ['x', 3]]))).toEqual({ 101: 7, 102: 15 });
+    expect(balancesFromRoster({ header: ['Clubber ID', 'First Name'], rows: [] })).toBe(null);
   });
 
-  const make = (f, pages) => {
-    const calls = [];
-    const client = { page: async (path) => { calls.push(path); return pages(path); } };
-    const watcher = { creds: () => ({ password: 'x' }), clientFor: () => client };
-    return { s: new Shares({ storage: store(f), watcher, now: () => WED_5PM }), calls };
-  };
-
-  it('auto with no store event: off, no reads, no numbers', async () => {
-    const { s } = make({ events: [] }, () => ({ ok: true, html: '' }));
-    await s.prepare();
-    expect(s.active()).toBe(false);
-    expect(s.due()).toBe(false);
+  it('the store tag: balance + 1, never under 10, 10 for a child not listed (owner 2026-11-21)', () => {
+    expect(STORE_MIN).toBe(10);
+    expect(storeTagNumber(7)).toBe(10);
+    expect(storeTagNumber(9)).toBe(10);
+    expect(storeTagNumber(15)).toBe(16);
+    expect(storeTagNumber(undefined)).toBe(10);
   });
 
-  it('switched on: reads the five clubs, then labels get balance + 1', async () => {
-    const { s, calls } = make({ events: [] }, (path) => ({ ok: true, html: path.includes('club_id=3') ? '"Name","Balance"\n"Ava Stone","7"\n' : '"Name","Balance"\n' }));
+  it('"+N": tonight minus last week, only when it went up; a top-up counts on store nights', () => {
+    expect(sharesGained(8, 5, false)).toBe(4);      // 8 + 1 tonight - 5
+    expect(sharesGained(4, 5, false)).toBe(null);   // went down (spent): nothing
+    expect(sharesGained(4, 5, true)).toBe(5);       // store night: topped up to 10, 10 - 5
+    expect(sharesGained(20, 30, true)).toBe(null);  // spent at the store: nothing
+    expect(sharesGained(8, undefined, false)).toBe(null); // no last week: nothing
+    expect(sharesGained(undefined, 3, false)).toBe(null);
+  });
+});
+
+describe('tonight\'s balances', () => {
+  it('only the first roster read of a club night counts, and it survives a restart sealed', async () => {
+    const { s, storage, clock } = make({ at: NOV18_5PM });
     await s.prepare();
-    expect(await s.setMode('on', null)).toMatchObject({ mode: 'on', active: true });
-    expect(s.due()).toBe(true);
-    for (let i = 0; i < 5; i += 1) await s.readOne();
-    expect(calls).toHaveLength(5);
-    expect(calls[0]).toBe('/report/shekelBalance?club_id=2&output=csv');
-    expect(s.due()).toBe(false);
-    expect(s.labelShares('Ava', 'Stone')).toBe(8);
-    expect(s.labelSharesFor('ava  stone')).toBe(8);
-    expect(s.labelShares('Nobody', 'Here')).toBe(null);
-    expect(s.view()).toMatchObject({ balances: 1, clubsRead: 5, error: null });
-    await s.setMode('off', null);
-    expect(s.labelShares('Ava', 'Stone')).toBe(null);
+    expect(s.wantsRoster()).toBe(true);
+    expect(await s.takeRoster(roster([[101, 5]]), clock.t)).toBe(true);
+    expect(await s.takeRoster(roster([[101, 6]]), clock.t + 60000)).toBe(false); // later read: ignored
+    expect(s.wantsRoster()).toBe(false);
+    const sealed = storage.m.get(NIGHTS_KEY);
+    expect(JSON.stringify(sealed)).not.toContain('101');                         // sealed, no id in the clear
+
+    // The next week, a fresh Worker (a deploy) opens last week's balances again.
+    const next = make({ at: NOV25_5PM, storage });
+    await next.s.prepare();
+    expect(next.s.lastNight()).toBe('2026-11-18');
+    await next.s.takeRoster(roster([[101, 8], [102, 2]]), next.clock.t);
+    expect(next.s.gainedFor('101')).toBe(4);
+    expect(next.s.gainedFor('102')).toBe(null);   // new: no last week
+    expect(next.s.tagFor('101')).toBe(null);      // not store night: no tag number
   });
 
-  it('refuses an unknown mode', async () => {
-    const { s } = make(null, () => ({ ok: true, html: '' }));
+  it('an export with no Share Balance column is not asked for again all night', async () => {
+    const { s } = make({ at: NOV25_5PM });
     await s.prepare();
-    expect(await s.setMode('maybe', null)).toBe(null);
+    expect(await s.takeRoster({ header: ['Clubber ID', 'First Name', 'Last Name'], rows: [['101', 'A', 'B']] }, NOV25_5PM)).toBe(false);
+    expect(s.wantsRoster()).toBe(false);
+    expect(s.view().error).toBe('no-share-column');
+  });
+
+  it('a read outside the watch window is never a night\'s balances', async () => {
+    const { s } = make({ at: NOV25_NOON });
+    await s.prepare();
+    expect(s.wantsRoster()).toBe(false);
+    expect(await s.takeRoster(roster([[101, 5]]), NOV25_NOON)).toBe(false);
+  });
+});
+
+describe('store night switch', () => {
+  it('Automatic follows the church calendar OR TwoTimTwo\'s page; On and Off override', async () => {
+    const calendar = { events: [{ date: '2026-11-25', title: 'Awana Store Night', isCancelled: false }] };
+    expect(calendarSaysStore(calendar, '2026-11-25')).toBe(true);
+    const a = make({ at: NOV25_5PM, cal: calendar });
+    await a.s.prepare();
+    expect(a.s.active()).toBe(true);
+
+    const b = make({ at: NOV25_5PM, cal: { events: [{ date: '2026-11-25', title: 'T&T Prayer Meeting' }] }, ttt: true });
+    await b.s.prepare();
+    expect(b.s.active()).toBe(true);   // the 11-18 miss: TwoTimTwo said store, the calendar did not
+    await b.s.setMode('off', null);
+    expect(b.s.active()).toBe(false);
+
+    const c = make({ at: NOV25_5PM });
+    await c.s.prepare();
+    expect(c.s.active()).toBe(false);
+    await c.s.setMode('on', null);
+    await c.s.takeRoster(roster([[101, 3]]), NOV25_5PM);
+    expect(c.s.tagFor('101')).toBe(10);
+    expect(c.s.tagFor('999')).toBe(10);
+    expect(await c.s.setMode('maybe', null)).toBe(null);
+  });
+
+  it('TwoTimTwo\'s check-in page: a store title counts, a Store link in its menu never does', () => {
+    const page = (body) => parseHTML(`<html><body>${body}</body></html>`).document;
+    expect(storeTitleOnPage(page('<nav><a>Store</a></nav><h2>Checkin</h2>'))).toBe(false);
+    expect(storeTitleOnPage(page('<nav><a>Store</a></nav><h2 class="title">Awana Store Night</h2>'))).toBe(true);
+    expect(storeTitleOnPage(page('<div class="calendar-event">AWANA STORE</div>'))).toBe(true);
+    expect(storeTitleOnPage(page('<select name="date"><option selected>11/25 - Awana Store</option></select>'))).toBe(true);
+    expect(storeTitleOnPage(page('<h3>Restore the roster</h3>'))).toBe(false);
   });
 });

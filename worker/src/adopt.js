@@ -208,9 +208,16 @@ export class Adopter {
     const c = await this.ledger.claim(e.night, e.tag, { source: 'ttt', initial: 'queued', jobId });
     if (!c.ok) return 'already';
     const record = printRecord(e, c.gen);
-    // Store night (shares.js): the coin badge's number, as the extension sent it.
-    const shares = this.shares ? this.shares.labelSharesFor(e.name) : null;
-    if (shares !== null) record.body.awanaShares = shares;
+    // Share balances (shares.js), by clubber id: the store-night tag's number and the lobby's "+N".
+    if (this.shares) {
+      try {
+        await this.shares.prepare();
+        const n = this.shares.tagFor(e.id);
+        if (n !== null) record.body.awanaShares = n;
+        const g = this.shares.gainedFor(e.id);
+        if (g !== null) record.body.sharesGained = g;
+      } catch (err) { console.error('[shares] a TwoTimTwo-page job got no share number', err); }
+    }
     // Who brought a friend, for the 6:30 email (the station skips it for a cloud job).
     if (e.friend && this.friends) {
       try { await this.friends.record({ name: e.name, club: e.club, clubberId: e.id, friendName: '' }); } catch (err) { console.error('[cloud] recording a friend failed', err); }

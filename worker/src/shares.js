@@ -1,104 +1,123 @@
 // @ts-check
-// Store night share balances on the name tags (owner 2026-11-18: "it should come
-// on automatically like the calendar before and also have a switch in settings").
+// Share balances: the store-night name tag and the lobby's "+N SHARES!"
+// (owner 2026-11-18, rebuilt 2026-11-22 after store night went badly).
 //
-// The Chrome extension did this until 10.0.0 (printer changes.md 3.6.0): on a
-// store night it read TwoTimTwo's share-balance report for Cubbies, Sparks, T&T,
-// Trek and Journey and sent each label `awanaShares` = balance + 1 (the report is
-// last week's total; tonight's attendance share is the + 1). The print server
-// still draws the coin badge from `awanaShares` (label-render.js), so this module
-// only has to find the number again:
+// WHERE THE NUMBERS COME FROM: TwoTimTwo's roster export (/clubber/csv), which
+// the Worker already reads for the stations (stationfeeds.js) and which carries
+// "Clubber ID" and "Share Balance" side by side. The first read of a club night
+// inside the watch window (about 4:30 pm, before the doors) is that night's
+// BEFORE balance per clubber id. Matching by id, never by name: the 11-18
+// version matched the share report's names to the check-in page's and missed
+// children. Later reads that night are ignored (a balance read after a child
+// checked in may already hold tonight's attendance share).
 //
-//   MODE (storage `store:mode`, /settings → Tonight → "Awana store night"):
-//     auto  today's church calendar has an event with "store" in its title
-//           (lobby calendarLogic.js isStoreNight, the same test), not cancelled
-//     on    store night today, whatever the calendar says
-//     off   never
-//   READS  while it is store night and the watch window is open: one club's
-//          `/report/shekelBalance?club_id=N&output=csv` per free slot of the one
-//          read clock (stationfeeds.js asks), the five clubs again every
-//          SHARES_MS. The balances (full name -> number) are held in MEMORY
-//          only, never stored, logged or answered as a list.
-//   USE    the desk roster answer gives each child `shares` (the page puts it on
-//          the label it seals); a TwoTimTwo-page check-in's job (adopt.js) gets
-//          `awanaShares`. A child the reports do not list gets no number: no
-//          badge, never a guessed balance.
+// KEPT: each club night's before balances, SEALED under the Worker's state key
+// (`shares:nights`, sealState: clubber ids and numbers only, never a name), the
+// newest NIGHTS_KEPT nights. A restarted Worker opens them again (the 11-18
+// version held them in memory only and a redeploy that evening lost them).
+//
+// STORE NIGHT (storage `store:mode`, /settings → Tonight → "Awana store night"):
+//   auto  the church calendar OR TwoTimTwo's own check-in page says "store"
+//   on / off
+// The tag's number (owner 2026-11-21): balance + 1 (tonight's attendance share),
+// never under STORE_MIN 10 (tonight's share counts toward it; a child the
+// export does not list prints 10).
+// "+N SHARES!" (owner 2026-11-21), every club night: tonight's number (the tag's
+// on a store night, top-up included; balance + 1 otherwise) minus LAST club
+// night's before balance, only when above 0.
 
 import { Doc } from './doc.js';
 import { fail, json } from './http.js';
-import { looksLikeCsv, parseCsvRows } from './twotimtwo.js';
-import { localTime, watchWindow } from './watcher.js';
+import { rosterKey } from './twotimtwo.js';
+import { localTime, openState, sealState, watchWindow } from './watcher.js';
 
-/** The clubs whose balances are read (the extension's list: Cubbies, Sparks, T&T, Trek, Journey). */
-export const SHARE_CLUB_IDS = Object.freeze([2, 3, 4, 5, 6]);
-/** How often the five reports are read again on a store night. */
-export const SHARES_MS = 10 * 60 * 1000;
-/** A failed club is tried again after this long. */
-export const SHARES_RETRY_MS = 2 * 60 * 1000;
-/** The most names one report may hold (a runaway answer cannot fill memory). */
-export const SHARES_PER_CLUB_MAX = 400;
 export const STORE_MODES = Object.freeze(['auto', 'on', 'off']);
+/** No store-night tag shows fewer shares than this (owner 2026-11-21). */
+export const STORE_MIN = 10;
+/** Club nights of before balances kept (last week's is the one used). */
+export const NIGHTS_KEPT = 4;
+/** The most children one night keeps (a runaway export cannot fill storage). */
+export const SHARES_MAX = 1500;
+/** A "+N" past this is not believed (an export glitch), so nothing is shown. */
+export const GAIN_MAX = 500;
+export const NIGHTS_KEY = 'shares:nights';
 
 /** The calendar's test (lobby calendarLogic.js isStoreNight). @param {unknown} title */
 export function isStoreTitle(title) {
   return /store/i.test(String(title ?? ''));
 }
 
-/** Lower case, trimmed, runs of spaces made one (the report has "Avery  McAdam"). @param {unknown} name */
-export function shareKey(name) {
-  return String(name ?? '').toLowerCase().replace(/\s+/g, ' ').trim();
-}
-
-/**
- * One share-balance report: `"Name","Balance"` rows. Header, blank and footer
- * rows and anything that is not a whole number at least 0 are skipped.
- * @param {string} text @returns {Map<string, number>|null} null when it is not a CSV
- */
-export function parseShareBalanceCsv(text) {
-  if (!looksLikeCsv(text)) return null;
-  /** @type {Map<string, number>} */
-  const out = new Map();
-  for (const row of parseCsvRows(text)) {
-    if (!row || row.length < 2) continue;
-    const key = shareKey(row[0]);
-    const raw = String(row[1] ?? '').trim();
-    if (!key || key === 'name' || !/^-?\d+(\.\d+)?$/.test(raw)) continue;
-    const n = Math.floor(Number(raw));
-    if (!Number.isFinite(n) || n < 0) continue;
-    out.set(key, n);
-    if (out.size >= SHARES_PER_CLUB_MAX) break;
-  }
-  return out;
-}
-
-/** Does today's calendar say store night? @param {any} feed the stored calendar @param {string} today YYYY-MM-DD */
+/** Does today's church calendar say store night? @param {any} feed @param {string} today */
 export function calendarSaysStore(feed, today) {
   const events = feed && Array.isArray(feed.events) ? feed.events : [];
   return events.some((/** @type {any} */ e) => e && e.date === today && !e.isCancelled && isStoreTitle(e.title));
 }
 
+/**
+ * Clubber id -> share balance from a parsed roster export. null when it has no
+ * Share Balance column. A blank or odd balance is left out (unknown, not 0).
+ * @param {{ header: string[], rows: string[][] }} roster @returns {Record<string, number>|null}
+ */
+export function balancesFromRoster(roster) {
+  const keys = (roster && Array.isArray(roster.header) ? roster.header : []).map(rosterKey);
+  const idI = keys.indexOf('clubber id');
+  const balI = keys.indexOf('share balance');
+  if (idI < 0 || balI < 0) return null;
+  /** @type {Record<string, number>} */
+  const out = {};
+  let n = 0;
+  for (const row of roster.rows) {
+    const id = String(row[idI] ?? '').trim();
+    const raw = String(row[balI] ?? '').trim();
+    if (!/^\d{1,20}$/.test(id) || !/^-?\d+(\.\d+)?$/.test(raw)) continue;
+    const v = Math.floor(Number(raw));
+    if (!Number.isFinite(v) || v < 0) continue;
+    out[id] = v;
+    if (++n >= SHARES_MAX) break;
+  }
+  return out;
+}
+
+/** The tag's number: balance + 1, at least STORE_MIN; a child not listed gets STORE_MIN. @param {number|undefined} before */
+export function storeTagNumber(before) {
+  return Math.max(STORE_MIN, (before === undefined ? 0 : before + 1));
+}
+
+/**
+ * "+N": tonight's number minus last club night's before balance, or null.
+ * @param {number|undefined} before tonight's before balance @param {number|undefined} last last club night's
+ * @param {boolean} store tonight is store night
+ */
+export function sharesGained(before, last, store) {
+  if (last === undefined) return null;
+  if (before === undefined && !store) return null;
+  const tonight = store ? storeTagNumber(before) : /** @type {number} */ (before) + 1;
+  const n = tonight - last;
+  return n > 0 && n <= GAIN_MAX ? n : null;
+}
+
 export class Shares {
   /**
-   * @param {{ storage: any, watcher: any, now: () => number }} deps
+   * @param {{ storage: any, watcher: any, now: () => number, secret: () => string|null|undefined,
+   *   tttSaysStore?: () => boolean }} deps
    */
-  constructor({ storage, watcher, now }) {
+  constructor({ storage, watcher, now, secret, tttSaysStore }) {
     this.storage = storage;
     this.watcher = watcher;
     this.now = now;
+    this.secret = secret;
+    this.tttSaysStore = tttSaysStore || (() => false);
     this.modeDoc = new Doc(storage, 'store:mode', () => ({ mode: 'auto', at: null, by: null }));
-    /** Today's calendar answer, kept per local date (refreshed by prepare()). @type {{ date: string, store: boolean, at: number }|null} */
+    /** Today's church calendar answer (refreshed by prepare()). @type {{ date: string, store: boolean, at: number }|null} */
     this.cal = null;
-    /** The balances, full name -> balance (memory only). @type {Map<string, number>|null} */
-    this.map = null;
-    /** The pass under way. @type {{ night: string, idx: number, map: Map<string, number>, read: number }|null} */
-    this.pass = null;
-    this.night = '';
-    this.readAt = 0;
-    this.passAt = 0;
-    this.errorAt = 0;
+    /** date -> {at, byId} (opened from storage once). @type {Record<string, { at: number, byId: Record<string, number> }>|null} */
+    this.nights = null;
+    /** @type {Promise<void>|null} */
+    this.opening = null;
     /** @type {string|null} */
     this.error = null;
-    this.clubsRead = 0;
+    /** The night an export came with no Share Balance column (memory only): no re-reads for it. */
+    this.noColumnNight = '';
   }
 
   get mode() {
@@ -106,16 +125,36 @@ export class Shares {
     return STORE_MODES.includes(m) ? m : 'auto';
   }
 
-  /** Read the mode and today's calendar (async; the alarm and the routes call it). */
+  /** Open the kept nights once (a sealed blob under the state key). */
+  openNights() {
+    if (this.nights) return Promise.resolve();
+    if (!this.opening) {
+      this.opening = (async () => {
+        const secret = this.secret();
+        let sealed;
+        try { sealed = await this.storage.get(NIGHTS_KEY); } catch { sealed = null; }
+        const opened = secret && sealed ? await openState(secret, sealed) : null;
+        this.nights = opened && typeof opened === 'object' && opened.nights && typeof opened.nights === 'object' ? opened.nights : {};
+      })().finally(() => { this.opening = null; });
+    }
+    return this.opening;
+  }
+
+  /** Read the mode, today's calendar and the kept nights (async; the alarm and the routes call it). */
   async prepare() {
     await this.modeDoc.load();
+    await this.openNights();
     const today = localTime(this.now()).date;
     if (!this.cal || this.cal.date !== today || this.now() - this.cal.at > 10 * 60 * 1000) {
       let feed;
       try { feed = await this.storage.get('calendar'); } catch { feed = null; }
       this.cal = { date: today, store: calendarSaysStore(feed, today), at: this.now() };
     }
-    if (this.night !== today) { this.night = today; this.map = null; this.pass = null; this.passAt = 0; this.readAt = 0; this.clubsRead = 0; }
+  }
+
+  /** The church calendar says store night today (sync; after prepare()). */
+  calendarStore() {
+    return !!this.cal && this.cal.date === localTime(this.now()).date && this.cal.store;
   }
 
   /** Is it store night (sync; after prepare())? */
@@ -123,92 +162,87 @@ export class Shares {
     const m = this.mode;
     if (m === 'on') return true;
     if (m === 'off') return false;
-    return !!this.cal && this.cal.date === localTime(this.now()).date && this.cal.store;
+    let ttt;
+    try { ttt = this.tttSaysStore() === true; } catch { ttt = false; }
+    return this.calendarStore() || ttt;
   }
 
-  /** A read is wanted now (sync). */
-  due() {
-    if (!this.active() || !this.watcher.creds || !this.watcher.creds()) return false;
-    const now = this.now();
-    if (!watchWindow(now).open) return false;
-    if (this.pass) return now - this.errorAt >= (this.error ? SHARES_RETRY_MS / 4 : 0);
-    if (this.errorAt && !this.map && now - this.errorAt < SHARES_RETRY_MS) return false;
-    return now - this.passAt >= SHARES_MS;
+  /** Tonight's before balances, or null (not read yet tonight). */
+  tonight() {
+    const today = localTime(this.now()).date;
+    return this.nights && this.nights[today] ? this.nights[today].byId : null;
   }
 
-  /** How long until a read is wanted (ms), or null. */
-  wakeInMs() {
-    if (!this.active() || !watchWindow(this.now()).open) return null;
-    if (this.due()) return 0;
-    return Math.max(1000, this.passAt + SHARES_MS - this.now());
+  /** The newest kept club night before today, or null. */
+  lastNight() {
+    if (!this.nights) return null;
+    const today = localTime(this.now()).date;
+    const dates = Object.keys(this.nights).filter((d) => d < today).sort();
+    return dates.length ? dates[dates.length - 1] : null;
   }
 
-  /** One club's report. true when a read was made (or tried). */
-  async readOne() {
-    const client = this.watcher.clientFor ? this.watcher.clientFor() : null;
-    if (!client) return false;
-    const now = this.now();
-    const night = localTime(now).date;
-    if (!this.pass || this.pass.night !== night) this.pass = { night, idx: 0, map: new Map(), read: 0 };
-    const clubId = SHARE_CLUB_IDS[this.pass.idx];
-    const page = await client.page(`/report/shekelBalance?club_id=${clubId}&output=csv`, { waitMs: 0, kind: 'share-balance' });
-    if (!page.ok && page.error === 'read-busy') return false;
-    const parsed = page.ok ? parseShareBalanceCsv(page.html) : null;
-    if (parsed) {
-      for (const [k, v] of parsed) this.pass.map.set(k, v);
-      this.pass.read += 1;
-    } else {
-      this.error = page.ok ? 'shares-unreadable' : page.error;
-      this.errorAt = now;
-    }
-    this.pass.idx += 1;
-    if (this.pass.idx >= SHARE_CLUB_IDS.length) {
-      const pass = this.pass;
-      this.pass = null;
-      this.passAt = now;
-      this.clubsRead = pass.read;
-      if (pass.read) {
-        // A club that could not be read this time keeps last pass's names.
-        const merged = new Map(this.map || []);
-        for (const [k, v] of pass.map) merged.set(k, v);
-        this.map = merged;
-        this.readAt = now;
-        if (pass.read === SHARE_CLUB_IDS.length) this.error = null;
-      }
-      console.warn(`[shares] store night: ${pass.read} of ${SHARE_CLUB_IDS.length} reports read, ${this.map ? this.map.size : 0} balances held`);
-    }
-    return true;
+  /** Should the roster be read now for tonight's before balances? (sync) */
+  wantsRoster() {
+    return !!this.nights && watchWindow(this.now()).open && !this.tonight()
+      && this.noColumnNight !== localTime(this.now()).date;
   }
 
   /**
-   * The number for a child's label (balance + 1: tonight's attendance share), or
-   * null: not store night, not read yet, or the child is not on a report.
-   * @param {string} first @param {string} last
+   * A roster export the stations' feed just read. Only the first of a club
+   * night (inside the watch window) is kept; it is sealed at once.
+   * @param {{ header: string[], rows: string[][] }} roster @param {number} at
    */
-  labelShares(first, last) {
-    if (!this.map || !this.active()) return null;
-    const v = this.map.get(shareKey(`${first} ${last}`));
-    return v === undefined ? null : v + 1;
+  async takeRoster(roster, at) {
+    if (!watchWindow(at).open) return false;
+    await this.openNights();
+    const date = localTime(at).date;
+    if (!this.nights || this.nights[date]) return false;
+    const byId = balancesFromRoster(roster);
+    if (!byId) { this.error = 'no-share-column'; this.noColumnNight = date; return false; }
+    this.error = null;
+    this.nights[date] = { at, byId };
+    const keep = Object.keys(this.nights).sort().slice(-NIGHTS_KEPT);
+    for (const d of Object.keys(this.nights)) if (!keep.includes(d)) delete this.nights[d];
+    const secret = this.secret();
+    if (secret) {
+      try { await this.storage.put(NIGHTS_KEY, await sealState(secret, { nights: this.nights })); } catch (err) { console.error('[shares] could not keep tonight\'s balances', err); }
+    }
+    console.warn(`[shares] tonight's balances taken: ${Object.keys(byId).length} children`);
+    return true;
   }
 
-  /** The same, from one full name. @param {string} name */
-  labelSharesFor(name) {
-    if (!this.map || !this.active()) return null;
-    const v = this.map.get(shareKey(name));
-    return v === undefined ? null : v + 1;
+  /** The store-night tag number for a child, or null (not store night, or no balances read tonight). @param {string} clubberId */
+  tagFor(clubberId) {
+    const t = this.tonight();
+    if (!t || !this.active()) return null;
+    return storeTagNumber(t[String(clubberId)]);
+  }
+
+  /** "+N" for a child, or null. @param {string} clubberId */
+  gainedFor(clubberId) {
+    const t = this.tonight();
+    const last = this.lastNight();
+    if (!t || !last || !this.nights) return null;
+    const id = String(clubberId);
+    return sharesGained(t[id], this.nights[last].byId[id], this.active());
   }
 
   /** For /settings: words and counts only, never a name or a balance. */
   view() {
-    const iso = (/** @type {number} */ t) => (t ? new Date(t).toISOString() : null);
+    const t = this.tonight();
+    const today = localTime(this.now()).date;
+    const last = this.lastNight();
+    let ttt;
+    try { ttt = this.tttSaysStore() === true; } catch { ttt = false; }
     return {
       mode: this.mode,
-      calendarSaysStore: !!(this.cal && this.cal.store),
+      calendarSaysStore: this.calendarStore(),
+      twotimtwoSaysStore: ttt,
       active: this.active(),
-      balances: this.map ? this.map.size : 0,
-      readAt: iso(this.readAt),
-      clubsRead: this.clubsRead,
-      clubs: SHARE_CLUB_IDS.length,
+      balances: t ? Object.keys(t).length : 0,
+      readAt: t && this.nights ? new Date(this.nights[today].at).toISOString() : null,
+      lastNight: last,
+      minimum: STORE_MIN,
       error: this.error,
       changedAt: this.modeDoc.data ? this.modeDoc.data.at : null,
       changedBy: this.modeDoc.data ? this.modeDoc.data.by : null,
@@ -224,8 +258,6 @@ export class Shares {
     d.at = new Date(this.now()).toISOString();
     d.by = by && typeof by === 'object' ? { name: typeof by.name === 'string' ? by.name.slice(0, 60) : null } : null;
     await this.modeDoc.save();
-    // Turned on: read at once (the alarm's next free slot).
-    if (this.active()) { this.passAt = 0; this.errorAt = 0; this.error = null; }
     return this.view();
   }
 }
@@ -245,8 +277,6 @@ export function mountShares(registry, core) {
     const name = request.headers.get('X-Device-Name');
     const v = await core.shares.setMode(b && b.mode, { name: name ? String(name) : null });
     if (!v) return fail('Mode must be auto, on or off.', 400, { reason: 'bad-mode' });
-    // Wake the alarm so the first read is not left for the next tick.
-    try { if (v.active && core.watcher && core.watcher.alarms) await core.watcher.alarms.set(core.now() + 1000); } catch { /* the next tick reads */ }
     return json(v);
   });
 }

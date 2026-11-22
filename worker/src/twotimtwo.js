@@ -335,7 +335,29 @@ export function parseCheckinPage(html) {
   // The meeting the page is on: its filter form's selected date (docs §8.2).
   const picked = doc.querySelector('select[name="date"] option[selected]') || doc.querySelector('select[name="date"] option');
   const meetingDate = picked ? squash(picked.getAttribute('value') || picked.textContent).slice(0, 30) : null;
-  return { calendarId, meetingDate, events, roster };
+  return { calendarId, meetingDate, events, roster, storeNight: storeTitleOnPage(doc) };
+}
+
+/** Where a page's own menu lives: a "Store" link there is never a store night. */
+const NAV_SEL = 'nav, .nav, .navbar, .menu, .dropdown-menu, .sidebar, header, footer';
+/** What the old extension scanned (isAwanaStoreNight): headings and the meeting's title/event elements. */
+const STORE_SCAN_SEL = 'h1, h2, h3, h4, .title, [class*="event"], [class*="meeting"], [class*="calendar"]';
+
+/**
+ * Does the check-in page say tonight is store night? (owner 2026-11-22: Automatic
+ * missed 2026-11-18 because only the church calendar was read.) The old
+ * extension's rule: /store/i in a heading or the meeting's title/event elements,
+ * never the page's menu (TwoTimTwo's nav may link to a store); also the selected
+ * meeting date's own text. Check-in item labels (input.event) are not titles.
+ * @param {Document} doc
+ */
+export function storeTitleOnPage(doc) {
+  for (const el of doc.querySelectorAll(STORE_SCAN_SEL)) {
+    if (el.tagName === 'INPUT' || el.closest(NAV_SEL)) continue;
+    if (/\bstore\b/i.test(squash(el.textContent))) return true;
+  }
+  const picked = doc.querySelector('select[name="date"] option[selected]');
+  return !!picked && /\bstore\b/i.test(squash(picked.textContent));
 }
 
 /**
@@ -483,7 +505,7 @@ export function isFooterOrBlankRow(row) {
 const ROSTER_DROP = /^(?:parent|guardian|address|alt address|city|state|zip|alt city|alt state|alt zip|emergency|others pickup|doctor|church$|# ?payments|payments|rate$|shirt|grandprix|invited by|clubber created|clubber last updated|email|alt email)|phone/;
 const ROSTER_KEEP = /release|consent|permission|waiver|allerg|medic|note|middle/;
 /** A header as the print server compares it (clubbers.js normalizeHeader's first step). @param {string} h */
-const rosterKey = (h) => String(h || '').toLowerCase().replace(/[_\s]+/g, ' ').replace(/[?!.:]+$/, '').trim();
+export const rosterKey = (h) => String(h || '').toLowerCase().replace(/[_\s]+/g, ' ').replace(/[?!.:]+$/, '').trim();
 
 /**
  * TwoTimTwo's roster export (GET /clubber/csv, printer/docs/TWOTIMTWO.md section

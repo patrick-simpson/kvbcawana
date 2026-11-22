@@ -169,6 +169,7 @@ const clean = (v, max = 40) => String(v ?? '').replace(/\s+/g, ' ').trim().slice
 export function compactPage(page) {
   return {
     calendarId: String(page?.calendarId ?? ''),
+    storeNight: page?.storeNight === true,
     events: (Array.isArray(page?.events) ? page.events : []).map((/** @type {any} */ e) => ({
       id: String(e.id ?? ''), clubs: (Array.isArray(e.clubs) ? e.clubs : []).map(String), automatic: !!e.automatic, label: String(e.label ?? '').slice(0, 60),
     })),
@@ -600,11 +601,17 @@ export class Desk {
     // "Usually arrives first" (owner 2026-10-15, recent.js): minutes after local midnight, this season.
     const usual = this.recent ? await this.recent.usualOf(kids.map((/** @type {any} */ k) => String(k.clubberId))) : null;
     if (usual) for (const k of kids) { const u = usual.get(String(k.clubberId)); if (u != null) k.usual = u; }
-    // Store night (shares.js, owner 2026-11-18): each child's share number for the label the page seals.
+    // Share balances (shares.js, owner 2026-11-18 / 11-21): the tag's number and the lobby's "+N".
     if (this.shares) {
       try {
         await this.shares.prepare();
-        if (this.shares.active()) for (const k of kids) { const n = this.shares.labelShares(k.first, k.last); if (n !== null) k.shares = n; }
+        // Store night: the tag's number; every club night: "+N" for the lobby (by clubber id, never by name).
+        const store = this.shares.active();
+        for (const k of kids) {
+          if (store) { const n = this.shares.tagFor(k.clubberId); if (n !== null) k.shares = n; }
+          const g = this.shares.gainedFor(k.clubberId);
+          if (g !== null) k.gained = g;
+        }
       } catch (err) { console.error('[shares] roster lookup failed', err); }
     }
     // Tonight's meeting (owner 2026-10-22): the page's Record keeping button opens TwoTimTwo's record page for it.

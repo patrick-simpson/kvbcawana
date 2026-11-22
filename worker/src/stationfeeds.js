@@ -167,7 +167,7 @@ export class StationFeeds {
     this.slipCursor = { night: '', at: 0 };
     /** @type {Promise<void>|null} */
     this.loading = null;
-    /** Store night share balances (shares.js), set by SyncCore; null in tests that build this alone. @type {import('./shares.js').Shares|null} */
+    /** Share balances (shares.js): takes each club night's first roster read; set by SyncCore, null in tests that build this alone. @type {import('./shares.js').Shares|null} */
     this.shares = null;
   }
 
@@ -257,6 +257,8 @@ export class StationFeeds {
     if (r.errorAt && now - r.errorAt < ROSTER_RETRY_MS) return false;
     const doc = this.rosterDoc.data;
     if (this.wanted.roster || !doc.bundle || !this.covers(doc.bundle)) return true;
+    // Tonight's before balances (shares.js) come from the night's first roster read.
+    if (this.shares && this.shares.wantsRoster()) return true;
     if (watchWindow(now).open) return now - doc.readAt >= ROSTER_FRESH_MS;
     return localTime(doc.readAt).date !== localTime(now).date;
   }
@@ -291,12 +293,10 @@ export class StationFeeds {
    * the desk roster's read-ahead: the roster (child safety, about once an hour)
    * and a completed-books pass or meeting report that has waited two of its turns.
    * @param {boolean} urgent
-   * @returns {'roster'|'books'|'meeting'|'shares'|null}
+   * @returns {'roster'|'books'|'meeting'|null}
    */
   readDue(urgent) {
     if (this.rosterDue()) return 'roster';
-    // Store night: the first pass goes ahead (labels are printing), later passes wait their turn.
-    if (this.shares && this.shares.due() && (!urgent || !this.shares.map)) return 'shares';
     if (this.meetingDue(urgent)) return 'meeting';
     if (this.booksDue(urgent)) return 'books';
     return null;
@@ -310,8 +310,6 @@ export class StationFeeds {
     if (this.readDue(false)) return 0;
     /** @type {number[]} */
     const waits = [];
-    const sh = this.shares ? this.shares.wakeInMs() : null;
-    if (sh !== null) waits.push(sh);
     if (this.modern()) {
       const r = this.st.roster;
       if (r.errorAt && now - r.errorAt < ROSTER_RETRY_MS) waits.push(r.errorAt + ROSTER_RETRY_MS - now);
@@ -337,7 +335,6 @@ export class StationFeeds {
     if (this.watcher.budget.peek(false) !== 0) return false;
     const which = this.readDue(urgent);
     if (which === 'roster') return this.readRoster();
-    if (which === 'shares' && this.shares) return this.shares.readOne();
     if (which === 'meeting') return this.readMeeting();
     if (which === 'books') return this.readBooksClub();
     return false;
@@ -402,6 +399,10 @@ export class StationFeeds {
       r.errorAt = now;
       await this.statusDoc.save();
       return true;
+    }
+    // Tonight's before balances (shares.js): the night's first read only; never in the way of the stations' copy.
+    if (this.shares) {
+      try { await this.shares.takeRoster(res.roster, now); } catch (err) { console.error('[shares] taking the balances failed', err); }
     }
     const { csv, columns } = trimRosterCsv(res.roster);
     r.reads += 1;

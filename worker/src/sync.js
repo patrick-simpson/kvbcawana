@@ -45,7 +45,7 @@ import {
   sanitizeJourney,
   sanitizeTemplate,
 } from '../../lobby/src/lib/syncSpecs.js';
-import { PBKDF2_ITER, PBKDF2_ITER_MAX, PBKDF2_ITER_MIN, authVerifier } from '../../shared/cloud-crypto.js';
+import { PBKDF2_ITER, PBKDF2_ITER_MAX, PBKDF2_ITER_MIN, authVerifier, churchNight } from '../../shared/cloud-crypto.js';
 import { fromBase64, hmac, kidFor, newDisplayKey, randomBytes, safeEqual, seal, toBase64, toBase64Url } from './crypto.js';
 import { DEFAULT_CALENDAR_URL, scrapeCalendar } from './calendar.js';
 import { DOORBELL_EVENT, REPLAYED, checkPublish, frameText, replayKey } from './live.js';
@@ -277,7 +277,11 @@ export class SyncCore {
     this.watcher.feeds = this.feeds;
     mountStationFeeds(this.registry, this);   // GET /v1/station/roster, books (routes.md 4)
     // Store night share balances on the labels (shares.js, routes.md 10.20): read by the feeds' turns.
-    this.shares = new Shares({ storage: this.storage, watcher: this.watcher, now: this.now });
+    this.shares = new Shares({
+      storage: this.storage, watcher: this.watcher, now: this.now, secret: () => this.watcher.creds()?.password,
+      // Automatic also follows TwoTimTwo's own check-in page (owner 2026-11-22: the church calendar alone missed 11-18).
+      tttSaysStore: () => { const c = this.desk.cache; return !!c && c.night === churchNight(this.now()) && c.page && c.page.storeNight === true; },
+    });
     this.feeds.shares = this.shares;
     this.desk.shares = this.shares;
     this.adopt.shares = this.shares;
