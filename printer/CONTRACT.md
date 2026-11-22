@@ -39,6 +39,7 @@ Published on every successful label print (canary test prints excluded).
 | `isFirstTimer` | boolean | Welcome flag: the operator's explicit visitor mark, or (when the publisher's `connectCardAutoFirstTimer` setting is on) an auto-detected first-ever check-in. Same field, same type — consumers need no change. |
 | `welcomeBack` | OPTIONAL literal `true` — a RETURNING kid's first night of the season (#9). Sealed with the rest of the payload; fits the fixed 512-byte pad with wide headroom. |
 | `milestone` | OPTIONAL int 1–999 — the season night-count on a label-milestone night (5/10/25/50), for the display's milestone wall (#10). Sealed; per-child data never rides plaintext. |
+| `sharesGained` | OPTIONAL int 1–500 — shares the child earned since last club night, tonight's attendance share (and a store-night top-up) included, for the lobby's "+N SHARES!" (11.3.0). Sealed; only ever above 0. |
 
 ### `recap` — replay buffer (every ~2 min during club hours)
 

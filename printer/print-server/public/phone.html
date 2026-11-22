@@ -1205,12 +1205,14 @@ function applyRoster(data) {
     var was = old['id:' + String(k.clubberId)];
     if (hadRoster && was && !was.checkedIn && k.checkedIn && !Object.prototype.hasOwnProperty.call(STATE, 'id:' + String(k.clubberId))
       && (!ONLY || ONLY.indexOf(clubKit(k.club || '')) !== -1)) news.push({ name: (String(k.first || '') + ' ' + String(k.last || '')).trim(), out: false });
-    return { clubberId: String(k.clubberId), name: (String(k.first || '') + ' ' + String(k.last || '')).trim(), club: k.club || '', clubId: k.clubId || '', checkedIn: !!k.checkedIn, away: k.away === true, shares: typeof k.shares === 'number' ? k.shares : null };
+    return { clubberId: String(k.clubberId), name: (String(k.first || '') + ' ' + String(k.last || '')).trim(), club: k.club || '', clubId: k.clubId || '', checkedIn: !!k.checkedIn, away: k.away === true, shares: typeof k.shares === 'number' ? k.shares : null, gained: typeof k.gained === 'number' ? k.gained : null };
   }).filter(function(sk) {
     return !ONLY || ONLY.indexOf(clubKit(sk.club)) !== -1;
   }).map(function(sk) {
     var key = kidKey(sk);
-    if (Object.prototype.hasOwnProperty.call(STATE, key) && old[key]) return old[key];
+    // A child mid-tap keeps their record, but takes the newest share numbers (11-18: a child
+    // tapped before the balances arrived printed with none).
+    if (Object.prototype.hasOwnProperty.call(STATE, key) && old[key]) { old[key].shares = sk.shares; old[key].gained = sk.gained; return old[key]; }
     return sk;
   });
   // Checked out on another phone (the Worker's book, 2026-10-15): this page treats them as it treats its own.
@@ -2259,7 +2261,7 @@ function checkInMany(entries, family) {
     enqueue({
       id: 'c:' + key,
       clubberId: k.clubberId,
-      go: function(signal) { return desk.checkIn({ clubberId: k.clubberId, name: k.name, club: k.club, shares: k.shares }, choice, { signal: signal }); },
+      go: function(signal) { return desk.checkIn({ clubberId: k.clubberId, name: k.name, club: k.club, shares: k.shares, gained: k.gained }, choice, { signal: signal }); },
       // A hiccup or a minute with no answer: sent again by itself (the claim makes it safe).
       retryOn: true,
       // The roster shows them checked in: it landed.

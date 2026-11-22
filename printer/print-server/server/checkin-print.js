@@ -49,6 +49,7 @@ async function performCheckinPrint(input) {
     visitor       = false,
     stepUpNight   = false,
     awanaShares   = null,
+    sharesGained  = null,
     clubberId     = null,
     suppressConnectCard = false,
     demo          = false,
@@ -406,7 +407,7 @@ async function performCheckinPrint(input) {
       // plus a fresh tally so displays update within seconds of the check-in.
       const checkinEvent = events.buildCheckin({
         firstName, club: effectiveClubName, isBirthday: !!birthday, isFirstTimer: isFirstTimerTonight,
-        welcomeBack, milestone: milestoneCount,
+        welcomeBack, milestone: milestoneCount, sharesGained,
       });
       // A station's job: the greeting (birthday, first-timer, milestone: only this computer
       // has the roster and the history) is the ONE the single publisher lets through,
@@ -539,7 +540,7 @@ async function checkinRoute(req, res, opts = {}) {
     out = await performCheckinPrint({
       firstName, lastName,
       clubName: body.clubName, clubImageData: body.clubImageData, printerName: body.printerName,
-      visitor: body.visitor, stepUpNight: body.stepUpNight, awanaShares: body.awanaShares,
+      visitor: body.visitor, stepUpNight: body.stepUpNight, awanaShares: body.awanaShares, sharesGained: body.sharesGained,
       clubberId: body.clubberId, suppressConnectCard: body.suppressConnectCard, demo: body.demo,
       cloudCheckin: body.cloud === true,
       regen: body.regen === true,

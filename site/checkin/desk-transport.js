@@ -461,7 +461,7 @@ export function createDesk({ cc, fetch: fetchFn, store, base = DESK_API, now = D
    * The job record is exactly what the print role runs (routes.md section 5):
    * `{route: '/print', body: <the print server's /print body>, clubberId, source: 'desk'}`.
    * The page does not know the claim's gen: the lease carries it.
-   * @param {{ clubberId?: string|null, name: string, club?: string, visitor?: boolean, shares?: number|null }} child
+   * @param {{ clubberId?: string|null, name: string, club?: string, visitor?: boolean, shares?: number|null, gained?: number|null }} child
    * `welcomeOnly` (the youth page, owner 2026-10-15): the job is `/print-welcome`, the
    * TV's welcome with no label (a station below 9.4.8 refuses the route: nothing prints).
    * @param {{ bible?: boolean, friend?: boolean, friendName?: string, friendClub?: string, welcomeOnly?: boolean }} [choice]
@@ -484,6 +484,8 @@ export function createDesk({ cc, fetch: fetchFn, store, base = DESK_API, now = D
       ...(choice.friend ? { friend: true, ...(friendName ? { friendName } : {}) } : {}),
       // Store night (worker/src/shares.js): the roster's share number, drawn as the label's coin badge.
       ...(!isVisitor && Number.isInteger(child.shares) && child.shares >= 0 && child.shares < 100000 ? { awanaShares: child.shares } : {}),
+      // Every club night (owner 2026-11-21): shares earned since last week, for the lobby's "+N SHARES!".
+      ...(!isVisitor && Number.isInteger(child.gained) && child.gained > 0 && child.gained <= 500 ? { sharesGained: child.gained } : {}),
     };
     const friendClub = friendName ? String(choice.friendClub || '').slice(0, 20) : '';
     const out = await sealedPost('/v1/desk/checkin', async (list) => ({

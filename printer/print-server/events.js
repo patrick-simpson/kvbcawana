@@ -79,6 +79,10 @@ function buildCheckin(input) {
   if (src.oneOff === true) out.oneOff = true;
   const ms = Number(src.milestone);
   if (Number.isInteger(ms) && ms > 0 && ms <= 999) out.milestone = ms;
+  // sharesGained (11.3.0, owner 2026-11-21): shares earned since last club night,
+  // tonight's attendance share included, for the lobby's "+N SHARES!". Only above 0.
+  const sg = Number(src.sharesGained);
+  if (Number.isInteger(sg) && sg > 0 && sg <= 500) out.sharesGained = sg;
   return out;
 }
 

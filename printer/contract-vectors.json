@@ -73,6 +73,15 @@
           "isBirthday": false,
           "isFirstTimer": false,
           "oneOff": true
+        },
+        {
+          "id": "6f9619ff-8b86-4011-b42d-00c04fc964ee",
+          "at": "2026-11-25T23:05:00.000Z",
+          "firstName": "Priya",
+          "club": "Sparks",
+          "isBirthday": false,
+          "isFirstTimer": false,
+          "sharesGained": 4
         }
       ],
       "dirty": [
@@ -139,6 +148,21 @@
           "mustNotContain": [
             "Alice Smith"
           ]
+        },
+        {
+          "reason": "sharesGained must be a small positive int - junk is dropped, never rejected",
+          "payload": {
+            "id": "6f9619ff-8b86-4011-b42d-00c04fc964ef",
+            "at": "2026-11-25T23:05:00.000Z",
+            "firstName": "Priya",
+            "club": "Sparks",
+            "isBirthday": false,
+            "isFirstTimer": false,
+            "sharesGained": "Alice Smith"
+          },
+          "mustNotContain": [
+            "Alice Smith"
+          ]
         }
       ],
       "reject": [
@@ -162,7 +186,8 @@
       "optionalFields": [
         "welcomeBack",
         "milestone",
-        "oneOff"
+        "oneOff",
+        "sharesGained"
       ]
     },
     "recap": {

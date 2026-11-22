@@ -1,4 +1,9 @@
-﻿## [11.2.1] - 2026-11-11
+﻿## [11.3.0] - 2026-11-22
+**A clear SHARES box on store-night name tags.** On 18 November the share balance printed as a small coin and number beside the attendance streak's flame and number, and people mixed them up. On a store night the tag now shows "SHARES: 12" in its own black box in the bottom-right corner, and the streak flame is left off, so there is only one number there. A label already crowded with safety icons puts the box on the line above instead of cutting it off. The number comes from the check-in service: the child's balance plus tonight's attendance share, and never under 10 (owner's minimum).
+
+**"+N SHARES!" on the lobby TV.** Every club night, a check-in can carry how many shares the child earned since last week (tonight's attendance share and any store-night top-up included). This app passes it on to the screens inside the same sealed welcome as the child's first name; it only ever goes up, never down, and nothing is sent when it is 0.
+
+## [11.2.1] - 2026-11-11
 **A sign-in item for Cast.** Cast uses this computer's own sign-in, not the lobby screen's. On a computer that was never signed in, turning Cast on showed "This screen needs to be signed in" with nowhere to do it. The taskbar menu now shows "Cast needs this computer signed in: sign in..." at the top and "Sign this computer in (needed for Cast)..." first in the Cast menu. Both open the setup window, where the church passphrase is typed. The Cast screen's own message now gives the same steps.
 
 ## [11.2.0] - 2026-11-11

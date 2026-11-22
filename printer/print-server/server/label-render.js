@@ -24,6 +24,10 @@ Object.defineProperties(exports, {
 });
 
 // ── Draw a rounded rectangle on canvas ───────────────────────────────────────
+/** Store night's SHARES box (owner 2026-11-21): text size and side padding. */
+const SHARES_TEXT_SIZE = 18;
+const SHARES_PAD_X = 6;
+
 function roundedRect(ctx, x, y, w, h, r) {
   ctx.beginPath();
   ctx.moveTo(x + r, y);
@@ -307,6 +311,9 @@ async function generateLabel(input) {
     const n = Number(streakCount);
     streakCount = (Number.isFinite(n) && n >= 0) ? Math.floor(n) : null;
   }
+  // Store night (owner 2026-11-21): the SHARES box is the one number in that
+  // corner; the streak flame's number beside it was read as a balance on 11-18.
+  if (awanaShares !== null) streakCount = null;
   isNewKid = !!isNewKid;
   // Twin-safe fields (#13): a single initial and one short hint line, bounded
   // here so a malformed caller can't reshape the name block.
@@ -874,9 +881,9 @@ async function generateLabel(input) {
     //   coin-emoji + N (shares)  ->  cake (birthday)  ->  allergy icons
     const glyphs = [];
     if (awanaShares != null) {
-      // Coin emoji (U+1FA99) + space + ASCII digits. The font stack
-      // falls back to sans-serif for the digits, no extra font wiring.
-      glyphs.push({ ch: '🪙 ' + awanaShares, size: EMOJI_SIZE });
+      // Store night (owner 2026-11-21): "SHARES: 12" in its own inverse box, words
+      // not an emoji, so the store counter can't mistake it for anything else.
+      glyphs.push({ ch: 'SHARES: ' + awanaShares, size: SHARES_TEXT_SIZE, shares: true });
     }
     if (streakCount != null) {
       // Flame + attendance streak (#14) - same coin-badge pattern.
@@ -912,7 +919,9 @@ async function generateLabel(input) {
     ctx.textBaseline = 'alphabetic';
     let totalW = 0;
     glyphs.forEach(function(g, i) {
-      if (g.words) {
+      if (g.shares) {
+        g.w = type.measure(ctx, 'pill', g.size, g.ch) + SHARES_PAD_X * 2;
+      } else if (g.words) {
         g.w = type.measure(ctx, 'age', g.size, g.ch);
       } else {
         useEmoji(g.size);
@@ -941,14 +950,43 @@ async function generateLabel(input) {
       }
     }
 
+    // Store night's SHARES box never runs off the label: a row too full for it
+    // (many safety icons) puts the box on the line above, right-aligned.
+    let sharesAbove = null;
+    const sharesIdx = glyphs.findIndex(function(g) { return g.shares; });
+    if (sharesIdx >= 0 && totalW > ICON_ROW_MAX_W && glyphs.length > 1) {
+      sharesAbove = glyphs[sharesIdx];
+      glyphs.splice(sharesIdx, 1);
+      totalW -= sharesAbove.w + SPACING;
+    }
+
     let ex = $labelLayout.BX + bw - PAD - totalW;
     iconRowLeftX = ex;
     const ey = $labelLayout.BY + $labelLayout.BH - PAD;  // shared baseline along the bottom padding line
+    if (sharesAbove) {
+      const rowH = glyphs.reduce(function(m, g) { return Math.max(m, g.size); }, 0);
+      const sx = $labelLayout.BX + bw - PAD - sharesAbove.w;
+      const sy = ey - rowH - 8;
+      ctx.fillStyle = COLOR.visitorBg;
+      roundedRect(ctx, sx, sy - sharesAbove.size - 2, sharesAbove.w, sharesAbove.size + 5, 4);
+      ctx.fill();
+      ctx.fillStyle = COLOR.visitorText;
+      type.fill(ctx, 'pill', sharesAbove.size, sharesAbove.ch, sx + SHARES_PAD_X, sy);
+      // The bottom-left lines stop short of it, as they do of the icon row.
+      iconRowLeftX = Math.min(iconRowLeftX, sx);
+    }
     glyphs.forEach(function(g) {
       // A long icon row runs into the panel: the art ends above it.
       if (hasIcon && ex < PANEL_RIGHT) panelTextTop = Math.min(panelTextTop, ey - g.size);
       ctx.fillStyle = COLOR.name;  // share digits must stay light on step-up
-      if (g.words) {
+      if (g.shares) {
+        // The box: the visitor pill's inverse pair, readable on a white or an inverted label.
+        ctx.fillStyle = COLOR.visitorBg;
+        roundedRect(ctx, ex, ey - g.size - 2, g.w, g.size + 5, 4);
+        ctx.fill();
+        ctx.fillStyle = COLOR.visitorText;
+        type.fill(ctx, 'pill', g.size, g.ch, ex + SHARES_PAD_X, ey);
+      } else if (g.words) {
         type.fill(ctx, 'age', g.size, g.ch, ex, ey);
       } else {
         useEmoji(g.size);

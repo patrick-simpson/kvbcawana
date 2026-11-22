@@ -103,7 +103,7 @@ console.log('buildCheckin');
 
   // Celebration flags (#9/#10): optional means optional — the plain call above
   // already proved the legacy shape; here the extended shape and the junk paths.
-  const cf = events.buildCheckin({ firstName: 'Noah', club: 'T&T', welcomeBack: true, milestone: 25, oneOff: true });
+  const cf = events.buildCheckin({ firstName: 'Noah', club: 'T&T', welcomeBack: true, milestone: 25, oneOff: true, sharesGained: 4 });
   check('flags → exact extended field set',
     keysOf(cf).join(',') === [...spec.fields, ...spec.optionalFields].sort().join(','), keysOf(cf).join(','));
   check('oneOff only ever literal true',
@@ -115,6 +115,11 @@ console.log('buildCheckin');
     && !('milestone' in events.buildCheckin({ firstName: 'N', milestone: -5 }))
     && !('milestone' in events.buildCheckin({ firstName: 'N', milestone: 2.5 }))
     && events.buildCheckin({ firstName: 'N', milestone: 50 }).milestone === 50);
+  check('sharesGained must be a small positive integer (11.3.0)',
+    !('sharesGained' in events.buildCheckin({ firstName: 'N', sharesGained: 'Alice Smith' }))
+    && !('sharesGained' in events.buildCheckin({ firstName: 'N', sharesGained: 0 }))
+    && !('sharesGained' in events.buildCheckin({ firstName: 'N', sharesGained: -3 }))
+    && events.buildCheckin({ firstName: 'N', sharesGained: 4 }).sharesGained === 4);
   check('recap entries carry the flags through',
     events.buildRecap([{ ...cf }]).entries[0].welcomeBack === true
     && events.buildRecap([{ ...cf }]).entries[0].milestone === 25);
