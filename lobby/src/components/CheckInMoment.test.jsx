@@ -5,15 +5,17 @@ vi.mock('../lib/confetti.js', () => ({
   fireStandard: vi.fn(),
   fireBirthday: vi.fn(),
   fireFirstTimer: vi.fn(),
+  fireCoins: vi.fn(),
 }));
 vi.mock('../lib/audio.js', () => ({
   playChime: vi.fn(),
   playBirthdayChime: vi.fn(),
   playFirstTimerChime: vi.fn(),
+  playCoinClink: vi.fn(),
 }));
 
-import { fireBirthday, fireFirstTimer, fireStandard } from '../lib/confetti.js';
-import { playChime } from '../lib/audio.js';
+import { fireBirthday, fireCoins, fireFirstTimer, fireStandard } from '../lib/confetti.js';
+import { playChime, playCoinClink } from '../lib/audio.js';
 import { ZeroAnimationContext } from '../lib/motion.jsx';
 import { getClubPalette } from '../lib/clubs.js';
 import CheckInMoment from './CheckInMoment.jsx';
@@ -291,6 +293,45 @@ describe('CheckInMoment flips', () => {
       act(() => vi.advanceTimersByTime(3000));
       // Only the second child's burst: the first one's timer was cleared.
       expect(fireStandard).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+describe('CheckInMoment: "+N SHARES!" (owner 2026-11-21)', () => {
+  it('shows the shares earned since last week, and nothing without them', () => {
+    const { container, unmount } = render(still(<CheckInMoment event={kid({ sharesGained: 2 })} />));
+    expect(container.querySelector('.checkin__shares').textContent).toBe('+2 SHARES!');
+    unmount();
+    const one = render(still(<CheckInMoment event={kid({ sharesGained: 1 })} />));
+    expect(one.container.querySelector('.checkin__shares').textContent).toBe('+1 SHARE!');
+    one.unmount();
+    const none = render(still(<CheckInMoment event={kid()} />));
+    expect(none.container.querySelector('.checkin__shares')).toBe(null);
+  });
+
+  it('sits above a birthday sticker so the two never cover each other', () => {
+    const { container } = render(still(<CheckInMoment event={kid({ isBirthday: true, sharesGained: 3 })} />));
+    expect(container.querySelector('.checkin__shares-slot--above')).not.toBe(null);
+  });
+
+  it('a week of 5 or more gets the coin shower and a clink with the sound on; 4 gets neither', () => {
+    vi.useFakeTimers();
+    try {
+      render(still(<CheckInMoment event={kid({ sharesGained: 5 })} audioEnabled />));
+      act(() => { vi.advanceTimersByTime(3000); });
+      expect(fireCoins).toHaveBeenCalledTimes(1);
+      expect(playCoinClink).toHaveBeenCalledTimes(1);
+      cleanup();
+      vi.clearAllMocks();
+      render(still(<CheckInMoment event={kid({ sharesGained: 4 })} audioEnabled />));
+      act(() => { vi.advanceTimersByTime(3000); });
+      expect(fireCoins).not.toHaveBeenCalled();
+      cleanup();
+      render(still(<CheckInMoment event={kid({ sharesGained: 9, presentation: 'recap' })} audioEnabled />));
+      act(() => { vi.advanceTimersByTime(3000); });
+      expect(fireCoins).not.toHaveBeenCalled();   // a replayed arrival never showers
     } finally {
       vi.useRealTimers();
     }

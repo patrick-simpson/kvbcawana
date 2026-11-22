@@ -1032,6 +1032,31 @@ html, body, #root {
 .checkin__sticker--first .brand-sticker__text {
   font-size: calc(3.6 * var(--u));
 }
+/* "+N SHARES!" (owner 2026-11-21): where the sticker would sit, or above it
+   when a birthday sticker is up. Flat: sun plate, ink hard offset, no blur. */
+.checkin__shares-slot {
+  position: absolute;
+  right: calc(6 * var(--u));
+  bottom: calc(23 * var(--u));
+  display: grid;
+  justify-items: end;
+}
+.checkin__shares-slot--above {
+  bottom: calc(36 * var(--u));
+}
+.checkin .checkin__shares {
+  grid-area: 1 / 1;
+  font-family: var(--font-shout);
+  font-size: calc(3.4 * 1.057 * var(--u));
+  line-height: calc(1 / 1.057);
+  color: var(--brand-ink, #231F20);
+  background: var(--brand-sun, #FCB614);
+  padding: calc(0.9 * var(--u)) calc(1.6 * var(--u));
+  border-radius: calc(1.2 * var(--u));
+  box-shadow: calc(0.5 * var(--u)) calc(0.5 * var(--u)) 0 var(--brand-ink, #231F20);
+  white-space: nowrap;
+  transform-origin: 50% 100%;
+}
 .checkin__doodles {
   /* The 16:9 box, pinned to the bottom like the name, so the doodles keep
      their place beside it when the moment grows taller on a squarer screen. */

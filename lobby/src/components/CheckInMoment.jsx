@@ -2,15 +2,15 @@ import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, useIsPresent } from 'framer-motion';
 import { M } from '../lib/motion.jsx';
 import { getClubPalette } from '../lib/clubs.js';
-import { fireBirthday, fireFirstTimer, fireStandard } from '../lib/confetti.js';
-import { playBirthdayChime, playChime, playFirstTimerChime } from '../lib/audio.js';
+import { fireBirthday, fireCoins, fireFirstTimer, fireStandard } from '../lib/confetti.js';
+import { playBirthdayChime, playChime, playCoinClink, playFirstTimerChime } from '../lib/audio.js';
 import { nameAccent } from '../lib/nameAccent.js';
 import { DUR, EASE, inkEm, measureEm, shoutBaseline } from '../lib/brand.js';
 import { holdThenLand, LETTER_FROM, letterEnter } from '../lib/lobbyMotion.js';
 import { squishLand, withSquish } from '../lib/squish.js';
 import {
   FRONT_WAVE_DELAY, KICKER_TRACKING, KICKER_U, kickerFor, momentFor, NAME_ROOM_U, nameBox, nameRoomU, nameSizeU,
-  nameUnderKicker, PER_LETTER_MAX, stickerFor, sublineFor, WAVE_EXIT,
+  nameUnderKicker, PER_LETTER_MAX, SHARES_SHOWER_AT, sharesWords, stickerFor, sublineFor, WAVE_EXIT,
 } from '../lib/checkInMoment.js';
 import { hostClearancePx, isEmbedded } from '../lib/embed.js';
 import { lobbyUnitPx } from '../hooks/useTallerThan.js';
@@ -179,6 +179,30 @@ function MomentSticker({ moment, at, children }) {
   );
 }
 
+/**
+ * "+N SHARES!" (owner 2026-11-21): the shares a child earned since last club
+ * night, tonight's attendance share included. A flat sun-gold plate with an
+ * ink hard offset, popped on just after the sticker's beat; its last keyframe
+ * is the plate at rest (the M rule). Fixed at mount, keyed on the child.
+ */
+function SharesBadge({ text, at }) {
+  const [enter] = useState(() => withSquish(
+    holdThenLand(at, DUR.pop, { opacity: 0, scale: 0.3, rotate: 8 }, { opacity: 1, scale: 1, rotate: -3 }, EASE.pop),
+    squishLand(at, 'sticker', DUR.pop, 'pop'),
+  ));
+  return (
+    <M.div
+      className="checkin__shares"
+      initial={enter.initial}
+      animate={enter.animate}
+      exit={{ opacity: 0, scale: 0.6, transition: { duration: 0.2, ease: EASE.exit } }}
+      transition={enter.transition}
+    >
+      {text}
+    </M.div>
+  );
+}
+
 const NO_CONFETTI = () => {};
 
 /**
@@ -272,6 +296,8 @@ export default function CheckInMoment({ event, step = 0, audioEnabled, clubPhras
   const phrase = clubPhrases?.[String(event.club ?? '').trim().toLowerCase()];
   const line = sublineFor(moment, { ribbon, phrase });
   const sticker = stickerFor(moment);
+  const shares = sharesWords(event.sharesGained);
+  const showerAt = shares && event.sharesGained >= SHARES_SHOWER_AT ? (t.sticker + 0.25) * 1000 : null;
   const display = String(event.firstName).toUpperCase();
   const { size, wraps } = nameSizeU(display, (s) => measureEm(s), nameRoom());
   // Room for a tall mark (JOSÉ, NGUYỄN, ȘTEFAN) clear of the kicker above and
@@ -304,6 +330,16 @@ export default function CheckInMoment({ event, step = 0, audioEnabled, clubPhras
     }, burstAt);
     return () => clearTimeout(timer);
   }, [event.id, live, burstAt, moment, primary, tint]);
+  // The coin shower (owner 2026-11-21): a big week of shares, a live arrival only,
+  // with a soft clink when the lobby's sound is on. Never longer than the moment.
+  useEffect(() => {
+    if (!live || showerAt === null) return undefined;
+    const timer = setTimeout(() => {
+      fireCoins();
+      if (audioEnabled) playCoinClink(0.9);
+    }, showerAt);
+    return () => clearTimeout(timer);
+  }, [event.id, live, showerAt, audioEnabled]);
   useCelebration(event.id, audioEnabled, celebrationProfile(event.presentation, {
     confetti: NO_CONFETTI,
     chime: moment === 'birthday' ? playBirthdayChime : moment === 'first' ? playFirstTimerChime : playChime,
@@ -406,6 +442,12 @@ export default function CheckInMoment({ event, step = 0, audioEnabled, clubPhras
             {line && <Line key={line} text={line} delay={t.line} />}
           </AnimatePresence>
         </div>
+      </M.div>
+
+      <M.div className={`checkin__shares-slot${sticker ? ' checkin__shares-slot--above' : ''}`} exit={{ opacity: 0, scale: 0.8, transition: LEAVE }}>
+        <AnimatePresence>
+          {shares && <SharesBadge key={event.id} text={shares} at={t.sticker + 0.12} />}
+        </AnimatePresence>
       </M.div>
 
       <M.div className="checkin__sticker-slot" exit={{ opacity: 0, scale: 0.8, transition: LEAVE }}>

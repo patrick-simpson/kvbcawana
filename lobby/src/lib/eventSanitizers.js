@@ -21,6 +21,7 @@
  * @property {true} [welcomeBack] Returning kid's first night of the season (#9).
  * @property {true} [oneOff] A one-off name tag (printer 7.18.0): welcomed, never counted.
  * @property {number} [milestone] Season night-count on a label-milestone night (#10).
+ * @property {number} [sharesGained] Shares earned since last club night (owner 2026-11-21).
  * @property {string} [id] Producer uuid for live-vs-replay dedupe.
  * @property {number} [at] Epoch ms.
  */
@@ -214,6 +215,12 @@ export function sanitizeCheckin(payload) {
   if (typeof raw.milestone === 'number' && Number.isInteger(raw.milestone)
       && raw.milestone > 0 && raw.milestone <= 999) {
     safe.milestone = raw.milestone;
+  }
+  // Shares earned since last club night (printer 11.3.0, owner 2026-11-21): the
+  // check-in moment's "+N SHARES!". A small positive int, else dropped.
+  if (typeof raw.sharesGained === 'number' && Number.isInteger(raw.sharesGained)
+      && raw.sharesGained > 0 && raw.sharesGained <= 500) {
+    safe.sharesGained = raw.sharesGained;
   }
   return safe;
 }

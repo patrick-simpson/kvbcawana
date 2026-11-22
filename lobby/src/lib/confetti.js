@@ -283,3 +283,19 @@ export function fireWelcome(origin) {
     confetti({ ...cannons, particleCount: scaled(70), angle: 118, origin: { x: 1, y: 0.95 } });
   }, 220);
 }
+
+/** The coin shower's flat golds (the kit's sun and its deeper shade). */
+export const COIN_COLORS = ['#FCB614', '#E39B00', '#FFD45C'];
+
+/**
+ * The coin shower (owner 2026-11-21): a child who earned SHARES_SHOWER_AT or
+ * more shares since last week. Flat gold discs tumble down across the moment
+ * from the top edge. Same gates as every burst: confetti level, reduced
+ * motion (canvas-confetti no-ops), lowPower (level 'off').
+ */
+export function fireCoins() {
+  if (off()) return;
+  const coins = { ...BASE, shapes: ['circle'], colors: COIN_COLORS, scalar: 1.6, gravity: 1.15, ticks: 260, startVelocity: 18 };
+  confetti({ ...coins, particleCount: scaled(36), angle: 270, spread: 70, origin: { x: 0.35, y: -0.05 } });
+  confetti({ ...coins, particleCount: scaled(36), angle: 270, spread: 70, origin: { x: 0.7, y: -0.05 } });
+}

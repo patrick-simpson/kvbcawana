@@ -73,3 +73,15 @@ export function playFirstTimerChime(volume = 1) {
   tone(ctx, 440,    t,        0.3, 0.15 * volume); // A4
   tone(ctx, 659.25, t + 0.18, 0.6, 0.15 * volume); // E5
 }
+
+// Coin clink (owner 2026-11-21, the coin shower for a big week of shares): two
+// short high "ting"s a beat apart, softer than the chime it follows.
+export function playCoinClink(volume = 1) {
+  const ctx = getContext();
+  if (!ctx) return;
+  const t = ctx.currentTime;
+  tone(ctx, 2093.0, t,        0.12, 0.08 * volume); // C7
+  tone(ctx, 2637.0, t + 0.03, 0.18, 0.06 * volume); // E7
+  tone(ctx, 2093.0, t + 0.16, 0.12, 0.07 * volume); // C7
+  tone(ctx, 3136.0, t + 0.19, 0.22, 0.05 * volume); // G7
+}

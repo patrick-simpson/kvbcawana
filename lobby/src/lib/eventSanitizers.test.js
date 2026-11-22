@@ -38,7 +38,7 @@ const SANITIZERS = {
 // The exact key set each sanitizer may emit (checkin `at` becomes epoch
 // ms locally, so values differ from the wire shape but keys must not).
 const ALLOWED_KEYS = {
-  checkin: ['id', 'at', 'firstName', 'club', 'isBirthday', 'isFirstTimer', 'welcomeBack', 'milestone', 'oneOff'],
+  checkin: ['id', 'at', 'firstName', 'club', 'isBirthday', 'isFirstTimer', 'welcomeBack', 'milestone', 'oneOff', 'sharesGained'],
   recap: ['entries', 'at'],
   checkout: ['entries', 'at', 'printed'],
   tally: ['counts', 'total', 'at', 'season', 'rehearsal'],

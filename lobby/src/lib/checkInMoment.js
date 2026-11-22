@@ -245,3 +245,11 @@ export const WAVE_EXIT = {
 export const RUN_EXIT_MS = Math.ceil(
   Math.max(...Object.values(WAVE_EXIT).map((w) => (w.delay + w.duration) * 1000)) + 30,
 );
+
+/** "+N SHARES!" (owner 2026-11-21): the badge's words, or null when there is nothing to celebrate. @param {unknown} n */
+export function sharesWords(n) {
+  return typeof n === 'number' && Number.isInteger(n) && n > 0 && n <= 500 ? `+${n} ${n === 1 ? 'SHARE' : 'SHARES'}!` : null;
+}
+
+/** A week this big gets the coin shower (owner 2026-11-21: "coin shower at 5+"). */
+export const SHARES_SHOWER_AT = 5;

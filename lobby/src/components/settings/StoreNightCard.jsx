@@ -3,28 +3,29 @@ import { PanelCard } from './fields.jsx';
 import { agoWords } from '../../lib/missionControl.js';
 import { getStoreNight, putStoreNight } from '../../lib/workerClient.js';
 
-// Awana store night (owner 2026-11-18): each child's share balance prints on their
-// name tag as a coin badge. Automatic follows the church calendar ("store" in
+// Awana store night (owner 2026-11-18, 2026-11-21): each child's share number prints on
+// their name tag in a SHARES box. Automatic follows the church calendar ("store" in
 // tonight's event title), On and Off override it (worker/src/shares.js,
 // routes.md 10.20). Counts only: the page never sees a name or a balance.
 
 export const STORE_MODES = [
-  { mode: 'auto', label: 'Automatic', hint: 'On when tonight’s calendar event says “store”.' },
-  { mode: 'on', label: 'On', hint: 'Show share balances on the labels, whatever the calendar says.' },
+  { mode: 'auto', label: 'Automatic', hint: 'On when tonight’s church calendar or TwoTimTwo’s own meeting says “store”.' },
+  { mode: 'on', label: 'On', hint: 'Show share balances on the labels tonight, whatever the calendars say.' },
   { mode: 'off', label: 'Off', hint: 'Never show share balances.' },
 ];
 
 /** The status line under the buttons. @param {any} v */
 export function storeNightWords(v) {
   if (!v) return '';
+  const balances = v.readAt
+    ? `${v.balances} balances read from TwoTimTwo ${agoWords(v.readAt)}.`
+    : 'Balances are read from TwoTimTwo when club opens (about 4:30 pm).';
   if (!v.active) {
-    if (v.mode === 'off') return 'Off: labels show no share balances.';
-    return v.calendarSaysStore ? 'Not on yet.' : 'Tonight’s calendar does not say store night, so labels show no share balances.';
+    if (v.mode === 'off') return `Off: labels show no share balances. ${balances}`;
+    return `Tonight is not store night. ${balances}`;
   }
-  const why = v.mode === 'on' ? 'Switched on' : 'Tonight’s calendar says store night';
-  if (!v.readAt) return `${why}. Reading share balances from TwoTimTwo… (labels printed before this finishes have no coin).`;
-  const part = v.clubsRead < v.clubs ? ` (${v.clubsRead} of ${v.clubs} clubs read${v.error ? `; ${v.error}` : ''})` : '';
-  return `${why}. ${v.balances} balances read ${agoWords(v.readAt)}${part}. Each label shows the balance plus tonight’s share.`;
+  const why = v.mode === 'on' ? 'Switched on' : v.twotimtwoSaysStore ? 'TwoTimTwo says store night' : 'The church calendar says store night';
+  return `${why}. ${balances} Each label shows SHARES: the balance plus tonight’s share, never under ${v.minimum || 10}.`;
 }
 
 export default function StoreNightCard() {
@@ -51,7 +52,7 @@ export default function StoreNightCard() {
 
   return (
     <PanelCard title="Awana store night" tab="var(--brand-sun, #F7B917)">
-      <p className="hint">Puts each child’s share balance on their name tag (🪙 and a number) on store nights.</p>
+      <p className="hint">On store nights each name tag shows the child’s shares in a box. Every club night the lobby TV shows “+N SHARES!” for shares earned since last week.</p>
       {problem && <p className="hint hint--warn" role="status">{problem}</p>}
       {!data && !problem && <p className="hint" role="status">Reading…</p>}
       {data && (
