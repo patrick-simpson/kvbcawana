@@ -1,0 +1,155 @@
+/* ── Backwards Night (BackwardsPromo.jsx) ───────────────────────────────────
+   Everything the wrong way round: the waves hang from the top, the tab sits
+   top right, the headline's hard shadow falls to the left. Awana blue field,
+   white Paytone headline, a sun date chip, ink words. The lobby's own kit, so
+   every rule is .backwards-promo* (src/lib/promoFonts.test.js). Flat: hard
+   offsets only, no gradient, blur or glow. The component owns the timing.
+   Words sit in the widest 16:9 stage that fits, sized in --u. */
+
+.promo-slide--backwards {
+  background: var(--brand-blue, #4C72B8);
+}
+.backwards-promo {
+  --u: min(1vw, 1.7778vh);
+  color: #ffffff;
+  overflow: hidden;
+}
+
+/* The house waves, upside down along the TOP. */
+.backwards-promo__waves {
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: calc(var(--u) * 15);
+  z-index: 1;
+  pointer-events: none;
+}
+.backwards-promo__wave {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.backwards-promo__wave--sun path { fill: var(--brand-sun, #FCB614); }
+.backwards-promo__wave--orange path { fill: var(--brand-orange, #F7941D); }
+
+/* The corner tab, top RIGHT (the lobby's is top left). */
+.backwards-promo__tab {
+  position: absolute;
+  z-index: 3;
+  right: 0;
+  top: 0;
+  width: calc(var(--u) * 25);
+  box-sizing: border-box;
+  padding: calc(var(--u) * 2.3) calc(var(--u) * 3.1) calc(var(--u) * 2.7) calc(var(--u) * 2.9);
+  background: var(--brand-hot, #F15A28);
+  border-radius: 0 0 0 calc(var(--u) * 4.7);
+  pointer-events: none;
+}
+.backwards-promo__logo {
+  display: block;
+  width: calc(var(--u) * 17.7);
+  height: auto;
+  aspect-ratio: 1910 / 403;
+}
+@media (max-width: 1469.98px), (max-height: 826px) {
+  .backwards-promo__tab { display: none; }
+}
+
+/* The tape rewinding. */
+.backwards-promo__rewind {
+  position: absolute;
+  z-index: 4;
+  left: calc(var(--u) * 3);
+  top: calc(var(--u) * 2.4);
+  font-family: ui-monospace, 'Courier New', monospace;
+  font-weight: 700;
+  font-size: calc(var(--u) * 4);
+  color: #ffffff;
+  text-shadow: calc(var(--u) * 0.3) calc(var(--u) * 0.3) 0 var(--brand-ink, #231F20);
+}
+
+.backwards-promo__stage {
+  position: absolute;
+  z-index: 2;
+  left: 50%;
+  top: 50%;
+  width: calc(var(--u) * 100);
+  height: calc(var(--u) * 56.25);
+  translate: -50% -50%;
+  pointer-events: none;
+}
+.backwards-promo__headline {
+  position: absolute;
+  left: calc(var(--u) * 7);
+  top: calc(var(--u) * 13.5);
+  font-family: var(--font-shout);
+  font-size: calc(var(--u) * 11.2 * 1.057);
+  line-height: calc(0.98 / 1.057);
+  text-transform: uppercase;
+  white-space: nowrap;
+  perspective: 6em;
+}
+.backwards-promo__line {
+  display: grid;
+}
+.backwards-promo__row {
+  grid-area: 1 / 1;
+  display: flex;
+}
+.backwards-promo__letter {
+  display: inline-block;
+  color: #ffffff;
+  /* The shadow falls LEFT: the wrong way round. */
+  text-shadow: calc(var(--u) * -0.55) calc(var(--u) * 0.55) 0 var(--brand-ink, #231F20);
+  backface-visibility: hidden;
+}
+.backwards-promo__letter--back {
+  color: var(--brand-sun, #FCB614);
+}
+
+.backwards-promo__chip {
+  position: absolute;
+  left: calc(var(--u) * 64);
+  top: calc(var(--u) * 26.5);
+  rotate: 4deg;
+  font-family: var(--font-shout);
+  font-size: calc(var(--u) * 4.2 * 1.057);
+  line-height: calc(1 / 1.057);
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: var(--brand-ink, #231F20);
+  background: var(--brand-sun, #FCB614);
+  padding: calc(var(--u) * 1.1) calc(var(--u) * 2);
+  border-radius: calc(var(--u) * 1.4);
+  box-shadow: calc(var(--u) * -0.5) calc(var(--u) * 0.5) 0 var(--brand-ink, #231F20);
+}
+
+.backwards-promo__foot {
+  position: absolute;
+  left: calc(var(--u) * 7);
+  right: calc(var(--u) * 7);
+  top: calc(var(--u) * 41.5);
+  display: flex;
+  align-items: center;
+  gap: calc(var(--u) * 2);
+}
+.backwards-promo__shares {
+  margin: 0;
+  font-family: var(--font-body);
+  font-weight: 800;
+  font-size: calc(var(--u) * 3.3);
+  line-height: 1.1;
+  color: #ffffff;
+}
+.backwards-promo__coins {
+  display: flex;
+  gap: calc(var(--u) * 0.6);
+}
+.backwards-promo__coin {
+  display: block;
+  width: calc(var(--u) * 4.4);
+  height: calc(var(--u) * 4.4);
+}
+.backwards-promo__coin svg { display: block; width: 100%; height: 100%; }
+.backwards-promo__coin-face { fill: var(--brand-sun, #FCB614); stroke: var(--brand-ink, #231F20); stroke-width: 2.5; }
+.backwards-promo__coin-ring { fill: none; stroke: var(--brand-orange, #F7941D); stroke-width: 3; }

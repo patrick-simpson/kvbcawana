@@ -6,6 +6,7 @@ import {
   buildPromoSlot,
   buildEncoreSlot,
   VETERANS_SEC,
+  BACKWARDS_SEC,
   countdownLabel,
   isPromoSlide,
   nightsUntil,
@@ -140,7 +141,7 @@ describe('the promo holds', () => {
   // A promo still carries its OWN hold, which is what the slideshow reads.
   it('gives every descriptor in the table its own duration', () => {
     // The Grand Prix is a 33.68 s video (the torn cut, 2021 frames at 60 fps).
-    expect(SEASON_PROMOS.map((p) => p.durationSec)).toEqual([2021 / 60, VETERANS_SEC]);
+    expect(SEASON_PROMOS.map((p) => p.durationSec)).toEqual([2021 / 60, VETERANS_SEC, BACKWARDS_SEC]);
   });
 });
 
@@ -223,7 +224,7 @@ describe('buildPromoSlot', () => {
   it('every descriptor in the real table is one of the two known kinds', () => {
     expect(TEST_PROMOS.every((t) => SEASON_PROMOS.includes(t))).toBe(true);
     expect(SEASON_PROMOS.filter((p) => !TEST_PROMOS.includes(p)).map((p) => p.kind).sort())
-      .toEqual(['grandPrix', 'veterans']);
+      .toEqual(['backwards', 'grandPrix', 'veterans']);
   });
 
   // The Grand Prix video (owner 2026-10-29: "Get that one set to show up on
@@ -450,5 +451,17 @@ describe('buildEncoreSlot', () => {
     expect(buildEncoreSlot([], '2026-11-11')).toBeNull();
     expect(buildEncoreSlot(null, '2026-11-11')).toBeNull();
     expect(buildEncoreSlot(season, '2026-11-11', { enabled: false })).toBeNull();
+  });
+});
+
+describe('the Backwards Night poster (owner 2026-11-23)', () => {
+  const kinds = (day) => (buildPromoSlot(season, day)?.promos ?? []).filter(Boolean).map((p) => p.kind);
+  it('shows from the club night a week before through the night itself, then retires', () => {
+    const b = SEASON_PROMOS.find((p) => p.kind === 'backwards');
+    expect(b).toMatchObject({ id: 'promo_backwards', showFrom: '2027-01-06', eventDate: '2027-01-13', durationSec: BACKWARDS_SEC });
+    expect(kinds('2027-01-05')).not.toContain('backwards');
+    expect(kinds('2027-01-06')).toContain('backwards');
+    expect(kinds('2027-01-13')).toContain('backwards');
+    expect(kinds('2027-01-14')).not.toContain('backwards');
   });
 });

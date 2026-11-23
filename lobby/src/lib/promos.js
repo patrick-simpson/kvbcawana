@@ -38,7 +38,7 @@ import { dateKey } from './time.js';
 /**
  * @typedef {Object} SeasonPromo
  * @property {string} id
- * @property {string} kind 'grandPrix' | 'veterans'
+ * @property {string} kind 'grandPrix' | 'veterans' | 'backwards'
  * @property {string} eventDate Last day the promo shows, inclusive.
  * @property {string} showFrom First day the promo may show.
  * @property {number} durationSec How long the slideshow holds THIS poster.
@@ -66,6 +66,8 @@ export const GRAND_PRIX_SEC = 2021 / 60;
 
 // The Veterans Day poster's hold: a quiet 10 s (VeteransPromo.jsx).
 export const VETERANS_SEC = 10;
+// Backwards Night's poster (BackwardsPromo.jsx): 12 s, the flip lands at ~5.5 s.
+export const BACKWARDS_SEC = 12;
 
 /** @type {ReadonlyArray<SeasonPromo>} */
 export const SEASON_PROMOS = [
@@ -84,6 +86,10 @@ export const SEASON_PROMOS = [
   // Wednesday, November 11 ONLY (showFrom and eventDate are the same day), gone
   // the day after. It airs twice per pass that day (`encore`, buildEncoreSlot).
   { id: 'promo_veterans', kind: 'veterans', eventDate: '2026-11-11', showFrom: '2026-11-11', durationSec: VETERANS_SEC, encore: true },
+  // Backwards Night (owner 2026-11-23: "a fun promo the week before, and that
+  // night"; picked "Jan 6 through Jan 13"): from the club night a week before
+  // through the night itself, then it retires on its own.
+  { id: 'promo_backwards', kind: 'backwards', eventDate: '2027-01-13', showFrom: '2027-01-06', durationSec: BACKWARDS_SEC },
 ];
 
 /**

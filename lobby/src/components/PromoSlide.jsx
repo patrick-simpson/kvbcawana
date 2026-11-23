@@ -1,6 +1,7 @@
 import SnowAlertsPromo, { DETAILS as SNOW_ALERTS_DETAILS } from './promos/SnowAlertsPromo.jsx';
 import GrandPrixPromo, { DETAILS as GRAND_PRIX_DETAILS } from './promos/GrandPrixPromo.jsx';
 import VeteransPromo, { DETAILS as VETERANS_DETAILS } from './promos/VeteransPromo.jsx';
+import BackwardsPromo, { DETAILS as BACKWARDS_DETAILS } from './promos/BackwardsPromo.jsx';
 
 // ─────────────────────────────────────────────────────────────
 // The season promos. Which one shows, when, and what its countdown says is
@@ -25,6 +26,7 @@ export const PROMO_DETAILS = Object.freeze({
   snowAlerts: SNOW_ALERTS_DETAILS,
   grandPrix: GRAND_PRIX_DETAILS,
   veterans: VETERANS_DETAILS,
+  backwards: BACKWARDS_DETAILS,
 });
 
 const NO_DETAILS = Object.freeze([]);
@@ -49,6 +51,7 @@ const SCENES = {
   snowAlerts: SnowAlertsPromo,
   grandPrix: GrandPrixPromo,
   veterans: VeteransPromo,
+  backwards: BackwardsPromo,
 };
 
 /**

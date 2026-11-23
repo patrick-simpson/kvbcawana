@@ -20,7 +20,8 @@ export const SOURCE_LABELS = {
 // instead of sitting there all year.
 const lastDay = (list) => list.reduce((max, p) => (p.eventDate > max ? p.eventDate : max), '');
 const GRAND_PRIX = SEASON_PROMOS.find((p) => p.kind === 'grandPrix');
-const PROMOS_END = lastDay(SEASON_PROMOS.filter((p) => p !== GRAND_PRIX));
+const BACKWARDS = SEASON_PROMOS.find((p) => p.kind === 'backwards');
+const PROMOS_END = lastDay(SEASON_PROMOS.filter((p) => p !== GRAND_PRIX && p !== BACKWARDS));
 
 /** A published deck that arrived but is not the chosen source: say so, with the way back. */
 export function IgnoredDeckNotice({ form, update, syncedDeck }) {
@@ -187,10 +188,12 @@ export function SlidesCard({ form, set, slideCount, onEditSlides, syncedDeck, on
 export function CalendarSlidesCard({ form, set, today }) {
   const fallLive = !PROMOS_END || today <= PROMOS_END;
   const grandPrixLive = Boolean(GRAND_PRIX) && today <= GRAND_PRIX.eventDate;
+  const backwardsLive = Boolean(BACKWARDS) && today <= BACKWARDS.eventDate;
   const snowLive = inSnowSeason(today);
   const promoHint = [
     fallLive && 'Poster Contest, BARF Night, Parents’ Night: animated, dated, retire themselves.',
     grandPrixLive && 'The Awana Grand Prix video, January 1 through race day (March 20).',
+    backwardsLive && 'The Backwards Night poster, January 6 through Backwards Night (January 13).',
     snowLive && 'The snow-alerts sign-up (QR for kvbchurch.org/alerts), Nov to Mar: about one pass in six, every other pass when snow is forecast for club night.',
   ].filter(Boolean).join(' ');
   return (
@@ -211,7 +214,7 @@ export function CalendarSlidesCard({ form, set, today }) {
             title="Nights-remaining slide" hint="A countdown nudge once fewer than 10 club nights remain." />
         </>
       )}
-      {(fallLive || grandPrixLive || snowLive) && (
+      {(fallLive || grandPrixLive || backwardsLive || snowLive) && (
         <Toggle checked={form.seasonPromos} onChange={set('seasonPromos')}
           title="Season promos" hint={promoHint} />
       )}
