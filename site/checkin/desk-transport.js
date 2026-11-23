@@ -357,7 +357,13 @@ export function createDesk({ cc, fetch: fetchFn, store, base = DESK_API, now = D
     throw httpError(r);
   }
 
-  const roster = () => get('/v1/desk/roster');
+  /** Backwards Night (worker/src/theme.js): the last roster answer says so; each label then prints backwards. */
+  let backwardsNight = false;
+  const roster = async () => {
+    const r = await get('/v1/desk/roster');
+    if (r && typeof r === 'object') backwardsNight = r.backwards === true;
+    return r;
+  };
   const families = () => get('/v1/desk/families');
   const printStatus = () => get('/v1/print/status');
   /** The Worker's own tonight count (routes.md `GET /v1/desk/tonight`, P5): null until that route exists. */
@@ -486,6 +492,8 @@ export function createDesk({ cc, fetch: fetchFn, store, base = DESK_API, now = D
       ...(!isVisitor && Number.isInteger(child.shares) && child.shares >= 0 && child.shares < 100000 ? { awanaShares: child.shares } : {}),
       // Every club night (owner 2026-11-21): shares earned since last week, for the lobby's "+N SHARES!".
       ...(!isVisitor && Number.isInteger(child.gained) && child.gained > 0 && child.gained <= 500 ? { sharesGained: child.gained } : {}),
+      // Backwards Night (owner 2026-11-23): the name and the handbook group print spelled backwards.
+      ...(backwardsNight ? { awanaBackwards: true } : {}),
     };
     const friendClub = friendName ? String(choice.friendClub || '').slice(0, 20) : '';
     const out = await sealedPost('/v1/desk/checkin', async (list) => ({

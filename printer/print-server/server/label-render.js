@@ -236,6 +236,21 @@ async function thermalClubMark(key, inkWhite) {
 // rather than as a plausible-looking label.
 //
 // @param {object} input
+/**
+ * Spelled backwards by letter (accents kept on their letter), then each word
+ * capitalised: "Liam" -> "Mail", "Red Group" -> "Puorg Der". The same reversal
+ * as shared/backwards.js backwardsText (a test holds the two together).
+ * @param {string} text
+ */
+function backwardsWords(text) {
+  const s = String(text || '');
+  if (!s) return s;
+  let parts;
+  try { parts = Array.from(new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(s), (x) => x.segment); } catch { parts = Array.from(s); }
+  return parts.reverse().join('').toLocaleLowerCase()
+    .replace(/(^|[\s\-'’])(\S)/gu, (m, sep, ch) => sep + ch.toLocaleUpperCase());
+}
+
 async function generateLabel(input) {
   if (input === null || typeof input !== 'object' || Array.isArray(input)) {
     // Loud rather than mysterious: a leftover positional caller would otherwise
@@ -251,7 +266,7 @@ async function generateLabel(input) {
     testBanner = false, footerText = '', greeting = '', template = null,
     streakCount = null, isNewKid = false, middleInitial = '', nameHint = '',
     extras = {}, isLeader = false,
-    customText = '',
+    customText = '', backwards = false,
   } = input;
   // (`season` and `collectibleIndex` were inputs until the 2026-27 rebrand took
   // the seasonal motif and the collectible icon off the label. A stale caller
@@ -266,6 +281,15 @@ async function generateLabel(input) {
   allergyTokens = Array.isArray(allergyTokens) ? allergyTokens : [];
   handbookGroup = (handbookGroup || '').trim();
   footerText    = String(footerText == null ? '' : footerText).trim();
+  // Backwards Night (owner 2026-11-23, rules shared/backwards.js): the name and
+  // the handbook group print spelled backwards, capitalised as names are
+  // ("Liam" -> "Mail"); no real name underneath (owner). Every safety glyph,
+  // the club mark and the footer are untouched.
+  if (backwards === true) {
+    firstName = backwardsWords(firstName);
+    lastName = backwardsWords(lastName);
+    handbookGroup = backwardsWords(handbookGroup);
+  }
   // First-class greeting slot (connect cards). It renders on the same line the
   // handbook group uses, but is NOT subject to that field's 30-character cap —
   // the cap exists because a group name past 30 chars is roster noise, whereas

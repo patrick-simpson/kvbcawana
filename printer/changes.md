@@ -1,4 +1,7 @@
-﻿## [11.3.0] - 2026-11-22
+﻿## [11.4.0] - 2026-11-23
+**Backwards Night name tags.** On a night the check-in service calls Backwards Night (the church calendar says "Backwards" that day, or it is switched on in /settings → Tonight), the child's name and handbook group print spelled backwards: "Liam Sample, Red Group" prints as "Mail Elpmas, Puorg Der". There is no real name underneath (owner's choice). Allergy, no-photo, birthday and every other safety mark, the club logo and the footer print exactly as on any other night.
+
+## [11.3.0] - 2026-11-22
 **A clear SHARES box on store-night name tags.** On 18 November the share balance printed as a small coin and number beside the attendance streak's flame and number, and people mixed them up. On a store night the tag now shows "SHARES: 12" in its own black box in the bottom-right corner, and the streak flame is left off, so there is only one number there. A label already crowded with safety icons puts the box on the line above instead of cutting it off. The number comes from the check-in service: the child's balance plus tonight's attendance share, and never under 10 (owner's minimum).
 
 **"+N SHARES!" on the lobby TV.** Every club night, a check-in can carry how many shares the child earned since last week (tonight's attendance share and any store-night top-up included). This app passes it on to the screens inside the same sealed welcome as the child's first name; it only ever goes up, never down, and nothing is sent when it is 0.

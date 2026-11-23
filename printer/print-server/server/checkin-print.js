@@ -50,6 +50,7 @@ async function performCheckinPrint(input) {
     stepUpNight   = false,
     awanaShares   = null,
     sharesGained  = null,
+    backwards     = false,
     clubberId     = null,
     suppressConnectCard = false,
     demo          = false,
@@ -283,6 +284,7 @@ async function performCheckinPrint(input) {
         footerText: $tags.labelFooterText(),
         template: $tags.labelTemplateFor(effectiveClubName),
         extras,
+        backwards: backwards === true,   // Backwards Night: name and group spelled backwards
       });
       pngPath = result.pngPath;
 
@@ -540,7 +542,7 @@ async function checkinRoute(req, res, opts = {}) {
     out = await performCheckinPrint({
       firstName, lastName,
       clubName: body.clubName, clubImageData: body.clubImageData, printerName: body.printerName,
-      visitor: body.visitor, stepUpNight: body.stepUpNight, awanaShares: body.awanaShares, sharesGained: body.sharesGained,
+      visitor: body.visitor, stepUpNight: body.stepUpNight, awanaShares: body.awanaShares, sharesGained: body.sharesGained, backwards: body.awanaBackwards === true,
       clubberId: body.clubberId, suppressConnectCard: body.suppressConnectCard, demo: body.demo,
       cloudCheckin: body.cloud === true,
       regen: body.regen === true,

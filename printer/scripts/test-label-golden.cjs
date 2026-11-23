@@ -216,6 +216,7 @@ const CASES = [
   { name: 'visitor-inverted', model: { firstName: 'Testkid', lastName: 'Sample', clubName: 'Sparks', isVisitor: true, extras: { inverted: true } } },
   { name: 'step-up',          model: { firstName: 'Testkid', lastName: 'Sample', clubName: 'Sparks', stepUp: true, stepUpNextClub: 'T&T' } },
   { name: 'shares',           model: { firstName: 'Testkid', lastName: 'Sample', clubName: 'Sparks', awanaShares: 12 } },
+  { name: 'backwards',        model: { firstName: 'Liam', lastName: 'Sample', clubName: 'Sparks', handbookGroup: 'Red Group', backwards: true } },
   { name: 'streak-flame',     model: { firstName: 'Testkid', lastName: 'Sample', clubName: 'Sparks', streakCount: 7 } },
   { name: 'new-kid-sparkle',  model: { firstName: 'Testkid', lastName: 'Sample', clubName: 'Sparks', isNewKid: true } },
   // Twin-safe (#13): the birth-month whisper under the name, and the
