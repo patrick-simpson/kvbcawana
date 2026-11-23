@@ -57,3 +57,21 @@ describe('Backwards Night on the lobby (owner 2026-11-23)', () => {
     expect(container.querySelector('.vhs')).toBe(null);
   });
 });
+
+describe('the share banner (owner 2026-11-23)', () => {
+  it('names the children and the amount; spelled backwards on Backwards Night', async () => {
+    const { default: ShareBanner } = await import('./ShareBanner.jsx');
+    const gift = { kids: [{ firstName: 'Ava', club: 'Sparks' }, { firstName: 'Ben', club: 'T&T' }], shares: 3 };
+    const a = render(backwards(<ShareBanner gift={gift} />, false));
+    expect(a.container.querySelector('.share-banner__names').textContent).toBe('AVA & BEN');
+    expect(a.container.querySelector('.share-banner__line').textContent).toBe('got 3 shares each!');
+    a.unmount();
+    const b = render(backwards(<ShareBanner gift={gift} />));
+    expect(b.container.querySelector('.share-banner__names').textContent).toBe('NEB & AVA');
+  });
+  it('a framing host is handed first names, clubs and the amount only', async () => {
+    const { hostShares } = await import('../lib/embed.js');
+    expect(hostShares({ kids: [{ firstName: 'Ava', club: 'Sparks', lastName: 'Stone' }], shares: 2 }))
+      .toEqual({ type: 'awana-display:shares', kids: [{ firstName: 'Ava', club: 'Sparks' }], shares: 2 });
+  });
+});

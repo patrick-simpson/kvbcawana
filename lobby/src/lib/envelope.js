@@ -57,7 +57,7 @@ export const ENVELOPE_VERSION = 1;
 
 /** Events that must arrive sealed: the name-bearing four plus the synced
  * slide deck and the shared settings (operator-authored free text). */
-export const ENCRYPTED_EVENTS = ['checkin', 'recap', 'birthdays', 'checkout', 'slides', 'settings'];
+export const ENCRYPTED_EVENTS = ['checkin', 'recap', 'birthdays', 'checkout', 'slides', 'settings', 'shares'];
 
 /**
  * Fixed padded plaintext size for `checkin` — every frame is exactly this big.

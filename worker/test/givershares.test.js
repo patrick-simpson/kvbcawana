@@ -56,3 +56,12 @@ describe('hand out shares (owner 2026-11-23)', () => {
     expect(posts).toHaveLength(0);
   });
 });
+
+describe('the banner\'s list (owner 2026-11-23)', () => {
+  it('names only the children a Give actually gave to', async () => {
+    const { g } = make({ balances: { 7: 4, 8: 2 } });
+    await g.give({ id: '7', shares: 2, why: 'x', key: 'batch-0009' });
+    expect((await g.givenIn('batch-0009')).ids).toEqual(['7']);
+    expect((await g.givenIn('other-000')).ids).toEqual([]);
+  });
+});

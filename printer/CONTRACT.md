@@ -180,6 +180,19 @@ times and church copy. The publisher caps the settings object's JSON at
 anything bigger with a 413 before committing, so every accepted frame seals
 into the `[2048, 4096]` ladder `slides` uses, fail closed above.
 
+### `shares` — shares handed out, for every screen's bottom third (v6, sealed)
+
+Owner 2026-11-23. Published by the sync Worker alone (`worker/src/givershares.js`, routes.md 10.23),
+never by a print station: one frame each time the owner gives shares from awana.kvbchurch.org/tools/shares/.
+
+```json
+{ "kids": [{ "firstName": "Ava", "club": "Sparks" }], "shares": 3, "at": "2027-01-13T23:40:00.000Z" }
+```
+
+- `kids` (1 to 20): first names only (the first word), and the club; nothing else of a child.
+- `shares`: the whole number each child got, 1 to 20.
+- Sealed like `checkin` (it names children); never replayed to a screen that connects later.
+
 ### `update` — retired
 
 The laptop-internal release ping (the release workflow publishing `{ version,

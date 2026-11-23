@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSocket } from '../../hooks/useSocket.js';
 import { normalizeClub } from '../lib/birthdays.js';
 import { saveLiveBirthdays } from './useBirthdays.js';
@@ -28,7 +28,8 @@ import { saveLiveBirthdays } from './useBirthdays.js';
  * useSync reads). An old link that still carries Pusher's `?key=&cluster=`
  * is simply ignored.
  */
-export function useRealtime() {
+/** @param {{ onShares?: (gift: any) => void }} [opts] */
+export function useRealtime({ onShares: takeShares } = {}) {
   const [tally, setTally] = useState(null);
   const [schedule, setSchedule] = useState(null);
 
@@ -49,7 +50,12 @@ export function useRealtime() {
     });
   }, []);
 
-  const { status } = useSocket({ onTally, onBirthdays, onSchedule });
+  // The share banner (owner 2026-11-23; shared/shareBanner.js): each sealed `shares` frame, stamped.
+  const takeRef = useRef(takeShares);
+  useEffect(() => { takeRef.current = takeShares; }, [takeShares]);
+  const onShares = useCallback((safe) => { takeRef.current?.(safe); }, []);
+
+  const { status } = useSocket({ onTally, onBirthdays, onSchedule, onShares });
   return {
     tally,
     schedule,

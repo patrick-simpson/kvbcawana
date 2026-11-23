@@ -1558,6 +1558,121 @@
           }
         }
       ]
+    },
+    "shares": {
+      "fields": [
+        "kids",
+        "shares",
+        "at"
+      ],
+      "kidFields": [
+        "firstName",
+        "club"
+      ],
+      "maxKids": 20,
+      "note": "Owner 2026-11-23: shares handed out from /tools/shares, shown on every screen's bottom third. Published by the sync Worker only (worker/src/givershares.js), SEALED like checkin: first names only.",
+      "valid": [
+        {
+          "kids": [
+            {
+              "firstName": "Ava",
+              "club": "Sparks"
+            },
+            {
+              "firstName": "Ben",
+              "club": "T&T"
+            }
+          ],
+          "shares": 3,
+          "at": "2027-01-13T23:40:00.000Z"
+        },
+        {
+          "kids": [
+            {
+              "firstName": "Mia",
+              "club": ""
+            }
+          ],
+          "shares": 1,
+          "at": "2027-01-13T23:41:00.000Z"
+        }
+      ],
+      "dirty": [
+        {
+          "reason": "a last name or anything else on a child is dropped",
+          "payload": {
+            "kids": [
+              {
+                "firstName": "Ava",
+                "lastName": "Stone",
+                "club": "Sparks",
+                "allergy": "peanuts"
+              }
+            ],
+            "shares": 2,
+            "at": "2027-01-13T23:40:00.000Z"
+          },
+          "mustNotContain": [
+            "Stone",
+            "peanuts",
+            "lastName",
+            "allergy"
+          ]
+        },
+        {
+          "reason": "a full name in the first-name field keeps the first word only",
+          "payload": {
+            "kids": [
+              {
+                "firstName": "Ava Marie Stone",
+                "club": "Sparks"
+              }
+            ],
+            "shares": 2,
+            "at": "2027-01-13T23:40:00.000Z"
+          },
+          "mustNotContain": [
+            "Stone",
+            "Marie"
+          ]
+        }
+      ],
+      "reject": [
+        {
+          "reason": "no children",
+          "payload": {
+            "kids": [],
+            "shares": 2,
+            "at": "2027-01-13T23:40:00.000Z"
+          }
+        },
+        {
+          "reason": "shares must be 1..20",
+          "payload": {
+            "kids": [
+              {
+                "firstName": "Ava",
+                "club": "Sparks"
+              }
+            ],
+            "shares": 0,
+            "at": "2027-01-13T23:40:00.000Z"
+          }
+        },
+        {
+          "reason": "shares must be a whole number",
+          "payload": {
+            "kids": [
+              {
+                "firstName": "Ava",
+                "club": "Sparks"
+              }
+            ],
+            "shares": "3",
+            "at": "2027-01-13T23:40:00.000Z"
+          }
+        }
+      ]
     }
   }
 }

@@ -143,6 +143,8 @@ export const EMBED_CHECKIN_MESSAGE = 'awana-display:checkin';
 export const EMBED_MIRROR_MESSAGE = 'awana-display:ceremony-mirror';
 /** Backwards Night handed up to a framing host (the classroom, Journey): lib/embed.js hostBackwards. */
 export const EMBED_BACKWARDS_MESSAGE = 'awana-display:backwards';
+/** A share banner handed up to a framing host (the classroom, Journey): lib/embed.js hostShares. */
+export const EMBED_SHARES_MESSAGE = 'awana-display:shares';
 
 // Self-updating pages (see CLAUDE.md, "Self-updating pages"). A display that
 // has been running for days polls version.json this often, and again on the

@@ -701,7 +701,8 @@ function isClubNightNow(clubNights, date, graceMinutes = 0, leadMinutes = 0) {
 //   plaintext = u32be(jsonByteLength) || json || zero filler
 //   ct        = aesgcm_ciphertext || 16-byte tag   (WebCrypto's layout)
 const ENVELOPE_VERSION = 1;
-const ENCRYPTED_EVENTS = new Set(['checkin', 'recap', 'birthdays', 'checkout', 'slides', 'settings']);
+// `shares` (owner 2026-11-23) is published by the sync Worker alone; listed so the envelope vectors seal it.
+const ENCRYPTED_EVENTS = new Set(['checkin', 'recap', 'birthdays', 'checkout', 'slides', 'settings', 'shares']);
 // checkin gets a FIXED pad: it is the frame that matters, one child per event,
 // so its length must reveal nothing at all. 512 covers the true worst case —
 // note the builders cap names at 40 CHARACTERS, and a character can be 4 bytes

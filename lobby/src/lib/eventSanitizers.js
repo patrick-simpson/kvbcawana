@@ -311,6 +311,36 @@ export function sanitizeCheckout(payload) {
 }
 
 /**
+ * `shares` (owner 2026-11-23; CONTRACT.md): shares handed out from the owner's
+ * /tools/shares page, for every screen's bottom-third banner. Sealed; published
+ * by the sync Worker alone. First names only (the first word), the club, the
+ * whole number each child got (1..20), at most SHARES_KIDS_MAX children.
+ * @param {unknown} payload
+ * @returns {{ kids: { firstName: string, club: string }[], shares: number, at?: number } | null}
+ */
+export const SHARES_KIDS_MAX = 20;
+export function sanitizeShares(payload) {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return null;
+  const raw = /** @type {Record<string, unknown>} */ (payload);
+  const n = raw.shares;
+  if (typeof n !== 'number' || !Number.isInteger(n) || n < 1 || n > 20) return null;
+  const list = Array.isArray(raw.kids) ? raw.kids : [];
+  const kids = [];
+  for (const k of list.slice(0, SHARES_KIDS_MAX)) {
+    if (!k || typeof k !== 'object' || Array.isArray(k)) continue;
+    const first = cleanString(/** @type {any} */ (k).firstName, NAME_MAX).split(/\s+/)[0] || '';
+    if (!first) continue;
+    kids.push({ firstName: first, club: cleanString(/** @type {any} */ (k).club, NAME_MAX) });
+  }
+  if (!kids.length) return null;
+  /** @type {{ kids: { firstName: string, club: string }[], shares: number, at?: number }} */
+  const safe = { kids, shares: n };
+  const at = toEpochMs(raw.at);
+  if (at !== null) safe.at = at;
+  return safe;
+}
+
+/**
  * `tally` — per-club counts. Numbers only: any non-numeric value (a
  * name smuggled into a count) is dropped, never passed through.
  * @param {unknown} payload

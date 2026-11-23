@@ -14,6 +14,7 @@ import {
   sanitizeSlidesChunk,
   sanitizeTally,
   sanitizeTonight,
+  sanitizeShares,
 } from './eventSanitizers.js';
 
 // Data-driven over the mirrored contract vectors: every valid vector
@@ -33,6 +34,7 @@ const SANITIZERS = {
   notice: sanitizeNotice,
   slides: sanitizeSlidesChunk,
   settings: sanitizeSettings,
+  shares: sanitizeShares,
 };
 
 // The exact key set each sanitizer may emit (checkin `at` becomes epoch
@@ -51,6 +53,7 @@ const ALLOWED_KEYS = {
   notice: ['level', 'message', 'at', ...vectors.events.notice.optionalFields],
   slides: ['deckRev', 'publishedAt', 'seq', 'total', 'slides'],
   settings: ['rev', 'publishedAt', 'settings'],
+  shares: ['kids', 'shares', 'at'],
 };
 
 // Straight from the contract, so a new optional field (holdCheckIns, stage 4)

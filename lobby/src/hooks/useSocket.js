@@ -23,6 +23,7 @@ import {
   sanitizeSlidesChunk,
   sanitizeTally,
   sanitizeTonight,
+  sanitizeShares,
 } from '../lib/eventSanitizers.js';
 
 // PRIVACY INVARIANT — DO NOT relax. Every event type on the channel is
@@ -45,6 +46,7 @@ const EVENT_SANITIZERS = {
   notice: sanitizeNotice,
   slides: sanitizeSlidesChunk,
   settings: sanitizeSettings,
+  shares: sanitizeShares,
 };
 
 /**
@@ -90,6 +92,7 @@ const HANDLER_NAMES = {
   notice: 'onNotice',
   slides: 'onSlides',
   settings: 'onSettings',
+  shares: 'onShares',
 };
 
 /**

@@ -46,7 +46,7 @@ import { CopyRoomContext } from './lib/copyRoom.js';
 import { localDateStr } from './lib/calendarLogic.js';
 import { PREVIEW_PROMOS, previewPromo } from './lib/promos.js';
 import PromoSlide from './components/PromoSlide.jsx';
-import { fireMilestone, setConfettiLevel, setConfettiLoad, setConfettiSkin, setConfettiUpsideDown } from './lib/confetti.js';
+import { fireCoins, fireMilestone, setConfettiLevel, setConfettiLoad, setConfettiSkin, setConfettiUpsideDown } from './lib/confetti.js';
 import { resolveSkin, sceneForSkin, SKIN_TABLE } from './lib/skins.js';
 import { BOARD_HIDDEN, BOARD_NAMES, decideBoard, demoCheckout, pickupNow } from './lib/checkoutBoard.js';
 import { SAMPLE_BOARD_NAMES, SAMPLE_NAMES, pick } from './lib/demoNames.js';
@@ -97,9 +97,11 @@ import {
 import { useWatchdogReload } from './hooks/useWatchdogReload.js';
 import { useBuildReload } from './hooks/useBuildReload.js';
 import { useTallerThan } from './hooks/useTallerThan.js';
-import { hostBackwards, hostCheckin, hostDoorbell, hostMirror, isEmbedded } from './lib/embed.js';
+import { hostBackwards, hostShares, hostCheckin, hostDoorbell, hostMirror, isEmbedded } from './lib/embed.js';
 import { BackwardsContext, useBackwards } from './hooks/useBackwards.js';
 import VhsRewind from './components/VhsRewind.jsx';
+import ShareBanner from './components/ShareBanner.jsx';
+import { SHARE_BANNER_MS, createShareQueue } from '../../shared/shareBanner.js';
 import { useCeremonyMirror } from './hooks/useCeremonyMirror.js';
 import { CeremonyLeadIn } from './components/CeremonyLeadIn.jsx';
 import { MirrorSwitching } from './components/MirrorSwitching.jsx';
@@ -724,7 +726,40 @@ export default function App() {
   }, []);
   useEffect(() => () => { if (shareTimerRef.current) clearTimeout(shareTimerRef.current); }, []);
 
+  // The share banner (owner 2026-11-23; shared/shareBanner.js): shares handed out from
+  // /tools/shares. Framed (the classroom, Journey), it goes up to the host, which shows it
+  // over its own cards; here it waits its turn and a quiet moment (no name, no mirror).
+  const shareQueue = useState(createShareQueue)[0];
+  const [shareGift, setShareGift] = useState(/** @type {any} */ (null));
+  const [shareWaiting, setShareWaiting] = useState(0);
+  const handleShares = useCallback((gift) => {
+    if (CONFIGURE || FLAGS.overlay) return;
+    if (isEmbedded()) {
+      try { window.parent.postMessage(hostShares(gift), window.location.origin); } catch { /* no parent to tell */ }
+      return;
+    }
+    shareQueue.add(gift, Date.now());
+    setShareWaiting(shareQueue.size());
+  }, [shareQueue]);
+  useEffect(() => {
+    if (shareGift) {
+      const t = window.setTimeout(() => setShareGift(null), SHARE_BANNER_MS);
+      return () => window.clearTimeout(t);
+    }
+    if (!shareWaiting) return undefined;
+    const tick = () => {
+      const g = shareQueue.take(Date.now(), currentEvent != null || coverUp);
+      setShareWaiting(shareQueue.size());
+      if (!g) return;
+      setShareGift({ ...g, key: Date.now() });
+      if (!config.reduceMotion) fireCoins();
+    };
+    tick();
+    const t = window.setInterval(tick, 1000);
+    return () => window.clearInterval(t);
+  }, [shareGift, shareWaiting, shareQueue, currentEvent, coverUp, config.reduceMotion]);
   const socketHandlers = useMemo(() => ({
+    onShares: handleShares,
     onCheckin: handleCheckIn,
     onRecap: handleRecap,
     onOps: recordOps,
@@ -735,7 +770,7 @@ export default function App() {
     onBirthdays: setBirthdays,
     onSlides,
     onSettings,
-  }), [handleCheckIn, handleRecap, recordOps, handleTally, handleTonight, handleNotice, handleCheckout, onSlides, onSettings]);
+  }), [handleShares, handleCheckIn, handleRecap, recordOps, handleTally, handleTonight, handleNotice, handleCheckout, onSlides, onSettings]);
 
   // In configure mode the socket only feeds Settings' status: no child's
   // name, recap, pickup or notice is ever shown in the booth's Settings window.
@@ -748,7 +783,7 @@ export default function App() {
   const [mission, missionDispatch] = useReducer(reduceMission, undefined, initialMission);
   const liveHandlers = useMemo(() => {
     if (!CONFIGURE) return socketHandlers;
-    const quiet = { ...socketHandlers, onCheckin: noop, onRecap: noop, onCheckout: noop, onNotice: noop };
+    const quiet = { ...socketHandlers, onCheckin: noop, onRecap: noop, onCheckout: noop, onNotice: noop, onShares: noop };
     if (!SETTINGS_PAGE) return quiet;
     return {
       ...quiet,
@@ -1579,6 +1614,9 @@ export default function App() {
         </ErrorBoundary>
       )}
       {/* Backwards Night's VHS rewind (owner's easter egg): never over a name or a held slide. */}
+      {!overlay && !CONFIGURE && (
+        <AnimatePresence>{shareGift && <ShareBanner key={shareGift.key} gift={shareGift} />}</AnimatePresence>
+      )}
       {!overlay && !CONFIGURE && (
         <VhsRewind on={backwards && !config.reduceMotion} busy={currentEvent != null || checkInsHeld} />
       )}

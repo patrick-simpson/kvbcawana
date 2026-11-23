@@ -174,6 +174,8 @@ async function give() {
   }
   giving = false;
   drawBar();
+  // The banner on every screen: one announcement for this Give (only the children it reached).
+  request('/v1/shares/announce', { method: 'POST', body: { key } }).catch(() => {});
   // Fresh "+N tonight" tags, keeping each row's result line.
   const lines = new Map([...document.querySelectorAll('.kid')].map((row) => [row.dataset.id, row.querySelector('.out').outerHTML]));
   const res = await request('/v1/shares/tonight');

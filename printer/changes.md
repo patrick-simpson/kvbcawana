@@ -1,4 +1,7 @@
-﻿## [11.5.0] - 2026-11-23
+﻿## [11.5.1] - 2026-11-23
+**The screens' event list gains `shares`.** The sync service now sends a sealed `shares` message to every screen when the owner hands out shares (a banner in the bottom third). This app never sends it; it only knows the name so the shared contract and its test vectors stay one list. Nothing changes on the labels or the print path.
+
+## [11.5.0] - 2026-11-23
 **Leader tags print backwards on Backwards Night too.** A leader's name and the line under it print spelled backwards ("Pat Sample, Sparks Leader" prints as "Tap Elpmas, Redael Skraps"), from /checkin's leader tag and from /settings. The LEADER badge and every safety mark print as usual.
 
 ## [11.4.0] - 2026-11-23

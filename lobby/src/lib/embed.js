@@ -24,7 +24,7 @@
 // is laid out exactly as it always was.
 
 import { sanitizeJourneyPress } from '../../../shared/journeyRemote.js';
-import { EMBED_BACKWARDS_MESSAGE, EMBED_CHECKIN_MESSAGE, EMBED_DOORBELL_MESSAGE, EMBED_MIRROR_MESSAGE } from './constants.js';
+import { EMBED_BACKWARDS_MESSAGE, EMBED_SHARES_MESSAGE, EMBED_CHECKIN_MESSAGE, EMBED_DOORBELL_MESSAGE, EMBED_MIRROR_MESSAGE } from './constants.js';
 
 /**
  * Whether this page is inside another page's frame: the same test the
@@ -118,6 +118,18 @@ export function hostMirror(up) {
  */
 export function hostBackwards(on) {
   return { type: EMBED_BACKWARDS_MESSAGE, on: on === true };
+}
+
+/**
+ * A share banner (owner 2026-11-23), handed up to a framing host (the classroom,
+ * Journey), which shows it over its own cards: first names and clubs, the
+ * amount, nothing else (the frame's own sanitized `shares`).
+ * @param {{ kids: { firstName: string, club: string }[], shares: number }} gift
+ */
+export function hostShares(gift) {
+  const kids = (gift && Array.isArray(gift.kids) ? gift.kids : []).slice(0, 20)
+    .map((k) => ({ firstName: String(k.firstName || ''), club: String(k.club || '') }));
+  return { type: EMBED_SHARES_MESSAGE, kids, shares: gift && Number.isInteger(gift.shares) ? gift.shares : 0 };
 }
 
 /**

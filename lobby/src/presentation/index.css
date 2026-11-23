@@ -1405,6 +1405,29 @@
 .pj-take__fire > span:nth-child(3) { translate: -6% 0; opacity: 0.55; animation-duration: 0.53s; animation-delay: -0.2s; }
 @keyframes pjFlicker { 0% { transform: scaleY(1.18) scaleX(1.02); } 100% { transform: scaleY(0.88) scaleX(0.98); } }
 
+/* The share banner (components/ShareBanner.jsx, owner 2026-11-23): the wall's bottom third. */
+.pj-share {
+  position: absolute;
+  z-index: 27;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: calc(16 * var(--u, 1vw));
+  display: flex;
+  align-items: center;
+  gap: calc(3 * var(--u, 1vw));
+  padding: 0 calc(6 * var(--u, 1vw));
+  background: #FCB614;
+  box-shadow: 0 calc(-0.6 * var(--u, 1vw)) 0 #231F20;
+  color: #231F20;
+  pointer-events: none;
+}
+.pj-share__coins { display: flex; gap: calc(0.8 * var(--u, 1vw)); }
+.pj-share__coin { width: calc(6.5 * var(--u, 1vw)); height: calc(6.5 * var(--u, 1vw)); display: block; }
+.pj-share__copy { min-width: 0; }
+.pj-share__names { font-family: var(--font-display); font-size: calc(6 * 1.057 * var(--u, 1vw)); line-height: calc(1 / 1.057); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pj-share__line { font-family: var(--font-condensed); font-size: calc(3.6 * var(--u, 1vw)); letter-spacing: 0.06em; text-transform: uppercase; color: #8c2a0b; margin-top: calc(0.6 * var(--u, 1vw)); }
+
 /* ════════════════════════════════════════════════════════════════════
    Phones and tablets (lib/touch.js). Everything below is gated on the
    PRIMARY pointer, never on the window's size: the projector PC (a mouse
@@ -1972,3 +1995,4 @@
   /* ── The weather scene: its shapes twice the unit, so a cloud is a cloud ── */
   .pj-wx { --wx-u: calc(2 * var(--u)); }
 }
+

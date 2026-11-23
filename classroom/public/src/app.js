@@ -11,6 +11,8 @@ const own = new URL(import.meta.url);
 const L = await import(new URL(`./logic.js${own.search}`, own).href);
 // Backwards Night's text turner (backwards.js), with the page's own ?v=.
 const BW = await import(new URL(`./backwards.js${own.search}`, own).href);
+// The share banner's words and queue (shared/shareBanner.js, a byte copy beside this file).
+const SB = await import(new URL(`./shared/shareBanner.js${own.search}`, own).href);
 
 const params = new URLSearchParams(window.location.search);
 const CONFIGURE = params.get('configure') === '1';
@@ -38,6 +40,8 @@ export const CHECKIN_MESSAGE = 'awana-display:checkin';
 export const MIRROR_MESSAGE = 'awana-display:ceremony-mirror';
 /** Backwards Night, told by the embedded lobby (lobby src/lib/embed.js hostBackwards). */
 export const BACKWARDS_MESSAGE = 'awana-display:backwards';
+/** A share banner, handed up by the embedded lobby (lobby src/lib/embed.js hostShares). */
+export const SHARES_MESSAGE = 'awana-display:shares';
 
 const root = document.documentElement;
 const $ = (id) => /** @type {HTMLElement} */ (document.getElementById(id));
@@ -436,6 +440,51 @@ let mirrorSaid = false;
 let mirrorSince = 0;
 let mirrorShown = false;
 let mirrorLeaveTimer = 0;
+// The share banner (owner 2026-11-23; shared/shareBanner.js): shares the owner hands out,
+// shown in the bottom third over whatever is up, never over a video the remote is playing.
+// Names from the embedded lobby only (its own frame and origin), memory only.
+const shareBox = document.createElement('div');
+shareBox.className = 'cr-share';
+shareBox.hidden = true;
+shareBox.setAttribute('role', 'status');
+document.body.append(shareBox);
+const shareQueue = SB.createShareQueue();
+let shareUp = false;
+function showShare(gift) {
+  const w = SB.shareWords(gift);
+  const say = (t) => (backwardsCards.on() ? BW.backwardsText(t) : t);
+  shareBox.textContent = '';
+  const coins = document.createElement('div');
+  coins.className = 'cr-share-coins';
+  for (let i = 0; i < 3; i++) { const c = document.createElement('i'); c.style.setProperty('--i', String(i)); coins.append(c); }
+  const names = document.createElement('div');
+  names.className = 'cr-share-names';
+  names.textContent = say(w.names);
+  const line = document.createElement('div');
+  line.className = 'cr-share-line';
+  line.textContent = say(w.line);
+  const copy = document.createElement('div');
+  copy.append(names, line);
+  shareBox.append(coins, copy);
+  shareBox.hidden = false;
+  shareUp = true;
+  setTimeout(() => { shareBox.hidden = true; shareBox.textContent = ''; shareUp = false; }, SB.SHARE_BANNER_MS);
+}
+if (!CONFIGURE) {
+  window.addEventListener('message', (event) => {
+    if (!frame || event.source !== frame.contentWindow || event.origin !== window.location.origin) return;
+    const d = event.data;
+    if (!d || typeof d !== 'object' || d.type !== SHARES_MESSAGE || !Array.isArray(d.kids)) return;
+    const kids = d.kids.slice(0, 20).map((k) => ({ firstName: String((k && k.firstName) || '').split(/\s+/)[0].slice(0, 40), club: String((k && k.club) || '').slice(0, 40) })).filter((k) => k.firstName);
+    const shares = Number.isInteger(d.shares) && d.shares >= 1 && d.shares <= 20 ? d.shares : 0;
+    if (kids.length && shares) shareQueue.add({ kids, shares }, Date.now());
+  });
+  setInterval(() => {
+    if (shareUp) return;
+    const gift = shareQueue.take(Date.now(), Boolean(stageApi && stageApi.videoPlaying()));
+    if (gift) showShare(gift);
+  }, 1000);
+}
 // Backwards Night (owner 2026-11-23): the lobby frame says when; the cards' own words turn (backwards.js).
 const backwardsCards = BW.createBackwards(['cubbies', 'sparks', 'welcome-cubbies', 'welcome-sparks', 'board']
   .map((id) => document.getElementById(id)).filter((el) => el !== null));

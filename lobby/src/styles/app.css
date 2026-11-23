@@ -4491,3 +4491,44 @@ html.vhs-rewind .manual-slide-copy {
   66% { translate: calc(-1.2 * var(--u)) 0; }
   100% { translate: 0 0; }
 }
+
+/* ── The share banner (components/ShareBanner.jsx, owner 2026-11-23) ──────
+   The bottom third: a sun-gold plate with an ink hard top edge, three coins,
+   the names in the shout face and the amount in the label face. Flat. */
+.share-banner {
+  position: absolute;
+  z-index: 55;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: calc(16 * var(--u, 1vw));
+  display: flex;
+  align-items: center;
+  gap: calc(3 * var(--u, 1vw));
+  padding: 0 calc(6 * var(--u, 1vw));
+  background: var(--brand-sun, #FCB614);
+  box-shadow: 0 calc(-0.6 * var(--u, 1vw)) 0 var(--brand-ink, #231F20);
+  color: var(--brand-ink, #231F20);
+  pointer-events: none;
+}
+.share-banner__coins { display: flex; gap: calc(0.8 * var(--u, 1vw)); }
+.share-banner__coin { width: calc(6.5 * var(--u, 1vw)); height: calc(6.5 * var(--u, 1vw)); display: block; }
+.share-banner__coin-face { fill: #FFD54A; stroke: var(--brand-ink, #231F20); stroke-width: 2.5; }
+.share-banner__coin-ring { fill: none; stroke: var(--brand-orange, #FAA41D); stroke-width: 3; }
+.share-banner__copy { min-width: 0; }
+.share-banner__names {
+  font-family: var(--font-shout);
+  font-size: calc(6 * 1.057 * var(--u, 1vw));
+  line-height: calc(1 / 1.057);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.share-banner__line {
+  font-family: var(--font-condensed);
+  font-size: calc(3.6 * var(--u, 1vw));
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--brand-hot-ink, #8c2a0b);
+  margin-top: calc(0.6 * var(--u, 1vw));
+}

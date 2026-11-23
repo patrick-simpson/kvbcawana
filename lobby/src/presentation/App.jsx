@@ -1,4 +1,6 @@
 import { BackwardsContext, useBackwards } from '../hooks/useBackwards.js';
+import { ShareBanner } from './components/ShareBanner.jsx';
+import { SHARE_BANNER_MS, createShareQueue } from '../../../shared/shareBanner.js';
 import React, { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { AnimatePresence, MotionConfig, motion } from 'framer-motion';
 import { AppMode } from './types.js';
@@ -89,7 +91,17 @@ export const App = () => {
   // before useSchedule() so the `schedule` broadcast can be folded in
   // as an advisory layer over shared/schedule.json (never a
   // replacement — see lib/scheduleAdvisory.js).
-  const { tally, schedule: scheduleAdvisory, socketStatus } = useRealtime();
+  // The share banner (owner 2026-11-23): waits while the opening ceremony slides or a winner
+  // film are up; a mirror shows none (the lobby that frames it shows its own).
+  const shareQueue = useState(createShareQueue)[0];
+  const [shareGift, setShareGift] = useState(/** @type {any} */ (null));
+  const [shareWaiting, setShareWaiting] = useState(0);
+  const takeShares = useCallback((gift) => {
+    if (MIRROR || CONFIGURE) return;
+    shareQueue.add(gift, Date.now());
+    setShareWaiting(shareQueue.size());
+  }, [shareQueue]);
+  const { tally, schedule: scheduleAdvisory, socketStatus } = useRealtime({ onShares: takeShares });
   const { state, isOverride, resumeAt, select, resume, stay } = useSchedule(now, scheduleAdvisory);
 
   // Advancing past the opening deck's final blackout jumps straight into
@@ -111,6 +123,21 @@ export const App = () => {
   const backwards = useBackwards({ enabled: !CONFIGURE });
   const scoringClub = board?.active ?? null;
   const lowPowerNow = useLowPower();
+  useEffect(() => {
+    if (shareGift) {
+      const t = window.setTimeout(() => setShareGift(null), SHARE_BANNER_MS);
+      return () => window.clearTimeout(t);
+    }
+    if (!shareWaiting) return undefined;
+    const tick = () => {
+      const g = shareQueue.take(Date.now(), state.mode === AppMode.SLIDESHOW || Boolean(finale));
+      setShareWaiting(shareQueue.size());
+      if (g) setShareGift({ ...g, key: Date.now() });
+    };
+    tick();
+    const t = window.setInterval(tick, 1000);
+    return () => window.clearInterval(t);
+  }, [shareGift, shareWaiting, shareQueue, state.mode, finale]);
   // Into the scoreboard it wipes in over the old view (ScoringView); into the opening ceremony it cuts (cutsIn).
   const layOver = scoringClub ? !lowPowerNow : cutsIn(state, now);
 
@@ -386,6 +413,7 @@ export const App = () => {
       <AnimatePresence>{backup && <BackupView key={backup} what={backup} />}</AnimatePresence>
 
       <AnimatePresence>
+        <AnimatePresence>{shareGift && <ShareBanner key={shareGift.key} gift={shareGift} still={lowPowerNow} />}</AnimatePresence>
         {finale && <FinaleFilm key={finale.id} club={finale.club} teams={finale.teams} scores={finale.scores} night={board?.night || nightOf(serverNow())} still={lowPowerNow} sounds={board?.sounds === true} />}
       </AnimatePresence>
 

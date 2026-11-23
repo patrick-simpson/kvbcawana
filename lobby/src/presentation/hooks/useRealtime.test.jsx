@@ -69,10 +69,10 @@ describe('useRealtime — existing tally/birthdays wiring is unaffected', () => 
     expect(result.current.tally).toEqual({ counts: { Sparks: 4 }, total: 4, at: new Date(1000) });
   });
 
-  it('registers all three handlers with useSocket', () => {
+  it('registers its handlers with useSocket (the share banner since 2026-11-23)', () => {
     renderHook(() => useRealtime());
     expect(Object.keys(socketHandlers.current).sort()).toEqual(
-      ['onBirthdays', 'onSchedule', 'onTally'].sort(),
+      ['onBirthdays', 'onSchedule', 'onShares', 'onTally'].sort(),
     );
   });
 });

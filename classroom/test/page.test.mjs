@@ -290,3 +290,22 @@ describe('Backwards Night (owner 2026-11-23)', { skip: SKIP }, () => {
     await page.close();
   });
 });
+
+describe('the share banner (owner 2026-11-23)', { skip: SKIP }, () => {
+  it('shows the lobby frame\'s gift in the bottom third, from the frame only, then goes', async () => {
+    const page = await open('?now=2026-10-14T23:10:00Z');
+    await page.waitForFunction(() => document.documentElement.dataset.phase === 'sparks');
+    const gift = { type: 'awana-display:shares', kids: [{ firstName: 'Ava', club: 'Sparks' }, { firstName: 'Ben', club: 'T&T' }], shares: 3 };
+    await page.evaluate((m) => window.postMessage(m, location.origin), gift);
+    await page.waitForTimeout(1500);
+    assert.equal(await page.isHidden('.cr-share'), true, 'not from the frame: ignored');
+    const frame = page.frame({ url: /\/lobby\/\?club=sparks/ });
+    await frame.evaluate((m) => window.postMessage({ post: m }, location.origin), gift);
+    await page.waitForSelector('.cr-share:not([hidden])', { timeout: 3000 });
+    assert.equal(await page.textContent('.cr-share-names'), 'AVA & BEN');
+    assert.equal(await page.textContent('.cr-share-line'), 'got 3 shares each!');
+    const stored = await page.evaluate(() => JSON.stringify({ ...localStorage }) + JSON.stringify({ ...sessionStorage }));
+    assert.doesNotMatch(stored, /Ava|Ben/);
+    await page.close();
+  });
+});

@@ -25,6 +25,7 @@ const HANDLER_FOR = {
   notice: 'onNotice',
   slides: 'onSlides',
   settings: 'onSettings',
+  shares: 'onShares',
 };
 
 describe('simulateEvent', () => {

@@ -574,9 +574,29 @@ html[data-phase="configure"] .cr-configure {
 .cr-configure ul { padding-left: 1.2rem; }
 html[data-phase="configure"] .cr-black { display: none; }
 
+/* ── The share banner (app.js showShare, owner 2026-11-23) ──────────────────
+   The bottom third over everything (the lobby mirror is z 20): a sun-gold plate,
+   three coins, the names and the amount. Flat; rises in only with motion. */
+.cr-share {
+  position: fixed; z-index: 30; left: 0; right: 0; bottom: 0;
+  height: calc(16 * var(--u));
+  display: flex; align-items: center; gap: calc(3 * var(--u));
+  padding: 0 calc(6 * var(--u));
+  background: #FCB614; color: #231F20;
+  box-shadow: 0 calc(-0.6 * var(--u)) 0 #231F20;
+  pointer-events: none;
+}
+.cr-share-coins { display: flex; gap: calc(0.8 * var(--u)); }
+.cr-share-coins i { display: block; width: calc(6.5 * var(--u)); height: calc(6.5 * var(--u)); border-radius: 50%; background: #FFD54A; border: calc(0.4 * var(--u)) solid #231F20; box-shadow: inset 0 0 0 calc(0.9 * var(--u)) #FFD54A, inset 0 0 0 calc(1.5 * var(--u)) #FAA41D; }
+.cr-share-names { font-family: var(--brand-font-display, 'Paytone One'); font-size: calc(6 * var(--cr-shout-fit, 1.057) * var(--u)); line-height: 0.95; white-space: nowrap; }
+.cr-share-line { font-family: var(--brand-font-label, 'Londrina Solid'); font-size: calc(3.6 * var(--u)); letter-spacing: 0.06em; text-transform: uppercase; color: #8c2a0b; margin-top: calc(0.6 * var(--u)); }
+
 /* ── Motion: only when the OS allows it ─────────────────────────── */
 @media (prefers-reduced-motion: no-preference) {
   /* Arrival: the wave rises, the mark pops with a soft squish, doodles land. */
+  html.cr-motion .cr-share:not([hidden]) { animation: cr-share-up 550ms cubic-bezier(.34,1.56,.64,1) backwards; }
+  html.cr-motion .cr-share:not([hidden]) .cr-share-coins i { animation: cr-pop 400ms var(--brand-ease-pop, ease-out) backwards; animation-delay: calc(350ms + var(--i) * 120ms); }
+  @keyframes cr-share-up { from { transform: translateY(110%); } }
   html.cr-motion .cr-card.is-arriving .cr-wave { animation: cr-rise 900ms var(--brand-ease-settle, ease-out) backwards; }
   html.cr-motion .cr-card.is-arriving .cr-hero { animation: cr-pop 1100ms var(--brand-ease-pop, ease-out) 300ms backwards; }
   html.cr-motion .cr-card.is-arriving .cr-title { animation: cr-up 1000ms var(--brand-ease-settle, ease-out) 250ms backwards; }

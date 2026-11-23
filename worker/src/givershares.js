@@ -67,6 +67,22 @@ export class GiveShares {
     await this.storage.put(GIVE_KEY, await sealState(secret, this.night));
   }
 
+  /**
+   * The children one Give actually gave to (`given`), with how many each: for the banner.
+   * @param {string} key @returns {Promise<{ ids: string[], shares: number }>}
+   */
+  async givenIn(key) {
+    const night = await this.load();
+    const ids = [];
+    let shares = 0;
+    for (const [k, v] of Object.entries(night.done)) {
+      if (!k.startsWith(`${key}:`) || v.s !== 'given') continue;
+      ids.push(v.id);
+      shares = Math.max(shares, v.n);
+    }
+    return { ids, shares };
+  }
+
   /** Shares given tonight per child (given only), for the page. */
   async givenTonight() {
     const night = await this.load();
@@ -145,4 +161,26 @@ export function mountGiveShares(registry, core) {
     return json({ ok: true, backwards: body.backwards === true, kids, ...(body.stale ? { stale: true } : {}) });
   }));
   registry.add('POST', '/v1/shares/give', 'public', owner(async ({ body }) => core.giveShares.give(await body())));
+  // The banner on every screen (owner 2026-11-23: "a cool animation on every screen ... on the
+  // bottom third"): once a Give has run, ONE sealed `shares` frame (CONTRACT.md) naming the
+  // children it gave to, first names and clubs only. Never replayed; once per Give.
+  const announced = new Set();
+  registry.add('POST', '/v1/shares/announce', 'public', owner(async ({ body }) => {
+    const b = await body();
+    const key = String(b && b.key || '');
+    if (!/^[A-Za-z0-9_-]{8,40}$/.test(key)) return fail('Reload the page.', 400, { reason: 'bad-key' });
+    if (announced.has(key)) return json({ ok: true, repeat: true });
+    const { ids, shares } = await core.giveShares.givenIn(key);
+    if (!ids.length || shares < 1) return json({ ok: false, reason: 'none-given' });
+    const res = await core.desk.roster();
+    const roster = await res.json().catch(() => null);
+    const byId = new Map((roster && Array.isArray(roster.kids) ? roster.kids : []).map((/** @type {any} */ k) => [String(k.clubberId), k]));
+    const kids = ids.map((id) => byId.get(id)).filter(Boolean).slice(0, 20)
+      .map((/** @type {any} */ k) => ({ firstName: String(k.first || '').split(/\s+/)[0], club: String(k.club || '') }))
+      .filter((k) => k.firstName);
+    if (!kids.length) return json({ ok: false, reason: 'no-names' });
+    announced.add(key);
+    const sent = await core.publishSealed('shares', { kids, shares: Math.min(20, shares), at: new Date(core.now()).toISOString() });
+    return json({ ok: sent.ok, kids: kids.length });
+  }));
 }

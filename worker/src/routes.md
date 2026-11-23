@@ -2162,3 +2162,7 @@ unlisted, noindex). Owner only: the church session AND `X-Mail-Owner` (the club 
   page shows the new balance) / `refused` / `unknown`. The same `key:id` again answers `repeat: true` and
   posts nothing; `unknown` is never posted again. Before any mark: 429 `read-busy`, 502 (TwoTimTwo, a form
   it could not read, `no-permission`), 409 `no-meeting-tonight`; the page may ask again with the same key.
+- `POST /v1/shares/announce {key}` (owner only): once a Give has run, ONE sealed `shares` frame (CONTRACT.md:
+  first names and clubs of the children that Give reached, the amount; never replayed; once per key) for
+  the share banner on every screen (`shared/shareBanner.js`; lobby `ShareBanner.jsx`, projector
+  `presentation/components/ShareBanner.jsx`, the classroom and Journey through the lobby's `hostShares`).

@@ -51,11 +51,11 @@ export const KIT = 'shared/brand';
 // club-night rule its Trek small group card follows (src/schedule/25-trek.js);
 // and the phone remote's rules (public/remote/, which also signs in with the first two);
 // and the club transition gap (src/schedule/29-transition-gap.js, owner 2026-10-17).
-export const JOURNEY_MODULES = ['sync-protocol.js', 'cloud-crypto.js', 'clubNight.js', 'journeyRemote.js', 'transitionGap.js'];
+export const JOURNEY_MODULES = ['sync-protocol.js', 'cloud-crypto.js', 'clubNight.js', 'journeyRemote.js', 'transitionGap.js', 'shareBanner.js'];
 // What each app holds a copy of. Paths are repo-relative.
 export const COPIES = {
   journey: { kit: 'journey/public/brand', modules: 'journey/public/src/shared' },
-  classroom: { kit: 'classroom/public/brand', modules: 'classroom/public/src/shared', moduleList: ['clubNight.js', 'transitionGap.js', 'classroomRemote.js', 'sync-protocol.js', 'cloud-crypto.js', 'screenShare.js'] },
+  classroom: { kit: 'classroom/public/brand', modules: 'classroom/public/src/shared', moduleList: ['clubNight.js', 'transitionGap.js', 'classroomRemote.js', 'sync-protocol.js', 'cloud-crypto.js', 'screenShare.js', 'shareBanner.js'] },
   printer: { kit: 'printer/print-server/public/brand', committed: true },
 };
 
