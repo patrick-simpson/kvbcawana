@@ -310,6 +310,8 @@ export function sanitizeCheckout(payload) {
   return out;
 }
 
+/** The most children one `shares` frame names. */
+export const SHARES_KIDS_MAX = 20;
 /**
  * `shares` (owner 2026-11-23; CONTRACT.md): shares handed out from the owner's
  * /tools/shares page, for every screen's bottom-third banner. Sealed; published
@@ -318,7 +320,6 @@ export function sanitizeCheckout(payload) {
  * @param {unknown} payload
  * @returns {{ kids: { firstName: string, club: string }[], shares: number, at?: number } | null}
  */
-export const SHARES_KIDS_MAX = 20;
 export function sanitizeShares(payload) {
   if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return null;
   const raw = /** @type {Record<string, unknown>} */ (payload);
