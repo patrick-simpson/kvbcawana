@@ -32,3 +32,14 @@ describe('the look-only peek', () => {
   });
   it('masks digits', () => { expect(mask('shekels[123]')).toBe('shekels[#]'); });
 });
+
+describe('the script around a path', () => {
+  it('masks numbers and drops quoted words that could be a name', async () => {
+    const { scriptBit } = await import('../src/peek.js');
+    const out = scriptBit(`$.ajax({url: '/meeting/formClubberShekels', data: {id: 12345, who: 'Ava Stone', first: 'Ava', type: 'POST'}})`);
+    expect(out).toContain('/meeting/formClubberShekels');
+    expect(out).toContain('id: #');
+    expect(out).not.toContain('Ava');
+    expect(out).not.toContain('12345');
+  });
+});

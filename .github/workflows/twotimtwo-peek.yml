@@ -12,10 +12,14 @@ on:
       path:
         description: Page (one of the Worker's PEEK_PATHS)
         type: choice
-        options: [/meeting/shekels, /meeting/record, /meeting/colorGroup, /meeting/index, /calendar/index]
+        options: [/meeting/shekels, /meeting/formClubberShekels, /meeting/record, /meeting/colorGroup, /meeting/index, /calendar/index]
         default: /meeting/shekels
       query:
         description: "Optional, e.g. club_id=3 (only club_id, calendar_id, cal_id, date, tab pass)"
+        required: false
+        default: ''
+      sample:
+        description: "Optional: put ONE child's id (the Worker picks it, never shown) under this key: id, clubber_id, clubberId or recid"
         required: false
         default: ''
 
@@ -33,11 +37,13 @@ jobs:
           HANDBOOK_TOKEN: ${{ secrets.HANDBOOK_TOKEN }}
           PEEK_PATH: ${{ inputs.path }}
           PEEK_QUERY: ${{ inputs.query }}
+          PEEK_SAMPLE: ${{ inputs.sample }}
         run: |
           set -eu
           if [ -z "$HANDBOOK_TOKEN" ]; then echo "::error::HANDBOOK_TOKEN is not set."; exit 1; fi
           url="${SITE_ORIGIN%/}/api/v1/twotimtwo/shape?path=$(jq -rn --arg p "$PEEK_PATH" '$p|@uri')"
           if [ -n "$PEEK_QUERY" ]; then url="$url&$PEEK_QUERY"; fi
+          if [ -n "$PEEK_SAMPLE" ]; then url="$url&sample=$(jq -rn --arg p "$PEEK_SAMPLE" '$p|@uri')"; fi
           code=$(curl -sS --max-time 60 -o shape.json -w '%{http_code}' -H "Authorization: Bearer $HANDBOOK_TOKEN" "$url")
           echo "HTTP $code"
           jq . shape.json
