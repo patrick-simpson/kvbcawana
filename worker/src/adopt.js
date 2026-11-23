@@ -76,6 +76,8 @@ export class Adopter {
     this.friends = friends || null;
     /** Store night share balances (shares.js), set by SyncCore. @type {import('./shares.js').Shares|null} */
     this.shares = null;
+    /** Backwards Night (theme.js), set by SyncCore. @type {import('./theme.js').Theme|null} */
+    this.theme = null;
     this.ledger = ledger;
     this.printq = printq;
     this.stations = stations;
@@ -217,6 +219,10 @@ export class Adopter {
         const g = this.shares.gainedFor(e.id);
         if (g !== null) record.body.sharesGained = g;
       } catch (err) { console.error('[shares] a TwoTimTwo-page job got no share number', err); }
+    }
+    // Backwards Night (theme.js): the tag's name and group print backwards.
+    if (this.theme) {
+      try { await this.theme.prepare(); if (this.theme.backwards()) record.body.awanaBackwards = true; } catch (err) { console.error('[theme] a TwoTimTwo-page job got no theme', err); }
     }
     // Who brought a friend, for the 6:30 email (the station skips it for a cloud job).
     if (e.friend && this.friends) {

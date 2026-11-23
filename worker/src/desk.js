@@ -230,6 +230,8 @@ export class Desk {
     this.checkedOutIds = null;
     /** Store night share balances (shares.js), set by SyncCore. @type {import('./shares.js').Shares|null} */
     this.shares = null;
+    /** Backwards Night (theme.js), set by SyncCore. @type {import('./theme.js').Theme|null} */
+    this.theme = null;
     /** The one restore of a new object (single flight; kept once it ran to its end). @type {Promise<void>|null} */
     this.restoring = null;
     /** A restore that could not run yet is not tried again before this (ms). */
@@ -614,9 +616,14 @@ export class Desk {
         }
       } catch (err) { console.error('[shares] roster lookup failed', err); }
     }
+    // Backwards Night (theme.js, owner 2026-11-23): the page puts awanaBackwards on each label.
+    let theme = {};
+    if (this.theme) {
+      try { await this.theme.prepare(); if (this.theme.backwards()) theme = { backwards: true }; } catch (err) { console.error('[theme] roster lookup failed', err); }
+    }
     // Tonight's meeting (owner 2026-10-22): the page's Record keeping button opens TwoTimTwo's record page for it.
     const cal = typeof r.page.calendarId === 'string' && /^\d{1,9}$/.test(r.page.calendarId) ? { calendarId: r.page.calendarId } : {};
-    return json({ readAt: new Date(r.readAt).toISOString(), ...flag, ...test, ...away, ...cal, kids, items: itemClubs(r.page.events || []), ...(familiesAt ? { familiesAt } : {}) });
+    return json({ readAt: new Date(r.readAt).toISOString(), ...flag, ...test, ...away, ...cal, ...theme, kids, items: itemClubs(r.page.events || []), ...(familiesAt ? { familiesAt } : {}) });
   }
 
   /**

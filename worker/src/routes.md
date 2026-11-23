@@ -2132,3 +2132,16 @@ masked `#`, type, how many) and buttons, option words only of selects named for 
 one listing children), and the paths the page's own script posts to. NEVER a cell, value, name, balance or
 id; nothing stored or logged; it posts nothing. Run by hand from `.github/workflows/twotimtwo-peek.yml`
 (the log is public, which is why the answer holds structure only). Tests `worker/test/peek.test.js`.
+
+### 10.22 Backwards Night (BUILT, owner 2026-11-23)
+
+`worker/src/theme.js`, rules `shared/backwards.js`. Mode `auto` (the church calendar has an uncancelled
+event titled "backwards" today) / `on` / `off`, storage `theme:backwards`.
+
+- `GET /v1/theme` (session) -> `{backwards, mode, calendarSaysBackwards, changedAt, changedBy}`. Every
+  screen reads it at load, on the doorbell and as a slow safety net.
+- `PUT /v1/theme {mode}` (session; `X-Device-Name` recorded) -> the same view, 400 `bad-mode` otherwise;
+  rings `changed {what: 'theme', backwards}`.
+- The desk roster answers `backwards: true` on such a night; /checkin then puts `awanaBackwards: true` on
+  each `/print` body, and adopt.js does the same for a TwoTimTwo-page job: the station prints the name
+  and the handbook group spelled backwards (KVBC Awana's `label-render.js`).

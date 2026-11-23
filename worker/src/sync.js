@@ -74,6 +74,7 @@ import { YmCheckout } from './ymcheckout.js';
 import { StationFeeds, mountStationFeeds } from './stationfeeds.js';
 import { Shares, mountShares } from './shares.js';
 import { TopUp } from './topup.js';
+import { Theme, mountTheme } from './theme.js';
 import { Desk } from './desk.js';
 import { mountCheckin } from './checkinRoutes.js';
 import { History, mountHistory } from './history.js';
@@ -292,6 +293,11 @@ export class SyncCore {
     this.watcher.topup = this.topup;
     this.shares.topup = this.topup;
     mountShares(this.registry, this);   // GET, PUT /v1/store-night
+    // Backwards Night (theme.js, routes.md 10.22): the switch, the screens' answer, the name tags' flag.
+    this.theme = new Theme({ storage: this.storage, now: this.now });
+    this.desk.theme = this.theme;
+    this.adopt.theme = this.theme;
+    mountTheme(this.registry, this);   // GET, PUT /v1/theme
     mountPublisher(this.registry, this);   // /v1/desk/tonight, /v1/station/extras, /v1/publisher/status (routes.md 8)
     // The screen registry (ROADMAP.md#settings-page, phase 2): its doorbells ride the live
     // channel only, for the one screen they name.
