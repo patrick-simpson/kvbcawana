@@ -88,6 +88,7 @@ import { mountHealth } from './health.js';
 import { HealthCall } from './healthcall.js';
 import { KeyHealth } from './keys.js';
 import { mountHandbook } from './handbook.js';
+import { mountPeek } from './peek.js';
 import { netOf } from './netof.js';
 
 export { json, netOf };
@@ -387,6 +388,7 @@ export class SyncCore {
     mountOverview(this.registry, this);   // /v1/tonight/overview (routes.md 10.6)
     mountHealth(this.registry, this);   // /v1/health/checkin: is check-in ready tonight, no passphrase (routes.md 10.10)
     mountBarf(this.registry, this);   // /v1/desk/barf, /v1/desk/barf-late: a late BARF friend (routes.md 5.1)
+    mountPeek(this.registry, this);   // GET /v1/twotimtwo/shape: a share page's form, look only (routes.md 10.21)
     mountHandbook(this.registry, this);   // /v1/print/handbook-form: the handbook page's form, a setup aid (routes.md 10.11)
   }
 

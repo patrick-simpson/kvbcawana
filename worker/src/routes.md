@@ -2105,3 +2105,16 @@ it, at least 10 shares on every store-night tag, and "+N Shares!" on the lobby e
 - NOT BUILT (owner 2026-11-21 asked for it as a side project): topping a child up to 10 in TwoTimTwo
   itself. How TwoTimTwo records shares (`/meeting/shekels`, Record Shekels role) has never been read, and
   a guessed write to children's balances is not safe; the tag already shows at least 10.
+
+### 10.21 A look-only peek at a TwoTimTwo page (BUILT, owner 2026-11-23)
+
+Owner 2026-11-23: "Yes, please figure out how to top up shares". Before the Worker writes shares, the
+form it would post must be KNOWN. `GET /v1/twotimtwo/shape?path=<p>[&club_id|calendar_id|cal_id|date|tab]`
+(machine token `HANDBOOK_TOKEN` as `Authorization: Bearer`, or a session; `worker/src/peek.js`) reads ONE
+page of `PEEK_PATHS` (`/meeting/shekels`, `/meeting/record`, `/meeting/colorGroup`, `/meeting/index`,
+`/calendar/index`) on the one read clock and answers `{ok, path, landedOn, shape}`: title, headings, table
+headers and row counts, each form's action (a path, no query), method, fields (name with every number
+masked `#`, type, how many) and buttons, option words only of selects named for a club/date/kind (never
+one listing children), and the paths the page's own script posts to. NEVER a cell, value, name, balance or
+id; nothing stored or logged; it posts nothing. Run by hand from `.github/workflows/twotimtwo-peek.yml`
+(the log is public, which is why the answer holds structure only). Tests `worker/test/peek.test.js`.

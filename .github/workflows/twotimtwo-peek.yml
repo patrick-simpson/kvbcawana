@@ -1,0 +1,44 @@
+# Look at the SHAPE of one TwoTimTwo page (owner 2026-11-23: "Yes, please figure
+# out how to top up shares"). The sync Worker reads the page and answers only its
+# structure: form actions, field names with every number masked, buttons, table
+# headers. Never a child's name, a balance, a value or an id, so this public log
+# shows nothing private. It posts nothing to TwoTimTwo. worker/src/peek.js,
+# routes.md 10.21. Run by hand.
+name: Peek at a TwoTimTwo page (look only)
+
+on:
+  workflow_dispatch:
+    inputs:
+      path:
+        description: Page (one of the Worker's PEEK_PATHS)
+        type: choice
+        options: [/meeting/shekels, /meeting/record, /meeting/colorGroup, /meeting/index, /calendar/index]
+        default: /meeting/shekels
+      query:
+        description: "Optional, e.g. club_id=3 (only club_id, calendar_id, cal_id, date, tab pass)"
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+jobs:
+  peek:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Ask the Worker
+        env:
+          SITE_ORIGIN: ${{ vars.SITE_ORIGIN || 'https://awana.kvbchurch.org' }}
+          HANDBOOK_TOKEN: ${{ secrets.HANDBOOK_TOKEN }}
+          PEEK_PATH: ${{ inputs.path }}
+          PEEK_QUERY: ${{ inputs.query }}
+        run: |
+          set -eu
+          if [ -z "$HANDBOOK_TOKEN" ]; then echo "::error::HANDBOOK_TOKEN is not set."; exit 1; fi
+          url="${SITE_ORIGIN%/}/api/v1/twotimtwo/shape?path=$(jq -rn --arg p "$PEEK_PATH" '$p|@uri')"
+          if [ -n "$PEEK_QUERY" ]; then url="$url&$PEEK_QUERY"; fi
+          code=$(curl -sS --max-time 60 -o shape.json -w '%{http_code}' -H "Authorization: Bearer $HANDBOOK_TOKEN" "$url")
+          echo "HTTP $code"
+          jq . shape.json
+          [ "$code" = "200" ]
