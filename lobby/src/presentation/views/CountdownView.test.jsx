@@ -153,3 +153,17 @@ describe('CountdownView theme chip', () => {
     expect(width).toBeLessThanOrEqual(90);
   });
 });
+
+describe('Backwards Night (owner 2026-11-23): the countdown counts up to the start', () => {
+  const at = (s) => <CountdownView backwards now={nowFor(s)} target={TARGET} theme={null} onSkip={() => {}} />;
+  it('climbs from 0:00 to the wait it first saw, says when club starts, then shouts !OG', () => {
+    const { container, rerender } = render(at(15 * 60));
+    expect(container.textContent).toContain('ni snigeb anawA');
+    expect(container.querySelector('[data-countdown-starts]').textContent).toMatch(/^Starts /);
+    expect(container.querySelector('.pj-timer').textContent.replace(/\s/g, '')).toMatch(/^0?0:00/);
+    rerender(at(5 * 60));
+    expect(container.querySelector('.pj-timer').textContent.replace(/\s/g, '')).toMatch(/10:00/);
+    rerender(at(2));
+    expect(container.querySelector('[data-countdown-go]').textContent).toBe('!OG');
+  });
+});

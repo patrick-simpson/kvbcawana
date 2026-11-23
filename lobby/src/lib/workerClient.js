@@ -49,6 +49,10 @@ export const putSwitch = (body) => call('/v1/switches', { method: 'PUT', body })
 export const getStoreNight = () => call('/v1/store-night');
 /** @param {'auto' | 'on' | 'off'} mode */
 export const putStoreNight = (mode) => call('/v1/store-night', { method: 'PUT', body: { mode } });
+// Backwards Night (worker/src/theme.js, routes.md 10.22).
+export const getTheme = () => call('/v1/theme');
+/** @param {'auto' | 'on' | 'off'} mode */
+export const putTheme = (mode) => call('/v1/theme', { method: 'PUT', body: { mode } });
 export const getNotice = () => call('/v1/notice');
 /** @param {{ level: 'info' | 'warn' | 'critical', message: string, durationMin: number }} body */
 export const postNotice = (body) => call('/v1/notice', { method: 'POST', body });

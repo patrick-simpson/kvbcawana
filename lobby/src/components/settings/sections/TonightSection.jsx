@@ -7,6 +7,7 @@ import { AboutCard, CalendarPhaseCard, ConnectionCard, StatusAlerts } from './St
 import MissionControl from '../MissionControl.jsx';
 import SwitchesCard from '../SwitchesCard.jsx';
 import NoticeCard from '../NoticeCard.jsx';
+import BackwardsNightCard from '../BackwardsNightCard.jsx';
 import StoreNightCard from '../StoreNightCard.jsx';
 import { RecentChangesCard } from '../ChangeLogCard.jsx';
 
@@ -84,6 +85,7 @@ export function TonightSection({
         <MissionControl overview={overview} mission={mission} error={error} stopped={stopped} onRetry={retry} />
       )}
       {live && <StoreNightCard />}
+      {live && <BackwardsNightCard />}
       {live && <NoticeCard draft={noticeDraft} onDraft={onNoticeDraft} overviewNotice={overview ? overview.notice ?? null : undefined} />}
 
       {calendarCard}

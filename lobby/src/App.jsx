@@ -46,7 +46,7 @@ import { CopyRoomContext } from './lib/copyRoom.js';
 import { localDateStr } from './lib/calendarLogic.js';
 import { PREVIEW_PROMOS, previewPromo } from './lib/promos.js';
 import PromoSlide from './components/PromoSlide.jsx';
-import { fireMilestone, setConfettiLevel, setConfettiLoad, setConfettiSkin } from './lib/confetti.js';
+import { fireMilestone, setConfettiLevel, setConfettiLoad, setConfettiSkin, setConfettiUpsideDown } from './lib/confetti.js';
 import { resolveSkin, sceneForSkin, SKIN_TABLE } from './lib/skins.js';
 import { BOARD_HIDDEN, BOARD_NAMES, decideBoard, demoCheckout, pickupNow } from './lib/checkoutBoard.js';
 import { SAMPLE_BOARD_NAMES, SAMPLE_NAMES, pick } from './lib/demoNames.js';
@@ -97,7 +97,9 @@ import {
 import { useWatchdogReload } from './hooks/useWatchdogReload.js';
 import { useBuildReload } from './hooks/useBuildReload.js';
 import { useTallerThan } from './hooks/useTallerThan.js';
-import { hostCheckin, hostDoorbell, hostMirror, isEmbedded } from './lib/embed.js';
+import { hostBackwards, hostCheckin, hostDoorbell, hostMirror, isEmbedded } from './lib/embed.js';
+import { BackwardsContext, useBackwards } from './hooks/useBackwards.js';
+import VhsRewind from './components/VhsRewind.jsx';
 import { useCeremonyMirror } from './hooks/useCeremonyMirror.js';
 import { CeremonyLeadIn } from './components/CeremonyLeadIn.jsx';
 import { MirrorSwitching } from './components/MirrorSwitching.jsx';
@@ -256,6 +258,24 @@ export default function App() {
     mirrorToldRef.current = true;
     try { window.parent.postMessage(hostMirror(mirrorUp), window.location.origin); } catch { /* no parent to tell */ }
   }, [mirrorUp]);
+  // Backwards Night (owner 2026-11-23; hooks/useBackwards.js): words spelled
+  // backwards, animations reversed, the deck played last slide first. Never on
+  // the settings page, in configure mode or on the OBS feed. A framing host
+  // (the classroom, Journey) is told every change so its own cards follow.
+  const backwards = useBackwards({ enabled: !CONFIGURE && !SETTINGS_PAGE && !FLAGS.overlay });
+  useEffect(() => {
+    document.documentElement.classList.toggle('backwards', backwards);
+    setConfettiUpsideDown(backwards);
+    return () => document.documentElement.classList.remove('backwards');
+  }, [backwards]);
+  // Nothing is said until it first turns on (a host starts at "off").
+  const backwardsToldRef = useRef(false);
+  useEffect(() => {
+    if (CONFIGURE || !isEmbedded()) return;
+    if (!backwards && !backwardsToldRef.current) return;
+    backwardsToldRef.current = true;
+    try { window.parent.postMessage(hostBackwards(backwards), window.location.origin); } catch { /* no parent to tell */ }
+  }, [backwards]);
   const checkInsHeld = checkInsHeldNow({ overlay: FLAGS.overlay, slideSpecial: slideInfo.special, previewUp: coverUp });
   const {
     currentEvent, run: checkInRun, step: checkInStep, enqueue, skipCurrent, pending, gap: checkInGap,
@@ -1520,6 +1540,7 @@ export default function App() {
     // so config.reduceMotion === true means truly zero animation, not
     // just reduced transforms.
     <ZeroAnimationContext.Provider value={config.reduceMotion}>
+    <BackwardsContext.Provider value={backwards}>
     <LobbyLiveContext.Provider value={lobbyLive}>
     <CopyRoomContext.Provider value={copyRoom}>
     <MotionConfig reducedMotion={config.reduceMotion ? 'always' : 'user'}>
@@ -1556,6 +1577,10 @@ export default function App() {
             onSlide={handleSlide}
           />
         </ErrorBoundary>
+      )}
+      {/* Backwards Night's VHS rewind (owner's easter egg): never over a name or a held slide. */}
+      {!overlay && !CONFIGURE && (
+        <VhsRewind on={backwards && !config.reduceMotion} busy={currentEvent != null || checkInsHeld} />
       )}
 
       {/* Settings → Slides → "Preview the promos": the poster over the slideshow,
@@ -1986,6 +2011,7 @@ export default function App() {
     </MotionConfig>
     </CopyRoomContext.Provider>
     </LobbyLiveContext.Provider>
+    </BackwardsContext.Provider>
     </ZeroAnimationContext.Provider>
   );
 }

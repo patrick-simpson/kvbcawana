@@ -3,6 +3,7 @@ import { M } from '../lib/motion.jsx';
 import { EASE, shoutBaseline } from '../lib/brand.js';
 import { useFontsReady } from '../hooks/useFontsReady.js';
 import { CopyRoomContext } from '../lib/copyRoom.js';
+import { useBw } from '../hooks/useBackwards.js';
 import StepChip from './brand/StepChip.jsx';
 import { CHIP, KICKER, READ, SUB, bidiIsolates, fitFrame, LOBBY_THEMES, lobbyTheme } from '../lib/lobbyFrame.js';
 import {
@@ -129,9 +130,14 @@ function rowBreaks(h) {
  */
 export default function SlideCopy({ frame, theme = 'sky', via = 'boot', still = false, slide = false, sizeClass = '', className = '' }) {
   const loads = useFontsReady();
-  const { kicker, headline, sub, chip, textSize } = frame;
-  const chipLabel = chip?.label ?? '';
-  const chipValue = chip?.value ?? '';
+  // Backwards Night (owner 2026-11-23): every word of the slide spelled backwards.
+  const bw = useBw();
+  const { textSize } = frame;
+  const kicker = bw(frame.kicker);
+  const headline = bw(frame.headline);
+  const sub = bw(frame.sub);
+  const chipLabel = bw(frame.chip?.label ?? '');
+  const chipValue = bw(frame.chip?.value ?? '');
   // Where the copy may end: the pickup board's strip's top (App's provider),
   // higher while a long list has the strip grown.
   const { bottom } = useContext(CopyRoomContext);

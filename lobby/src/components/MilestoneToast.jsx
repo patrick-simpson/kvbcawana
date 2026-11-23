@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useBw } from '../hooks/useBackwards.js';
 import { AnimatePresence } from 'framer-motion';
 import { M } from '../lib/motion.jsx';
 import { DUR, EASE, PLATE, beats, inkOverflow } from '../lib/brand.js';
@@ -219,7 +220,10 @@ const TO = { opacity: 1, y: '0%', scale: 1 };
 const AWAY = { opacity: 0, y: '-30%', scale: 0.96, transition: { duration: DUR.exit, ease: EASE.exit } };
 
 function Toast({ celebration, club, compact, below, afterNotice }) {
-  const t = toastFor(celebration);
+  // Backwards Night (owner 2026-11-23): the toast's words spelled backwards.
+  const bw = useBw();
+  const raw = toastFor(celebration);
+  const t = { ...raw, label: bw(raw.label), line: bw(raw.line) };
   const logo = t.tone === 'club' && club?.logo;
   const fit = toastFit(t.line, { compact: compact && !below, logo: Boolean(logo) });
   // The beat sheet is fixed when the toast appears: with a band notice up

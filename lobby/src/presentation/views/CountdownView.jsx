@@ -1,3 +1,4 @@
+import { backwardsText } from '../../../../shared/backwards.js';
 import React, { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ScreenFrame } from '../components/small.jsx';
@@ -42,6 +43,8 @@ const STINGER_TIMES = [3600, 1800, 600, 300, 60];
  * moves. A countdown held at 0:00 (the remote's Back) stays stepped away.
  */
 export const FINAL_SEC = 10;
+/** Backwards Night: the last seconds the wall shouts "!OG" instead of the clock. */
+export const GO_SEC = 3;
 
 /**
  * The week-long countdown to Wednesday 6:00 PM, flattened to type on the
@@ -56,8 +59,15 @@ export const FINAL_SEC = 10;
  * `schedule` broadcast (hooks/useRealtime.js, lib/scheduleAdvisory.js
  * `advisoryTitle`) — purely informational, shown only while present.
  */
-export const CountdownView = ({ now, target, theme, onSkip, onBareChange }) => {
+export const CountdownView = ({ now, target, theme, onSkip, onBareChange, backwards = false }) => {
   const seconds = secondsUntil(target, now);
+  // Backwards Night (owner 2026-11-23: "counts up to the start"): the clock
+  // climbs from 0:00 to the wait it first saw (rounded up to a whole minute),
+  // reaching it at the start, and the last GO_SEC shout "!OG"; the start time
+  // stays readable under it, and the words above are spelled backwards.
+  const [upTo] = useState(() => Math.max(60, Math.ceil(seconds / 60) * 60));
+  const climbed = Math.max(0, Math.min(upTo, upTo - seconds));
+  const go = backwards && seconds <= GO_SEC;
   const weather = useWeatherReading();
   const events = useCalendarEvents();
   const still = useLowPower();
@@ -139,18 +149,27 @@ export const CountdownView = ({ now, target, theme, onSkip, onBareChange }) => {
         {/* The wrappers centre their lines as .pj-countdown does: nothing moves. */}
         <motion.div className="flex flex-col items-center" data-countdown-away {...away}>
           <Kicker color="#FFFFFF" size="var(--pj-countdown-kicker, calc(3.2 * var(--u)))" style={{ letterSpacing: '0.12em', marginRight: '-0.12em' }}>
-            Awana begins in
+            {backwards ? backwardsText('Awana begins in') : 'Awana begins in'}
           </Kicker>
         </motion.div>
 
         <div style={{ marginTop: 'var(--pj-countdown-gap, calc(0.6 * var(--u)))' }}>
-          <BigTimer seconds={seconds} accent={HOUSE.orange} urgencyEnabled onClick={touch ? tapSkip : onSkip} touch={touch} />
+          {go ? (
+            <p className="pj-timer" data-countdown-go style={{ fontSize: 'var(--text-timer)', color: HOUSE.orange, margin: 0 }}>!OG</p>
+          ) : (
+            <BigTimer seconds={backwards ? climbed : seconds} accent={HOUSE.orange} urgencyEnabled={!backwards} onClick={touch ? tapSkip : onSkip} touch={touch} />
+          )}
         </div>
+        {backwards && (
+          <p className="pj-body" data-countdown-starts style={{ fontSize: 'var(--pj-countdown-next, calc(2.4 * var(--u)))', color: '#FFFFFF', fontWeight: 600, margin: 'calc(0.8 * var(--u)) 0 0' }}>
+            Starts {targetTimeStr}
+          </p>
+        )}
 
         <motion.div className="flex flex-col items-center" data-countdown-away {...away}>
           {seconds >= 24 * 3600 && (
             <p className="pj-body" style={{ fontSize: 'var(--pj-countdown-next, calc(2.4 * var(--u)))', color: 'rgb(255 255 255 / 0.72)', fontWeight: 500 }}>
-              Next meeting · Wednesday · {targetTimeStr}
+              {backwards ? backwardsText(`Next meeting · Wednesday · ${targetTimeStr}`) : `Next meeting · Wednesday · ${targetTimeStr}`}
             </p>
           )}
 

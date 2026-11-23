@@ -24,7 +24,7 @@
 // is laid out exactly as it always was.
 
 import { sanitizeJourneyPress } from '../../../shared/journeyRemote.js';
-import { EMBED_CHECKIN_MESSAGE, EMBED_DOORBELL_MESSAGE, EMBED_MIRROR_MESSAGE } from './constants.js';
+import { EMBED_BACKWARDS_MESSAGE, EMBED_CHECKIN_MESSAGE, EMBED_DOORBELL_MESSAGE, EMBED_MIRROR_MESSAGE } from './constants.js';
 
 /**
  * Whether this page is inside another page's frame: the same test the
@@ -108,6 +108,16 @@ export function hostCheckin(payload) {
  */
 export function hostMirror(up) {
   return { type: EMBED_MIRROR_MESSAGE, up: up === true };
+}
+
+/**
+ * Backwards Night (owner 2026-11-23), told to a framing host (the classroom,
+ * Journey) so its own cards spell backwards too: `{type, on}`, nothing else.
+ * @param {unknown} on
+ * @returns {{ type: string, on: boolean }}
+ */
+export function hostBackwards(on) {
+  return { type: EMBED_BACKWARDS_MESSAGE, on: on === true };
 }
 
 /**

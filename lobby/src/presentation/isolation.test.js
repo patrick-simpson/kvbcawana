@@ -32,6 +32,7 @@ const ALLOWED = new Set([
   // The game time scoreboard (owner 2026-11-05; routes.md 10.17): the board from
   // the sync Worker's doorbell, cleaned by shared/scoreboard.js.
   'src/hooks/useScoreboard.js',
+  'src/hooks/useBackwards.js',
 ]);
 
 const walk = (dir) => readdirSync(dir).flatMap((f) => {

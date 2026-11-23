@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useContext, useEffect, useRef, useState } from 'react';
 import { AnimatePresence, useIsPresent } from 'framer-motion';
 import { M } from '../lib/motion.jsx';
 import { getClubPalette } from '../lib/clubs.js';
@@ -16,6 +16,7 @@ import { hostClearancePx, isEmbedded } from '../lib/embed.js';
 import { lobbyUnitPx } from '../hooks/useTallerThan.js';
 import { celebrationProfile, useCelebration } from '../hooks/useCelebration.js';
 import { useFontsReady } from '../hooks/useFontsReady.js';
+import { BackwardsContext, useBw } from '../hooks/useBackwards.js';
 import Wave from './brand/Wave.jsx';
 import Sticker from './brand/Sticker.jsx';
 import DoodleCluster from './brand/DoodleCluster.jsx';
@@ -222,7 +223,7 @@ function stickerOrigin(root) {
 // snapping (framer-motion layout animation, instant under ?lowPower=1).
 const GLIDE = { duration: DUR.settle, ease: EASE.settle };
 
-function Name({ text, entrance, timing, size, wraps, box, club }) {
+function Name({ text, entrance, timing, size, wraps, box, club, reverse = false }) {
   const className = useLeaving(`checkin__name${wraps ? ' checkin__name--wraps' : ''}`);
   // The beat sheet is fixed when this child's name first appears (the name is
   // keyed on the child, and a font landing re-renders it): only sizes follow
@@ -233,8 +234,11 @@ function Name({ text, entrance, timing, size, wraps, box, club }) {
   const perLetter = [...text].length <= PER_LETTER_MAX;
   const words = text.split(' ').filter(Boolean);
   let at = 0;
+  // Backwards Night (owner 2026-11-23): the letters land last one first.
+  const letters = [...text.replace(/\s/g, '')].length;
   const piece = (content, key, index) => {
-    const enter = letterEnter({ at: sheet.name + index * sheet.letter, dur: sheet.dur, from: sheet.from(index) });
+    const turn = reverse ? Math.max(0, letters - 1 - index) : index;
+    const enter = letterEnter({ at: sheet.name + turn * sheet.letter, dur: sheet.dur, from: sheet.from(turn) });
     return (
       <M.span
         key={key}
@@ -293,13 +297,17 @@ export default function CheckInMoment({ event, step = 0, audioEnabled, clubPhras
     ? { ...FLIP, kicker: FLIP.kicker + SWEPT, name: FLIP.name + SWEPT, line: FLIP.line + SWEPT, sticker: FLIP.sticker + SWEPT }
     : FLIP;
 
-  const kicker = kickerFor(event, moment);
+  // Backwards Night (owner 2026-11-23): every word of the moment spelled backwards.
+  const bw = useBw();
+  const reverse = useContext(BackwardsContext);
+  const kicker = bw(kickerFor(event, moment));
   const phrase = clubPhrases?.[String(event.club ?? '').trim().toLowerCase()];
-  const line = sublineFor(moment, { ribbon, phrase });
-  const sticker = stickerFor(moment);
-  const shares = sharesWords(event.sharesGained);
+  const line = bw(sublineFor(moment, { ribbon, phrase }));
+  const stickerWords = stickerFor(moment);
+  const sticker = stickerWords && reverse ? stickerWords.map(bw).reverse() : stickerWords;
+  const shares = bw(sharesWords(event.sharesGained));
   const showerAt = shares && event.sharesGained >= SHARES_SHOWER_AT ? (t.sticker + 0.25) * 1000 : null;
-  const display = String(event.firstName).toUpperCase();
+  const display = bw(String(event.firstName).toUpperCase());
   const { size, wraps } = nameSizeU(display, (s) => measureEm(s), nameRoom());
   // Room for a tall mark (JOSÉ, NGUYỄN, ȘTEFAN) clear of the kicker above and
   // the line below: measured, so only a mark that would meet one gets any.
@@ -444,7 +452,7 @@ export default function CheckInMoment({ event, step = 0, audioEnabled, clubPhras
         </div>
         <M.div className="checkin__cell checkin__cell--name" layout="position" transition={GLIDE}>
           <AnimatePresence>
-            <Name key={event.id} text={display} entrance={accent.entrance} timing={t} size={size} wraps={wraps} box={box} club={club} />
+            <Name key={event.id} text={display} entrance={accent.entrance} timing={t} size={size} wraps={wraps} box={box} club={club} reverse={reverse} />
           </AnimatePresence>
         </M.div>
         <div className="checkin__cell checkin__cell--line">

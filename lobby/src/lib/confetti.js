@@ -1,5 +1,25 @@
-import confetti from 'canvas-confetti';
+import fire from 'canvas-confetti';
 import { DOODLES } from './brand.js';
+
+// Backwards Night (owner 2026-11-23: "confetti falls upward"): every burst is
+// turned upside down: from the mirrored place, the mirrored angle, and gravity
+// that pulls up. App sets it from hooks/useBackwards.js.
+let upsideDown = false;
+export function setConfettiUpsideDown(on) {
+  upsideDown = on === true;
+}
+/** Upside down: y mirrored, the angle mirrored, gravity reversed (a little gentler). @param {any} o */
+export function flipBurst(o) {
+  const y = o.origin && typeof o.origin.y === 'number' ? 1 - o.origin.y : undefined;
+  return {
+    ...o,
+    ...(o.origin ? { origin: { ...o.origin, ...(y === undefined ? {} : { y }) } } : {}),
+    angle: 360 - (typeof o.angle === 'number' ? o.angle : 90),
+    gravity: -0.7 * (typeof o.gravity === 'number' ? o.gravity : 1),
+  };
+}
+/** @param {any} o */
+const confetti = (o) => fire(upsideDown ? flipBurst(o) : o);
 
 // Every burst respects prefers-reduced-motion (canvas-confetti no-ops the
 // call entirely), keeping the display comfortable on low-power signage
@@ -83,7 +103,7 @@ function brandShapes() {
     try {
       const [x, y, w, h] = DOODLES.sparkle.viewBox.split(/\s+/).map(Number);
       const k = 10 / Math.max(w, h);
-      sparkleShape = confetti.shapeFromPath({
+      sparkleShape = fire.shapeFromPath({
         path: DOODLES.sparkle.d,
         matrix: [k, 0, 0, k, -(x + w / 2) * k, -(y + h / 2) * k],
       });

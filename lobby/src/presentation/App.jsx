@@ -1,3 +1,4 @@
+import { useBackwards } from '../hooks/useBackwards.js';
 import React, { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { AnimatePresence, MotionConfig, motion } from 'framer-motion';
 import { AppMode } from './types.js';
@@ -106,6 +107,8 @@ export const App = () => {
   // hits an end button ... or switched toggles"); End or another club plays the
   // winner first (FINALE_MS). Never on the configure page or the lobby's mirror.
   const { board, finale, serverNow } = useScoreboard({ enabled: !CONFIGURE && !MIRROR });
+  // Backwards Night (owner 2026-11-23; hooks/useBackwards.js): the countdown counts UP and shouts "!OG".
+  const backwards = useBackwards({ enabled: !CONFIGURE });
   const scoringClub = board?.active ?? null;
   const lowPowerNow = useLowPower();
   // Into the scoreboard it wipes in over the old view (ScoringView); into the opening ceremony it cuts (cutsIn).
@@ -358,6 +361,7 @@ export const App = () => {
               />
             ) : (
             <ActiveView
+              backwards={backwards}
               state={state}
               now={now}
               tally={tally}
@@ -449,11 +453,12 @@ const slugFor = (state) =>
     [AppMode.SHUTDOWN]: 'shutdown',
   })[state.mode];
 
-const ActiveView = ({ state, now, tally, meetingTheme, onSelect, firstGameIndex, onBareChange, onIndexChange, clock, serverNow, sounds }) => {
+const ActiveView = ({ state, now, tally, meetingTheme, onSelect, firstGameIndex, onBareChange, onIndexChange, clock, serverNow, sounds, backwards = false }) => {
   switch (state.mode) {
     case AppMode.COUNTDOWN:
       return (
         <CountdownView
+          backwards={backwards}
           now={now}
           target={state.target}
           theme={meetingTheme}

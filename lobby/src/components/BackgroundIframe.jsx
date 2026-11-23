@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useContext, useEffect, useMemo, useState } from 'react';
 import { flagshipOnAir, withFlagship } from '../lib/flagship.js';
 import { placeEncore } from '../lib/lobbyDeck.js';
+import { BackwardsContext } from '../hooks/useBackwards.js';
 import { isHttpsUrl } from '../lib/safeUrl.js';
 import PptxSlideshow from './PptxSlideshow.jsx';
 import ManualSlideshow from './ManualSlideshow.jsx';
@@ -124,10 +125,12 @@ export default function BackgroundIframe({
     const t = setInterval(() => setFlagshipOn(flagshipOnAir()), 30_000);
     return () => clearInterval(t);
   }, []);
-  const deck = useMemo(
-    () => withFlagship(placeEncore(calendarSlides, manualSlides, encoreSlot), flagshipOn),
-    [calendarSlides, manualSlides, encoreSlot, flagshipOn]
-  );
+  // Backwards Night (owner 2026-11-23): the deck plays last slide first.
+  const backwards = useContext(BackwardsContext);
+  const deck = useMemo(() => {
+    const d = withFlagship(placeEncore(calendarSlides, manualSlides, encoreSlot), flagshipOn);
+    return backwards ? [...d].reverse() : d;
+  }, [calendarSlides, manualSlides, encoreSlot, flagshipOn, backwards]);
 
   // Full-screen looping video (#25): one file uploaded in Settings,
   // stored on this device only. Missing/broken video shows the friendly

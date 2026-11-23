@@ -1,3 +1,4 @@
+import { useBw } from '../hooks/useBackwards.js';
 import { AnimatePresence } from 'framer-motion';
 import { M } from '../lib/motion.jsx';
 import { DUR, EASE } from '../lib/brand.js';
@@ -44,6 +45,8 @@ const ENTER = withSquish(
 
 export default function CornerChip({ item, corner, loads, hidden = false, showNote = true, size }) {
   const show = !hidden && item && item.corner === corner;
+  // Backwards Night (owner 2026-11-23): the chip's label spelled backwards; its number stays true.
+  const bw = useBw();
   return (
     <AnimatePresence>
       {show && (
@@ -58,7 +61,7 @@ export default function CornerChip({ item, corner, loads, hidden = false, showNo
           transition={ENTER.transition}
         >
           <StepChip
-            label={item.label.toUpperCase()}
+            label={bw(item.label.toUpperCase())}
             value={item.value}
             size={size}
             icon={item.glyph ? <WeatherGlyph kind={item.glyph} /> : null}
