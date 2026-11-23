@@ -265,3 +265,28 @@ describe('the black board (owner 2026-10-18)', { skip: SKIP }, () => {
     });
   }
 });
+
+describe('Backwards Night (owner 2026-11-23)', { skip: SKIP }, () => {
+  const word = (on) => ({ type: 'awana-display:backwards', on });
+  const checkin = (id, firstName, club) => ({ type: 'awana-display:checkin', id, firstName, club });
+  it('the cards and welcomes spell backwards on the lobby frame\'s word only, and come back after', async () => {
+    const page = await open('?now=2026-10-14T23:10:00Z'); // Wednesday 7:10 pm Eastern: the Sparks card
+    await page.waitForFunction(() => document.documentElement.dataset.phase === 'sparks');
+    const text = () => page.evaluate(() => document.getElementById('sparks').textContent.replace(/\s+/g, ' ').trim());
+    const before = await text();
+    await page.evaluate((m) => window.postMessage(m, location.origin), word(true));
+    await page.waitForTimeout(200);
+    assert.equal(await text(), before, 'not from the frame: ignored');
+    const frame = page.frame({ url: /\/lobby\/\?club=sparks/ });
+    await frame.evaluate((m) => window.postMessage({ post: m }, location.origin), word(true));
+    await page.waitForFunction(() => document.documentElement.classList.contains('cr-backwards'));
+    assert.match(await text(), /puorG egraL/);
+    await frame.evaluate((m) => window.postMessage({ post: m }, location.origin), checkin('a', 'Ava', 'Sparks'));
+    await page.waitForSelector('#welcome-sparks:not([hidden])');
+    await page.waitForFunction(() => /avA/.test(document.querySelector('#welcome-sparks').textContent));
+    await frame.evaluate((m) => window.postMessage({ post: m }, location.origin), word(false));
+    await page.waitForFunction(() => !document.documentElement.classList.contains('cr-backwards'));
+    assert.equal(await text(), before);
+    await page.close();
+  });
+});

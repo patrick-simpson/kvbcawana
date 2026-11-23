@@ -9,6 +9,8 @@
 
 const own = new URL(import.meta.url);
 const L = await import(new URL(`./logic.js${own.search}`, own).href);
+// Backwards Night's text turner (backwards.js), with the page's own ?v=.
+const BW = await import(new URL(`./backwards.js${own.search}`, own).href);
 
 const params = new URLSearchParams(window.location.search);
 const CONFIGURE = params.get('configure') === '1';
@@ -34,6 +36,8 @@ export const CHECKIN_MESSAGE = 'awana-display:checkin';
 // The embedded lobby says when it puts the game time projector up for the
 // opening ceremony (lobby/src/lib/embed.js hostMirror: {type, up}).
 export const MIRROR_MESSAGE = 'awana-display:ceremony-mirror';
+/** Backwards Night, told by the embedded lobby (lobby src/lib/embed.js hostBackwards). */
+export const BACKWARDS_MESSAGE = 'awana-display:backwards';
 
 const root = document.documentElement;
 const $ = (id) => /** @type {HTMLElement} */ (document.getElementById(id));
@@ -432,6 +436,15 @@ let mirrorSaid = false;
 let mirrorSince = 0;
 let mirrorShown = false;
 let mirrorLeaveTimer = 0;
+// Backwards Night (owner 2026-11-23): the lobby frame says when; the cards' own words turn (backwards.js).
+const backwardsCards = BW.createBackwards(['cubbies', 'sparks', 'welcome-cubbies', 'welcome-sparks', 'board']
+  .map((id) => document.getElementById(id)).filter((el) => el !== null));
+window.addEventListener('message', (event) => {
+  if (!frame || event.source !== frame.contentWindow || event.origin !== window.location.origin) return;
+  const d = event.data;
+  if (!d || typeof d !== 'object' || d.type !== BACKWARDS_MESSAGE || CONFIGURE) return;
+  backwardsCards.set(d.on === true);
+});
 window.addEventListener('message', (event) => {
   if (!frame || event.source !== frame.contentWindow || event.origin !== window.location.origin) return;
   const d = event.data;
