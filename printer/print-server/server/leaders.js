@@ -67,12 +67,15 @@ Object.defineProperties(exports, {
 // The phone-never-prints-directly rule exists to keep a KID's label from
 // double-printing through the extension's detection paths; a leader has
 // nothing to drive on TwoTimTwo, so there is nothing to double.
-function renderLeaderLabel({ firstName, lastName, clubName, testBanner = false }) {
+function renderLeaderLabel({ firstName, lastName, clubName, testBanner = false, backwards = false }) {
   const club = String(clubName == null ? '' : clubName).trim();
+  const greeting = club ? `${club} Leader` : 'Leader';
   return $labelRender.generateLabel({
     firstName, lastName, clubName: club,
     isLeader: true,
-    greeting: club ? `${club} Leader` : 'Leader',
+    // Backwards Night (owner 2026-11-23): a leader's tag prints backwards too, the line under it as well.
+    greeting: backwards ? $labelRender.backwardsWords(greeting) : greeting,
+    backwards,
     // The greeting carries the club; the club text line would print it twice.
     template: { showClubLine: false },
     testBanner,
@@ -426,7 +429,7 @@ async function performLeaderPrint(input) {
 
   let pngPath = null;
   try {
-    const result = await renderLeaderLabel({ firstName, lastName, clubName, testBanner: isDemo });
+    const result = await renderLeaderLabel({ firstName, lastName, clubName, testBanner: isDemo, backwards: b.awanaBackwards === true });
     pngPath = result.pngPath;
     await $tunes.playTuneIfEnabled(effectivePrinter);
     await $printing.printLabel(pngPath, effectivePrinter);

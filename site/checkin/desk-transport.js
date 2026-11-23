@@ -558,7 +558,8 @@ export function createDesk({ cc, fetch: fetchFn, store, base = DESK_API, now = D
   async function leaderTag(tag) {
     const name = oneLine(tag.name, 80);
     if (!name) throw new DeskError('refused', 'Type the leader’s name.', { reason: 'no-name' });
-    return reprintJob('/print-leader', { name, clubName: String(tag.club || '').trim() });
+    // Backwards Night: the leader's tag prints backwards too (owner 2026-11-23).
+    return reprintJob('/print-leader', { name, clubName: String(tag.club || '').trim(), ...(backwardsNight ? { awanaBackwards: true } : {}) });
   }
 
   /**

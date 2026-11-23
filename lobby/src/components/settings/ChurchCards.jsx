@@ -525,11 +525,14 @@ export function NameTagsCard({ church }) {
     setBusy('');
     if (r.ok) { say(kind, { text: r.existing ? 'That one was already on its way.' : okText }); done(); } else say(kind, { bad: true, text: r.message });
   };
-  const leader = () => {
+  const leader = async () => {
     const who = name.trim();
     if (!who) return say('leader', { bad: true, text: 'Type the leader’s name first.' });
     if (!window.confirm(`Print a leader tag for ${who}?`)) return null;
-    return run('leader', leaderRecord({ name: who, clubName: leaderClub }), () => setName(''), `Sent ${who}’s tag to the printer.`);
+    // Backwards Night (worker/src/theme.js): the leader's tag prints backwards too (owner 2026-11-23).
+    const theme = await call('/v1/theme').catch(() => null);
+    const backwards = !!(theme && theme.ok && theme.body && theme.body.backwards === true);
+    return run('leader', leaderRecord({ name: who, clubName: leaderClub, backwards }), () => setName(''), `Sent ${who}’s tag to the printer.`);
   };
   const oneOff = () => {
     const f = first.replace(/\s+/g, ' ').trim();

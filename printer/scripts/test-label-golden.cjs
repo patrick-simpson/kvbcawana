@@ -239,6 +239,7 @@ const CASES = [
   // twice; and the club-less variant (no icon panel, plain "Leader").
   { name: 'leader',           model: { firstName: 'Testkid', lastName: 'Sample', clubName: 'Sparks', isLeader: true, greeting: 'Sparks Leader', template: { showClubLine: false } } },
   { name: 'leader-no-club',   model: { firstName: 'Pat', lastName: 'Sample', clubName: '', isLeader: true, greeting: 'Leader' } },
+  { name: 'leader-backwards', model: { firstName: 'Pat', lastName: 'Sample', clubName: 'Sparks', isLeader: true, greeting: 'Redael Skraps', backwards: true, template: { showClubLine: false } } },
   { name: 'test-banner',      model: { firstName: 'Canary 00:00:00', lastName: '', clubName: 'Test', testBanner: true } },
   // The official one-colour club mark (brand kit) in the icon column when no
   // TwoTimTwo logo was supplied: one case per club, a short name so the

@@ -34,7 +34,7 @@ export function toolRecord(route, body, now = Date.now()) {
 /** Reprint one child's label from tonight's list. @param {{ name: string, clubberId?: string | null }} child */
 export const reprintRecord = (/** @type {{ name: string, clubberId?: string | null }} */ child, /** @type {number} */ now = Date.now()) => toolRecord('/reprint', { name: String(child.name || '').trim(), clubberId: child.clubberId || null }, now);
 /** @param {{ name: string, clubName: string }} tag */
-export const leaderRecord = (/** @type {{ name: string, clubName: string }} */ tag, /** @type {number} */ now = Date.now()) => toolRecord('/print-leader', { name: tag.name, clubName: tag.clubName || '' }, now);
+export const leaderRecord = (/** @type {{ name: string, clubName: string, backwards?: boolean }} */ tag, /** @type {number} */ now = Date.now()) => toolRecord('/print-leader', { name: tag.name, clubName: tag.clubName || '', ...(tag.backwards === true ? { awanaBackwards: true } : {}) }, now);
 /** @param {{ firstName: string, clubName: string }} tag */
 export const oneOffRecord = (/** @type {{ firstName: string, clubName: string }} */ tag, /** @type {number} */ now = Date.now()) => toolRecord('/print-oneoff', { firstName: tag.firstName, clubName: tag.clubName }, now);
 /** @param {string} text */

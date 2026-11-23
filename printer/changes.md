@@ -1,4 +1,7 @@
-﻿## [11.4.0] - 2026-11-23
+﻿## [11.5.0] - 2026-11-23
+**Leader tags print backwards on Backwards Night too.** A leader's name and the line under it print spelled backwards ("Pat Sample, Sparks Leader" prints as "Tap Elpmas, Redael Skraps"), from /checkin's leader tag and from /settings. The LEADER badge and every safety mark print as usual.
+
+## [11.4.0] - 2026-11-23
 **Backwards Night name tags.** On a night the check-in service calls Backwards Night (the church calendar says "Backwards" that day, or it is switched on in /settings → Tonight), the child's name and handbook group print spelled backwards: "Liam Sample, Red Group" prints as "Mail Elpmas, Puorg Der". There is no real name underneath (owner's choice). Allergy, no-photo, birthday and every other safety mark, the club logo and the footer print exactly as on any other night.
 
 ## [11.3.0] - 2026-11-22

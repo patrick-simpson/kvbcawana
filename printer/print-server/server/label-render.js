@@ -15,6 +15,7 @@ const $labelType = lazy('./label-type');
 
 // What other modules (and server.js) read from this one; live bindings, so cycles are safe.
 Object.defineProperties(exports, {
+  backwardsWords: { enumerable: true, get: () => backwardsWords },
   generateLabel: { enumerable: true, get: () => generateLabel },
   prepareLogoForThermal: { enumerable: true, get: () => prepareLogoForThermal },
   PX_H: { enumerable: true, get: () => PX_H },
