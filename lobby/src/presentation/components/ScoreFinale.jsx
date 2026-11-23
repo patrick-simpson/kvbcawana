@@ -1,4 +1,5 @@
 import React from 'react';
+import { BackwardsContext } from '../../hooks/useBackwards.js';
 import { motion } from 'framer-motion';
 import { SCORE_CLUB_WORDS, SCORE_TEAMS, SCORE_TEAM_COLORS, SCORE_TEAM_WORDS, winnerOf } from '../../../../shared/scoreboard.js';
 import { EASE } from '../lib/motion-tokens.js';
@@ -21,6 +22,8 @@ const WIPE_OFF = 'polygon(120% 0%, 140% 0%, 140% 100%, 112% 100%)';
  * @param {{ club: string, scores: Record<string, number>, teams?: readonly string[], still: boolean, covered?: boolean }} props
  */
 export const ScoreFinale = ({ club, scores, teams: playing = SCORE_TEAMS, still, covered = false }) => {
+  // Backwards Night (owner 2026-11-23): every score shows a minus sign.
+  const minus = React.useContext(BackwardsContext);
   const w = winnerOf(scores, playing);
   const teams = w.teams.length ? w.teams : playing.slice(0, 1);
   const ink = !w.tie && SCORE_TEAM_COLORS[teams[0]].ink !== '#FFFFFF' ? 'ink' : 'white';
@@ -71,7 +74,7 @@ export const ScoreFinale = ({ club, scores, teams: playing = SCORE_TEAMS, still,
                 animate={{ opacity: 1, y: won ? -12 : 0, transition: { delay: 0.9 + i * 0.08, type: 'spring', stiffness: 320, damping: 20 } }}
               >
                 <span className="pj-finale__name">{SCORE_TEAM_WORDS[t]}</span>
-                <span className="pj-finale__num">{scores[t]}</span>
+                <span className="pj-finale__num">{minus ? `-${scores[t]}` : scores[t]}</span>
               </motion.div>
             );
           })}

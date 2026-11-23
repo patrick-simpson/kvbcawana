@@ -1,4 +1,4 @@
-import { useBackwards } from '../hooks/useBackwards.js';
+import { BackwardsContext, useBackwards } from '../hooks/useBackwards.js';
 import React, { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { AnimatePresence, MotionConfig, motion } from 'framer-motion';
 import { AppMode } from './types.js';
@@ -323,6 +323,7 @@ export const App = () => {
   }
 
   return (
+    <BackwardsContext.Provider value={backwards}>
     <MotionConfig reducedMotion={FLAGS.vr ? 'always' : 'user'}>
     <div className="w-full h-full relative" style={{ background: '#000000' }}>
       {/* One view at a time; exits run faster than entrances (the kit's rule).
@@ -411,6 +412,7 @@ export const App = () => {
       {MIRROR ? null : touch ? <SetupChecklist touch onSetUp={() => setMenu('display')} /> : <SetupChecklist />}
     </div>
     </MotionConfig>
+    </BackwardsContext.Provider>
   );
 };
 

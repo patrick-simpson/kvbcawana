@@ -1,4 +1,5 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { BackwardsContext } from '../../hooks/useBackwards.js';
 import { AnimatePresence, motion } from 'framer-motion';
 import { CLUBS } from '../config.js';
 import { THEME, artUrl } from '../lib/shared-config.js';
@@ -329,6 +330,8 @@ const FROM = {
  * the score in Paytone. A new score slams in; a lower one swaps quietly.
  */
 const TeamPlate = ({ team, score, index, count, leading, compact, still, waiting = false }) => {
+  // Backwards Night (owner 2026-11-23): every score shows a minus sign.
+  const minus = React.useContext(BackwardsContext);
   const c = SCORE_TEAM_COLORS[team];
   const from = (FROM[count] || FROM[4])[index] || { x: 0, y: 1 };
   // Up or down since the last render (adjusted during render, never in an effect).
@@ -372,7 +375,7 @@ const TeamPlate = ({ team, score, index, count, leading, compact, still, waiting
           initial={!seen.changed ? false : still || !up ? { opacity: 0.35 } : { opacity: 0, scale: 1.7, y: -4 * u }}
           animate={{ opacity: 1, scale: 1, y: 0, transition: up && !still ? { type: 'spring', stiffness: 520, damping: 16 } : { duration: 0.15 } }}
         >
-          {score}
+          {minus ? `-${score}` : score}
         </motion.span>
       </motion.span>
     </motion.div>

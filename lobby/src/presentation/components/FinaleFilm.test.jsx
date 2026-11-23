@@ -80,3 +80,12 @@ describe('FinaleFilm', () => {
     expect(container.querySelector('.pj-finale')).not.toBeNull();
   });
 });
+
+describe('Backwards Night (owner 2026-11-23)', () => {
+  it('plays the reversed film and spells the winner backwards, scores with a minus', async () => {
+    const { BackwardsContext } = await import('../../hooks/useBackwards.js');
+    const { container } = render(<BackwardsContext.Provider value><FinaleFilm club="sparks" scores={SCORES} night={NIGHT} still={false} /></BackwardsContext.Provider>);
+    expect(container.querySelector('video').getAttribute('src')).toBe(filmSrc(`${finaleFilmFor(NIGHT).id}-reverse`));
+    expect(container.querySelector('[aria-label]').getAttribute('aria-label')).toMatch(/!SNIW DER/);
+  });
+});

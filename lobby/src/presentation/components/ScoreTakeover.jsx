@@ -1,4 +1,5 @@
 import React from 'react';
+import { BackwardsContext } from '../../hooks/useBackwards.js';
 import { motion } from 'framer-motion';
 import { SCORE_TEAMS, SCORE_TEAM_COLORS, SCORE_TEAM_WORDS, streakWords } from '../../../../shared/scoreboard.js';
 import { EASE } from '../lib/motion-tokens.js';
@@ -96,6 +97,8 @@ function originOf(team, teams) {
 const SLANT = 0.08;
 
 const Band = ({ hit, lead, run = 0, total, index, count, still, fire = false }) => {
+  // Backwards Night (owner 2026-11-23): every score shows a minus sign.
+  const minus = React.useContext(BackwardsContext);
   const c = SCORE_TEAM_COLORS[hit.team];
   const w = 1 / count;
   const x0 = index * w;
@@ -160,7 +163,7 @@ const Band = ({ hit, lead, run = 0, total, index, count, still, fire = false }) 
           initial={still ? false : { y: 30, opacity: 0 }}
           animate={still ? undefined : { y: 0, opacity: 1, transition: { delay: 0.38, type: 'spring', stiffness: 420, damping: 20 } }}
         >
-          {total} {total === 1 ? 'POINT' : 'POINTS'}
+          {minus ? `-${total}` : total} {total === 1 ? 'POINT' : 'POINTS'}
         </motion.div>
         {callout && (
           <motion.div

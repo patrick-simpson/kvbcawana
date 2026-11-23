@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
+import { useContext, useEffect, useRef, useState } from 'react';
+import { BackwardsContext } from '../hooks/useBackwards.js';
 import { AnimatePresence } from 'framer-motion';
 import { M } from '../lib/motion.jsx';
 import { DUR, EASE, beats } from '../lib/brand.js';
@@ -83,6 +84,9 @@ const GAME_CLOCK_TICK_MS = 1000;
  * yet): each new one replays the chip's bump, its ring and its "+N".
  */
 function TeamChip({ team, value, index, bump, gained, won, final }) {
+  // Backwards Night (owner 2026-11-23): every score shows a minus sign.
+  const minus = useContext(BackwardsContext);
+  const shown = (/** @type {number} */ v) => (minus ? `-${v}` : v);
   const colors = SCORE_TEAM_COLORS[team];
   // The number before this one (adjusted during render, never in an effect): the cube's front face.
   const [num, setNum] = useState({ value, from: value });
@@ -115,8 +119,8 @@ function TeamChip({ team, value, index, bump, gained, won, final }) {
       >
         <span className="score-ticker__word">{SCORE_TEAM_WORDS[team]}</span>
         {hit && num.from < value
-          ? <CubeNum key={`v-${value}-${hit}`} from={num.from} value={value} />
-          : <span key={`v-${value}`} className="score-ticker__num">{value}</span>}
+          ? <CubeNum key={`v-${value}-${hit}`} from={shown(num.from)} value={shown(value)} />
+          : <span key={`v-${value}`} className="score-ticker__num">{shown(value)}</span>}
       </M.span>
       {hit > 0 && (
         <>

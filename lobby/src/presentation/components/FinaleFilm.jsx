@@ -1,4 +1,6 @@
-import React, { useEffect, useId, useRef, useState } from 'react';
+import React, { useContext, useEffect, useId, useRef, useState } from 'react';
+import { BackwardsContext } from '../../hooks/useBackwards.js';
+import { backwardsText } from '../../../../shared/backwards.js';
 import { motion } from 'framer-motion';
 import {
   FINALE_MS, SCORE_CLUB_WORDS, SCORE_TEAMS, SCORE_TEAM_COLORS, SCORE_TEAM_WORDS, finaleFilmColors, finaleFilmFor, winnerOf,
@@ -88,7 +90,10 @@ export const FinaleFilm = ({ club, scores, teams: playing = SCORE_TEAMS, night, 
   const winners = w.teams.length ? w.teams : playing.slice(0, 1);
   const film0 = finaleFilmColors(winners);
   const colors = { team: liftInk(film0.team), deep: w.tie ? liftInk(film0.deep) : film0.deep };
-  const head = w.tie ? "IT'S A TIE!" : `${SCORE_TEAM_WORDS[winners[0]]} WINS!`;
+  // Backwards Night (owner 2026-11-23): the film runs in reverse, its words spelled backwards.
+  const minus = useContext(BackwardsContext);
+  const head0 = w.tie ? "IT'S A TIE!" : `${SCORE_TEAM_WORDS[winners[0]]} WINS!`;
+  const head = minus ? backwardsText(head0) : head0;
   const filterId = `pj-ink-${useId().replace(/[^a-zA-Z0-9]/g, '')}`;
   const video = useRef(/** @type {HTMLVideoElement|null} */ (null));
   // 'none', 'early' (never played: the flat screen out of the cover) or 'late' (stalled: over the film).
@@ -208,7 +213,7 @@ export const FinaleFilm = ({ club, scores, teams: playing = SCORE_TEAMS, night, 
         <motion.video
           ref={video}
           className="pj-film__video"
-          src={filmSrc(film.id)}
+          src={filmSrc(minus ? `${film.id}-reverse` : film.id)}
           muted
           playsInline
           preload="auto"
@@ -279,7 +284,7 @@ export const FinaleFilm = ({ club, scores, teams: playing = SCORE_TEAMS, night, 
                       : { opacity: 1, y: won ? -12 : 0, transition: { delay: i * 0.08, type: 'spring', stiffness: 320, damping: 20 } }}
                   >
                     <span className="pj-finale__name">{SCORE_TEAM_WORDS[t]}</span>
-                    <span className="pj-finale__num"><CountUp to={scores[t]} delay={0.15 + i * 0.08} /></span>
+                    <span className="pj-finale__num">{minus ? '-' : ''}<CountUp to={scores[t]} delay={0.15 + i * 0.08} /></span>
                   </motion.div>
                 );
               })}
