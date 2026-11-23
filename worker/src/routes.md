@@ -2145,3 +2145,20 @@ event titled "backwards" today) / `on` / `off`, storage `theme:backwards`.
 - The desk roster answers `backwards: true` on such a night; /checkin then puts `awanaBackwards: true` on
   each `/print` body, and adopt.js does the same for a TwoTimTwo-page job: the station prints the name
   and the handbook group spelled backwards (KVBC Awana's `label-render.js`).
+
+### 10.23 Hand out shares (BUILT, owner 2026-11-23)
+
+`worker/src/givershares.js`; the page awana.kvbchurch.org/tools/shares/ (`site/tools/shares/`,
+unlisted, noindex). Owner only: the church session AND `X-Mail-Owner` (the club email page's
+`MAIL_OWNER_CODE`), or the owner's kept email sign-in (`X-Mail-Token` of the office); anything else 403
+`owner-only`.
+
+- `GET /v1/shares/tonight` -> `{ok, backwards, kids: [{id, first, last, club, given?}], stale?}`: the desk
+  roster's checked-in, not checked-out children (no extra TwoTimTwo read beyond the roster's own);
+  `given` = shares this page gave the child tonight. A day with no club: `{noClub: true, kids: []}`.
+- `POST /v1/shares/give {id, shares 1..20, why <= 75, key}`: ONE child through TwoTimTwo's Special Share
+  Awards form (the store top-up's, 10.20): reads the child's page, finds tonight's meeting by date, marks
+  `key:id` `posting` (sealed `give:night`, written through) BEFORE the post, then `given` (the answer's
+  page shows the new balance) / `refused` / `unknown`. The same `key:id` again answers `repeat: true` and
+  posts nothing; `unknown` is never posted again. Before any mark: 429 `read-busy`, 502 (TwoTimTwo, a form
+  it could not read, `no-permission`), 409 `no-meeting-tonight`; the page may ask again with the same key.

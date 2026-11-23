@@ -63,6 +63,7 @@ import { Tally, mountTally } from './tally.js';
 import { Scoreboard, mountScoreboard } from './scoreboard.js';
 import { Prints, mountPrints } from './prints.js';
 import { ClubMail, mountClubMail } from './clubmail.js';
+import { GiveShares, mountGiveShares } from './givershares.js';
 import { parseSession, sessionBody } from './session.js';
 import { BadRequest, fail, json } from './http.js';
 import { Registry } from './registry.js';
@@ -381,6 +382,9 @@ export class SyncCore {
       alarms: () => this.watcher.alarms,   // send later: its steps run from the alarm (clubMail.tick)
     });
     mountClubMail(this.registry, this);   // /v1/mail/* (routes.md 10.19)
+    // Hand out shares (givershares.js, routes.md 10.23): the owner's page, TwoTimTwo's Special Share Awards.
+    this.giveShares = new GiveShares({ storage: this.storage, now: this.now, secret: () => this.watcher.creds()?.password, client: () => this.watcher.clientFor() });
+    mountGiveShares(this.registry, this);   // GET /v1/shares/tonight, POST /v1/shares/give
     // The change log (changes.js, routes.md 10.5): every write path below logs who
     // (device.js), when, which keys, before and after; a module that owns an
     // undoable kind adds its undoer to `undoers`.

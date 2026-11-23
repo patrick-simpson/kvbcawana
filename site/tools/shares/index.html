@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Hand out shares · KVBC Awana</title>
+<link rel="stylesheet" href="/lobby/shared/brand/tokens.css">
+<link rel="stylesheet" href="/lobby/shared/brand/fonts.css">
+<style>
+  /* Hand out shares (owner 2026-11-23): tonight's checked-in children by club; tick some, pick an
+     amount, Give. Owner only. Rules: worker/src/routes.md 10.23. Flat, the kit's hard offsets. */
+  @font-face { font-family: 'Figtree'; font-weight: 300 900; src: url('/lobby/shared/brand/fonts/figtree-latin-wght-normal.woff2') format('woff2'); }
+  :root { --ink: var(--brand-ink, #231F20); --paper: #f6f4ef; --hot: #CF4518; --muted: #4a4a4a; }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { margin: 0; background: var(--paper); color: var(--ink); font: 400 16px/1.5 var(--brand-font-body); padding-bottom: 168px; }
+  header { display: flex; align-items: center; gap: 12px; padding: 14px 16px; background: var(--brand-blue); color: #fff; }
+  header h1 { margin: 0; font: 400 24px/1 var(--brand-font-display); }
+  header button { margin-left: auto; }
+  button { font: 400 16px/1 var(--brand-font-label); letter-spacing: .05em; text-transform: uppercase; border: 0; border-radius: 10px; padding: 10px 14px; min-height: 44px; cursor: pointer; color: var(--ink); background: #fff; box-shadow: 3px 3px 0 var(--ink); }
+  button:active { translate: 2px 2px; box-shadow: 1px 1px 0 var(--ink); }
+  button.hot { background: var(--hot); color: #fff; }
+  button.quiet { box-shadow: none; border: 2px solid currentColor; background: transparent; color: inherit; min-height: 34px; padding: 6px 10px; font-size: 13px; }
+  button[aria-pressed="true"] { background: var(--ink); color: #fff; }
+  button:disabled { opacity: .5; cursor: default; }
+  button:focus-visible, input:focus-visible { outline: 3px solid var(--brand-blue); outline-offset: 2px; }
+  .signin { display: grid; gap: 10px; width: calc(100% - 32px); max-width: 26rem; margin: 40px auto; padding: 24px 20px; background: #fff; border-radius: 16px; box-shadow: 4px 4px 0 var(--ink); }
+  .signin h2 { margin: 0; font: 400 26px/1.1 var(--brand-font-display); }
+  .signin p { margin: 0; }
+  .signin label { font: 400 17px/1.1 var(--brand-font-label); letter-spacing: .06em; text-transform: uppercase; color: var(--brand-blue); margin-top: 6px; }
+  .signin input { width: 100%; min-height: 48px; font: inherit; font-size: 17px; padding: 10px 12px; border: 2px solid var(--ink); border-radius: 10px; }
+  .signin button { width: 100%; min-height: 48px; }
+  #note { min-height: 1.5em; font-weight: 600; color: var(--brand-sparks-deep, #8c1d23); }
+  main { max-width: 760px; margin: 0 auto; padding: 12px 16px; }
+  #list-note { font-weight: 600; color: var(--muted); }
+  .club { margin: 14px 0; background: #fff; border-radius: 14px; box-shadow: 3px 3px 0 var(--ink); overflow: hidden; }
+  .club h2 { display: flex; align-items: center; justify-content: space-between; margin: 0; padding: 10px 14px; font: 400 20px/1 var(--brand-font-label); letter-spacing: .05em; text-transform: uppercase; color: #fff; background: var(--ink); }
+  .club[data-club="puggles"] h2 { background: var(--brand-puggles-plate); }
+  .club[data-club="cubbies"] h2 { background: var(--brand-cubbies-plate); }
+  .club[data-club="sparks"] h2 { background: var(--brand-sparks-plate); }
+  .club[data-club="tnt"] h2 { background: var(--brand-tnt-plate); }
+  .club[data-club="trek"] h2 { background: var(--brand-trek-plate); }
+  .club[data-club="journey"] h2 { background: var(--brand-journey-plate); }
+  .kid { display: grid; grid-template-columns: 28px 1fr auto; align-items: center; gap: 4px 10px; padding: 10px 14px; border-top: 1px solid #e6e1d7; cursor: pointer; }
+  .kid input { width: 24px; height: 24px; margin: 0; accent-color: var(--hot); }
+  .kid .name { font-weight: 600; font-size: 17px; }
+  .kid .tag { font-size: 13px; font-weight: 700; color: var(--brand-trek-plate, #0d6b6e); }
+  .kid .out { grid-column: 2 / 4; font-size: 14px; font-weight: 600; }
+  .kid .out:empty { display: none; }
+  .out.good { color: #1f6b33; } .out.warn { color: #8a5a00; } .out.bad { color: #8c1d23; }
+  .bar { position: fixed; left: 0; right: 0; bottom: 0; background: #fff; border-top: 3px solid var(--ink); padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); }
+  .bar .inner { max-width: 760px; margin: 0 auto; display: grid; gap: 10px; }
+  .bar .row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+  .bar #count { font-weight: 700; margin-right: auto; }
+  .bar label { font: 400 15px/1 var(--brand-font-label); letter-spacing: .05em; text-transform: uppercase; color: var(--brand-blue); }
+  .bar input { flex: 1; min-width: 12rem; min-height: 44px; font: inherit; padding: 8px 10px; border: 2px solid var(--ink); border-radius: 10px; }
+  .bar #give { min-width: 9rem; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Hand out shares</h1>
+  <button type="button" class="quiet" id="reload">Refresh</button>
+</header>
+
+<form class="signin" id="signin" hidden>
+  <h2>Owner sign-in</h2>
+  <p>Only the owner can give shares from here. Every tap really gives them in TwoTimTwo.</p>
+  <label for="passphrase">Church passphrase</label>
+  <input id="passphrase" type="password" autocomplete="current-password">
+  <label for="owner-code">Owner's code</label>
+  <input id="owner-code" type="password" autocomplete="off">
+  <button type="submit" class="hot" id="signin-btn">Sign in</button>
+  <p id="note" role="status"></p>
+</form>
+
+<div id="app" hidden>
+  <main>
+    <p id="list-note" role="status"></p>
+    <div id="list"></div>
+  </main>
+  <div class="bar">
+    <div class="inner">
+      <div class="row">
+        <span id="count">Pick children</span>
+        <button type="button" data-amount="1" aria-pressed="true">1</button>
+        <button type="button" data-amount="2">2</button>
+        <button type="button" data-amount="3">3</button>
+        <button type="button" data-amount="5">5</button>
+        <button type="button" data-amount="10">10</button>
+      </div>
+      <div class="row">
+        <label for="why">Why</label>
+        <input id="why" maxlength="75" data-auto="1">
+        <button type="button" class="hot" id="give" disabled>Give 1</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>
