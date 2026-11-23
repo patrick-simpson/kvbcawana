@@ -311,9 +311,12 @@ describe('CheckInMoment: "+N SHARES!" (owner 2026-11-21)', () => {
     expect(none.container.querySelector('.checkin__shares')).toBe(null);
   });
 
-  it('sits above a birthday sticker so the two never cover each other', () => {
+  it('sits on the kicker\'s line in the name\'s part of the screen (owner 2026-11-23), never by the sticker', () => {
     const { container } = render(still(<CheckInMoment event={kid({ isBirthday: true, sharesGained: 3 })} />));
-    expect(container.querySelector('.checkin__shares-slot--above')).not.toBe(null);
+    const head = container.querySelector('.checkin__copy .checkin__head');
+    expect(head.querySelector('.checkin__cell--kicker')).not.toBe(null);
+    expect(head.querySelector('.checkin__shares').textContent).toBe('+3 SHARES!');
+    expect(container.querySelector('.checkin__sticker-slot .checkin__shares')).toBe(null);
   });
 
   it('a week of 5 or more gets the coin shower and a clink with the sound on; 4 gets neither', () => {

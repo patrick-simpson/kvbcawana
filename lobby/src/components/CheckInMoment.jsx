@@ -182,7 +182,8 @@ function MomentSticker({ moment, at, children }) {
 /**
  * "+N SHARES!" (owner 2026-11-21): the shares a child earned since last club
  * night, tonight's attendance share included. A flat sun-gold plate with an
- * ink hard offset, popped on just after the sticker's beat; its last keyframe
+ * ink hard offset, beside the kicker over the name, popped on just after the
+ * kicker's beat; its last keyframe
  * is the plate at rest (the M rule). Fixed at mount, keyed on the child.
  */
 function SharesBadge({ text, at }) {
@@ -427,11 +428,20 @@ export default function CheckInMoment({ event, step = 0, audioEnabled, clubPhras
       </M.div>
 
       <M.div className="checkin__copy" exit={{ opacity: 0, y: u(-1.6), transition: LEAVE }}>
-        <M.div className="checkin__cell checkin__cell--kicker" layout="position" transition={GLIDE}>
-          <AnimatePresence>
-            <Kicker key={kicker} text={kicker} delay={t.kicker} club={club} />
-          </AnimatePresence>
-        </M.div>
+        {/* The kicker's line also holds "+N SHARES!" (owner 2026-11-23: in the
+            name's part of the screen, never up in the announcements). */}
+        <div className="checkin__head">
+          <M.div className="checkin__cell checkin__cell--kicker" layout="position" transition={GLIDE}>
+            <AnimatePresence>
+              <Kicker key={kicker} text={kicker} delay={t.kicker} club={club} />
+            </AnimatePresence>
+          </M.div>
+          <div className="checkin__shares-slot">
+            <AnimatePresence>
+              {shares && <SharesBadge key={event.id} text={shares} at={t.kicker + 0.12} />}
+            </AnimatePresence>
+          </div>
+        </div>
         <M.div className="checkin__cell checkin__cell--name" layout="position" transition={GLIDE}>
           <AnimatePresence>
             <Name key={event.id} text={display} entrance={accent.entrance} timing={t} size={size} wraps={wraps} box={box} club={club} />
@@ -442,12 +452,6 @@ export default function CheckInMoment({ event, step = 0, audioEnabled, clubPhras
             {line && <Line key={line} text={line} delay={t.line} />}
           </AnimatePresence>
         </div>
-      </M.div>
-
-      <M.div className={`checkin__shares-slot${sticker ? ' checkin__shares-slot--above' : ''}`} exit={{ opacity: 0, scale: 0.8, transition: LEAVE }}>
-        <AnimatePresence>
-          {shares && <SharesBadge key={event.id} text={shares} at={t.sticker + 0.12} />}
-        </AnimatePresence>
       </M.div>
 
       <M.div className="checkin__sticker-slot" exit={{ opacity: 0, scale: 0.8, transition: LEAVE }}>

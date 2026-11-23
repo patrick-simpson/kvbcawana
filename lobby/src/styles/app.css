@@ -1032,30 +1032,39 @@ html, body, #root {
 .checkin__sticker--first .brand-sticker__text {
   font-size: calc(3.6 * var(--u));
 }
-/* "+N SHARES!" (owner 2026-11-21): where the sticker would sit, or above it
-   when a birthday sticker is up. Flat: sun plate, ink hard offset, no blur. */
-.checkin__shares-slot {
-  position: absolute;
-  right: calc(6 * var(--u));
-  bottom: calc(23 * var(--u));
-  display: grid;
-  justify-items: end;
+/* "+N SHARES!" (owner 2026-11-21; on the kicker's line since 2026-11-23, owner:
+   "inside the same section of the screen as the name"): the kicker and the
+   badge share one row over the name, bottoms level, so the name never moves.
+   A kicker too long to share the line puts the badge on the line ABOVE it
+   (wrap-reverse), never into the name. Flat: sun plate, ink hard offset. */
+.checkin__head {
+  display: flex;
+  flex-wrap: wrap-reverse;
+  align-items: flex-end;
+  column-gap: calc(1.4 * var(--u));
+  width: 100%;
 }
-.checkin__shares-slot--above {
-  bottom: calc(36 * var(--u));
+.checkin__head > .checkin__cell--kicker {
+  width: auto;
+}
+.checkin__shares-slot {
+  display: grid;
+  /* Clear of the name's tall marks: the kicker's own margin, its letters'
+     foot (0.1465em of 2.5u) and the plate's offset shadow. */
+  margin-bottom: calc(1.6 * var(--u));
 }
 .checkin .checkin__shares {
   grid-area: 1 / 1;
   font-family: var(--font-shout);
-  font-size: calc(3.4 * 1.057 * var(--u));
+  font-size: calc(2.6 * 1.057 * var(--u));
   line-height: calc(1 / 1.057);
   color: var(--brand-ink, #231F20);
   background: var(--brand-sun, #FCB614);
-  padding: calc(0.9 * var(--u)) calc(1.6 * var(--u));
-  border-radius: calc(1.2 * var(--u));
-  box-shadow: calc(0.5 * var(--u)) calc(0.5 * var(--u)) 0 var(--brand-ink, #231F20);
+  padding: calc(0.55 * var(--u)) calc(1.2 * var(--u));
+  border-radius: calc(0.9 * var(--u));
+  box-shadow: calc(0.35 * var(--u)) calc(0.35 * var(--u)) 0 var(--brand-ink, #231F20);
   white-space: nowrap;
-  transform-origin: 50% 100%;
+  transform-origin: 0% 100%;
 }
 .checkin__doodles {
   /* The 16:9 box, pinned to the bottom like the name, so the doodles keep
