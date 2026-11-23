@@ -45,6 +45,10 @@ export function useCheckInQueue(config, { held = false } = {}) {
         welcomeBack: payload.welcomeBack === true,
         milestone: Number.isInteger(payload.milestone) && payload.milestone > 0
           ? payload.milestone : null,
+        // "+N SHARES!" (owner 2026-11-21): dropped here until 2026-11-23, so the
+        // badge and the coin shower never reached a real TV.
+        sharesGained: Number.isInteger(payload.sharesGained) && payload.sharesGained > 0 && payload.sharesGained <= 500
+          ? payload.sharesGained : null,
         // 'live' (default) | 'replay' (recap after reconnect) | 'late'
         // (arrived mid-program) — presentation only, never logic.
         presentation: payload.presentation === 'replay' || payload.presentation === 'late'

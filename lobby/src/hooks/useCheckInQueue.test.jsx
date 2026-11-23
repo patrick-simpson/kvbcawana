@@ -14,6 +14,17 @@ beforeEach(() => vi.useFakeTimers());
 afterEach(() => vi.useRealTimers());
 
 describe('useCheckInQueue', () => {
+  it('carries "+N SHARES!" through to the moment on screen (it was dropped here)', () => {
+    const { result } = renderHook(() => useCheckInQueue(config));
+    act(() => {
+      result.current.enqueue({ firstName: 'Ava', club: 'Sparks', sharesGained: 6 });
+      result.current.enqueue({ firstName: 'Noah', club: 'Trek', sharesGained: 'lots' });
+    });
+    expect(result.current.currentEvent.sharesGained).toBe(6);
+    act(() => vi.advanceTimersByTime(6000));
+    expect(result.current.currentEvent.sharesGained).toBeNull();
+  });
+
   it('shows queued events one at a time in FIFO order', () => {
     const { result } = renderHook(() => useCheckInQueue(config));
 
