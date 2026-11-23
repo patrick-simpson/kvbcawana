@@ -14,9 +14,13 @@ import { safeEqual } from './crypto.js';
 import { fail, json } from './http.js';
 import { documentOf, isLoginPage } from './twotimtwo.js';
 import { INTERACTIVE_WAIT_MS, READ_INTERVAL_MS } from './readbudget.js';
+import { parseSpecialSharePage } from './topup.js';
+import { localTime } from './watcher.js';
 
 /** The only pages it may look at: where TwoTimTwo records shares. */
-export const PEEK_PATHS = Object.freeze(['/meeting/shekels', '/meeting/formClubberShekels', '/meeting/record', '/meeting/colorGroup', '/meeting/index', '/calendar/index']);
+export const PEEK_PATHS = Object.freeze(['/meeting/shekels', '/meeting/formClubberShekels', '/meeting/record', '/meeting/colorGroup', '/meeting/index', '/calendar/index', '/clubber/special_shekel']);
+/** Pages whose child is in the PATH (`/clubber/special_shekel/<id>`), so `sample` goes there. */
+const PATH_ID = ['/clubber/special_shekel'];
 /** `sample=<key>` puts ONE real child's clubber id under that key (the Worker picks it; it is never answered). */
 export const SAMPLE_KEYS = Object.freeze(['id', 'clubber_id', 'clubberId', 'recid']);
 /** The only query keys passed on (a meeting, a club, a date, a tab). */
@@ -121,18 +125,32 @@ export function mountPeek(registry, core) {
     }
     const client = core.watcher.clientFor();
     if (!client) return json({ ok: false, reason: 'not-configured' }, 503);
+    let target = path;
     // One real child for a one-child form: the check-in page's first child, never answered.
     const sample = url.searchParams.get('sample');
     if (sample !== null) {
-      if (!SAMPLE_KEYS.includes(sample)) return json({ ok: false, reason: 'bad-sample', keys: SAMPLE_KEYS }, 400);
+      if (!PATH_ID.includes(path) && !SAMPLE_KEYS.includes(sample)) return json({ ok: false, reason: 'bad-sample', keys: SAMPLE_KEYS }, 400);
       const c = await client.checkinPage({ waitMs: INTERACTIVE_WAIT_MS, kind: 'peek' });
       const kid = c.ok && c.page && Array.isArray(c.page.roster) ? c.page.roster[0] : null;
       if (!kid) return json({ ok: false, reason: 'no-sample', error: c.ok ? null : c.error }, 502);
-      q.set(sample, String(kid.clubberId));
-    }
-    const r = await client.page(q.toString() ? `${path}?${q}` : path, { waitMs: INTERACTIVE_WAIT_MS, kind: 'peek' });
+      if (PATH_ID.includes(path)) target = `${path}/${kid.clubberId}`;
+      else q.set(sample, String(kid.clubberId));
+    } else if (PATH_ID.includes(path)) return json({ ok: false, reason: 'needs-sample' }, 400);
+    const r = await client.page(q.toString() ? `${target}?${q}` : target, { waitMs: INTERACTIVE_WAIT_MS, kind: 'peek' });
     if (!r.ok) return r.error === 'read-busy' ? json({ ok: false, reason: 'read-busy', retryAfterMs: r.retryAfterMs ?? READ_INTERVAL_MS }, 429) : json({ ok: false, reason: r.error }, 502);
     if (isLoginPage(r.html)) return json({ ok: false, reason: 'signed-out' }, 502);
+    /** The store night top-up's dry run (topup.js): could it give shares tonight? Yes/no only. */
+    let topup;
+    if (path === '/clubber/special_shekel') {
+      const f = parseSpecialSharePage(r.html);
+      const today = localTime(core.now()).date;
+      topup = f ? {
+        formFound: !!f.token && !!f.profileId && !!f.clubberId, balanceFound: f.balance !== null,
+        meetings: f.meetings.length, tonightListed: f.meetings.some((m) => m.date === today),
+      } : null;
+    }
+    // A one-child page may name the child in a heading: it answers yes/no only, never its shape.
+    if (topup !== undefined) return json({ ok: true, path, landedOn: PATH_ID.includes(path) ? path : pathOf(r.path || ''), topup });
     return json({ ok: true, path, landedOn: pathOf(r.path || ''), shape: pageShapeOf(r.html) });
   });
 }

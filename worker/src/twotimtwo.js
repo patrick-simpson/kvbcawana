@@ -1118,6 +1118,47 @@ export class TwoTimTwoClient {
     return accept(res.html) ? { ok: true } : { ok: false, error: 'refused' };
   }
 
+  /**
+   * Give one child shares: TwoTimTwo's Special Share Awards form (topup.js), a
+   * write behind the club-day guard. The outcome is DEFINITE only when the
+   * answer proves it: `given` (the page shows the expected balance), `refused`
+   * (the form's own error, a 4xx, or signed out before the form took it).
+   * Anything else is `unknown`: never posted again.
+   * @param {{ clubberId: string, calendarId: string, profileId: string, token: string, shares: number, why: string, expect: number }} g
+   * @returns {Promise<{ outcome: 'given'|'refused'|'unknown', error?: string }>}
+   */
+  async giveSpecialShares(g) {
+    const r = await this.write(async () => {
+      const form = new URLSearchParams();
+      form.set('YII_CSRF_TOKEN', g.token);
+      form.set('ClubberSpecialShekel[clubber_id]', g.clubberId);
+      form.set('ClubberSpecialShekel[calendar_id]', g.calendarId);
+      form.set('ClubberSpecialShekel[profile_id]', g.profileId);
+      form.set('ClubberSpecialShekel[shekels]', String(g.shares));
+      form.set('ClubberSpecialShekel[why]', g.why);
+      form.set('yt0', '1');
+      let res;
+      try {
+        res = await this.request(`/clubber/special_shekel/${encodeURIComponent(g.clubberId)}`, { method: 'POST', form, stopAtLogin: true });
+      } catch (err) {
+        const code = errorCode(err);
+        // A slot refused for the redirect hop: the post itself was already made.
+        return { ok: /** @type {const} */ (false), error: code, outcome: /** @type {const} */ ('unknown') };
+      }
+      if (/\/site\/login/i.test(res.path) || isLoginPage(res.html)) return { ok: /** @type {const} */ (false), error: 'signed-out', outcome: /** @type {const} */ ('refused') };
+      if (res.status >= 400 && res.status < 500) return { ok: /** @type {const} */ (false), error: `http-${res.status}`, outcome: /** @type {const} */ ('refused') };
+      if (res.status !== 200) return { ok: /** @type {const} */ (false), error: `http-${res.status}`, outcome: /** @type {const} */ ('unknown') };
+      const text = String(documentOf(res.html).body?.textContent || '').replace(/\s+/g, ' ');
+      const m = /Share Balance:\s*(-?\d+)/i.exec(text);
+      if (m && Number(m[1]) === g.expect) return { ok: /** @type {const} */ (true), outcome: /** @type {const} */ ('given') };
+      if (/class="[^"]*errorSummary/i.test(res.html) && m && Number(m[1]) === g.expect - g.shares) return { ok: /** @type {const} */ (false), error: 'form-error', outcome: /** @type {const} */ ('refused') };
+      return { ok: /** @type {const} */ (false), error: 'unclear', outcome: /** @type {const} */ ('unknown') };
+    }, {});
+    if ('outcome' in r) return { outcome: r.outcome, ...(r.error ? { error: r.error } : {}) };
+    // The club-day guard refused it: nothing was sent.
+    return { outcome: 'refused', error: r.error };
+  }
+
   /** The families, from TwoTimTwo's household export (names only kept). */
   async households(opts = {}) {
     const page = await this.page('/household/csv', { kind: 'households', ...opts });

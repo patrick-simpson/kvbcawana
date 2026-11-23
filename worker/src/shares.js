@@ -118,6 +118,8 @@ export class Shares {
     this.error = null;
     /** The night an export came with no Share Balance column (memory only): no re-reads for it. */
     this.noColumnNight = '';
+    /** The TwoTimTwo top-up (topup.js), for the view's counts; set by SyncCore. @type {any} */
+    this.topup = null;
   }
 
   get mode() {
@@ -246,6 +248,7 @@ export class Shares {
       error: this.error,
       changedAt: this.modeDoc.data ? this.modeDoc.data.at : null,
       changedBy: this.modeDoc.data ? this.modeDoc.data.by : null,
+      topup: this.topup ? this.topup.view() : null,
     };
   }
 

@@ -285,6 +285,8 @@ export class Watcher {
     this.publisher = null;
     /** The youth check-out (ymcheckout.js): set by SyncCore; the watcher hands it each applied report and a turn of its alarm. @type {import('./ymcheckout.js').YmCheckout|null} */
     this.ym = null;
+    /** The store night top-up (topup.js), set by SyncCore. @type {import('./topup.js').TopUp|null} */
+    this.topup = null;
     /** The desk (desk.js): set by SyncCore; the watcher warms its check-in page and catches its families up. @type {import('./desk.js').Desk|null} */
     this.desk = null;
     /** Who came the last two club nights (recent.js; SyncCore sets it). @type {any} */
@@ -489,6 +491,7 @@ export class Watcher {
       const feeds = this.feeds;
       if (feeds) await feeds.load().catch((err) => console.error('[feeds] load failed', err));
       if (feeds && feeds.shares) await feeds.shares.prepare().catch((err) => console.error('[shares] prepare failed', err));
+      if (this.topup) await this.topup.load().catch((err) => console.error('[topup] load failed', err));
       const before = await this.loadStatus();
       const reportAt = this.lastWatcherRead(before) + watchIntervalAt(this.now());
       // The next report's slot is the watcher's: other reads keep clear of it.
@@ -526,6 +529,9 @@ export class Watcher {
         try { await this.read(); } catch (err) { console.error('[cloud] watcher read failed', err); }
       } else if (this.ym && this.ym.due() && await this.ym.step().catch((err) => { console.error('[cloud] youth check-out failed', err); return false; })) {
         // A Checkout page read or ONE check-out post (at most one every 15 s, ymcheckout.js).
+      } else if (this.budget.peek(false) === 0 && this.topup && this.topup.next() !== null
+        && await this.topup.step().catch((err) => { console.error('[topup] top-up failed', err); return false; })) {
+        // Store night: one child topped up to 10 shares in TwoTimTwo, in a slot nothing above wanted (topup.js).
       } else if (this.publisher) {
         // The minute's tally / ticker / still-here list, and anything a change left
         // waiting. (A tick that read the report published from onReport already; one
@@ -583,7 +589,7 @@ export class Watcher {
    */
   otherWakeInMs(status) {
     if (this.checkinPageDue(status)) return 0;
-    const waits = [this.desk ? this.desk.familiesSource.wakeInMs() : null, this.desk ? this.desk.rosterRefreshInMs() : null, this.feeds ? this.feeds.wakeInMs() : null];
+    const waits = [this.topup ? this.topup.wakeInMs() : null, this.desk ? this.desk.familiesSource.wakeInMs() : null, this.desk ? this.desk.rosterRefreshInMs() : null, this.feeds ? this.feeds.wakeInMs() : null];
     const due = waits.filter((w) => w !== null);
     return due.length ? Math.min(...due) : null;
   }
@@ -750,6 +756,8 @@ export class Watcher {
       await this.storage.put('cloud:snap', await sealState(creds.password, { date, kids }));
       // Who is in, for the youth check-out (in memory; it reads no report of its own).
       this.ym?.onReport({ date, kids });
+      // Who is in, for the store night top-up (topup.js; ids only, in memory).
+      this.topup?.onReport({ date, kids });
       // A child the households export does not list: a family to catch up (families.js).
       this.desk?.familiesSource.noteChildren(date, res.report.entries.map((e) => e.name));
       // Who is checked in, for the desk's roster (the check-in page drops their rows; desk.js onReport).

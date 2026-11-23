@@ -14,6 +14,21 @@ export const STORE_MODES = [
   { mode: 'off', label: 'Off', hint: 'Never show share balances.' },
 ];
 
+/** The TwoTimTwo top-up line (worker/src/topup.js): counts only. @param {any} t */
+export function topUpWords(t) {
+  if (!t) return '';
+  if (t.error === 'no-permission') return 'TwoTimTwo top-up: the service’s TwoTimTwo login may not open Special Share Awards. Give it that permission in TwoTimTwo.';
+  const parts = [];
+  if (t.given) parts.push(`${t.given} ${t.given === 1 ? 'child' : 'children'} topped up to 10 (${t.shares} shares)`);
+  if (t.full) parts.push(`${t.full} already at 10`);
+  if (t.waiting) parts.push(`${t.waiting} still to check`);
+  if (t.unknown) parts.push(`${t.unknown} not sure it went in: look in TwoTimTwo, it is never tried twice`);
+  if (t.refused) parts.push(`${t.refused} TwoTimTwo would not take`);
+  if (!parts.length) return 'TwoTimTwo top-up: children under 10 are topped up after they check in.';
+  const tail = t.error === 'no-meeting-tonight' ? ' TwoTimTwo’s Special Share form does not list tonight’s meeting.' : '';
+  return `TwoTimTwo top-up: ${parts.join(' · ')}.${tail}`;
+}
+
 /** The status line under the buttons. @param {any} v */
 export function storeNightWords(v) {
   if (!v) return '';
@@ -52,7 +67,7 @@ export default function StoreNightCard() {
 
   return (
     <PanelCard title="Awana store night" tab="var(--brand-sun, #F7B917)">
-      <p className="hint">On store nights each name tag shows the child’s shares in a box. Every club night the lobby TV shows “+N SHARES!” for shares earned since last week.</p>
+      <p className="hint">On store nights each name tag shows the child’s shares in a box, and any child under 10 is topped up to 10 in TwoTimTwo after checking in. Every club night the lobby TV shows “+N SHARES!” for shares earned since last week.</p>
       {problem && <p className="hint hint--warn" role="status">{problem}</p>}
       {!data && !problem && <p className="hint" role="status">Reading…</p>}
       {data && (
@@ -68,6 +83,7 @@ export default function StoreNightCard() {
           </div>
           <p className="hint">{STORE_MODES.find((m) => m.mode === data.mode)?.hint}</p>
           <p className="hint" role="status" data-store-night-status>{storeNightWords(data)}</p>
+          {data.active && data.topup && <p className="hint" data-store-night-topup>{topUpWords(data.topup)}</p>}
         </>
       )}
     </PanelCard>

@@ -2102,9 +2102,23 @@ it, at least 10 shares on every store-night tag, and "+N Shares!" on the lobby e
   last kept club night's before balance; only when 1..500, else nothing (spent, the same, or no last
   week). `GET /v1/desk/roster` adds `gained`; the sealed `/print` body carries `sharesGained`; the station
   puts it on the sealed `checkin` event (contract `sharesGained`, printer 11.3.0); the lobby draws it.
-- NOT BUILT (owner 2026-11-21 asked for it as a side project): topping a child up to 10 in TwoTimTwo
-  itself. How TwoTimTwo records shares (`/meeting/shekels`, Record Shekels role) has never been read, and
-  a guessed write to children's balances is not safe; the tag already shows at least 10.
+- The TwoTimTwo top-up (BUILT, owner 2026-11-23: "build it that way"; `worker/src/topup.js`): on a store
+  night, each child the applied check-in report lists whose before balance + 1 is under 10 (or who has no
+  balance) is topped up to 10 IN TWOTIMTWO through its one-child Special Share Awards form
+  (`/clubber/special_shekel/<clubber id>`: `ClubberSpecialShekel[clubber_id|calendar_id|profile_id|shekels|why]`
+  + `YII_CSRF_TOKEN`; the Share Usage page only takes shares away, Color Groups gives a whole group). One
+  child per free read slot (the watcher's chain, after the rush's report and the youth check-out): read
+  the page (the LIVE balance, tonight's meeting by date, the token and profile), at 10 or more nothing
+  (`full`), else post `10 - balance` with Why "Store night top-up to 10" (`TwoTimTwoClient.giveSpecialShares`,
+  behind the club-day write guard). Marked `posting` (sealed `topup:night`, written through) BEFORE the
+  post; `given` only when the answer's page shows the expected balance, `refused` only on a 4xx, a
+  sign-in page or the form's own error with the old balance; anything else `unknown`, looked at ONCE by a
+  later read (10 by then = `given`) and NEVER posted again; a restart turns `posting` into `unknown`. A
+  401/403 on the page = the service's TwoTimTwo user lacks the permission: stopped for the night,
+  `no-permission`. `GET /v1/store-night` carries `topup {given, shares, full, waiting, unknown, refused,
+  error}`, counts only; /settings shows them under the store-night card. Dry run: the peek
+  (10.21) with `path=/clubber/special_shekel&sample=1` answers `topup {formFound, balanceFound, meetings,
+  tonightListed}` only (that page may name the child, so never its shape). Tests `worker/test/topup.test.js`.
 
 ### 10.21 A look-only peek at a TwoTimTwo page (BUILT, owner 2026-11-23)
 

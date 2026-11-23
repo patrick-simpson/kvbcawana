@@ -12,14 +12,14 @@ on:
       path:
         description: Page (one of the Worker's PEEK_PATHS)
         type: choice
-        options: [/meeting/shekels, /meeting/formClubberShekels, /meeting/record, /meeting/colorGroup, /meeting/index, /calendar/index]
+        options: [/meeting/shekels, /meeting/formClubberShekels, /meeting/record, /meeting/colorGroup, /meeting/index, /calendar/index, /clubber/special_shekel]
         default: /meeting/shekels
       query:
         description: "Optional, e.g. club_id=3 (only club_id, calendar_id, cal_id, date, tab pass)"
         required: false
         default: ''
       sample:
-        description: "Optional: put ONE child's id (the Worker picks it, never shown) under this key: id, clubber_id, clubberId or recid"
+        description: "Optional (needed for /clubber/special_shekel, any word there): put ONE child's id (the Worker picks it, never shown) under this key: id, clubber_id, clubberId or recid"
         required: false
         default: ''
 

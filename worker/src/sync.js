@@ -73,6 +73,7 @@ import { Adopter } from './adopt.js';
 import { YmCheckout } from './ymcheckout.js';
 import { StationFeeds, mountStationFeeds } from './stationfeeds.js';
 import { Shares, mountShares } from './shares.js';
+import { TopUp } from './topup.js';
 import { Desk } from './desk.js';
 import { mountCheckin } from './checkinRoutes.js';
 import { History, mountHistory } from './history.js';
@@ -286,6 +287,10 @@ export class SyncCore {
     this.feeds.shares = this.shares;
     this.desk.shares = this.shares;
     this.adopt.shares = this.shares;
+    // Store night: every checked-in child topped up to 10 shares in TwoTimTwo itself (topup.js, routes.md 10.20).
+    this.topup = new TopUp({ storage: this.storage, watcher: this.watcher, shares: this.shares, now: this.now, secret: () => this.watcher.creds()?.password });
+    this.watcher.topup = this.topup;
+    this.shares.topup = this.topup;
     mountShares(this.registry, this);   // GET, PUT /v1/store-night
     mountPublisher(this.registry, this);   // /v1/desk/tonight, /v1/station/extras, /v1/publisher/status (routes.md 8)
     // The screen registry (ROADMAP.md#settings-page, phase 2): its doorbells ride the live

@@ -43,3 +43,10 @@ describe('the script around a path', () => {
     expect(out).not.toContain('12345');
   });
 });
+
+describe('the top-up dry run', () => {
+  it('lists the Special Share Awards page among the pages it may look at', async () => {
+    const { PEEK_PATHS } = await import('../src/peek.js');
+    expect(PEEK_PATHS).toContain('/clubber/special_shekel');
+  });
+});
