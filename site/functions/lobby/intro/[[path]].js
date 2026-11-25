@@ -1,5 +1,5 @@
-// /lobby/intro/* is the lobby's 3D intro (lobby/public/intro, made by
-// video/awana-intro/), played by the flagship slide now and then
+// /lobby/intro/* is the lobby's intro film (lobby/public/intro, made by
+// video/lobby-intro/), played by the flagship slide now and then
 // (lobby/src/components/FlagshipIntro.jsx). A <video> asks for byte ranges,
 // and Safari plays a video only from a server that answers them, which Pages'
 // static files do not: so it is left out of the upload by site/build.mjs and
