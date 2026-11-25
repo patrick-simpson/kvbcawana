@@ -7,9 +7,9 @@ its record. It lives on `main`; the next review reads its starting point from he
 
 ## State
 
-- Last review date: 2026-11-11
-- Last reviewed commit: 331b5cc
-- Reviews done: 1
+- Last review date: 2026-11-25
+- Last reviewed commit: 63144340
+- Reviews done: 2
 
 ## Instructions for the reviewer
 
@@ -102,6 +102,86 @@ history keeps them).
 
 ## Open findings
 
+### IP-20261125-01: Send later: one error in a waiting email's step wakes the Worker every second, for good
+- Severity: High
+- Where: worker/src/clubmail.js:1139 `tick` catch, :1077 `arm` (commit 12f9f43a)
+- What: When a step throws, the catch does not move that email's `wakeAt` forward, so `arm` sets the alarm 1 second ahead again, every time. One known trigger: a file whose pieces were deleted by a cancel (IP-20261125-04) makes the step throw on every try.
+- Why it matters: About 86,000 extra Durable Object wake-ups a day, on top of normal use, against the free plan's 100,000 requests a day. If the budget runs out on a club night, check-in and the screens stop working until the next day.
+- Suggested fix: In the catch, push `x.wakeAt` out (the same back-off as a failed step) and count it as a try, so 8 throws give up and mail the sender. Add a test with a step that throws.
+- Status: Open
+
+### IP-20261125-02: The game deploy workflow uses Awana's Cloudflare account and token
+- Severity: High
+- Where: .github/workflows/deploy-port-calamity-city.yml:54 and :60 (commit f0d99402)
+- What: A by-hand workflow checks out another repository at any ref, runs `npm ci` with its install scripts, and runs its `wrangler deploy` with this repo's Cloudflare token and account. The new game Worker lives in the same Cloudflare account as the sync Worker.
+- Why it matters: The free plan's 100,000 requests a day and the Durable Object allowance are counted for the whole account, so game traffic uses up Awana's budget and check-in could fail on a club night. Code or a package in the other repo also gets a token that can deploy over the Awana Worker. The workflow's own header says it "touches nothing of Awana", and no rule in CLAUDE.md covers it.
+- Suggested fix: Owner's call. Safest: deploy the game from its own repo to its own Cloudflare account (or a token scoped to that one Worker). At least add a line to CLAUDE.md's Costs section about the shared allowance.
+- Status: Open
+
+### IP-20261125-03: The TwoTimTwo peek can print a child's name in a public Actions log
+- Severity: High
+- Where: worker/src/peek.js:150-154 and `pageShapeOf` :56-58, .github/workflows/twotimtwo-peek.yml:49 (commits ec95f788, de33b413)
+- What: Only `/clubber/special_shekel` is cut down to yes/no answers. With `sample=clubber_id` on `/meeting/formClubberShekels`, which is also one real child's page, the answer has every heading, legend and `th` text, and `mask` hides only digits. The workflow prints the answer with `jq .`.
+- Why it matters: If that page shows the child's name in a heading or a row header (the code's own comment says a one-child page may), a full name goes into a public GitHub log. routes.md 10.21 says never a name. Not confirmed against TwoTimTwo's real page; the guard is just missing in the code.
+- Suggested fix: Treat any `sample` request as a one-child page: answer only the yes/no facts and field names, never headings, `th` or button words. Owner: look over any past peek runs made with a sample and delete their logs if a name shows.
+- Status: Open
+
+### IP-20261125-04: Send later: Cancel can be undone, and a new schedule can be lost
+- Severity: Medium
+- Where: worker/src/clubmail.js:1091-1126 `tick`, :1051 `cancel` (commit 12f9f43a)
+- What: `tick` reads the waiting list, then waits on TwoTimTwo and Microsoft during the step, then writes its old copy of the list back and saves the draft again. While the first step runs the line still reads `waiting`, so Cancel is allowed.
+- Why it matters: A director who cancels at that moment is told it will not be sent, but the old list and the saved draft come back and the next alarm sends it to parents. A message scheduled during another one's step is overwritten and never sent, with no word to anyone.
+- Suggested fix: Mark the line `sending` (and save) before the step starts, and after the step read the list again and change only that line. Skip the save if the waiting copy was deleted. Add a test that cancels during a step.
+- Status: Open
+
+### IP-20261125-05: Store night "On" never turns itself off, and now gives real shares every club night
+- Severity: Medium
+- Where: worker/src/shares.js:163-166 `active`, worker/src/topup.js:135 and :229, lobby/src/components/settings/StoreNightCard.jsx:13 (commits fc1d7d09, 8855f9b3)
+- What: The card's On hint says "tonight", but `store:mode` stays `on` until someone changes it. Since the top-up was added, On also tops up every checked-in child under 10 in TwoTimTwo.
+- Why it matters: If On is left from one store night, every later club night quietly gives shares in TwoTimTwo, which has no undo. Backwards Night's On (worker/src/theme.js) stays on the same way.
+- Suggested fix: Store the date with On and treat it as Automatic once that date has passed (the same for Backwards Night), or change the hint so it does not say "tonight". Owner's call which.
+- Status: Open
+
+### IP-20261125-06: Hand out shares: a slow give can be given twice
+- Severity: Medium
+- Where: site/tools/shares/app.js:16 and :161-173, worker/src/givershares.js:110-128, site/tools/shares/logic.js:51 (commit 2c618641)
+- What: The page gives up on a request after 60 s and sends it again with the same key, but a give can take longer than that (two queued TwoTimTwo reads plus the post). The retry then gets `outcome: 'posting'`, which `resultWords` shows as "Could not reach TwoTimTwo: try again", and the child stays ticked. If both requests arrive before the mark, both post.
+- Why it matters: The owner presses Give again (a new key) and the child gets the shares twice in TwoTimTwo.
+- Suggested fix: Words for `posting` ("Still going: look in TwoTimTwo before giving again") and untick the child for it. In the Worker, check the mark again right before marking `posting`. Add a test for two requests at once.
+- Status: Open
+
+### IP-20261125-07: Send later gets past the 6 emails a day limit
+- Severity: Medium
+- Where: worker/src/clubmail.js:774-778 `begin`, :1021 `later`, :1088 `tick` (commit 12f9f43a)
+- What: The daily limit is checked only when a send starts by hand. `later` and the alarm's steps never check it.
+- Why it matters: A director can send 6 by hand and still schedule more, so parents can get more than the rule allows in a day.
+- Suggested fix: Check the limit in `later` and again before the alarm's first step, counting the sends due that day. Add a test.
+- Status: Open
+
+### IP-20261125-08: A long list stopped partway is reported as not sent
+- Severity: Medium
+- Where: worker/src/clubmail.js:1133-1135 `giveUp`, :895 batches (commits b82461ed, 12f9f43a)
+- What: If batch 1 of a list over 450 fails 8 times after batch 0 went out, the sender is mailed that the email "was NOT sent to parents" and told to send it again. No log line is written.
+- Why it matters: Sending again gives the first 450 parents a second copy, and the day's count misses the send.
+- Suggested fix: When `run.batch` is above 0, say how many messages went and do not advise sending again; write a log line for what went.
+- Status: Open
+
+### IP-20261125-09: GAME ON! can stay over the scoreboard
+- Severity: Medium
+- Where: lobby/src/presentation/views/ScoringView.jsx:157-165 and :263 (commit b4b75ef6)
+- What: `intro` starts true when low power is off. If low power turns on while a winner film is still playing (`held`), the effect later returns before its timer, so `intro` is never set back to false, and the banner draws whenever `intro` is true.
+- Why it matters: The full-wall GAME ON! banner covers the scores on the gym projector until the club changes.
+- Suggested fix: When `lowPower`, call `setIntro(false)` before returning (or draw the banner only when `intro && !lowPower`). Add the case to the `held` test.
+- Status: Open
+
+### IP-20261125-10: The classroom and Journey screens can stay backwards after Backwards Night
+- Severity: Medium
+- Where: lobby/src/App.jsx:273-280 (commit f84919ae)
+- What: The framed lobby tells its host "off" only if this same copy of the lobby first told it "on". A lobby frame that reloads while the host is backwards never tells it to switch back.
+- Why it matters: A classroom or Journey screen left running after Jan 13 keeps its cards backwards until someone reloads that page.
+- Suggested fix: When framed, tell the host the current state once when the lobby loads (off included). Add a test in embed.test.js.
+- Status: Open
+
 ### IP-20261111-08: The home page film is out of date and cannot be rebuilt as it stands
 - Severity: Medium
 - Where: printer/reel/shots.mjs:157 and :163, printer/reel/film/film.js:507 (after commits 50200cd, 40c79c2)
@@ -110,7 +190,71 @@ history keeps them).
 - Suggested fix: Remove the BARF shot and its cut, set the intro to 8 seconds and re-pick its moment, then the owner runs `npm run reel` (it needs his music file).
 - Status: Open. The recipe is fixed (2082381). The film itself is still the old one until the owner runs `npm run reel` with his music file.
 
+### IP-20261125-11: The calendar's store night test matches any word with "store" in it
+- Severity: Low
+- Where: worker/src/shares.js:46-48 `isStoreTitle`
+- What: It uses `/store/i` with no word edges, while TwoTimTwo's page test uses `\bstore\b` and refuses "Restore".
+- Why it matters: A club-night church event such as "Restore..." turns on Automatic store night, which now gives shares in TwoTimTwo, not only labels.
+- Suggested fix: Use `\bstore\b` in both copies (here and lobby calendarLogic.js `isStoreNight`) with a "Restore" test.
+- Status: Open
+
+### IP-20261125-12: The reversed winner films are over the 12 MB rule and not tested
+- Severity: Low
+- Where: lobby/public/finale/trophy-reverse.mp4 (about 14.9 MB), stadium-reverse.mp4 (about 13.9 MB), site/test/largeFiles.test.mjs:194 (commit b30e6797)
+- What: 364b0c42 cut the forward films under 12 MB so they start on the church Wi-Fi; the test checks only the three forward films.
+- Why it matters: On Backwards Night the film is more likely to stall and fall back to the flat winner screen (never black).
+- Suggested fix: Re-encode the two reversed films under 12 MB and add the `-reverse` ids to the test.
+- Status: Open
+
+### IP-20261125-13: routes.md still says a mail token lasts 30 days and a list is at most 450
+- Severity: Low
+- Where: worker/src/routes.md:1967 and :1979 (after commits 16ef767e, b82461ed)
+- What: The code keeps a token 180 days from its last use (`MAIL_TOKEN_MS`) and splits a longer list into several messages.
+- Why it matters: Drift between the contract and the code. Not fixed here because it is in worker/.
+- Suggested fix: Correct the two lines.
+- Status: Open
+
+### IP-20261125-16: Tools still call the deleted Blender intro folder
+- Severity: Low
+- Where: video/grand-welcome/Make Grand Welcome Stills.bat:4, Watch Grand Welcome Stills.bat:4, video/grand-welcome/grand_welcome.py:615, video/grand-prix/concepts/*/encode.py (after commit fce285ed)
+- What: They call `..\awana-intro\_find_blender.bat` or import `faststart` from `video/awana-intro/tools`, which were removed on 2026-11-14.
+- Why it matters: These tools now stop at once when the owner runs them. Nothing on a club night uses them.
+- Suggested fix: Move `_find_blender.bat` and `faststart.py` to a shared `video/tools/` and point the callers there, or remove the dead tools.
+- Status: Open
+
+### IP-20261125-17: CLAUDE.md's lobby privacy rule does not list the new shares event
+- Severity: Low
+- Where: CLAUDE.md "Privacy invariant: DO NOT relax" (lobby section), event lists (after commit 0e4fd896)
+- What: The code seals and sanitizes `shares` (lobby/src/lib/envelope.js:60, printer events.js), but the rule's list of events and of encrypted events leaves it out.
+- Why it matters: The rule is the one a later change is checked against. Not fixed here because it is a DO NOT relax section.
+- Suggested fix: Add `shares` to both lists.
+- Status: Open
+
+### IP-20261125-18: A failed Worker answer check also holds back the site
+- Severity: Low
+- Where: .github/workflows/ci.yml:669 and :692 (commit 4ae7bee8)
+- What: When "Is the new Worker the one answering?" fails, "Publish the site" is skipped too.
+- Why it matters: A site change pushed with a Worker change waits until someone runs CI again. It fails loudly, so nothing is hidden.
+- Suggested fix: Owner's call: publish the site anyway, or say in CLAUDE.md that it waits on purpose.
+- Status: Open
+
 ## Closed findings
+
+### IP-20261125-14: CLAUDE.md said a director's email sign-in lasts 30 days
+- Severity: Low
+- Where: CLAUDE.md "Club email", the Who line (after commit 16ef767e)
+- What: The same section later says, and the code does, 180 days from the last use.
+- Why it matters: Drift inside the rule file.
+- Suggested fix: Correct the line.
+- Status: Fixed in 53f1c45
+
+### IP-20261125-15: A comment named the deleted Blender intro folder and the 3D intro
+- Severity: Low
+- Where: site/functions/lobby/intro/[[path]].js:1-2 (after commit fce285ed)
+- What: The intro is now the flat film made by video/lobby-intro/.
+- Why it matters: Drift between the words and the code.
+- Suggested fix: Correct the comment.
+- Status: Fixed in 6002394
 
 ### IP-20261111-23: The lost-label count is not shown on the settings page
 - Severity: Low
@@ -328,3 +472,4 @@ history keeps them).
 - 2026-11-11: first review, by Fable with four Fable helpers (the owner asked for Fable this once). 58721b9..331b5cc, 171 commits (about 165 without the bots). 22 findings: 1 High, 8 Medium, 13 Low. Fixed 3 (13, 14, 15: stale words in docs and comments). Nothing weakened a privacy rule; no paid-plan risk found.
 - 2026-11-11, later: the owner said to build them all. 18 findings fixed the same day (see Closed); IP-08 half done (the film needs the owner's rebuild). Three small follow-ups found while fixing: IP-23, IP-24, IP-25. The club-evening deploy hold was removed at the owner's word (0036b72).
 - 2026-11-11, evening: the three follow-ups fixed (IP-23, IP-24, IP-25). Only IP-08 is open: the film needs the owner's rebuild with his music file.
+- 2026-11-25: second review (no run on 2026-11-18, so this covers two weeks), by Opus with three Opus helpers and one Haiku helper for the checks. 331b5cc..63144340, 114 commits (72 without the bots and the 2026-11-11 fixes, already reviewed then). 18 findings: 3 High, 7 Medium, 8 Low. Fixed 2 (14, 15: a stale doc line and a stale comment). IP-08 still open. Checks: all pass except one classroom remote test that failed once and passed twice on rerun, and the handbook PDF test, which needs a Chromium this session could not install.
