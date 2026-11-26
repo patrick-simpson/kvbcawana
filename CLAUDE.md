@@ -40,6 +40,7 @@ This one repo holds three apps for Kennebec Valley Baptist Church's Awana club:
 
 - Every part runs on a free plan: Cloudflare Workers free tier, Durable Objects and D1 free allowances, and GitHub Actions free minutes and storage.
 - Any change that needs a paid plan is the wrong change.
+- The free allowances (100,000 Worker requests a day, Durable Objects, D1) count for the whole Cloudflare ACCOUNT. Nothing that is not Awana runs on Awana's account or with its `CLOUDFLARE_API_TOKEN` (owner 2026-11-25, weekly review IP-20261125-02): `deploy-port-calamity-city.yml` (the owner's game, by hand) uses its own `CALAMITY_CLOUDFLARE_API_TOKEN`/`CALAMITY_CLOUDFLARE_ACCOUNT_ID` and stops without them.
 - Encryption and decryption run in the browser or the app, never in the Worker. The Worker only routes and stores scrambled data.
 
 ## Current state
