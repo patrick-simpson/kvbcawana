@@ -44,6 +44,34 @@ describe('the tray\'s Show Cast code on an idle room (IP-20261111-07)', () => {
   });
 });
 
+// Owner 2026-11-26 (the request budget): the TV's read says whether a presenter is
+// connected, by the desk state's own rule, so the TV reads every 30 s only while
+// someone presents (or something is up) and every 2 minutes otherwise.
+describe('Cast: the TV hears whether a presenter is connected', () => {
+  it('presenter is false before a join, true after, false after leave', async () => {
+    const s = await setup();
+    const { code } = (await s.call('POST', '/v1/cast/open', {})).body;
+    expect((await s.call('GET', '/v1/cast/screen')).body.presenter).toBe(false);
+    s.frames.length = 0;
+    const token = (await s.call('POST', '/v1/cast/join', { code }, { auth: '' })).body.token;
+    // The join rings the TV, so a TV on its slow 2-minute read hears it at once.
+    expect(s.frames.some((f) => f.e === 'changed' && f.d?.what === 'cast' && f.d?.presenter === true)).toBe(true);
+    expect((await s.call('GET', '/v1/cast/screen')).body.presenter).toBe(true);
+    expect((await s.call('GET', '/v1/cast/desk/state')).body.presenter).toBe(true);
+    expect((await s.call('POST', '/v1/cast/leave', {}, { auth: '', cast: token })).status).toBe(200);
+    expect((await s.call('GET', '/v1/cast/screen')).body.presenter).toBe(false);
+    expect((await s.call('GET', '/v1/cast/desk/state')).body.presenter).toBe(false);
+  });
+
+  it('a presenter quiet past PRESENTER_IDLE_MS no longer counts', async () => {
+    const s = await setup();
+    const { code } = (await s.call('POST', '/v1/cast/open', {})).body;
+    await s.call('POST', '/v1/cast/join', { code }, { auth: '' });
+    s.tick(31 * 60 * 1000);
+    expect((await s.call('GET', '/v1/cast/screen')).body.presenter).toBe(false);
+  });
+});
+
 // Owner 2026-11-11: "All of those sound fantastic. Let's build them" (the Black button).
 describe('Cast: Black', () => {
   const text = (words) => ({ action: 'item', data: { item: { id: 'bplaceholder', kind: 'text', text: words } } });

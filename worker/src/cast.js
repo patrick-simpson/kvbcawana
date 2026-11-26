@@ -440,6 +440,9 @@ export class Cast {
     this.seen.clear();
     this.seen.set(hash, t);
     await this.storage.put(ROOM_KEY, { ...room, tokens: [{ hash, at: t }], pass: null });
+    // The TV reads every 2 minutes while nobody is connected (owner 2026-11-26): ring it, so
+    // it reads now, hears `presenter`, goes back to every 30 s and is "online" for the phone.
+    this.ring({ what: 'cast', presenter: true });
     return json({ ok: true, token, ttlMs: TOKEN_TTL_MS });
   }
 
@@ -710,9 +713,17 @@ export class Cast {
   async deskState() {
     const room = await this.roomDoc();
     const body = await (await this.engine.remoteState()).json();
-    const t = this.now();
-    const presenter = room.tokens.some((x) => t - x.at <= TOKEN_TTL_MS && t - (this.seen.get(x.hash) ?? x.at) <= PRESENTER_IDLE_MS);
+    const presenter = this.presenterLive(room, this.now());
     return json({ ...body, code: room.code, presenter, house: sanitizeHouse(await this.houseDoc()), lineup: await this.lineupNow() });
+  }
+
+  /**
+   * Whether a presenter holds the room now: a token still good and used within
+   * PRESENTER_IDLE_MS. ONE rule for the desk's state and the TV's read.
+   * @param {{ tokens: { hash: string, at: number }[] }} room @param {number} t
+   */
+  presenterLive(room, t) {
+    return room.tokens.some((x) => t - x.at <= TOKEN_TTL_MS && t - (this.seen.get(x.hash) ?? x.at) <= PRESENTER_IDLE_MS);
   }
 
   /** The house slide: its line, and when it was saved. @returns {Promise<{ line: string, savedAt: string | null }>} */
@@ -752,12 +763,17 @@ export class Cast {
     return json({ ok: true });
   }
 
-  /** GET /v1/cast/screen (the Cast screen): its code, the stage and the house slide's line (no second request). */
+  /**
+   * GET /v1/cast/screen (the Cast screen): its code, the stage and the house slide's line (no
+   * second request), and whether a presenter is connected (owner 2026-11-26, the request
+   * budget: the TV reads every 30 s only while someone presents or something is up, every
+   * 2 minutes otherwise; a join rings it so it reads at once).
+   */
   async screen() {
     const room = await this.roomDoc();
     const res = await this.engine.readStage(true);
     const body = await res.json();
-    return json({ ...body, code: room.code, revealAt: room.revealAt, house: sanitizeHouse(await this.houseDoc()) });
+    return json({ ...body, code: room.code, revealAt: room.revealAt, presenter: this.presenterLive(room, this.now()), house: sanitizeHouse(await this.houseDoc()) });
   }
 
   /* ── PowerPoint into slides ── */

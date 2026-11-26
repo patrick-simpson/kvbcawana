@@ -1763,7 +1763,7 @@ tap Pass the remote); rotating the code, `leave` (the passer's own), `kick`, `re
 | --- | --- | --- | --- |
 | `POST /v1/cast/open` | session (the Cast screen) | `{}` | `{ok, code}`: a fresh code; whatever was up, every file and token gone |
 | `POST /v1/cast/close` | session | `{}` | `{ok}`: no code, nothing kept (KVBC Awana turning Cast off) |
-| `GET /v1/cast/screen` | session | | as `GET /v1/classroom/stage` (so `serverNow` too) plus `code`, `revealAt` and `house {line}` (the house slide's line, below: the TV needs no request of its own for it) |
+| `GET /v1/cast/screen` | session | | as `GET /v1/classroom/stage` (so `serverNow` too) plus `code`, `revealAt`, `presenter` (true while a presenter holds the room: a live token used within `PRESENTER_IDLE_MS`, the desk state's own rule; owner 2026-11-26, the TV's backup read is 30 s while someone presents or something is up, 2 min otherwise; a successful `POST /v1/cast/join` rings `changed {what: 'cast', presenter: true}` so the TV reads at once) and `house {line}` (the house slide's line, below: the TV needs no request of its own for it) |
 | `GET /v1/cast/screen/files/:id` | session | | the file (as 10.13) |
 | `POST /v1/cast/screen/now` | session | `{now}` | as `POST /v1/classroom/now` (views add `screen`, `waiting`) |
 | `GET /v1/cast/screen/signal` | session | | `{signal: {type: 'offer', id, sdp} \| null, id}`: the share's offer |
