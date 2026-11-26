@@ -1,15 +1,8 @@
 {
   "version": 1,
-  "generatedAt": "2026-11-19T17:22:15.197Z",
+  "generatedAt": "2026-11-26T18:25:27.995Z",
   "sourceUrl": "https://kvbchurch.twotimtwo.com/calendar/index",
   "events": [
-    {
-      "date": "2026-11-25",
-      "kind": "club",
-      "title": "No Awana this week",
-      "isCancelled": true,
-      "isSpecial": false
-    },
     {
       "date": "2026-12-02",
       "kind": "club",
