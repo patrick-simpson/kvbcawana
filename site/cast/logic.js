@@ -660,3 +660,33 @@ export function notesView(notes, page) {
   const text = notes[page - 1] || '';
   return { where, text: text || 'No notes for this slide.', empty: !text };
 }
+
+/* ── The TV's pace, and Cast turning itself off (owner 2026-11-26, the request budget) ── */
+
+/** Cast unused this long turns itself off (KVBC Awana, the tray's checkbox's own way). */
+export const CAST_IDLE_OFF_MS = 60 * 60 * 1000;
+/** The TV's backup read while someone presents or something is up (the Worker counts a TV online for 45 s). */
+export const TV_POLL_IN_USE_MS = 30 * 1000;
+/** The TV's backup read when nobody is connected and nothing is up (the doorbell still reads at once). */
+export const TV_POLL_IDLE_MS = 120 * 1000;
+
+/**
+ * Whether Cast is in use now: something on the TV, a presenter connected, or the code
+ * being shown (asked for within revealMs). A click or key on the TV counts too, but the
+ * page notes that itself.
+ * @param {{ stage?: any, presenter?: boolean, revealAt?: number, now: number, revealMs: number }} s
+ */
+export function castInUse({ stage, presenter, revealAt, now, revealMs }) {
+  if (stage && stage.show) return true;
+  if (presenter === true) return true;
+  const at = Number(revealAt) || 0;
+  return at > 0 && now - at < revealMs;
+}
+
+/**
+ * The wait before the TV's next backup read (the tuning seam may shorten either).
+ * @param {{ inUse: boolean, inUseMs?: number, idleMs?: number }} s
+ */
+export function tvPollMs({ inUse, inUseMs = TV_POLL_IN_USE_MS, idleMs = TV_POLL_IDLE_MS }) {
+  return inUse ? inUseMs : idleMs;
+}

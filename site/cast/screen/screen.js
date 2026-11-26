@@ -8,8 +8,13 @@
 //   off clears the room.
 // - What to show comes from GET /v1/cast/screen: read when the live channel rings
 //   `changed {what: 'cast'}` (/v1/live, the presentation page's socket: ping, 2 s
-//   doubling to 60 s back-off) and every 30 s as the safety net (also what keeps the
-//   presenter's "the TV is on" true: the Worker's 45 s online window).
+//   doubling to 60 s back-off) and a backup read as the safety net: every 30 s while a
+//   presenter is connected or something is up (what keeps the presenter's "the TV is
+//   on" true: the Worker's 45 s online window), every 2 minutes otherwise (owner
+//   2026-11-26, the request budget; a join rings the TV, so it hears a presenter at once).
+// - An hour unused (nothing up, nobody connected, the code not shown, no click or key on
+//   the TV): window.awanaCastHost.idle(), once, and KVBC Awana turns Cast off as the
+//   tray's checkbox does. A plain browser, or an app without idle(), does nothing.
 // - A shared screen: the presenter's OFFER (GET /v1/cast/screen/signal), our ANSWER
 //   (POST), then the picture comes laptop to TV over the church network
 //   (shared/screenShare.js; no ICE servers: KVBC Awana turns Chromium's mDNS hiding
@@ -59,6 +64,7 @@ import * as R from '../shared/classroomRemote.js';
 import { CONNECT_WAIT_MS, answerShare } from '../shared/screenShare.js';
 import { addressWords, presenterUrl } from '../logic.js';
 import { clockWords, createSkew, minSec, timerLeft, verseRuns } from '../logic.js';
+import { CAST_IDLE_OFF_MS, TV_POLL_IDLE_MS, castInUse, tvPollMs } from '../logic.js';
 import { drawQrCode } from '../qr.js';
 
 const SESSION_KEY = 'awanaSyncSession.v1';
@@ -77,7 +83,7 @@ async function pdfWorkerUrl() {
   return URL.createObjectURL(new Blob([await res.text()], { type: 'text/javascript' }));
 }
 const T = Object.assign({
-  pollMs: 30000, reportVideoMs: 10000, timeoutMs: 10000, fadeMs: 450,
+  pollMs: 30000, idlePollMs: TV_POLL_IDLE_MS, idleOffMs: CAST_IDLE_OFF_MS, reportVideoMs: 10000, timeoutMs: 10000, fadeMs: 450,
   pingMs: 25000, silentMs: 70000, retryMinMs: 2000, retryMaxMs: 60000,
   openRetryMinMs: 5000, signalPollMs: 1500, signalWaitMs: 45000,
 }, window.castScreenTuning || {});
@@ -118,6 +124,15 @@ let black = false; // the presenter's Black button: the TV is black over what is
 const POINTER_LINGER_MS = 1000;
 const POINTER_QUIET_MS = 2500;
 let pointerTimer = 0;
+// Cast in use (owner 2026-11-26, the request budget; memory only): the last moment
+// something was up, a presenter connected, the code shown, or the TV clicked. The backup
+// read is every T.pollMs (30 s) while in use, T.idlePollMs (2 min) otherwise, and an hour
+// unused asks KVBC Awana to turn Cast off (once).
+let lastInUse = Date.now();
+let inUse = false;
+let backupTimer = 0;
+let backupAt = 0;
+let idleAsked = false;
 
 const session = () => {
   let s = '';
@@ -297,6 +312,44 @@ async function read() {
     if (fresh) reveal();
   }
   apply(R.sanitizeStage(r.body.stage));
+  noteUse(castInUse({ stage, presenter: r.body.presenter === true, revealAt: asked, now: Date.now() + skew, revealMs: REVEAL_MS }));
+}
+
+/* ── The pace of the backup read, and an hour unused (owner 2026-11-26) ── */
+
+/** What the last read said (or a touch on the TV): in use or not. @param {boolean} now */
+function noteUse(now) {
+  inUse = now;
+  if (now) { lastInUse = Date.now(); idleAsked = false; }
+  scheduleBackup();
+  checkIdle();
+}
+
+/** The next backup read, sooner if in use now (a later one already set is brought forward, never pushed back). */
+function scheduleBackup() {
+  if (closed || CONFIGURE) return;
+  const ms = tvPollMs({ inUse, inUseMs: T.pollMs, idleMs: T.idlePollMs });
+  const at = Date.now() + ms;
+  if (backupTimer && backupAt <= at) return;
+  clearTimeout(backupTimer);
+  backupAt = at;
+  backupTimer = setTimeout(backupTick, ms);
+}
+
+async function backupTick() {
+  backupTimer = 0;
+  if (session() && code) await read();
+  checkIdle();
+  scheduleBackup();
+}
+
+/** An hour unused: KVBC Awana turns Cast off (the tray's checkbox's way). A plain browser has no bridge: nothing. */
+function checkIdle() {
+  if (CONFIGURE || closed || idleAsked || inUse || Date.now() - lastInUse < T.idleOffMs) return;
+  const host = window.awanaCastHost;
+  if (!host || typeof host.idle !== 'function') return;
+  idleAsked = true;
+  try { Promise.resolve(host.idle()).catch(() => {}); } catch { /* an older app: nothing */ }
 }
 
 /* ── Black: pure black over whatever is up ── */
@@ -1022,6 +1075,10 @@ async function start() {
   // A click or a key on the TV shows the code.
   document.addEventListener('pointerdown', () => { if (layer.hidden) reveal(); });
   document.addEventListener('keydown', () => { if (layer.hidden) reveal(); });
+  // Either one is a use of Cast too: the hour unused starts again (owner 2026-11-26).
+  const touched = () => { lastInUse = Date.now(); idleAsked = false; };
+  document.addEventListener('pointerdown', touched);
+  document.addEventListener('keydown', touched);
   window.addEventListener('storage', (e) => {
     if (e.key !== SESSION_KEY) return;
     if (session() && !code) { location.reload(); }
@@ -1038,7 +1095,9 @@ async function start() {
     fitText();
     if (pdf && shownPage) busy = busy.then(() => drawPdfPage(shownPage)).catch(() => {});
   });
-  setInterval(() => { if (session() && code) read(); }, T.pollMs);
+  // The backup read under the doorbell: 30 s while in use, 2 minutes otherwise (scheduleBackup).
+  lastInUse = Date.now();
+  scheduleBackup();
   setInterval(() => { if (stage.show && R.CLASSROOM_PLAYABLE_KINDS.includes(stage.show.button.kind)) report(true); }, T.reportVideoMs);
 }
 

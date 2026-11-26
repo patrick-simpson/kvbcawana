@@ -19,6 +19,7 @@ import {
   clockPress, clockWords, createSkew, minSec, timerLeft, timerPress,
   entryWords, lineupAdd, lineupEntryFrom, lineupMove, lineupRemove, lineupView,
   scripturePagesWords, scripturePress, verseRuns,
+  CAST_IDLE_OFF_MS, TV_POLL_IDLE_MS, TV_POLL_IN_USE_MS, castInUse, tvPollMs,
 } from '../cast/logic.js';
 import { pagesFor, parseReference } from '../cast/bible/reference.js';
 
@@ -924,4 +925,39 @@ test('the desk: Mica when the app says so, and a live miniature of the TV that n
   // The desk's CSP lets the data: picture in (img-src has data: already; nothing else was added for it).
   const build = read('build.mjs');
   assert.match(build, /const CAST_DESK_CSP = tvPagePolicy\(\{\n  origin: CAST_ORIGIN,\n  images: \['https:\/\/i\.ytimg\.com'\],/);
+});
+
+// Owner 2026-11-26 (the request budget: Cast left on all week cost about 5,800 requests a day).
+test('Cast in use: something up, a presenter, or the code shown within its five minutes', () => {
+  const R5 = 5 * 60 * 1000;
+  const empty = R.sanitizeStage(null);
+  const up = R.sanitizeStage({ show: { button: { id: 'babcdefgh', kind: 'text', text: 'Hi' }, at: 1, page: 1 } });
+  assert.equal(castInUse({ stage: empty, presenter: false, revealAt: 0, now: 1e9, revealMs: R5 }), false);
+  assert.equal(castInUse({ stage: up, presenter: false, revealAt: 0, now: 1e9, revealMs: R5 }), true);
+  assert.equal(castInUse({ stage: empty, presenter: true, revealAt: 0, now: 1e9, revealMs: R5 }), true);
+  assert.equal(castInUse({ stage: empty, presenter: false, revealAt: 1e9 - R5 + 1, now: 1e9, revealMs: R5 }), true);
+  assert.equal(castInUse({ stage: empty, presenter: false, revealAt: 1e9 - R5, now: 1e9, revealMs: R5 }), false);
+  assert.equal(castInUse({ stage: null, presenter: undefined, revealAt: undefined, now: 1e9, revealMs: R5 }), false);
+});
+
+test('the TV reads every 30 s while in use, every 2 minutes otherwise; an hour unused turns Cast off', () => {
+  assert.equal(TV_POLL_IN_USE_MS, 30000);
+  assert.equal(TV_POLL_IDLE_MS, 120000);
+  assert.ok(TV_POLL_IN_USE_MS < 45000, 'under the Worker\'s 45 s online window');
+  assert.equal(tvPollMs({ inUse: true }), 30000);
+  assert.equal(tvPollMs({ inUse: false }), 120000);
+  assert.equal(tvPollMs({ inUse: false, idleMs: 50 }), 50);
+  assert.equal(CAST_IDLE_OFF_MS, 60 * 60 * 1000);
+  // The TV page: no fixed 30 s interval any more; the pace comes from tvPollMs.
+  assert.doesNotMatch(screen, /setInterval\(\(\) => \{ if \(session\(\) && code\) read\(\); \}, T\.pollMs\)/);
+  assert.match(screen, /tvPollMs\(\{ inUse, inUseMs: T\.pollMs, idleMs: T\.idlePollMs \}\)/);
+  assert.match(screen, /presenter: r\.body\.presenter === true/);
+  // The app's bridge is asked once, only when it has idle(): a plain browser or an older app does nothing.
+  assert.match(screen, /typeof host\.idle !== 'function'\) return;/);
+  assert.match(screen, /idleAsked = true;/);
+  assert.match(screen, /if \(CONFIGURE \|\| closed \|\| idleAsked/);
+  // A click or a key on the TV is a use.
+  assert.match(screen, /const touched = \(\) => \{ lastInUse = Date\.now\(\); idleAsked = false; \};/);
+  assert.match(screen, /addEventListener\('pointerdown', touched\)/);
+  assert.match(screen, /addEventListener\('keydown', touched\)/);
 });
