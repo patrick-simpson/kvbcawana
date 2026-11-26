@@ -50,3 +50,19 @@ describe('the top-up dry run', () => {
     expect(PEEK_PATHS).toContain('/clubber/special_shekel');
   });
 });
+
+describe('a sample (one child) page', () => {
+  const CHILD = `<html><head><title>Shares for Ava Stone</title></head><body>
+<h1>Ava Stone</h1><fieldset><legend>Awards for Ava Stone</legend>
+<form action="/meeting/formClubberShekels?clubber_id=12345" method="post">
+<table><tr><th>Ava Stone</th><th>Balance</th></tr><tbody><tr><td>Ava Stone</td></tr></tbody></table>
+<select name="meeting"><option>Ava Stone night</option></select>
+<input name="shekels[12345]" value="3"><button>Give Ava Stone</button></form></fieldset>
+<script>var who = '/meeting/ajax'; $.post('/meeting/ajax', {n: 'Ava Stone'});</script></body></html>`;
+  it('answers field names and counts only, never a word from the page', () => {
+    const text = JSON.stringify(pageShapeOf(CHILD, { oneChild: true }));
+    expect(text).not.toMatch(/Ava|Stone/);
+    expect(text).toContain('shekels[#]');
+    expect(text).not.toContain('12345');
+  });
+});

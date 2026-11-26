@@ -49,9 +49,12 @@ export function scriptBit(code) {
 
 /**
  * The shape of a page: structure only, never data.
+ * With `oneChild` (the page is one real child's page) it answers only counts, form actions and field
+ * names/types: never a heading, legend, table header, button word, option word, title or script.
  * @param {string} html
+ * @param {{oneChild?: boolean}} [opts]
  */
-export function pageShapeOf(html) {
+export function pageShapeOf(html, opts = {}) {
   const doc = documentOf(html);
   const headings = [...doc.querySelectorAll('h1, h2, h3, h4, legend')].map((h) => mask(h.textContent)).filter(Boolean).slice(0, 20);
   const tables = [...doc.querySelectorAll('table')].slice(0, 10).map((t) => ({
@@ -72,17 +75,21 @@ export function pageShapeOf(html) {
       /** @type {{name: string, tag: string, type: string, count: number, options?: number, words?: string[]}} */
       const field = { name, tag, type, count: 1 };
       if (tag === 'select') {
-        const opts = [...el.querySelectorAll('option')];
-        field.options = opts.length;
+        const options = [...el.querySelectorAll('option')];
+        field.options = options.length;
         const raw = String(el.getAttribute('name') || el.getAttribute('id') || '');
-        if (SAFE_SELECT.test(raw) && !CHILD_SELECT.test(raw)) field.words = opts.slice(0, 12).map((o) => mask(o.textContent));
+        if (!opts.oneChild && SAFE_SELECT.test(raw) && !CHILD_SELECT.test(raw)) field.words = options.slice(0, 12).map((o) => mask(o.textContent));
       }
       fields.set(key, field);
     }
     const buttons = [...f.querySelectorAll('button, input[type="submit"], input[type="button"]')]
       .map((b) => mask(b.tagName === 'BUTTON' ? b.textContent : b.getAttribute('value'))).filter(Boolean).slice(0, 10);
-    return { action: pathOf(f.getAttribute('action') || ''), method: String(f.getAttribute('method') || 'get').toLowerCase(), fields: [...fields.values()].slice(0, 60), buttons };
+    return { action: pathOf(f.getAttribute('action') || ''), method: String(f.getAttribute('method') || 'get').toLowerCase(), fields: [...fields.values()].slice(0, 60), buttons: opts.oneChild ? [] : buttons };
   });
+  if (opts.oneChild) {
+    // Yes/no and counts only: a one-child page may carry the child's name in any text.
+    return { title: '', headings: [], tables: [{ headers: [], rows: doc.querySelectorAll('tbody tr').length }], forms, scriptPaths: [], scriptAround: [], links: [] };
+  }
   // Where the page's own script posts (ajax), paths only.
   const posts = new Set();
   /** The script around each such path (how the page builds the call), numbers masked, quoted words dropped. */
@@ -151,6 +158,7 @@ export function mountPeek(registry, core) {
     }
     // A one-child page may name the child in a heading: it answers yes/no only, never its shape.
     if (topup !== undefined) return json({ ok: true, path, landedOn: PATH_ID.includes(path) ? path : pathOf(r.path || ''), topup });
-    return json({ ok: true, path, landedOn: pathOf(r.path || ''), shape: pageShapeOf(r.html) });
+    // Any request with a sample is one child's page: field names and counts only, no words from the page.
+    return json({ ok: true, path, landedOn: pathOf(r.path || ''), shape: pageShapeOf(r.html, { oneChild: sample !== null }) });
   });
 }

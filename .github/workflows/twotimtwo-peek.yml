@@ -46,5 +46,7 @@ jobs:
           if [ -n "$PEEK_SAMPLE" ]; then url="$url&sample=$(jq -rn --arg p "$PEEK_SAMPLE" '$p|@uri')"; fi
           code=$(curl -sS --max-time 60 -o shape.json -w '%{http_code}' -H "Authorization: Bearer $HANDBOOK_TOKEN" "$url")
           echo "HTTP $code"
+          # With a sample the Worker answers yes/no facts and field names only (peek.js, never any page words),
+          # and the inputs are not echoed anywhere else in this log.
           jq . shape.json
           [ "$code" = "200" ]
