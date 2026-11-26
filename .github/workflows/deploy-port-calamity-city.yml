@@ -1,17 +1,15 @@
-# Deploys the PORT CALAMITY game message service. Kept here as a by-hand job; it
-# uses its OWN Cloudflare secrets (below). Source: the draft in the game repository, server/deploy/. It deploys Worker
-# "port-calamity-city" from the game repository's server/ folder, with its own Cloudflare token.
+# Deploys the PORT CALAMITY game message service. Kept here because this repository holds the
+# Cloudflare secrets. Source: the draft in the game repository, server/deploy/. It deploys Worker
+# "port-calamity-city" from the game repository's server/ folder. It shares Awana's Cloudflare
+# account and token, so its requests count against the same free allowance (owner's choice, 2026-11-26).
 #
 # - Manual only (workflow_dispatch): it never runs on a push, so this repository's own deploys are
 #   unaffected.
-# - It NEVER uses Awana's CLOUDFLARE_API_TOKEN (owner 2026-11-25, weekly review IP-20261125-02):
-#   the game's code and its npm packages run in this job, and Awana's token could deploy over the
-#   sync Worker. It reads its own secrets, CALAMITY_CLOUDFLARE_API_TOKEN and
-#   CALAMITY_CLOUDFLARE_ACCOUNT_ID, and stops if either is missing. Make that token in Cloudflare
-#   (My Profile, API Tokens) with "Workers Scripts: Edit" and, best, on a SEPARATE free Cloudflare
-#   account, so the game's requests never count against Awana's 100,000 a day. They are passed to
-#   wrangler as environment variables of ONE step and never echoed. Do not add `set -x`, `env`,
+# - It reads two existing secrets, CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID. They are passed
+#   to wrangler as environment variables of ONE step and never echoed. Do not add `set -x`, `env`,
 #   or debug printing to that step.
+# - The API token needs "Workers Scripts: Edit" on the account (the token that already deploys a
+#   Worker with a Durable Object from this repository should do).
 # - If the game repository is private, add a read-only token for it as a secret and pass it to the
 #   checkout step as `token:`; a public repository needs nothing.
 
@@ -37,15 +35,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - name: The game's own Cloudflare token is set
-        env:
-          TOKEN: ${{ secrets.CALAMITY_CLOUDFLARE_API_TOKEN }}
-          ACCOUNT: ${{ secrets.CALAMITY_CLOUDFLARE_ACCOUNT_ID }}
-        run: |
-          if [ -z "$TOKEN" ] || [ -z "$ACCOUNT" ]; then
-            echo "::error::Add the secrets CALAMITY_CLOUDFLARE_API_TOKEN and CALAMITY_CLOUDFLARE_ACCOUNT_ID (see this file's header). Awana's own Cloudflare token is never used here."
-            exit 1
-          fi
       - name: Check out the game repository
         uses: actions/checkout@v4
         with:
@@ -72,7 +61,7 @@ jobs:
       - name: Deploy
         working-directory: game/server
         env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CALAMITY_CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CALAMITY_CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           WRANGLER_SEND_METRICS: "false"
         run: npx wrangler deploy

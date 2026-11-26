@@ -126,7 +126,7 @@ history keeps them).
 - What: A by-hand workflow checks out another repository at any ref, runs `npm ci` with its install scripts, and runs its `wrangler deploy` with this repo's Cloudflare token and account. The new game Worker lives in the same Cloudflare account as the sync Worker.
 - Why it matters: The free plan's 100,000 requests a day and the Durable Object allowance are counted for the whole account, so game traffic uses up Awana's budget and check-in could fail on a club night. Code or a package in the other repo also gets a token that can deploy over the Awana Worker. The workflow's own header says it "touches nothing of Awana", and no rule in CLAUDE.md covers it.
 - Suggested fix: Owner's call. Safest: deploy the game from its own repo to its own Cloudflare account (or a token scoped to that one Worker). At least add a line to CLAUDE.md's Costs section about the shared allowance.
-- Status: Fixed in 8d39cfec
+- Status: Closed, owner's call (2026-11-26): keep sharing Awana's account and token. 8d39cfec (a separate token) was reverted; CLAUDE.md's Costs section records the choice. Do not report again.
 
 ### IP-20261125-03: The TwoTimTwo peek can print a child's name in a public Actions log
 - Severity: High
