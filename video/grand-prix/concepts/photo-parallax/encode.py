@@ -2,7 +2,7 @@
 #   "<blender.exe>" --factory-startup -b -P encode.py -- <concept> <out.mp4> [hd]
 # hd: frames1080 at 1920x1080, 60 fps; otherwise frames at 960x540, 30 fps
 import bpy, os, sys
-sys.path.insert(0, r"C:\Users\User\Documents\GitHub\kvbcawana\video\awana-intro\tools")
+sys.path.insert(0, r"C:\Users\User\Documents\GitHub\kvbcawana\video\tools")
 from faststart import faststart
 args = sys.argv[sys.argv.index('--') + 1:]
 HD = len(args) > 2 and args[2] == "hd"

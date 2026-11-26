@@ -58,7 +58,7 @@ FPS, F_END = 30, 600
 # The frame rate the video is RENDERED at. The real film is 60 fps (owner
 # 2026-11-01: "the real one should be 60fps"); the rough previews stay 30.
 # The timeline below stays in 30 fps frames and Blender's time stretching
-# plays it RATE / 30 times as many frames (as in ../awana-intro).
+# plays it RATE / 30 times as many frames (as the old Blender intro did).
 # --final: the real film, 1920 x 1080 at 60 fps with motion blur (owner
 # 2026-11-01: "Make the whole thing in 1080p 60fps"), plus the projector's
 # copies in lobby/public/welcome/ (the web video and its two stills).
@@ -575,7 +575,7 @@ def encode_mp4(frames_dir, out_path, fps=RATE, web=False):
     """Glue the PNG frames into one H.264 .mp4 (Blender's own video editor).
     `web`: the projector's copy instead: a steady bitrate, a keyframe every
     second, and its index moved to the front so the wall can start it from
-    the first request (as ../awana-intro does for the lobby)."""
+    the first request (as the old Blender intro did for the lobby)."""
     files = sorted(f for f in os.listdir(frames_dir) if f.endswith(".png") and
                    os.path.getsize(os.path.join(frames_dir, f)) > 0)
     if not files:
@@ -612,7 +612,7 @@ def encode_mp4(frames_dir, out_path, fps=RATE, web=False):
         bpy.ops.render.render(animation=True, scene=enc.name)
     bpy.data.scenes.remove(enc)
     if web:
-        sys.path.insert(0, os.path.join(HERE, "..", "awana-intro", "tools"))
+        sys.path.insert(0, os.path.join(HERE, "..", "tools"))
         from faststart import faststart
         faststart(out_path)
     log(f"video saved: {out_path}")

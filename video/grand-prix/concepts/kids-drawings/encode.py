@@ -1,6 +1,6 @@
 # blender --factory-startup -b -P encode.py -- <seq_dir> <out.mp4>
 import bpy, os, sys
-sys.path.insert(0, r"C:\Users\User\Documents\GitHub\kvbcawana\video\awana-intro\tools")
+sys.path.insert(0, r"C:\Users\User\Documents\GitHub\kvbcawana\video\tools")
 from faststart import faststart
 args = sys.argv[sys.argv.index('--') + 1:]
 SEQ, OUT = args[0], args[1]

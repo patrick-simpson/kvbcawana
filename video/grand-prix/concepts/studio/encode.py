@@ -1,5 +1,5 @@
 import bpy, os, sys
-sys.path.insert(0, r"C:\Users\User\Documents\GitHub\kvbcawana\video\awana-intro\tools")
+sys.path.insert(0, r"C:\Users\User\Documents\GitHub\kvbcawana\video\tools")
 from faststart import faststart
 SEQ = r"C:\Users\User\scratch-intro\gp\studio\comp"
 OUT = sys.argv[sys.argv.index('--') + 1]

@@ -1,7 +1,7 @@
 @echo off
 title Grand Welcome - rough preview of the film
 cd /d "%~dp0"
-call "%~dp0..\awana-intro\_find_blender.bat"
+call "%~dp0..\tools\_find_blender.bat"
 if not defined BLENDER (pause & exit /b 1)
 echo.
 echo  ===============================================================
