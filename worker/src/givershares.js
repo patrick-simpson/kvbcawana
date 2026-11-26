@@ -59,6 +59,27 @@ export class GiveShares {
     return this.night;
   }
 
+  /**
+   * Take a (key, child) pair for posting: ONE synchronous step, no await between the check and the
+   * write, so two requests with the same key never both post (IP-20261125-06). Returns what is
+   * already marked when the pair is taken, else null (and the mark is in memory at once).
+   * @param {string} k @param {{ s: string, n: number, id: string }} mark
+   */
+  claim(k, mark) {
+    if (!this.night) throw new Error('not-loaded');
+    const had = this.night.done[k];
+    if (had) return had;
+    this.night.done[k] = mark;
+    return null;
+  }
+
+  /** Write the marks through (sealed). */
+  async save() {
+    const secret = this.secret();
+    if (!secret || !this.night) throw new Error('no-secret');
+    await this.storage.put(GIVE_KEY, await sealState(secret, this.night));
+  }
+
   /** @param {string} k @param {{ s: string, n: number, id: string }} mark */
   async mark(k, mark) {
     const secret = this.secret();
@@ -124,8 +145,12 @@ export class GiveShares {
     if (!f || f.balance === null || f.clubberId !== id || !f.token || !f.profileId) return json({ ok: false, reason: 'form-unreadable' }, 502);
     if (!meeting) return json({ ok: false, reason: 'no-meeting-tonight' }, 409);
 
-    // Marked BEFORE the post: a crash, a timeout or an odd answer never posts again.
-    await this.mark(k, { s: 'posting', n, id });
+    // Marked BEFORE the post: a crash, a timeout or an odd answer never posts again. The check and the
+    // mark are one synchronous step: the page read above took a while, and an identical request may
+    // have marked this pair meanwhile.
+    const taken = this.claim(k, { s: 'posting', n, id });
+    if (taken) return json({ ok: taken.s === 'given', outcome: taken.s, shares: taken.n, repeat: true });
+    await this.save();
     const r = await client.giveSpecialShares({
       clubberId: id, calendarId: meeting.id, profileId: f.profileId, token: f.token, shares: n, why, expect: f.balance + n,
     });

@@ -168,9 +168,10 @@ async function give() {
     const r = (res && res.body) || {};
     if (out) {
       out.textContent = resultWords(r);
-      out.className = `out ${r.outcome === 'given' ? 'good' : r.outcome === 'unknown' ? 'warn' : 'bad'}`;
+      out.className = `out ${r.outcome === 'given' ? 'good' : r.outcome === 'unknown' || r.outcome === 'posting' ? 'warn' : 'bad'}`;
     }
-    if (r.outcome === 'given' || r.outcome === 'unknown') picked.delete(id);
+    // Given, not sure, or still going: untick, so a second Give cannot repeat it.
+    if (r.outcome === 'given' || r.outcome === 'unknown' || r.outcome === 'posting') picked.delete(id);
   }
   giving = false;
   drawBar();

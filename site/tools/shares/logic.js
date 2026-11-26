@@ -51,6 +51,7 @@ export function confirmWords(kids, shares) {
 export function resultWords(r) {
   if (!r) return '';
   if (r.outcome === 'given') return r.repeat ? 'Already given' : `+${r.shares} given${Number.isInteger(r.balance) ? ` · now ${r.balance}` : ''}`;
+  if (r.outcome === 'posting') return 'Still going: look in TwoTimTwo before giving again';
   if (r.outcome === 'unknown') return 'Not sure it went in: look in TwoTimTwo (never tried twice)';
   if (r.outcome === 'refused') return 'TwoTimTwo would not take it';
   if (r.reason === 'no-meeting-tonight') return 'TwoTimTwo has no meeting tonight';

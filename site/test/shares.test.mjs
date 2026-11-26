@@ -23,6 +23,7 @@ test('the words: tonight\'s theme as the reason, a plain confirm, each result', 
   assert.equal(confirmWords(5, 3), 'Give 3 shares to 5 children? TwoTimTwo has no undo.');
   assert.equal(resultWords({ outcome: 'given', shares: 3, balance: 12 }), '+3 given · now 12');
   assert.match(resultWords({ outcome: 'unknown' }), /never tried twice/);
+  assert.equal(resultWords({ outcome: 'posting' }), 'Still going: look in TwoTimTwo before giving again');
   assert.match(batchKey(), /^[0-9a-f]{24}$/);
 });
 

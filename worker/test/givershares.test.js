@@ -57,6 +57,28 @@ describe('hand out shares (owner 2026-11-23)', () => {
   });
 });
 
+describe('two requests at once (IP-20261125-06)', () => {
+  it('the same key and child posts once; the other answers posting/repeat', async () => {
+    const storage = memory();
+    const posts = [];
+    let release;
+    const gate = new Promise((r) => { release = r; });
+    const balances = { 7: 4 };
+    const client = {
+      page: async (path) => { await gate; const id = /(\d+)$/.exec(path)[1]; return { ok: true, html: PAGE(id, balances[id]) }; },
+      giveSpecialShares: async (g) => { posts.push(g); return { outcome: 'given' }; },
+    };
+    const g = new GiveShares({ storage, now: () => AT, secret: () => 'state-secret', client: () => client });
+    const one = g.give({ id: '7', shares: 2, why: 'x', key: 'batch-0009' });
+    const two = g.give({ id: '7', shares: 2, why: 'x', key: 'batch-0009' });
+    release();
+    const [a, b] = await Promise.all([one, two]);
+    expect(posts).toHaveLength(1);
+    const outs = [await body(a), await body(b)];
+    expect(outs.filter((o) => o.repeat)).toHaveLength(1);
+  });
+});
+
 describe('the banner\'s list (owner 2026-11-23)', () => {
   it('names only the children a Give actually gave to', async () => {
     const { g } = make({ balances: { 7: 4, 8: 2 } });
