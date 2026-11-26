@@ -39,7 +39,9 @@ if (!base && location.protocol === 'https:') base = `${location.origin}/api`;
 
 const ui = createControls({
   base,
-  tuning: window.castDeskTuning,
+  // The desk pauses after 10 untouched minutes (owner 2026-11-26, the request budget; the
+  // phone keeps 30): a click or key wakes it at once.
+  tuning: Object.assign({ idleMs: 10 * 60 * 1000 }, window.castDeskTuning),
   nav: true,
   verb: 'Click', // a mouse, not a finger
   // The presenter's routes, as the desk's twins (worker/src/routes.md 10.18 "The desk").

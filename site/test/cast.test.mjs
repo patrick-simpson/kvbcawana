@@ -177,6 +177,11 @@ test('the presenter\'s token lives in sessionStorage only, and every call carrie
   assert.ok(!/Authorization/.test(app), 'a presenter never sends the church sign-in');
 });
 
+test('the desk pauses after 10 untouched minutes; the phone keeps 30 (owner 2026-11-26)', () => {
+  assert.match(read('cast', 'desk', 'desk.js'), /tuning: Object\.assign\(\{ idleMs: 10 \* 60 \* 1000 \}, window\.castDeskTuning\)/);
+  assert.match(read('cast', 'controls.js'), /idleMs: 30 \* 60 \* 1000/);
+});
+
 test('the presenter page polls only while visible, and stops after 30 minutes untouched', () => {
   assert.match(app, /pollMs: 2000/);
   assert.match(app, /idleMs: 30 \* 60 \* 1000/);
