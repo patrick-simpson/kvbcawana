@@ -1964,7 +1964,7 @@ outlook account that goes to all parents who have a kid in that club"). Code
 `src/clubmail.js`; tests `test/clubmail.test.js`, `site/test/email.test.mjs`.
 
 **Who.** A director signs in with their own code (`XXXX-XXXX-XXXX`, stored as a SHA-256
-hash) for a token (`X-Mail-Token`, 30 days, stored as a hash) tied to their clubs and
+hash) for a token (`X-Mail-Token`, 180 days from its last use (`MAIL_TOKEN_MS`), stored as a hash) tied to their clubs and
 their reply address. ONLY THE OWNER adds, changes or removes a director (owner
 2026-11-13: "Lock adding directors to me only"): the church session AND the header
 `X-Mail-Owner` equal to the Worker secret `MAIL_OWNER_CODE` (12+ characters; unset = 503
@@ -1976,7 +1976,7 @@ then 429 `locked`.
 
 **To whom.** The addresses are read from TwoTimTwo's roster export (`/clubber/csv`, the
 one read clock) when a count or a send asks: active children of the club, Email and Alt
-Email, each address once, at most 450. They stay in memory at most 5 minutes and are
+Email, each address once (a list over 450 goes out as several messages, below). They stay in memory at most 5 minutes and are
 NEVER stored, logged or answered: a page gets counts. Parents are BCC; To and Reply-To
 are the director. The Awana mailbox (`MAIL_FROM`) is BCC'd on every real send as well
 (owner 2026-11-14), unless it is already the To; never on a test, never in the count.
