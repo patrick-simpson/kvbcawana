@@ -759,6 +759,11 @@ export class ClubMail {
 
   async sendLog() { const l = await this.storage.get(LOG_KEY); return Array.isArray(l) ? l : []; }
 
+  /** How many real sends this sender made in the day (24 hours) before `at`. @param {string} whoId @param {number} at */
+  async sentInDay(whoId, at) {
+    return (await this.sendLog()).filter((l) => l.who === whoId && l.at > at - 24 * 60 * 60 * 1000 && l.at <= at).length;
+  }
+
   /**
    * POST /v1/mail/drafts/:id/send {test}: begin sending. A test goes to the sender
    * alone. Nothing is sent yet: the page calls /step until it is done.
@@ -772,8 +777,7 @@ export class ClubMail {
     if (draft.files.some((/** @type {any} */ f) => f.next !== f.parts)) return fail('Part of a file did not arrive. Try again.', 400, { reason: 'parts' });
     const test = Boolean(body?.test);
     if (!test) {
-      const day = this.now() - 24 * 60 * 60 * 1000;
-      const mine = (await this.sendLog()).filter((l) => l.who === who.id && l.at > day).length;
+      const mine = await this.sentInDay(who.id, this.now());
       if (mine >= MAIL_SENDS_PER_DAY) return fail(`That is ${MAIL_SENDS_PER_DAY} emails in a day, the most this page sends. Try again tomorrow.`, 429, { reason: 'daily-limit' });
     }
     draft.run = { test, stage: 'draft', graphId: '', file: 0, offset: 0, uploadUrl: '', count: 0, batch: 0, batches: 1, done: 0 };
@@ -1031,6 +1035,11 @@ export class ClubMail {
     const waiting = list.filter((x) => x.state !== 'failed');
     if (waiting.filter((x) => x.who === who.id).length >= LATER_PER_SENDER) return fail(`You already have ${LATER_PER_SENDER} emails waiting to be sent. Cancel one first.`, 409, { reason: 'later-full' });
     if (waiting.length >= LATER_ALL) return fail('Too many emails are waiting to be sent. Try again after one has gone.', 409, { reason: 'later-full' });
+    // The day's limit counts what was sent in the day before that time, and what is
+    // already waiting to go within a day of it.
+    const day = 24 * 60 * 60 * 1000;
+    const near = (await this.sentInDay(who.id, at)) + waiting.filter((x) => x.who === who.id && Math.abs(x.at - at) < day).length;
+    if (near >= MAIL_SENDS_PER_DAY) return fail(`That would be more than ${MAIL_SENDS_PER_DAY} emails in a day, the most this page sends. Pick another day.`, 429, { reason: 'daily-limit' });
     draft.sendAt = at;
     draft.run = { test: false, stage: 'draft', graphId: '', file: 0, offset: 0, uploadUrl: '', count: 0, batch: 0, batches: 1, done: 0 };
     await this.storage.put(laterKey(draft.id), draft);
@@ -1128,6 +1137,10 @@ export class ClubMail {
       if (!draft) { await forget(); return true; }
       if (!who || !this.mayWrite(who, draft.club)) return giveUp('Its sender can no longer email that club.', 'Ask the Awana director if that is a mistake.');
       if (!this.configured()) return giveUp('Sending is not set up on the service.', 'Tell the Awana director.');
+      // The day's limit, again at its time: sends made by hand since it was set count too.
+      if (x.state === 'waiting' && draft.run?.stage === 'draft' && !(draft.run.batch > 0) && (await this.sentInDay(who.id, this.now())) >= MAIL_SENDS_PER_DAY) {
+        return giveUp(`You had already sent ${MAIL_SENDS_PER_DAY} emails in the day before its time, the most this page sends in a day.`, 'Open the page to send it tomorrow.');
+      }
       // Marked BEFORE the step: Cancel is refused while it runs, so nothing the step
       // writes back can undo a cancel.
       before = x.state;

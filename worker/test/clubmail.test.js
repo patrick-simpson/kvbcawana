@@ -520,6 +520,50 @@ describe('club email: send later', () => {
     expect(s.graph().filter((c) => c.path === '/messages')).toHaveLength(0);
   });
 
+  it('keeps to the day\'s limit: when it is set, and again at its time', async () => {
+    const s = await setup();
+    const d = await s.director();
+    const byHand = async (n) => {
+      for (let i = 0; i < n; i += 1) {
+        const id = (await s.call('POST', '/v1/mail/drafts', { club: 'sparks', subject: `Hand ${i}`, blocks: WORDS, files: [] }, d.auth)).body.id;
+        await s.call('POST', `/v1/mail/drafts/${id}/send`, {}, d.auth);
+        expect((await run(s, id, d.auth)).body.done).toBe(true);
+      }
+    };
+    const iso = (ms) => new Date(Date.parse('2026-11-13T15:00:00Z') + ms).toISOString();
+    const hour = 60 * 60 * 1000;
+    // 4 sent today, then 2 more set for later today: the third would be one too many.
+    await byHand(4);
+    expect((await waiting(s, d, iso(2 * hour), 'One')).res.status).toBe(200);
+    expect((await waiting(s, d, iso(3 * hour), 'Two')).res.status).toBe(200);
+    const over = await waiting(s, d, iso(4 * hour), 'Three');
+    expect(over.res.status).toBe(429);
+    expect(over.res.body.reason).toBe('daily-limit');
+    expect(over.res.body.error).toContain('more than 6 emails in a day');
+    // Another day is fine.
+    expect((await s.call('POST', `/v1/mail/drafts/${over.id}/later`, { at: iso(3 * 24 * hour) }, d.auth)).status).toBe(200);
+    expect(s.graph().filter((c) => c.path === '/messages')).toHaveLength(4);
+
+    // Sent by hand after it was set: at its time it is not sent, and the sender is told why.
+    const t = await setup();
+    const e = await t.director();
+    const late = await waiting(t, e, iso(24 * hour), 'Late');
+    expect(late.res.status).toBe(200);
+    t.tick(20 * hour);
+    for (let i = 0; i < MAIL_SENDS_PER_DAY; i += 1) {
+      const id = (await t.call('POST', '/v1/mail/drafts', { club: 'sparks', subject: `Hand ${i}`, blocks: WORDS, files: [] }, e.auth)).body.id;
+      await t.call('POST', `/v1/mail/drafts/${id}/send`, {}, e.auth);
+      expect((await run(t, id, e.auth)).body.done).toBe(true);
+    }
+    t.tick(4 * hour);
+    expect(await t.core.clubMail.tick()).toBe(true);
+    expect(t.graph().filter((c) => c.path === '/messages')).toHaveLength(MAIL_SENDS_PER_DAY);
+    const line = (await t.call('GET', '/v1/mail/later', undefined, e.auth)).body.later[0];
+    expect(line).toMatchObject({ id: late.id, state: 'failed' });
+    expect(line.problem).toContain(`already sent ${MAIL_SENDS_PER_DAY} emails`);
+    expect(t.graph().filter((c) => c.path === '/sendMail').pop().body.message.subject).toBe('Not sent: Late');
+  });
+
   it('never sends twice when Microsoft does not answer the send', async () => {
     const s = await setup();
     const d = await s.director();
