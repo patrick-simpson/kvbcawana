@@ -673,6 +673,11 @@ jobs:
         # a hand-run redeploy fixed it). The secrets now go first, and this reads
         # GET /v1/health/build back: not this commit within 90 s = one more deploy,
         # still not = the run fails, so a stale Worker is never a silent green.
+        # 2026-11-25 (owner, IP-20261125-18): the site no longer waits on it. This
+        # step may fail without stopping the publishes below; the last step of the
+        # job then fails the run, so the owner is still emailed.
+        id: answering
+        continue-on-error: true
         if: steps.ready.outputs.ready == 'true' && steps.worker.outputs.changed == 'true'
         working-directory: worker
         env:
@@ -716,4 +721,9 @@ jobs:
             if echo "$out" | grep -qi 'already exists'; then echo "kvbc-cast already exists."; else echo "$out"; echo "::warning::Could not make the kvbc-cast project (above); trying the deploy anyway."; fi
           fi
           $WRANGLER pages deploy ../dist-cast --project-name kvbc-cast --branch main --commit-dirty=true
-
+      - name: Did the Worker check fail?
+        # The site went out above either way (IP-20261125-18); the run still fails.
+        if: steps.answering.outcome == 'failure'
+        run: |
+          echo "::error::The site was published, but the sync Worker is not answering from $GITHUB_SHA. Run CI by hand with \"Redeploy the sync Worker\" ticked."
+          exit 1
