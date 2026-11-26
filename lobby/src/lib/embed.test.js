@@ -299,4 +299,14 @@ describe('the sync doorbell, passed up to the Journey kiosk', () => {
     const classroom = readFileSync(resolve(__dirname, '../../../classroom/public/src/app.js'), 'utf8');
     expect(classroom).toContain(`export const MIRROR_MESSAGE = '${EMBED_MIRROR_MESSAGE}';`);
   });
+
+  it('the App tells a host Backwards Night once it is known, off included, then every change (IP-20261125-10); both hosts take an off they were never on for as a no-op', () => {
+    const app = readFileSync(resolve(__dirname, '../App.jsx'), 'utf8');
+    expect(app).toMatch(/if \(CONFIGURE \|\| !isEmbedded\(\) \|\| !backwardsKnown\) return;\s*try \{ window\.parent\.postMessage\(hostBackwards\(backwards\), window\.location\.origin\)/);
+    expect(app).not.toContain('backwardsToldRef');
+    const journey = readFileSync(resolve(__dirname, '../../../journey/src/schedule/31-backwards.js'), 'utf8');
+    expect(journey).toMatch(/if \(on === backwardsState\.on\) return;/);
+    const classroom = readFileSync(resolve(__dirname, '../../../classroom/public/src/backwards.js'), 'utf8');
+    expect(classroom).toMatch(/if \(next === on\) return;/);
+  });
 });

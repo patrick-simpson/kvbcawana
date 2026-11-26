@@ -98,7 +98,7 @@ import { useWatchdogReload } from './hooks/useWatchdogReload.js';
 import { useBuildReload } from './hooks/useBuildReload.js';
 import { useTallerThan } from './hooks/useTallerThan.js';
 import { hostBackwards, hostShares, hostCheckin, hostDoorbell, hostMirror, isEmbedded } from './lib/embed.js';
-import { BackwardsContext, useBackwards } from './hooks/useBackwards.js';
+import { BackwardsContext, useBackwardsState } from './hooks/useBackwards.js';
 import VhsRewind from './components/VhsRewind.jsx';
 import ShareBanner from './components/ShareBanner.jsx';
 import { SHARE_BANNER_MS, createShareQueue } from '../../shared/shareBanner.js';
@@ -264,20 +264,18 @@ export default function App() {
   // backwards, animations reversed, the deck played last slide first. Never on
   // the settings page, in configure mode or on the OBS feed. A framing host
   // (the classroom, Journey) is told every change so its own cards follow.
-  const backwards = useBackwards({ enabled: !CONFIGURE && !SETTINGS_PAGE && !FLAGS.overlay });
+  const { on: backwards, known: backwardsKnown } = useBackwardsState({ enabled: !CONFIGURE && !SETTINGS_PAGE && !FLAGS.overlay });
   useEffect(() => {
     document.documentElement.classList.toggle('backwards', backwards);
     setConfettiUpsideDown(backwards);
     return () => document.documentElement.classList.remove('backwards');
   }, [backwards]);
-  // Nothing is said until it first turns on (a host starts at "off").
-  const backwardsToldRef = useRef(false);
+  // Told once the answer is known (off included: a reloaded frame must still switch a
+  // backwards host back), then every change (IP-20261125-10).
   useEffect(() => {
-    if (CONFIGURE || !isEmbedded()) return;
-    if (!backwards && !backwardsToldRef.current) return;
-    backwardsToldRef.current = true;
+    if (CONFIGURE || !isEmbedded() || !backwardsKnown) return;
     try { window.parent.postMessage(hostBackwards(backwards), window.location.origin); } catch { /* no parent to tell */ }
-  }, [backwards]);
+  }, [backwards, backwardsKnown]);
   const checkInsHeld = checkInsHeldNow({ overlay: FLAGS.overlay, slideSpecial: slideInfo.special, previewUp: coverUp });
   const {
     currentEvent, run: checkInRun, step: checkInStep, enqueue, skipCurrent, pending, gap: checkInGap,

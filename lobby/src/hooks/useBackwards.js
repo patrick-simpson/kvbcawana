@@ -22,10 +22,16 @@ export function backwardsFlag() {
   } catch { return null; }
 }
 
-/** @param {{ enabled?: boolean }} [opts] @returns {boolean} */
-export function useBackwards({ enabled = true } = {}) {
+/**
+ * The switch and whether this copy has heard the answer yet (`known`): a framed
+ * lobby tells its host only what it knows, off included, so a reloaded frame
+ * still switches a backwards host back.
+ * @param {{ enabled?: boolean }} [opts] @returns {{ on: boolean, known: boolean }}
+ */
+export function useBackwardsState({ enabled = true } = {}) {
   const { signedIn } = useSync();
   const [on, setOn] = useState(false);
+  const [heard, setHeard] = useState(false);
   const [flag] = useState(backwardsFlag);
   const live = enabled && signedIn && flag === null;
 
@@ -34,12 +40,12 @@ export function useBackwards({ enabled = true } = {}) {
     let gone = false;
     const read = async () => {
       const res = await syncAuthed('/v1/theme');
-      if (!gone && res.ok && res.body && typeof res.body.backwards === 'boolean') setOn(res.body.backwards);
+      if (!gone && res.ok && res.body && typeof res.body.backwards === 'boolean') { setOn(res.body.backwards); setHeard(true); }
     };
     const first = window.setTimeout(read, 0);
     const off = onSyncDoorbell((what, payload) => {
       if (what !== 'theme') return;
-      if (payload && typeof payload.backwards === 'boolean') setOn(payload.backwards);
+      if (payload && typeof payload.backwards === 'boolean') { setOn(payload.backwards); setHeard(true); }
       else read();
     });
     const tick = window.setInterval(() => { if (!document.hidden) read(); }, BACKWARDS_READ_MS);
@@ -54,8 +60,13 @@ export function useBackwards({ enabled = true } = {}) {
     };
   }, [live]);
 
-  if (flag !== null) return enabled && flag;
-  return live && on;
+  if (flag !== null) return { on: enabled && flag, known: enabled };
+  return { on: live && on, known: live && heard };
+}
+
+/** @param {{ enabled?: boolean }} [opts] @returns {boolean} */
+export function useBackwards(opts) {
+  return useBackwardsState(opts).on;
 }
 
 /** Tonight is Backwards Night, for every signage component below App. */
