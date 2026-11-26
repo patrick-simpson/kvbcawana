@@ -42,7 +42,7 @@ const RETRY_LOAD_MS = 30 * 1000;
 const CURSOR_IDLE_MS = 3000;
 // What the volunteer calls the monitor it goes on, in titles and the tray.
 const WHERE = { lobby: 'the lobby TV', projector: 'the projector', journey: 'the Journey screen', classroom: 'the downstairs classroom screen' };
-const IPC_HANDLES = ['configure:get', 'configure:set', 'cast:session', 'cast:preview'];
+const IPC_HANDLES = ['configure:get', 'configure:set', 'cast:session', 'cast:preview', 'cast:idle'];
 const IPC_EVENTS = ['card:cancel', 'chooser:choose', 'chooser:cancel', 'configure:choose-monitor', 'configure:reload-screen',
   'configure:reload-settings', 'configure:open-log', 'configure:cancel-shutdown'];
 
@@ -942,6 +942,29 @@ function createDisplay(opts) {
   }
 
   /**
+   * Cast unused an hour (owner 2026-11-26, the request budget; 11.6.0): the Cast TV page
+   * (site/cast/screen/screen.js) asks through its bridge once nothing has been up, nobody
+   * connected, the code not shown and the TV not clicked for an hour. Accepted only from
+   * the Cast screen's own window, its top frame, on Cast's TV page (castSession's check;
+   * never the desk), while Cast is the screen: then Cast goes off exactly as the tray's
+   * checkbox does (castOff: back to the screen before it, no screen defaults re-applied).
+   * @param {Electron.IpcMainInvokeEvent} event
+   */
+  function castIdle(event) {
+    const frame = event.senderFrame;
+    const allowed = castHostAllowed({
+      fromCastWindow: Boolean(lobby && !lobby.isDestroyed() && event.sender === lobby.webContents && urls().screen.id === 'cast'),
+      fromDeskWindow: false,
+      isTopFrame: Boolean(frame && !frame.parent),
+      frameUrl: frame ? frame.url : '',
+    });
+    if (!allowed || state.settings.screen !== 'cast') { log('cast: idle refused to', frame ? frame.url : '(no frame)'); return false; }
+    log('cast off: unused an hour');
+    castOff();
+    return true;
+  }
+
+  /**
    * The desk's live TV miniature (cast-preview.js): a small JPEG of the Cast TV window, only
    * for the desk window's top frame on /desk/ while Cast is the screen up; else null.
    */
@@ -974,6 +997,7 @@ function createDisplay(opts) {
     ipcMain.handle('cast:preview', (event) => castPreviewFor(event));
     ipcMain.on('card:cancel', cancelShutdown);
     ipcMain.handle('cast:session', (event) => castSession(event));
+    ipcMain.handle('cast:idle', (event) => castIdle(event));
     ipcMain.on('chooser:choose', (event) => {
       const picked = choosers.get(event.sender.id);
       if (picked) chooseDisplay(picked.display);

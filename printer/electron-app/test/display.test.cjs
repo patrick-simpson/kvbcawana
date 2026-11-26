@@ -711,19 +711,22 @@ describe('display: Cast on and off (real createDisplay with a stand-in Electron)
     });
     return f;
   }
+  // The windows the display made and the IPC handlers it wired, for the bridge's tests.
+  const windows = [];
+  const handles = new Map();
   function electronStandIn() {
     const bounds = { x: 0, y: 0, width: 1920, height: 1080 };
     const display = { id: 1, bounds, workArea: bounds, scaleFactor: 1 };
     const screen = { getAllDisplays: () => [display], getPrimaryDisplay: () => display, on() {}, removeListener() {} };
     class BrowserWindow {
-      constructor() { this.webContents = fake(); this.destroyed = false; }
+      constructor() { this.webContents = fake(); this.destroyed = false; windows.push(this); }
       on() {} once() {} isDestroyed() { return this.destroyed; } destroy() { this.destroyed = true; }
       isVisible() { return false; } isFullScreen() { return false; } getBounds() { return bounds; }
       setBounds() {} setFullScreen() {} setAlwaysOnTop() {} setTitle() {} show() {} showInactive() {} focus() {}
       moveTop() {} loadURL() { return Promise.resolve(); } loadFile() { return Promise.resolve(); } close() {}
     }
     const powerSaveBlocker = { start: () => 1, stop() {}, isStarted: () => true };
-    return { BrowserWindow, WebContentsView: fake(), ipcMain: { handle() {}, on() {}, removeHandler() {}, removeListener() {}, removeAllListeners() {} },
+    return { BrowserWindow, WebContentsView: fake(), ipcMain: { handle(ch, fn) { handles.set(ch, fn); }, on() {}, removeHandler(ch) { handles.delete(ch); }, removeListener() {}, removeAllListeners() {} },
       net: { fetch: () => Promise.reject(new Error('offline in tests')) }, powerMonitor: { on() {}, removeListener() {} },
       powerSaveBlocker, screen, session: fake(), shell: fake() };
   }
@@ -836,6 +839,37 @@ describe('display: Cast on and off (real createDisplay with a stand-in Electron)
     try {
       display.start();
       expect(display.statusLine()).toBe('Cast: on screen now');
+    } finally { display.stop(); clock.mock.restore(); }
+  });
+
+  // Owner 2026-11-26 (the request budget): the TV page asks through its bridge after an
+  // hour unused, and Cast goes off exactly as the tray's checkbox does.
+  it('Cast unused an hour: the TV page\'s idle() turns Cast off, only from the Cast window\'s top frame on /screen/', async () => {
+    const clock = mock.method(Date, 'now', () => at('2026-11-12T17:00:00')); // Thursday: no club
+    windows.length = 0;
+    const { display, casts, saved, logText } = setup({
+      settings: { screen: 'classroom', hours: { start: '15:30', end: '21:00' }, shutdown: { enabled: false, at: '21:30' } },
+    });
+    try {
+      display.start();
+      display.castOn();
+      const idle = handles.get('cast:idle');
+      expect(typeof idle).toBe('function');
+      const tv = windows.filter((w) => !w.isDestroyed()).at(-1);
+      const top = (url) => ({ url, parent: null });
+      // Refused: another window, a child frame, the desk's page, another site.
+      expect(idle({ sender: {}, senderFrame: top('https://cast.kvbchurch.org/screen/') })).toBe(false);
+      expect(idle({ sender: tv.webContents, senderFrame: { url: 'https://cast.kvbchurch.org/screen/', parent: {} } })).toBe(false);
+      expect(idle({ sender: tv.webContents, senderFrame: top('https://cast.kvbchurch.org/desk/') })).toBe(false);
+      expect(idle({ sender: tv.webContents, senderFrame: top('https://example.com/screen/') })).toBe(false);
+      expect(saved().settings.screen).toBe('cast');
+      // The Cast TV page itself: off, back to the classroom with its own hours and shutdown.
+      expect(idle({ sender: tv.webContents, senderFrame: top('https://cast.kvbchurch.org/screen/') })).toBe(true);
+      expect(saved().settings.screen).toBe('classroom');
+      expect(saved().settings.hours).toEqual({ start: '15:30', end: '21:00' });
+      expect(saved().settings.shutdown).toEqual({ enabled: false, at: '21:30' });
+      expect(casts).toEqual([true, false]);
+      expect(logText().includes('cast off: unused an hour')).toBe(true);
     } finally { display.stop(); clock.mock.restore(); }
   });
 

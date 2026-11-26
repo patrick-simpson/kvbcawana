@@ -1,4 +1,9 @@
-﻿## [11.5.1] - 2026-11-23
+﻿## [11.6.0] - 2026-11-26
+**Cast turns itself off after an hour unused.** When nothing has been on the TV, nobody has been connected, the code has not been shown and nobody has clicked the TV for a full hour, the app turns Cast off by itself, the same as unticking it in the taskbar menu: the screen from before comes back, with its hours and shutdown untouched. The display log says "cast off: unused an hour". Turn it on again from the tray any time.
+
+**Why:** everything the church runs shares Cloudflare's free plan of 100,000 requests a day. A Cast screen left on all week checked in with the service every 30 seconds, about 5,800 requests a day, even with nobody using it. Along with this, the Cast TV page now checks every 30 seconds only while a presenter is connected or something is on the TV, and every 2 minutes otherwise; anything a presenter does still reaches the TV at once, as before.
+
+## [11.5.1] - 2026-11-23
 **The screens' event list gains `shares`.** The sync service now sends a sealed `shares` message to every screen when the owner hands out shares (a banner in the bottom third). This app never sends it; it only knows the name so the shared contract and its test vectors stay one list. Nothing changes on the labels or the print path.
 
 ## [11.5.0] - 2026-11-23

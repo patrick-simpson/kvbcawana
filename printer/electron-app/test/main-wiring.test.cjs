@@ -160,10 +160,20 @@ describe('Cast on its own site signs in with the computer\'s own sign-in (11.0.0
     // Two windows carry the bridge: the Cast screen and the Cast desk (cast-desk.js).
     assert.equal((display.match(/staticFile\('cast-preload\.cjs'\)/g) || []).length, 2);
   });
-  it('the preload exposes session, preview and material, on Cast\'s own origin only', () => {
+  it('the preload exposes session, preview, idle (11.6.0) and material, on Cast\'s own origin only', () => {
     assert.match(castPreload, /if \(window\.location\.origin === 'https:\/\/cast\.kvbchurch\.org'\) \{/);
-    assert.match(castPreload, /contextBridge\.exposeInMainWorld\('awanaCastHost', \{\n\s*session: \(\) => ipcRenderer\.invoke\('cast:session'\),\n(?:\s*\/\/[^\n]*\n)*\s*preview: \(\) => ipcRenderer\.invoke\('cast:preview'\),\n(?:\s*\/\/[^\n]*\n)*\s*material: [^\n]*\n\s*\}\);/);
-    assert.equal((castPreload.match(/ipcRenderer\./g) || []).length, 2);
+    assert.match(castPreload, /contextBridge\.exposeInMainWorld\('awanaCastHost', \{\n\s*session: \(\) => ipcRenderer\.invoke\('cast:session'\),\n(?:\s*\/\/[^\n]*\n)*\s*preview: \(\) => ipcRenderer\.invoke\('cast:preview'\),\n(?:\s*\/\/[^\n]*\n)*\s*idle: \(\) => ipcRenderer\.invoke\('cast:idle'\),\n(?:\s*\/\/[^\n]*\n)*\s*material: [^\n]*\n\s*\}\);/);
+    assert.equal((castPreload.match(/ipcRenderer\./g) || []).length, 3);
+  });
+  it('cast:idle (owner 2026-11-26, an hour unused) is checked like the sign-in, the TV window only, and turns Cast off', () => {
+    const fn = display.slice(display.indexOf('function castIdle(event)'), display.indexOf('const castPreview = createCastPreview'));
+    assert.match(fn, /event\.sender === lobby\.webContents && urls\(\)\.screen\.id === 'cast'/);
+    assert.match(fn, /fromDeskWindow: false,/);
+    assert.match(fn, /isTopFrame: Boolean\(frame && !frame\.parent\)/);
+    assert.match(fn, /if \(!allowed \|\| state\.settings\.screen !== 'cast'\) \{[^}]*return false; \}/);
+    assert.match(fn, /log\('cast off: unused an hour'\);\n\s*castOff\(\);/);
+    assert.match(display, /ipcMain\.handle\('cast:idle', \(event\) => castIdle\(event\)\);/);
+    assert.match(display, /const IPC_HANDLES = \[[^\]]*'cast:idle'/);
   });
   it('the main process checks the sender: the Cast window, its top frame, Cast\'s TV page', () => {
     const fn = display.slice(display.indexOf('function castSession(event)'), display.indexOf('function wireIpc()'));

@@ -2,7 +2,8 @@
 // https://cast.kvbchurch.org, and the lobby's sign-in does not cross origins, so the TV
 // page (site/cast/screen/screen.js) and the Cast desk (site/cast/desk/desk.js, the
 // back-of-house window, cast-desk.js) ask the app for this computer's own sign-in with
-// window.awanaCastHost.session(). Exposed on Cast's own origin only; the main process
+// window.awanaCastHost.session(), and the TV page says it went unused an hour with
+// window.awanaCastHost.idle() (11.6.0). Exposed on Cast's own origin only; the main process
 // checks the caller again (display.js castSession, screens.js castHostAllowed: the TV
 // window only on /screen/, the desk window only on /desk/) and answers nothing to any
 // other window, frame or page. Sandboxed, so CommonJS.
@@ -13,6 +14,8 @@ if (window.location.origin === 'https://cast.kvbchurch.org') {
     session: () => ipcRenderer.invoke('cast:session'),
     // A JPEG data URL snapshot of the Cast TV (the desk window only), or null.
     preview: () => ipcRenderer.invoke('cast:preview'),
+    // Cast unused an hour (the TV page only, 11.6.0): the app turns Cast off as the tray does.
+    idle: () => ipcRenderer.invoke('cast:idle'),
     // 'mica' when the desk window has the Mica material, else ''.
     material: (process.argv.find((a) => a.startsWith('--awana-cast-material=')) || '').slice('--awana-cast-material='.length) === 'mica' ? 'mica' : '',
   });
