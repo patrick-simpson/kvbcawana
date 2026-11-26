@@ -191,7 +191,8 @@ test('the Journey Function streams GET and Range on the lesson video from the re
 });
 
 test('the scoreboard\'s winner films are committed, streamed, and small enough (owner 2026-11-15)', () => {
-  for (const id of ['trophy', 'stadium', 'takeover']) {
+  // The -reverse copies (Backwards Night, owner 2026-11-23) are the same films played backwards.
+  for (const id of ['trophy', 'stadium', 'takeover', 'trophy-reverse', 'stadium-reverse', 'takeover-reverse']) {
     const film = path.join(ROOT, `lobby/public/finale/${id}.mp4`);
     assert.ok(existsSync(film), `lobby/public/finale/${id}.mp4 is committed`);
     assert.equal(mustStream(`/lobby/finale/${id}.mp4`, statSync(film).size), true);
