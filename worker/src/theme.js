@@ -18,14 +18,18 @@ export class Theme {
   constructor({ storage, now }) {
     this.storage = storage;
     this.now = now;
-    this.doc = new Doc(storage, 'theme:backwards', () => ({ mode: 'auto', at: null, by: null }));
+    this.doc = new Doc(storage, 'theme:backwards', () => ({ mode: 'auto', at: null, by: null, date: null }));
     /** @type {{ date: string, says: boolean, at: number }|null} */
     this.cal = null;
   }
 
   get mode() {
-    const m = this.doc.data && this.doc.data.mode;
-    return BACKWARDS_MODES.includes(m) ? m : 'auto';
+    const d = this.doc.data;
+    const m = d && d.mode;
+    if (!BACKWARDS_MODES.includes(m)) return 'auto';
+    // On lasts for the Eastern day it was set (IP-20261125-05); an On with no date, or from an earlier day, is Automatic.
+    if (m === 'on' && !(d.date && d.date === localTime(this.now()).date)) return 'auto';
+    return m;
   }
 
   async prepare() {
@@ -62,6 +66,7 @@ export class Theme {
     if (typeof mode !== 'string' || !BACKWARDS_MODES.includes(mode)) return null;
     const d = this.doc.data;
     d.mode = mode;
+    d.date = mode === 'on' ? localTime(this.now()).date : null;
     d.at = new Date(this.now()).toISOString();
     d.by = by && typeof by.name === 'string' ? { name: by.name.slice(0, 60) } : null;
     await this.doc.save();

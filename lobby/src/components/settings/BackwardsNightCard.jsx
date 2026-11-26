@@ -12,7 +12,7 @@ import { getTheme, putTheme } from '../../lib/workerClient.js';
 
 export const BACKWARDS_MODES = [
   { mode: 'auto', label: 'Automatic', hint: 'On when tonight’s church calendar says “Backwards”.' },
-  { mode: 'on', label: 'On', hint: 'Backwards tonight, whatever the calendar says. Good for a test before the night.' },
+  { mode: 'on', label: 'On', hint: 'On for tonight only. Backwards whatever the calendar says, then it goes back to Automatic.' },
   { mode: 'off', label: 'Off', hint: 'Never backwards.' },
 ];
 
@@ -20,7 +20,7 @@ export const BACKWARDS_MODES = [
 export function backwardsWords(v) {
   if (!v) return '';
   if (!v.backwards) return v.mode === 'off' ? 'Off: every screen and tag reads the right way round.' : 'Tonight is not Backwards Night.';
-  const why = v.mode === 'on' ? 'Switched on' : 'The church calendar says Backwards Night';
+  const why = v.mode === 'on' ? 'Switched on for tonight' : 'The church calendar says Backwards Night';
   const when = v.changedAt && v.mode !== 'auto' ? ` (${agoWords(v.changedAt)})` : '';
   return `${why}${when}. Screens spell their words backwards and name tags print the name and group backwards.`;
 }

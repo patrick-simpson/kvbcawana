@@ -21,3 +21,24 @@ describe('Backwards Night switch', () => {
     expect(await quiet.setMode('sideways', null)).toBe(null);
   });
 });
+
+describe('Backwards On lasts for tonight only (IP-20261125-05)', () => {
+  it('On from one day is Automatic the next; an old On with no date too; Off stays', async () => {
+    const clock = { t: JAN13_5PM };
+    const storage = memory();
+    const t = new Theme({ storage, now: () => clock.t });
+    await t.prepare();
+    await t.setMode('on', null);
+    expect(t.backwards()).toBe(true);
+    clock.t = JAN13_5PM + 24 * 3600 * 1000;
+    expect(t.mode).toBe('auto');
+    expect(t.backwards()).toBe(false);
+    await t.setMode('off', null);
+    clock.t += 7 * 24 * 3600 * 1000;
+    expect(t.mode).toBe('off');
+    const old = new Theme({ storage: memory({ 'theme:backwards': { mode: 'on', at: null, by: null } }), now: () => JAN13_5PM });
+    await old.prepare();
+    expect(old.mode).toBe('auto');
+  });
+});
+

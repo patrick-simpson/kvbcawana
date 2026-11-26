@@ -107,7 +107,7 @@ export class Shares {
     this.now = now;
     this.secret = secret;
     this.tttSaysStore = tttSaysStore || (() => false);
-    this.modeDoc = new Doc(storage, 'store:mode', () => ({ mode: 'auto', at: null, by: null }));
+    this.modeDoc = new Doc(storage, 'store:mode', () => ({ mode: 'auto', at: null, by: null, date: null }));
     /** Today's church calendar answer (refreshed by prepare()). @type {{ date: string, store: boolean, at: number }|null} */
     this.cal = null;
     /** date -> {at, byId} (opened from storage once). @type {Record<string, { at: number, byId: Record<string, number> }>|null} */
@@ -123,8 +123,12 @@ export class Shares {
   }
 
   get mode() {
-    const m = this.modeDoc.data && this.modeDoc.data.mode;
-    return STORE_MODES.includes(m) ? m : 'auto';
+    const d = this.modeDoc.data;
+    const m = d && d.mode;
+    if (!STORE_MODES.includes(m)) return 'auto';
+    // On lasts for the Eastern day it was set (IP-20261125-05); an On with no date, or from an earlier day, is Automatic.
+    if (m === 'on' && !(d.date && d.date === localTime(this.now()).date)) return 'auto';
+    return m;
   }
 
   /** Open the kept nights once (a sealed blob under the state key). */
@@ -258,6 +262,7 @@ export class Shares {
     if (typeof mode !== 'string' || !STORE_MODES.includes(mode)) return null;
     const d = this.modeDoc.data;
     d.mode = mode;
+    d.date = mode === 'on' ? localTime(this.now()).date : null;
     d.at = new Date(this.now()).toISOString();
     d.by = by && typeof by === 'object' ? { name: typeof by.name === 'string' ? by.name.slice(0, 60) : null } : null;
     await this.modeDoc.save();

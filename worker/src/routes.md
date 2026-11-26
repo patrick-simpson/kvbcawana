@@ -2093,8 +2093,9 @@ it, at least 10 shares on every store-night tag, and "+N Shares!" on the lobby e
 - `PUT /v1/store-night {mode}` (session), `mode` = `auto` (today's church calendar has an uncancelled
   event with "store" in its title, OR TwoTimTwo's own check-in page does: `parseCheckinPage storeNight`,
   `storeTitleOnPage`, headings and the meeting's title/event elements and the selected meeting date, never
-  the page's menu) | `on` | `off`; 400 `bad-mode` otherwise. Storage `store:mode`. /settings → Tonight →
-  "Awana store night".
+  the page's menu) | `on` | `off`; 400 `bad-mode` otherwise. Storage `store:mode`. `on` lasts for the Eastern day it was set (`date`
+  kept with it); on a later day, or an `on` with no date, the mode reads as `auto` (owner 2026-11-26, IP-20261125-05).
+  /settings → Tonight → "Awana store night".
 - THE TAG (store night only): `max(10, balance + 1)` (tonight's attendance share counts toward the 10; a
   child the export does not list: 10). `GET /v1/desk/roster` adds `shares` per child; /checkin puts it on
   the sealed `/print` body as `awanaShares`; a TwoTimTwo-page job (adopt.js) gets it too.
@@ -2136,7 +2137,7 @@ id; nothing stored or logged; it posts nothing. Run by hand from `.github/workfl
 ### 10.22 Backwards Night (BUILT, owner 2026-11-23)
 
 `worker/src/theme.js`, rules `shared/backwards.js`. Mode `auto` (the church calendar has an uncancelled
-event titled "backwards" today) / `on` / `off`, storage `theme:backwards`.
+event titled "backwards" today) / `on` / `off`, storage `theme:backwards`. `on` lasts for the Eastern day it was set; later it reads as `auto`.
 
 - `GET /v1/theme` (session) -> `{backwards, mode, calendarSaysBackwards, changedAt, changedBy}`. Every
   screen reads it at load, on the doorbell and as a slow safety net.

@@ -10,7 +10,7 @@ import { getStoreNight, putStoreNight } from '../../lib/workerClient.js';
 
 export const STORE_MODES = [
   { mode: 'auto', label: 'Automatic', hint: 'On when tonight’s church calendar or TwoTimTwo’s own meeting says “store”.' },
-  { mode: 'on', label: 'On', hint: 'Show share balances on the labels tonight, whatever the calendars say.' },
+  { mode: 'on', label: 'On', hint: 'On for tonight only. Share balances show on the labels whatever the calendars say, then it goes back to Automatic.' },
   { mode: 'off', label: 'Off', hint: 'Never show share balances.' },
 ];
 
@@ -39,7 +39,7 @@ export function storeNightWords(v) {
     if (v.mode === 'off') return `Off: labels show no share balances. ${balances}`;
     return `Tonight is not store night. ${balances}`;
   }
-  const why = v.mode === 'on' ? 'Switched on' : v.twotimtwoSaysStore ? 'TwoTimTwo says store night' : 'The church calendar says store night';
+  const why = v.mode === 'on' ? 'Switched on for tonight' : v.twotimtwoSaysStore ? 'TwoTimTwo says store night' : 'The church calendar says store night';
   return `${why}. ${balances} Each label shows SHARES: the balance plus tonight’s share, never under ${v.minimum || 10}.`;
 }
 

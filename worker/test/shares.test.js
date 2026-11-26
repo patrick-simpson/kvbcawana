@@ -121,3 +121,29 @@ describe('store night switch', () => {
     expect(storeTitleOnPage(page('<h3>Restore the roster</h3>'))).toBe(false);
   });
 });
+
+describe('On lasts for tonight only (IP-20261125-05)', () => {
+  const DEC2_5PM = Date.parse('2026-12-02T22:00:00Z');
+  it('On set on one day reads as Automatic the next day; Off stays off', async () => {
+    const a = make({ at: NOV25_5PM });
+    await a.s.prepare();
+    await a.s.setMode('on', null);
+    expect(a.s.active()).toBe(true);
+    expect(a.s.view().mode).toBe('on');
+    a.clock.t = DEC2_5PM;
+    await a.s.prepare();
+    expect(a.s.mode).toBe('auto');
+    expect(a.s.active()).toBe(false);
+    await a.s.setMode('off', null);
+    a.clock.t = DEC2_5PM + 7 * 24 * 3600 * 1000;
+    expect(a.s.mode).toBe('off');
+  });
+  it('an old On with no date is Automatic', async () => {
+    const storage = memory({ 'store:mode': { mode: 'on', at: '2026-11-18T22:00:00.000Z', by: null } });
+    const a = make({ at: NOV25_5PM, storage });
+    await a.s.prepare();
+    expect(a.s.mode).toBe('auto');
+    expect(a.s.active()).toBe(false);
+  });
+});
+

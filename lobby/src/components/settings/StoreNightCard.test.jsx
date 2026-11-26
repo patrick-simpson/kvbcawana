@@ -1,10 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { storeNightWords, topUpWords } from './StoreNightCard.jsx';
+import { STORE_MODES, storeNightWords, topUpWords } from './StoreNightCard.jsx';
 
 describe('store night words', () => {
   it('says why it is off', () => {
     expect(storeNightWords({ mode: 'auto', active: false })).toMatch(/^Tonight is not store night\./);
     expect(storeNightWords({ mode: 'off', active: false })).toMatch(/^Off/);
+  });
+  it('says On is for tonight only', () => {
+    expect(STORE_MODES.find((m) => m.mode === 'on').hint).toMatch(/^On for tonight only/);
+    expect(storeNightWords({ mode: 'on', active: true, readAt: null })).toMatch(/^Switched on for tonight/);
   });
   it('says the balances come at club opening before they are read', () => {
     expect(storeNightWords({ mode: 'on', active: true, readAt: null })).toMatch(/when club opens/);
