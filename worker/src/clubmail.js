@@ -1086,16 +1086,22 @@ export class ClubMail {
    * Never throws. @returns {Promise<boolean>} was there anything to do?
    */
   async tick() {
+    /** @type {any} */
+    let x = null;
+    /** @type {null | ((why: string, advice: string) => Promise<boolean>)} */
+    let giveUp = null;
+    /** @type {null | (() => Promise<any>)} */
+    let put = null;
     try {
       const t = this.now();
       const list = await this.laterList();
-      const x = list.filter((y) => y.state !== 'failed' && (y.wakeAt || y.at) <= t).sort((a, b) => a.at - b.at)[0];
+      x = list.filter((y) => y.state !== 'failed' && (y.wakeAt || y.at) <= t).sort((a, b) => a.at - b.at)[0];
       if (!x) return false;
-      const put = () => this.storage.put(LATER_KEY, list);
+      put = () => this.storage.put(LATER_KEY, list);
       const draft = await this.storage.get(laterKey(x.id));
       const who = draft ? await this.senderNow(x.who) : null;
       /** The wait ends without a send: the pieces go, the line stays (failed) for the sender to see, and they are mailed why. */
-      const giveUp = async (/** @type {string} */ why, /** @type {string} */ advice) => {
+      giveUp = async (/** @type {string} */ why, /** @type {string} */ advice) => {
         Object.assign(x, { state: 'failed', problem: why, wakeAt: 0 });
         await put();
         if (draft) for (let f = 0; f < draft.files.length; f += 1) for (let n = 0; n < draft.files[f].parts; n += 1) await this.storage.delete(partKey(x.id, f, n));
@@ -1138,7 +1144,19 @@ export class ClubMail {
       return true;
     } catch (err) {
       this.log(`[mail] a waiting email's step failed: ${String(/** @type {any} */ (err)?.message || err)}`);
-      return false;
+      if (!x || !put) return false;
+      // Counted as a failed try and waited out like one: never the alarm again a second later.
+      try {
+        x.tries = (x.tries || 0) + 1;
+        const words = 'Something went wrong on the service while it was being sent.';
+        if (x.tries >= LATER_TRIES && giveUp) return await giveUp(`${words} (It was tried ${LATER_TRIES} times.)`, 'Open the page to send it again.');
+        Object.assign(x, { problem: words, wakeAt: this.now() + Math.min(LATER_RETRY_MS * x.tries, 15 * 60 * 1000) });
+        await put();
+        return true;
+      } catch (again) {
+        this.log(`[mail] could not put a waiting email off: ${String(/** @type {any} */ (again)?.message || again)}`);
+        return false;
+      }
     }
   }
 

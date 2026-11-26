@@ -451,6 +451,34 @@ describe('club email: send later', () => {
     expect((await s.call('DELETE', `/v1/mail/later/${again.id}`, undefined, d.auth)).status).toBe(200);
   });
 
+  it('a step that throws is waited out like a failed try, and given up after the tries', async () => {
+    const s = await setup();
+    const set = [];
+    s.core.clubMail.alarms = () => ({ get: () => set.at(-1) ?? null, set: (at) => { set.push(at); } });
+    const d = await s.director();
+    const { id } = await waiting(s, d);
+    s.tick(6 * 24 * 60 * 60 * 1000);
+    s.core.clubMail.step = async () => { throw new Error('boom'); };
+    expect(await s.core.clubMail.tick()).toBe(true);
+    // Not due again a second later: the alarm is set minutes off, not one second.
+    expect(await s.core.clubMail.tick()).toBe(false);
+    const wake = await s.core.clubMail.wake();
+    set.length = 0;
+    await s.core.clubMail.arm();
+    expect(set[0]).toBe(wake);
+    expect(wake).toBeGreaterThan(Date.parse('2026-11-19T15:00:00Z') + 60 * 1000);
+    expect((await s.call('GET', '/v1/mail/later', undefined, d.auth)).body.later[0]).toMatchObject({ id, state: 'waiting' });
+    for (let i = 1; i < LATER_TRIES; i += 1) { s.tick(16 * 60 * 1000); expect(await s.core.clubMail.tick()).toBe(true); }
+    s.tick(16 * 60 * 1000);
+    expect(await s.core.clubMail.tick()).toBe(false);
+    const line = (await s.call('GET', '/v1/mail/later', undefined, d.auth)).body.later[0];
+    expect(line).toMatchObject({ id, state: 'failed' });
+    expect(line.problem).toContain(`tried ${LATER_TRIES} times`);
+    expect(s.graph().filter((c) => c.path === '/sendMail').pop().body.message.subject).toBe('Not sent: Tonight');
+    expect(await s.storage.get(`mail:later:${id}`)).toBeUndefined();
+    expect(await s.core.clubMail.wake()).toBe(null);
+  });
+
   it('never sends twice when Microsoft does not answer the send', async () => {
     const s = await setup();
     const d = await s.director();
