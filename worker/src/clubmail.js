@@ -1090,69 +1090,79 @@ export class ClubMail {
     let x = null;
     /** @type {null | ((why: string, advice: string) => Promise<boolean>)} */
     let giveUp = null;
-    /** @type {null | (() => Promise<any>)} */
-    let put = null;
+    let before = 'waiting';
+    // After a step the list is read AGAIN and only this line changed: the step waits on
+    // TwoTimTwo and Microsoft, and another message may be scheduled meanwhile.
+    /** @param {(y: any) => void} fn @returns {Promise<boolean>} false = the line is gone */
+    const change = async (fn) => {
+      const list = await this.laterList();
+      const y = list.find((z) => z.id === x.id);
+      if (!y) return false;
+      fn(y);
+      await this.storage.put(LATER_KEY, list);
+      return true;
+    };
+    const forget = async () => this.storage.put(LATER_KEY, (await this.laterList()).filter((z) => z.id !== x.id));
+    /** A failed try: waited out, or given up after the last one. @param {string} words */
+    const failed = async (words) => {
+      const tries = (x.tries || 0) + 1;
+      if (tries >= LATER_TRIES && giveUp) return giveUp(`${words} (It was tried ${LATER_TRIES} times.)`, 'Open the page to send it again.');
+      await change((y) => Object.assign(y, { state: before, tries, problem: words, wakeAt: this.now() + Math.min(LATER_RETRY_MS * tries, 15 * 60 * 1000) }));
+      return true;
+    };
     try {
       const t = this.now();
       const list = await this.laterList();
       x = list.filter((y) => y.state !== 'failed' && (y.wakeAt || y.at) <= t).sort((a, b) => a.at - b.at)[0];
       if (!x) return false;
-      put = () => this.storage.put(LATER_KEY, list);
       const draft = await this.storage.get(laterKey(x.id));
       const who = draft ? await this.senderNow(x.who) : null;
       /** The wait ends without a send: the pieces go, the line stays (failed) for the sender to see, and they are mailed why. */
       giveUp = async (/** @type {string} */ why, /** @type {string} */ advice) => {
-        Object.assign(x, { state: 'failed', problem: why, wakeAt: 0 });
-        await put();
+        const kept = await change((y) => Object.assign(y, { state: 'failed', problem: why, wakeAt: 0 }));
         if (draft) for (let f = 0; f < draft.files.length; f += 1) for (let n = 0; n < draft.files[f].parts; n += 1) await this.storage.delete(partKey(x.id, f, n));
         await this.storage.delete(laterKey(x.id));
-        if (who) await this.tell(who, `Not sent: ${x.subject}`, `${who.name},\n\nThe email "${x.subject}" you set to send later was NOT sent to parents.\n\n${why}\n\n${advice}\n\nPage: https://awana.kvbchurch.org/tools/email/\n\nKVBC Awana\n`);
+        if (kept && who) await this.tell(who, `Not sent: ${x.subject}`, `${who.name},\n\nThe email "${x.subject}" you set to send later was NOT sent to parents.\n\n${why}\n\n${advice}\n\nPage: https://awana.kvbchurch.org/tools/email/\n\nKVBC Awana\n`);
         return true;
       };
-      if (!draft) { list.splice(list.indexOf(x), 1); await put(); return true; }
+      if (!draft) { await forget(); return true; }
       if (!who || !this.mayWrite(who, draft.club)) return giveUp('Its sender can no longer email that club.', 'Ask the Awana director if that is a mistake.');
       if (!this.configured()) return giveUp('Sending is not set up on the service.', 'Tell the Awana director.');
-      const res = await this.step(who, x.id, { draft, save: () => this.storage.put(laterKey(x.id), draft) });
+      // Marked BEFORE the step: Cancel is refused while it runs, so nothing the step
+      // writes back can undo a cancel.
+      before = x.state;
+      x.state = 'sending';
+      await this.storage.put(LATER_KEY, list);
+      const save = async () => { if (await this.storage.get(laterKey(x.id))) await this.storage.put(laterKey(x.id), draft); };
+      const res = await this.step(who, x.id, { draft, save });
       const body = await res.json().catch(() => null);
       if (res.status === 200 && body?.stage === 'unknown') {
         // Microsoft never answered the send: it may have gone. Never sent again.
-        Object.assign(x, { state: 'failed', problem: 'Microsoft did not answer when it was sent, so it may or may not have gone out.', wakeAt: 0 });
-        await put();
+        const kept = await change((y) => Object.assign(y, { state: 'failed', problem: 'Microsoft did not answer when it was sent, so it may or may not have gone out.', wakeAt: 0 }));
         await this.storage.delete(laterKey(x.id));
-        await this.tell(who, `Check: ${x.subject}`, `${who.name},\n\nThe email "${x.subject}" you set to send later may or may not have gone out: Microsoft did not answer when it was sent.\n\nDo NOT send it again yet. Look in the Sent folder of ${this.fromFor(draft.club)} first (you were on the To line, so check your own inbox too).\n\nKVBC Awana\n`);
+        if (kept) await this.tell(who, `Check: ${x.subject}`, `${who.name},\n\nThe email "${x.subject}" you set to send later may or may not have gone out: Microsoft did not answer when it was sent.\n\nDo NOT send it again yet. Look in the Sent folder of ${this.fromFor(draft.club)} first (you were on the To line, so check your own inbox too).\n\nKVBC Awana\n`);
         return true;
       }
       if (res.status === 200 && body?.done) {
         await this.storage.delete(laterKey(x.id));
-        list.splice(list.indexOf(x), 1);
-        await put();
+        await forget();
         return true;
       }
       if (res.status === 200) {
-        Object.assign(x, { state: 'sending', tries: 0, wakeAt: this.now() + LATER_STEP_MS });
-        await put();
+        await change((y) => Object.assign(y, { state: 'sending', tries: 0, wakeAt: this.now() + LATER_STEP_MS }));
         return true;
       }
       // A step that did not work. Nothing has been sent by it; some reasons never will.
       const reason = String(body?.reason || '');
       const words = String(body?.error || 'It could not be sent.');
       if (['no-recipients', 'not-your-club', 'graph-auth', 'no-run'].includes(reason)) return giveUp(words, 'Open the page to write it again.');
-      x.tries = (x.tries || 0) + 1;
-      if (x.tries >= LATER_TRIES) return giveUp(`${words} (It was tried ${LATER_TRIES} times.)`, 'Open the page to send it again.');
-      Object.assign(x, { problem: words, wakeAt: this.now() + Math.min(LATER_RETRY_MS * x.tries, 15 * 60 * 1000) });
-      await put();
-      return true;
+      return failed(words);
     } catch (err) {
       this.log(`[mail] a waiting email's step failed: ${String(/** @type {any} */ (err)?.message || err)}`);
-      if (!x || !put) return false;
+      if (!x) return false;
       // Counted as a failed try and waited out like one: never the alarm again a second later.
       try {
-        x.tries = (x.tries || 0) + 1;
-        const words = 'Something went wrong on the service while it was being sent.';
-        if (x.tries >= LATER_TRIES && giveUp) return await giveUp(`${words} (It was tried ${LATER_TRIES} times.)`, 'Open the page to send it again.');
-        Object.assign(x, { problem: words, wakeAt: this.now() + Math.min(LATER_RETRY_MS * x.tries, 15 * 60 * 1000) });
-        await put();
-        return true;
+        return await failed('Something went wrong on the service while it was being sent.');
       } catch (again) {
         this.log(`[mail] could not put a waiting email off: ${String(/** @type {any} */ (again)?.message || again)}`);
         return false;

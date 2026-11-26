@@ -479,6 +479,47 @@ describe('club email: send later', () => {
     expect(await s.core.clubMail.wake()).toBe(null);
   });
 
+  it('cannot be cancelled while a step is running, and a message scheduled meanwhile is kept', async () => {
+    const s = await setup();
+    const d = await s.director();
+    const { id } = await waiting(s, d);
+    s.tick(6 * 24 * 60 * 60 * 1000);
+    // The parents' list is slow to come: the step waits on it.
+    let open = () => {};
+    let asked = false;
+    s.core.clubMail.client = () => ({ rosterCsv: async () => { asked = true; await new Promise((r) => { open = r; }); return { ok: true, roster: ROSTER }; } });
+    const step = s.core.clubMail.tick();
+    while (!asked) await new Promise((r) => setTimeout(r, 0));
+    const refused = await s.call('DELETE', `/v1/mail/later/${id}`, undefined, d.auth);
+    expect(refused.status).toBe(409);
+    expect(refused.body.reason).toBe('running');
+    const other = await waiting(s, d, new Date(Date.parse(AT) + 7 * 24 * 60 * 60 * 1000).toISOString(), 'Next week');
+    expect(other.res.status).toBe(200);
+    open();
+    expect(await step).toBe(true);
+    const later = (await s.call('GET', '/v1/mail/later', undefined, d.auth)).body.later;
+    expect(later.map((x) => [x.id, x.state])).toEqual([[id, 'sending'], [other.id, 'waiting']]);
+    s.tick(LATER_STEP_MS);
+    await alarms(s);
+    expect(s.graph().filter((c) => c.path === '/messages/MSG1/send')).toHaveLength(1);
+    expect((await s.call('GET', '/v1/mail/later', undefined, d.auth)).body.later.map((x) => x.id)).toEqual([other.id]);
+    expect(await s.storage.get(`mail:later:${other.id}`)).toBeTruthy();
+  });
+
+  it('a first step that fails can still be cancelled while it waits to try again', async () => {
+    const s = await setup();
+    const d = await s.director();
+    const { id } = await waiting(s, d);
+    s.tick(6 * 24 * 60 * 60 * 1000);
+    s.setRoster({ ok: false, error: 'roster' });
+    expect(await s.core.clubMail.tick()).toBe(true);
+    expect((await s.call('DELETE', `/v1/mail/later/${id}`, undefined, d.auth)).status).toBe(200);
+    s.setRoster({ ok: true, roster: ROSTER });
+    s.tick(60 * 60 * 1000);
+    await alarms(s);
+    expect(s.graph().filter((c) => c.path === '/messages')).toHaveLength(0);
+  });
+
   it('never sends twice when Microsoft does not answer the send', async () => {
     const s = await setup();
     const d = await s.director();
