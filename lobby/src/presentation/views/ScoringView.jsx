@@ -160,8 +160,9 @@ export const ScoringView = ({ now, club, scores, teams = SCORE_TEAMS, clock, ser
     if (held || introStarted.current) return undefined;
     introStarted.current = true;
     gameOnSound(sounds);
-    if (lowPower) return undefined;
-    const t = window.setTimeout(() => setIntro(false), INTRO_MS);
+    // Low power ends the intro at once (a 0 ms timer, not a set in the effect), so low power
+    // switched off later never brings GAME ON! back over the scores (IP-20261125-09).
+    const t = window.setTimeout(() => setIntro(false), lowPower ? 0 : INTRO_MS);
     return () => { window.clearTimeout(t); introStarted.current = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [club, held]);
@@ -260,7 +261,7 @@ export const ScoringView = ({ now, club, scores, teams = SCORE_TEAMS, clock, ser
       <AnimatePresence>
         {takeover && <ScoreTakeover key={takeover.id} hits={takeover.hits} lead={takeover.lead} streak={takeover.streak || 0} scores={scores} teams={teams} still={lowPower} />}
         <AnimatePresence>
-          {intro && (
+          {intro && !lowPower && (
             <motion.div
               key="intro"
               className="pj-gameon"

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, cleanup, render } from '@testing-library/react';
+import { act, cleanup, render, waitFor } from '@testing-library/react';
 
 // The game time scoreboard on the wall (owner 2026-11-05): the four plates in
 // the phone's 2 x 2, the leader tagged, everything else in the strip, a
@@ -9,6 +9,7 @@ vi.mock('../lib/stingers.js', () => ({ playStinger: vi.fn(), playTones: vi.fn() 
 vi.mock('../hooks/useBirthdays.js', () => ({ useBirthdays: () => [] }));
 
 import { playTones } from '../lib/stingers.js';
+import { setLowPowerPreference } from '../hooks/useLowPower.js';
 import { ScoringView } from './ScoringView.jsx';
 import { ScoreFinale } from '../components/ScoreFinale.jsx';
 
@@ -25,7 +26,7 @@ const view = (s, extra = {}) => (
 
 describe('ScoringView', () => {
   beforeEach(() => { vi.clearAllMocks(); vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] }); });
-  afterEach(() => { cleanup(); vi.useRealTimers(); });
+  afterEach(() => { cleanup(); setLowPowerPreference(false); vi.useRealTimers(); });
 
   it('draws the four teams blue, red, yellow, green, with the leader tagged', () => {
     const { container } = render(view(scores(12, 9, 14, 7)));
@@ -137,6 +138,16 @@ describe('ScoringView', () => {
     expect(playTones).toHaveBeenCalledTimes(1);   // the sweep, now
     rerender(view(scores(0, 0, 0, 0), { held: false }));
     expect(playTones).toHaveBeenCalledTimes(1);   // once only
+  });
+
+  it('low power coming on under a winner still playing never leaves GAME ON! over the scores (IP-20261125-09)', async () => {
+    vi.useRealTimers();   // the banner's exit runs on the browser's own frame clock
+    const { container, rerender } = render(view(scores(3, 1, 0, 0), { held: true }));
+    expect(container.querySelector('.pj-gameon')).not.toBeNull();
+    act(() => { setLowPowerPreference(true); });
+    rerender(view(scores(3, 1, 0, 0), { held: false }));
+    await waitFor(() => expect(container.querySelector('.pj-gameon')).toBeNull());
+    expect(container.querySelectorAll('.pj-score__grid [data-team]')).toHaveLength(4);
   });
 
   it('points close together share one takeover, split', () => {
