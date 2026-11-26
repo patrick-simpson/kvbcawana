@@ -44,7 +44,7 @@ export const NIGHTS_KEY = 'shares:nights';
 
 /** The calendar's test (lobby calendarLogic.js isStoreNight). @param {unknown} title */
 export function isStoreTitle(title) {
-  return /store/i.test(String(title ?? ''));
+  return /\bstore\b/i.test(String(title ?? ''));
 }
 
 /** Does today's church calendar say store night? @param {any} feed @param {string} today */

@@ -49,6 +49,8 @@ describe('isStoreNight', () => {
     expect(isStoreNight('Awana Store Night')).toBe(true);
     expect(isStoreNight('STORE night - bring your shekels')).toBe(true);
     expect(isStoreNight('Water Night')).toBe(false);
+    expect(isStoreNight('Restore night')).toBe(false);
+    expect(isStoreNight('Awana Store')).toBe(true);
   });
 });
 

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { parseHTML } from 'linkedom';
 import {
-  NIGHTS_KEY, STORE_MIN, Shares, balancesFromRoster, calendarSaysStore, sharesGained, storeTagNumber,
+  NIGHTS_KEY, STORE_MIN, Shares, balancesFromRoster, calendarSaysStore, isStoreTitle, sharesGained, storeTagNumber,
 } from '../src/shares.js';
 import { storeTitleOnPage } from '../src/twotimtwo.js';
 
@@ -110,6 +110,12 @@ describe('store night switch', () => {
     expect(c.s.tagFor('101')).toBe(10);
     expect(c.s.tagFor('999')).toBe(10);
     expect(await c.s.setMode('maybe', null)).toBe(null);
+  });
+
+  it('the calendar test wants the word store, not Restore (IP-20261125-11)', () => {
+    expect(isStoreTitle('Awana Store Night')).toBe(true);
+    expect(isStoreTitle('Restore night')).toBe(false);
+    expect(calendarSaysStore({ events: [{ date: '2026-11-25', title: 'Restore Evening' }] }, '2026-11-25')).toBe(false);
   });
 
   it('TwoTimTwo\'s check-in page: a store title counts, a Store link in its menu never does', () => {

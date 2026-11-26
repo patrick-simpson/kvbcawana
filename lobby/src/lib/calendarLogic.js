@@ -35,7 +35,7 @@ export function splitTitle(rawTitle) {
 }
 
 export function isStoreNight(title) {
-  return /store/i.test(String(title ?? ''));
+  return /\bstore\b/i.test(String(title ?? ''));
 }
 
 // 'YYYY-MM-DD' → 'Wed, Sep 9'. Components go through the LOCAL Date
