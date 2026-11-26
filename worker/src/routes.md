@@ -2030,13 +2030,21 @@ sender's one draft slot (`mail:later:<id>`, its line in `mail:later`; its files'
 until it goes). The Durable Object's alarm walks the SAME steps, one per alarm
 (`ClubMail.tick`, 1.5 s apart; `ClubMail.arm` only ever pulls the watcher's alarm earlier,
 and the cron arms it again), so the parents are read at that moment and the Awana copy,
-the long-list messages and the log are as for a send by hand. A step that fails waits
-(2 min x tries, at most 15) and is tried again; after 8 failures, or when it never can
-work (no parent address, the sender removed or no longer on that club, Microsoft refusing
-the app), the wait ends: its line reads `failed` with the reason and the sender is MAILED
-"Not sent: <subject>". A send Microsoft never answered is not sent again: `failed`, and
-the sender is mailed "Check: <subject>" (look in Sent Items). The daily limit does not
-count a waiting message until it is sent.
+the long-list messages and the log are as for a send by hand. Its line is marked
+`sending` BEFORE each step and saved, so Cancel is refused (409 `running`) while a step
+runs; after the step the list is read again and only that line changes (a message
+scheduled meanwhile is kept), and the waiting copy is never written back once deleted. A
+first step that fails goes back to `waiting` (it can still be cancelled). A step that
+fails, or throws, waits (2 min x tries, at most 15) and is tried again; after 8 failures,
+or when it never can work (no parent address, the sender removed or no longer on that
+club, Microsoft refusing the app), the wait ends: its line reads `failed` with the reason
+and the sender is MAILED "Not sent: <subject>". A long list stopped after some of its
+messages went is mailed "Partly sent: <subject>" instead (how many went, and not to send
+it again), and what went is written to `mail:log`. A send Microsoft never answered is not
+sent again: `failed`, and the sender is mailed "Check: <subject>" (look in Sent Items).
+The daily limit (6 real sends in 24 hours) is checked when the time is set (the sends in
+the day before it plus the sender's messages already waiting within a day of it: 429
+`daily-limit`) and again before its first step (over it: not sent, "Not sent").
 
 A sent message's words (`mail:body:<id>`: its blocks, no picture, no address) stay while
 its line is in the log, so the page's "Use again" can start a new message from it
