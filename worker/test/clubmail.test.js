@@ -564,6 +564,34 @@ describe('club email: send later', () => {
     expect(t.graph().filter((c) => c.path === '/sendMail').pop().body.message.subject).toBe('Not sent: Late');
   });
 
+  it('a long list stopped partway says what went, logs it, and never says to send it again', async () => {
+    const s = await setup();
+    const many = MAIL_RECIPIENTS_MAX + 10;
+    s.setRoster({ ok: true, roster: { header: ROSTER.header, rows: Array.from({ length: many }, (_, i) => [String(i), 'Kid', `N${i}`, 'Sparks', '', `p${String(i).padStart(4, '0')}@example.com`, '']) } });
+    const d = await s.director();
+    const { id } = await waiting(s, d, AT, 'Big');
+    s.tick(6 * 24 * 60 * 60 * 1000);
+    // The first message: its draft, then its send.
+    expect(await s.core.clubMail.tick()).toBe(true);
+    s.tick(LATER_STEP_MS);
+    expect(await s.core.clubMail.tick()).toBe(true);
+    expect(s.graph().filter((c) => c.path === '/messages/MSG1/send')).toHaveLength(1);
+    // Then the parents cannot be read again, every try.
+    s.setRoster({ ok: false, error: 'roster' });
+    for (let i = 0; i < LATER_TRIES; i += 1) { s.tick(16 * 60 * 1000); expect(await s.core.clubMail.tick()).toBe(true); }
+    const line = (await s.call('GET', '/v1/mail/later', undefined, d.auth)).body.later[0];
+    expect(line).toMatchObject({ id, state: 'failed' });
+    expect(line.problem).toContain('Only the first 1 of 2 messages went out');
+    const note = s.graph().filter((c) => c.path === '/sendMail').pop().body.message;
+    expect(note.subject).toBe('Partly sent: Big');
+    expect(note.body.content).toContain(`The first 1 went (to ${MAIL_RECIPIENTS_MAX} parent addresses)`);
+    expect(note.body.content).toContain('Do not send it again');
+    expect(note.body.content).not.toContain('NOT sent');
+    // What went is on the log, and counts toward the day.
+    expect((await s.call('GET', '/v1/mail/log', undefined, d.auth)).body.sends[0]).toMatchObject({ id, subject: 'Big', recipients: MAIL_RECIPIENTS_MAX });
+    expect(await s.core.clubMail.sentInDay(d.id, s.core.clubMail.now())).toBe(1);
+  });
+
   it('never sends twice when Microsoft does not answer the send', async () => {
     const s = await setup();
     const d = await s.director();

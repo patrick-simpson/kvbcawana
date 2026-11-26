@@ -912,21 +912,29 @@ export class ClubMail {
     }
     draft.sent = this.now();
     await save();
+    await this.recordSend(who, draft, draft.sent, run.count);
+    const out = { ok: true, ...this.progress(draft) };
+    for (let fi = 0; fi < draft.files.length; fi += 1) for (let n = 0; n < draft.files[fi].parts; n += 1) await this.storage.delete(partKey(draft.id, fi, n));
+    return json(out);
+  }
+
+  /**
+   * A send goes on the log (and counts toward the day's limit), with its words kept to
+   * start from again. @param {any} who @param {any} draft @param {number} at @param {number} recipients
+   */
+  async recordSend(who, draft, at, recipients) {
     if (!who.office) {
       // For the owner's list: when this director last sent.
       const doc = await this.directors();
       const d = doc.list.find((x) => x.id === who.id);
-      if (d) { d.lastSent = draft.sent; await this.storage.put(DIRECTORS_KEY, doc); }
+      if (d) { d.lastSent = at; await this.storage.put(DIRECTORS_KEY, doc); }
     }
     const log = await this.sendLog();
-    log.unshift({ id: draft.id, at: draft.sent, who: who.id, name: who.name, club: draft.club, label: this.clubLabel(who, draft.club), subject: draft.subject, recipients: run.count, files: draft.files.length });
+    log.unshift({ id: draft.id, at, who: who.id, name: who.name, club: draft.club, label: this.clubLabel(who, draft.club), subject: draft.subject, recipients, files: draft.files.length });
     // The words are kept with the log line (to start from again), and go when it does.
     await this.storage.put(bodyKey(draft.id), { look: draft.look || 'plain', blocks: draft.blocks.filter((/** @type {any} */ b) => b.t !== 'img') });
     for (const old of log.slice(MAIL_LOG_MAX)) if (old.id) await this.storage.delete(bodyKey(old.id));
     await this.storage.put(LOG_KEY, log.slice(0, MAIL_LOG_MAX));
-    const out = { ok: true, ...this.progress(draft) };
-    for (let fi = 0; fi < draft.files.length; fi += 1) for (let n = 0; n < draft.files[fi].parts; n += 1) await this.storage.delete(partKey(draft.id, fi, n));
-    return json(out);
   }
 
   // ── the Microsoft secret's end ─────────────────────────────────────────────
@@ -1128,10 +1136,17 @@ export class ClubMail {
       const who = draft ? await this.senderNow(x.who) : null;
       /** The wait ends without a send: the pieces go, the line stays (failed) for the sender to see, and they are mailed why. */
       giveUp = async (/** @type {string} */ why, /** @type {string} */ advice) => {
-        const kept = await change((y) => Object.assign(y, { state: 'failed', problem: why, wakeAt: 0 }));
+        // A long list stopped partway: the first messages DID go. They are logged (and
+        // count toward the day), and nobody is told to send it all again.
+        const run = draft?.run;
+        const went = run && !run.test && run.batch > 0 ? run.batch : 0;
+        const part = went ? `Only the first ${went} of ${run.batches} messages went out (to ${run.done} parent addresses), then it stopped.` : '';
+        const kept = await change((y) => Object.assign(y, { state: 'failed', problem: part ? `${part} ${why}` : why, wakeAt: 0 }));
+        if (went && who) await this.recordSend(who, draft, this.now(), run.done);
         if (draft) for (let f = 0; f < draft.files.length; f += 1) for (let n = 0; n < draft.files[f].parts; n += 1) await this.storage.delete(partKey(x.id, f, n));
         await this.storage.delete(laterKey(x.id));
-        if (kept && who) await this.tell(who, `Not sent: ${x.subject}`, `${who.name},\n\nThe email "${x.subject}" you set to send later was NOT sent to parents.\n\n${why}\n\n${advice}\n\nPage: https://awana.kvbchurch.org/tools/email/\n\nKVBC Awana\n`);
+        if (kept && who && went) await this.tell(who, `Partly sent: ${x.subject}`, `${who.name},\n\nThe email "${x.subject}" you set to send later went out to only some of the parents. It goes out as ${run.batches} messages because the list is long. The first ${went} went (to ${run.done} parent addresses), then it stopped.\n\n${why}\n\nDo not send it again: the parents who got it would get it twice. Ask the Awana director how to reach the rest.\n\nPage: https://awana.kvbchurch.org/tools/email/\n\nKVBC Awana\n`);
+        else if (kept && who) await this.tell(who, `Not sent: ${x.subject}`, `${who.name},\n\nThe email "${x.subject}" you set to send later was NOT sent to parents.\n\n${why}\n\n${advice}\n\nPage: https://awana.kvbchurch.org/tools/email/\n\nKVBC Awana\n`);
         return true;
       };
       if (!draft) { await forget(); return true; }
